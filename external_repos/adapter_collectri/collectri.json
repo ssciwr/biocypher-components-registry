@@ -1,5 +1,5 @@
 {
-  "@context": {
+"@context": {
     "@language": "en",
     "@vocab": "https://schema.org/",
     "sc": "https://schema.org/",
@@ -45,10 +45,22 @@
     "subField": "cr:subField",
     "transform": "cr:transform",
     "wd": "https://www.wikidata.org/wiki/"
-  },
-  "@type": "ComputationalWorkflow",
-
-  
+    },
+"@type": "SoftwareSourceCode",
+"@id": "collectriAdapter",
+"abstract": "Adapter integrating the CollecTRI resource into BioCypher, converting multi-omics and regulatory interaction data into standardized graph representations.",
+"license": "https://github.com/biocypher/collectri/blob/main/LICENSE",
+"codeRepository": "https://github.com/biocypher/collectri",
+"programmingLanguage": "Python",
+"targetProduct": "BioCypher",
+"creator": {
+    "@type": "Person",
+    "name": "Sebastian Lobentanzer",
+    "affiliation": "Helmholtz Munich",
+    "identifier": "https://orcid.org/0000-0003-3399-6695"
+    },
+"keywords": ["regulatory interactions"],
+"hasPart": {
   "@type": "sc:Dataset",
   "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "Collectri",
@@ -172,5 +184,6 @@
         }
       ]
     }
-  ]
+    ]
+}
 }
