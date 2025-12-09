@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Validate schema for the example adapter collectri
-        uses: iulusoy/verify-croissant-schema@main
+        uses: iulusoy/validate-croissant-schema@main
         with:
           file: "external_repos/adapter_collectri/collectri.json"
           python-version: ${{ matrix.python-version }}
