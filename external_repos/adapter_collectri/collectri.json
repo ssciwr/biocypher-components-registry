@@ -50,7 +50,7 @@
   "dct:conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
   "@id": "collectriAdapter",
   "name": "BioCypher CollecTRI Adapter",
-  "description": "Adapter integrating the CollecTRI resource into BioCypher, converting multi-omics and regulatory interaction data into standardized graph representations.",
+  "description": "Adapter integrating the CollecTRI resource into BioCypher, converting regulatory interaction data into standardized graph representations.",
   "version": "0.0.1",
   "license": "https://github.com/biocypher/collectri/blob/main/LICENSE",
   "codeRepository": "https://github.com/biocypher/collectri",
@@ -85,7 +85,7 @@
         "identifier": "https://orcid.org/0000-0003-3399-6695"
       }
     ],
-    "citeAs": "This adapter was developed by Sebastian Lobentanzer to load and transform the Collectri dataset. For dataset citation, refer to: https://doi.org/10.1093/nar/gkad841.",
+    "citeAs": "https://doi.org/10.1093/nar/gkad841",
     "distribution": [
       {
         "@type": "cr:FileObject",
