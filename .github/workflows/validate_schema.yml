@@ -8,6 +8,9 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13']
 
     steps:
       - name: Checkout repository
@@ -16,15 +19,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade uv
-          uv pip install --system mlcroissant
+          python-version: ${{ matrix.python-version }}
 
       - name: Validate schema for the example adapter collectri
-        run: |
-          cd external_repos/adapter_collectri
-          mlcroissant validate --jsonld collectri.json
+        uses: iulusoy/verify-croissant-schema@main
+        with:
+          file: "external_repos/adapter_collectri/collectri.json"
+          python-version: ${{ matrix.python-version }}
 
