@@ -47,8 +47,6 @@
     "wd": "https://www.wikidata.org/wiki/"
   },
   "@type": "ComputationalWorkflow",
-
-  
   "@type": "sc:Dataset",
   "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "Collectri",

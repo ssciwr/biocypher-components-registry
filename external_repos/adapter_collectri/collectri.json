@@ -68,7 +68,7 @@
   "hasPart": {
     "@type": "sc:Dataset",
     "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
-    "name": "Collectri",
+    "name": "CollecTRI",
     "description": "CollecTRI dataset",
     "version": "0.0.1",
     "license": "https://github.com/saezlab/CollecTRI/blob/main/LICENSE",
@@ -86,7 +86,6 @@
       }
     ],
     "citeAs": "This adapter was developed by Sebastian Lobentanzer to load and transform the Collectri dataset. For dataset citation, refer to: https://doi.org/10.1093/nar/gkad841.",
-    "conformsTo": "http://mlcommons.org/croissant/1.0",
     "distribution": [
       {
         "@type": "cr:FileObject",
