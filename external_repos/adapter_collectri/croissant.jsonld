@@ -50,7 +50,7 @@
   "@type": "sc:Dataset",
   "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "CollecTRI",
-  "description": "Adapter integrating the CollecTRI resource into BioCypher, converting multi-omics and regulatory interaction data into standardized graph representations.",
+  "description": "CollecTRI dataset containing transcription factor regulatory interactions, integrating multi-omics and regulatory interaction data for standardized graph-based analysis.",
   "version": "0.0.1",
   "license": "https://opensource.org/licenses/MIT",
   "url": "https://github.com/biocypher/collectri",
