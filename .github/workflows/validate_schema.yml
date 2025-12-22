@@ -1,7 +1,6 @@
 name: Validate Schema
 
 on:
-  push:
   pull_request:
   workflow_dispatch:
 
@@ -22,7 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Validate schema for the example adapter collectri
-        uses: iulusoy/validate-croissant-schema@main
+        uses: ssciwr/validate-croissant-schema@v0
         with:
           file: "external_repos/adapter_collectri/collectri.json"
           python-version: ${{ matrix.python-version }}
