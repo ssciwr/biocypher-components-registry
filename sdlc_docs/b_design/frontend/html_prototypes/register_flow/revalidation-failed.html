@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Revalidation Failed</title><link rel="stylesheet" href="styles.css"></head>
+  <body>
+    <header class="topbar"><div class="brand">BioCypher <span>| Registry</span></div><nav class="nav"><a href="#">Create</a><a class="active" href="#">Register</a><a href="#">Explore</a><a href="#">Docs</a></nav><div class="top-search">Search...</div><div class="user-pill">UI</div></header>
+    <main class="page">
+      <section class="page-header"><h1 class="page-title">Revalidation result</h1><p class="page-subtitle">A previously invalid registration was processed again and still requires maintainer action.</p><span class="badge invalid">INVALID</span></section>
+      <section class="card success-hero">
+        <div class="success-card">
+          <div class="success-icon" style="background: var(--amber-soft); color: var(--amber);">!</div>
+          <div><h2 class="summary-title">OmniPath Secondary Adapter still has validation issues</h2><p class="card-copy">The source was reprocessed, but the latest metadata did not pass the active validation profile.</p></div>
+          <div class="detail-strip">
+            <div><div class="detail-label">Previous status</div><div class="detail-value" style="color:var(--amber)">INVALID_SCHEMA</div></div>
+            <div><div class="detail-label">Current status</div><div class="detail-value" style="color:var(--amber)">INVALID</div></div>
+            <div><div class="detail-label">Latest event</div><div class="detail-value" style="color:var(--amber)">INVALID_SCHEMA</div></div>
+          </div>
+          <div class="actions" style="grid-column: 1 / -1"><a class="button warning" href="#">Open validation errors</a><a class="button" href="#">Back to detail</a></div>
+        </div>
+      </section>
+      <section class="card success-hero" style="margin-top:36px"><h2 class="card-title">What should happen next?</h2><p class="card-copy">Notify the submitter using the contact email and ask them to correct the metadata before another revalidation attempt.</p></section>
+    </main>
+  </body>
+</html>
