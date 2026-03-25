@@ -21,9 +21,9 @@ Repository-wide engineering standards for all AI-assisted changes.
 
 ## Tooling and Formatting
 - Use `uv` for env and dependency management.
-- Format with `black` (line length 88).
+- Format with `ruff format` (line length 88).
 - Sort imports with `isort`.
-- Lint with `ruff` and `flake8`.
+- Lint with `ruff`.
 - Type check with `mypy`.
 
 ## Error Handling and Logging
@@ -34,7 +34,7 @@ Repository-wide engineering standards for all AI-assisted changes.
 
 ## Testing Standards
 - Use `pytest` only. Do not use `unittest`.
-- Unit tests live in `tests/unit`. BDD tests live in `tests/bdd`.
+- Unit tests should live in `tests/unit`. BDD tests should live in `tests/bdd`.
 - Cover nominal, negative, edge, and regression cases.
 - Avoid network calls in tests; mock or monkeypatch external I/O.
 - For floats, use `pytest.approx()` or `math.isclose()`.
