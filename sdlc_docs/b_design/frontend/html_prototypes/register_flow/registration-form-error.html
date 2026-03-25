@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Registration Form - Error</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">BioCypher <span>| Registry</span></div>
+      <nav class="nav"><a href="#">Create</a><a class="active" href="#">Register</a><a href="#">Explore</a><a href="#">Docs</a></nav>
+      <div class="top-search">Search...</div><div class="user-pill">UI</div>
+    </header>
+    <main class="page">
+      <section class="page-header">
+        <h1 class="page-title">Register an adapter</h1>
+        <p class="page-subtitle">Submit a repository source so the registry can discover, validate, and track adapter metadata.</p>
+        <span class="badge">For adapter maintainers</span>
+      </section>
+      <section class="form-layout">
+        <div class="card form-card">
+          <h2 class="card-title">Registration details</h2>
+          <p class="card-copy">Provide the adapter name, repository location, and a contact email for status notifications.</p>
+          <div class="field"><label>Adapter name</label><div class="input">OmniPath Secondary Adapter</div></div>
+          <div class="field"><label>Repository location</label><div class="input" style="border-color: var(--red);">https://github.com/biocypher/omnipath-secondary-adapter</div><div class="error-text">Repository could not be reached. Check the URL or try again later.</div></div>
+          <div class="field"><label>Contact email</label><div class="input" style="border-color: var(--red);">maintainerexample.org</div><div class="error-text">Enter a valid contact email address.</div></div>
+          <div class="checkbox-warning"><div class="checkbox"></div><div><strong>I confirm that a croissant.jsonld file exists at the root of this repository.</strong><br><span class="helper">This checkbox is required before submitting.</span></div></div>
+          <div class="actions"><a class="button primary" href="#">Create registration</a><a class="button" href="#">Cancel</a></div>
+        </div>
+        <aside class="card side-card">
+          <h2 class="card-title">What happens next?</h2>
+          <div class="steps">
+            <div class="step"><div class="step-number">1</div><div><div class="step-title">Source is stored</div><div class="step-copy">A registration source record is created.</div></div></div>
+            <div class="step"><div class="step-number">2</div><div><div class="step-title">Discovery checks root file</div><div class="step-copy">The registry looks for croissant.jsonld.</div></div></div>
+            <div class="step"><div class="step-number">3</div><div><div class="step-title">Validation decides status</div><div class="step-copy">Results become VALID or INVALID.</div></div></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+input: /home/ecarreno/Downloads/OMNIPATH_DB/extracted
+output: croissant-edwin.jsonld
+validate: true
+
+metadata:
+  description: OmniPath dataset
+  url: https://archive.omnipathdb.org/
+  citation: https://www.omnipathdb.org/
+  dataset_version: 1.0.0
+  date_published: 2016-11-01
+  creators:
+    - name: Denes Turei
+      email: denes@gmail.com
+    - name: Saezlab
+      email: saezlab@gmail.com
+      url: https://www.saezlab.org

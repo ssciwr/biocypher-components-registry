@@ -22,15 +22,15 @@ from typing import Any
 import pytest
 from requests import RequestException
 
-from src.core.constants import METADATA_FILENAME
-from src.core.discovery import (
+from src.core.shared.files import (
     fetch_local_file,
     fetch_local_metadata,
     fetch_remote_file,
     fetch_remote_metadata,
     parse_json_metadata,
 )
-from src.core.exceptions import (
+from src.core.shared.constants import METADATA_FILENAME
+from src.core.shared.errors import (
     InvalidRepoURLError,
     MetadataNotFoundError,
     RemoteResourceNotFoundError,
@@ -231,7 +231,7 @@ class TestFetchRemoteFile:
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(200, "payload")
 
-        monkeypatch.setattr("src.core.discovery.requests.get", fake_get)
+        monkeypatch.setattr("src.core.shared.files.requests.get", fake_get)
         assert fetch_remote_file("https://example.com/file") == "payload"
 
     # ---- Negative Case Tests
@@ -242,7 +242,7 @@ class TestFetchRemoteFile:
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(404, "")
 
-        monkeypatch.setattr("src.core.discovery.requests.get", fake_get)
+        monkeypatch.setattr("src.core.shared.files.requests.get", fake_get)
         with pytest.raises(RemoteResourceNotFoundError):
             fetch_remote_file("https://example.com/missing")
 
@@ -253,7 +253,7 @@ class TestFetchRemoteFile:
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(500, "")
 
-        monkeypatch.setattr("src.core.discovery.requests.get", fake_get)
+        monkeypatch.setattr("src.core.shared.files.requests.get", fake_get)
         with pytest.raises(RequestException):
             fetch_remote_file("https://example.com/error")
 
@@ -265,7 +265,7 @@ class TestFetchRemoteFile:
         def fake_get(url: str, timeout: int) -> Any:
             raise RequestException("timeout")
 
-        monkeypatch.setattr("src.core.discovery.requests.get", fake_get)
+        monkeypatch.setattr("src.core.shared.files.requests.get", fake_get)
         with pytest.raises(RequestException):
             fetch_remote_file("https://example.com/timeout")
 
@@ -279,7 +279,7 @@ class TestFetchRemoteFile:
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(500, "")
 
-        monkeypatch.setattr("src.core.discovery.requests.get", fake_get)
+        monkeypatch.setattr("src.core.shared.files.requests.get", fake_get)
         with pytest.raises(RequestException) as exc_info:
             fetch_remote_file("https://example.com/error")
         assert "https://example.com/error" in str(exc_info.value)
@@ -298,7 +298,7 @@ class TestFetchRemoteMetadata:
         def fake_fetch(url: str) -> str:
             return '{"name": "remote"}'
 
-        monkeypatch.setattr("src.core.discovery.fetch_remote_file", fake_fetch)
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
         metadata = fetch_remote_metadata("https://github.com/org/repo")
         assert metadata["name"] == "remote"
 
@@ -324,7 +324,7 @@ class TestFetchRemoteMetadata:
         def fake_fetch(url: str) -> str:
             raise RemoteResourceNotFoundError(url)
 
-        monkeypatch.setattr("src.core.discovery.fetch_remote_file", fake_fetch)
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
         with pytest.raises(MetadataNotFoundError):
             fetch_remote_metadata("https://github.com/org/repo")
 
@@ -336,7 +336,7 @@ class TestFetchRemoteMetadata:
         def fake_fetch(url: str) -> str:
             return '{"name": "remote"}'
 
-        monkeypatch.setattr("src.core.discovery.fetch_remote_file", fake_fetch)
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
         metadata = fetch_remote_metadata("https://github.com/org/repo.git")
         assert metadata["name"] == "remote"
 
@@ -350,6 +350,6 @@ class TestFetchRemoteMetadata:
         def fake_fetch(url: str) -> str:
             raise RemoteResourceNotFoundError(url)
 
-        monkeypatch.setattr("src.core.discovery.fetch_remote_file", fake_fetch)
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
         with pytest.raises(MetadataNotFoundError):
             fetch_remote_metadata("https://github.com/org/repo")

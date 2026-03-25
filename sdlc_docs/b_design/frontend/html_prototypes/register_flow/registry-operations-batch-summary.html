@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Registry Operations - Batch Summary</title><link rel="stylesheet" href="styles.css"></head>
+  <body>
+    <header class="topbar"><div class="brand">BioCypher <span>| Registry</span></div><nav class="nav"><a href="#">Create</a><a href="#">Register</a><a href="#">Explore</a><a href="#">Docs</a><a class="active" href="#">Registry</a></nav><div class="top-search">Search...</div><div class="user-pill">UI</div></header>
+    <main class="page">
+      <section class="page-header"><h1 class="page-title">Batch refresh summary</h1><p class="page-subtitle">The latest registry refresh completed with mixed outcomes across active sources.</p><span class="badge">Maintainer view</span><div class="header-action"><a class="button primary" href="#">Run another refresh</a></div></section>
+      <section class="metric-row">
+        <div class="metric"><div class="metric-value" style="color:var(--blue)">42</div><div class="metric-label">Processed</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--green)">7</div><div class="metric-label">Valid created</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--amber)">2</div><div class="metric-label">Invalid</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--cyan)">2</div><div class="metric-label">Unchanged</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--red)">1</div><div class="metric-label">Fetch failed</div></div>
+      </section>
+      <section class="card">
+        <h2 class="card-title">Latest run outcome</h2>
+        <p class="card-copy">Run completed successfully. Review invalid and fetch-failed registrations first, then re-run targeted actions from the registry table.</p>
+        <div class="event-list">
+          <div class="event-item"><strong style="color:var(--green)">VALID_CREATED</strong><span>Clinical Graph Adapter accepted into canonical registry.</span></div>
+          <div class="event-item"><strong style="color:var(--amber)">INVALID_SCHEMA</strong><span>OmniPath Secondary Adapter still needs metadata corrections.</span></div>
+          <div class="event-item"><strong style="color:var(--red)">FETCH_FAILED</strong><span>Drug Target Adapter could not be fetched.</span></div>
+          <div class="event-item"><strong style="color:var(--cyan)">UNCHANGED</strong><span>Ontology Mapper metadata checksum unchanged.</span></div>
+        </div>
+        <div class="actions"><a class="button primary" href="#">Open filtered table</a><a class="button" href="#">Export summary</a></div>
+      </section>
+    </main>
+  </body>
+</html>

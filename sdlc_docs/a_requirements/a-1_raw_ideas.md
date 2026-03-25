@@ -24,7 +24,7 @@ considered proper requirements.
 5. If validation passes, the registry system extracts metadata, stores it in the registry data store, and records status as VALID.
     - Reviewed by human: Yes
 
-6. The registry system must prevent duplicates by uniqueness key (for example name + version or repository URL + version).
+6. The registry system must prevent duplicates by uniqueness key (recommended: adapter id + version).
     - Reviewed by human: Yes
 
 7. If validation fails, the registry system records status as INVALID and stores detailed validation errors in a status log/table.
@@ -42,6 +42,9 @@ considered proper requirements.
 11. The registry system must produce a processing summary for each registration/validation run, including at least: total adapters processed, number of VALID, number of INVALID, number of duplicates detected, and number of revalidated adapters, with a timestamped run identifier.
     - Reviewed by human: Yes
 
+12. The project should provide a professional React-based front-end that replaces the current front-end responsibilities, reuses existing backend logic, and keeps integration boundaries flexible for a future move to FastAPI or Flask.
+    - Reviewed by human: Yes
+
 
 ### Story-to-workflow traceability
 
@@ -51,13 +54,14 @@ considered proper requirements.
 | 2             | US-02      |
 | 3             | US-03      |
 | 4             | US-04      |
-| 5             | US-05      |
-| 6             | US-06      |
-| 7             | US-07      |
-| 8             | US-08      |
-| 9             | US-09      |
-| 10            | US-10      |
-| 11            | US-11      |
+| 5             | US-04a     |
+| 6             | US-05      |
+| 7             | US-06      |
+| 8             | US-07      |
+| 9             | US-08      |
+| 10            | US-09      |
+| 11            | US-10      |
+| 12            | US-11      |
 
 
 ### Check gate
@@ -69,14 +73,14 @@ considered proper requirements.
 | US-02         | Guided metadata generation            |
 | US-03         | Versioned validation profile          |
 | US-04         | Repository-based adapter registration |
-| US-05         | Persist valid adapter records         |
-| US-06         | Prevent duplicates                    |
-| US-07         | Persist invalid status and errors     |
-| US-08         | Non-blocking batch registration       |
-| US-09         | On-demand revalidation                |
-| US-10         | MCP metadata discovery and retrieval  |
-| US-11         | Run summary reporting                 |
+| US-04a        | Registration UI and submission persistence |
+| US-05         | Persist valid adapter records              |
+| US-06         | Prevent duplicates                         |
+| US-07         | Persist invalid status and errors          |
+| US-08         | Non-blocking batch registration            |
+| US-09         | On-demand revalidation                     |
+| US-10         | MCP metadata discovery and retrieval       |
+| US-11         | Run summary reporting                      |
+| US-12         | React front-end migration                  |
 
 ---
-
-

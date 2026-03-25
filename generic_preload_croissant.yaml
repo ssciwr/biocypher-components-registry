@@ -1,0 +1,94 @@
+# -------------------------------------------------------
+# --------------------  Adapter Metadata
+# -------------------------------------------------------
+adapter:
+  name: "OmniPath Adapter"
+  description: "Adapter that produces a knowledge graph of OmniPath secondary interactions for use with BioCypher."
+  version: "1.0.0"
+  license: "MIT"
+  code_repository: "https://github.com/biocypher/omnipath-secondary-adapter"
+  keywords:
+    - knowledge-graphs
+    - biocypher
+    - omnipath-secondary-adapter
+  creators:
+    - name: "Edwin Carreño"
+      affiliation: "Scientific Software Center, Saezlab"
+      identifier: "https://orcid.org/0009-0005-3359-2211"
+    - name: "Matthieu Najm"
+      affiliation: "Institute Pasteur"
+      identifier: "https://orcid.org/0000-0001-9757-1499"
+
+# -------------------------------------------------------
+# --------------------  Dataset Metadata
+# -------------------------------------------------------
+datasets:
+  - name: "Networks"
+    description: "A comprehensive dataset capturing diverse interaction relationships between molecular entities, enabling the exploration of complex biological networks and signaling pathways."
+    version: "1.0.0"
+    license: "MIT"
+    url: "https://omnipathdb.org/"
+    datePublished: "2016-06-01"
+    citeAs: "https://omnipathdb.org/"
+    distribution:
+      - contentUrl: "https://archive.omnipathdb.org/omnipath_webservice_interactions__latest.tsv.gz"
+        encodingFormat: "text/tab-separated-values"
+        name: "omnipath_webservice_interactions__latest.tsv.gz"
+        md5: null
+        sha256: "635b6283e2b9b5d8423f127613278361b4a98836abcc109044ec59a3f6523215"
+
+  - name: "Enzyme-PTM"
+    description: "A detailed dataset describing enzyme–substrate relationships with an emphasis on post-translational modifications, including kinase-driven phosphorylation as well as acetylation and other PTM types."
+    version: "1.0.0"
+    license: "MIT"
+    url: "https://omnipathdb.org/"
+    datePublished: "2016-06-02"
+    citeAs: "https://omnipathdb.org/"
+    distribution:
+      - contentUrl: "https://archive.omnipathdb.org/omnipath_webservice_enz_sub__latest.tsv.gz"
+        encodingFormat: "text/tab-separated-values"
+        name: "omnipath_webservice_enz_sub__latest.tsv.gz"
+        md5: null
+        sha256: 10c889259078136e5572a75783343000998e33040f7ed3037aed4d5a9ecab32a
+
+  - name: "Complexes"
+    description: "An integrated dataset compiling information on protein complexes from multiple resources, offering a unified view of macromolecular assemblies and their components."
+    version: "1.0.0"
+    license: "MIT"
+    url: "https://omnipathdb.org/"
+    datePublished: "2016-06-03"
+    citeAs: "https://omnipathdb.org/"
+    distribution:
+      - contentUrl: "https://archive.omnipathdb.org/omnipath_webservice_complexes__latest.tsv.gz"
+        encodingFormat: "text/tab-separated-values"
+        name: "omnipath_webservice_complexes__latest.tsv.gz"
+        md5: null
+        sha256: 4c0ff2c432dfae88cf2adba9dc09ee6f0ae8606bff000b97252147e733b01a6b
+
+  - name: "Annotations"
+    description: "A rich dataset providing extensive functional and structural annotations of proteins and genes, including their localization, expression patterns, and biological roles."
+    version: "1.0.0"
+    license: "MIT"
+    url: "https://omnipathdb.org/"
+    datePublished: "2016-06-04"
+    citeAs: "https://omnipathdb.org/"
+    distribution:
+      - contentUrl: "https://archive.omnipathdb.org/omnipath_webservice_annotations__latest.tsv.gz"
+        encodingFormat: "text/tab-separated-values"
+        name: "omnipath_webservice_annotations__latest.tsv.gz"
+        md5: null
+        sha256: f1628dc3d31c32643bcef0951a9aff4f8c712a805e8eb1a87ec3f75ce8714e04
+
+  - name: "Intercell"
+    description: "A specialized dataset annotating proteins according to their roles in intercellular communication, such as ligands, receptors, and extracellular matrix components."
+    version: "1.0.0"
+    license: "MIT"
+    url: "https://omnipathdb.org/"
+    datePublished: "2016-06-05"
+    citeAs: "https://omnipathdb.org/"
+    distribution:
+      - contentUrl: "https://archive.omnipathdb.org/omnipath_webservice_intercell__latest.tsv.gz"
+        encodingFormat: "text/tab-separated-values"
+        name: "omnipath_webservice_intercell__latest.tsv.gz"
+        md5: null
+        sha256: 635b6283e2b9b5d8423f127613278361b4a98836abcc109044ec59a3f6523215

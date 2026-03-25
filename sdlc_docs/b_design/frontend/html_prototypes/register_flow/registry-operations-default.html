@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Registry Operations - Default</title><link rel="stylesheet" href="styles.css"></head>
+  <body>
+    <header class="topbar"><div class="brand">BioCypher <span>| Registry</span></div><nav class="nav"><a href="#">Create</a><a href="#">Register</a><a href="#">Explore</a><a href="#">Docs</a><a class="active" href="#">Registry</a></nav><div class="top-search">Search...</div><div class="user-pill">UI</div></header>
+    <main class="page">
+      <section class="page-header"><h1 class="page-title">Registry operations</h1><p class="page-subtitle">Monitor active sources with a dashboard-style table, column filters, and status-aware actions.</p><span class="badge">Maintainer view</span><div class="header-action"><a class="button primary" href="#">Run batch refresh</a></div></section>
+      <section class="metric-row">
+        <div class="metric"><div class="metric-value" style="color:var(--blue)">42</div><div class="metric-label">Active</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--amber)">9</div><div class="metric-label">Needs attention</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--red)">3</div><div class="metric-label">Fetch failed</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--green)">28</div><div class="metric-label">Valid</div></div>
+        <div class="metric"><div class="metric-value" style="color:var(--cyan)">2</div><div class="metric-label">Unchanged</div></div>
+      </section>
+      <section class="data-grid">
+        <div class="grid-head"><div><h2 class="card-title">Registration sources</h2><p class="card-copy">Filter, sort, and act on tracked sources. Actions adapt to source state.</p></div><div class="toolbar"><span class="tool-button">Columns</span><span class="tool-button">Filters</span><span class="tool-button">Export</span></div></div>
+        <div class="filter-bar"><strong>Filters</strong><div class="filter-controls"><span class="filter-control">Adapter name contains...</span><span class="filter-control">Status: any</span><span class="filter-control">Latest event: any</span><span class="filter-control">Kind: any</span><span class="tool-button">Clear</span><span class="tool-button" style="background:var(--blue);color:#fff">Apply</span></div></div>
+        <table><thead><tr><th><span class="checkbox-mini"></span></th><th>Adapter</th><th>Status</th><th>Latest event</th><th>Kind</th><th>Last checked</th><th>Action</th></tr></thead><tbody>
+          <tr><td><span class="checkbox-mini"></span></td><td>OmniPath Secondary Adapter</td><td><span class="pill invalid">INVALID</span></td><td style="color:var(--amber)">INVALID_SCHEMA</td><td>remote</td><td>2026-04-12 15:02</td><td><a class="button warning" style="height:32px" href="#">Revalidate</a></td></tr>
+          <tr><td><span class="checkbox-mini"></span></td><td>Clinical Graph Adapter</td><td><span class="pill valid">VALID</span></td><td style="color:var(--cyan)">UNCHANGED</td><td>remote</td><td>2026-04-12 11:30</td><td><a class="button primary" style="height:32px" href="#">View</a></td></tr>
+          <tr><td><span class="checkbox-mini"></span></td><td>Drug Target Adapter</td><td><span class="pill failed">FETCH_FAILED</span></td><td style="color:var(--red)">FETCH_FAILED</td><td>remote</td><td>2026-04-13 09:12</td><td><a class="button primary" style="height:32px" href="#">Retry fetch</a></td></tr>
+        </tbody></table><div class="grid-pagination">Rows per page: 10 &nbsp;&nbsp; 1-10 of 42 <span style="float:right">‹ &nbsp; ›</span></div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -136,8 +136,18 @@ cython_debug/
 # UV
 .uv/
 
+# Docker runtime data
+.docker-data/
+
+# Local registry database
+registry.sqlite3
+*.sqlite3
+*.db
+
 # Collected metadata files
 registry_data/*
 
 # Unified Metadata file
 # unified_adapters_metadata.jsonld
+
+clones/*

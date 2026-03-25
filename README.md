@@ -23,18 +23,29 @@ adapters:
 
 ### Developer
 
-1. Fetch all the registered adapters.
-   
+The legacy `scripts/` pipeline has been retired. Use the shared CLI and
+registration database workflow instead.
+
+1. Submit an adapter repository.
+
 ```bash
-python scripts/fetch_adapters.py
+uv run python cli.py submit-registration --name "Example Adapter" /path/to/adapter-repo
 ```
 
-2. Generate a unified Croissant file containing all the adapters (registed).
+2. Process all active registrations.
+
 ```bash
-python scripts/generate_registry.py
+uv run python cli.py refresh-registry
 ```
 
-3. Validate unified Croissant file
+3. Inspect canonical registry entries.
+
 ```bash
-mlcroissant validate --jsonld unified_adapters_metadata.jsonld
+uv run python cli.py list-registry-entries
+```
+
+4. Validate one metadata file directly.
+
+```bash
+uv run python cli.py validate /path/to/croissant.jsonld
 ```

@@ -16,7 +16,7 @@ The project covers adapter metadata registration and discovery through a reposit
 - A GitHub repository that serves as the canonical BioCypher Components Registry.
 - A standardized adapter registration input (`adapters.yaml` or equivalent).
 - A metadata ingestion and validation workflow for `croissant.jsonld` files.
-- A unified registry artifact (`unified_adapters_metadata.jsonld` or equivalent).
+- Queryable canonical registry entries backed by the registration database.
 - Validation outcomes per adapter (`VALID`/`INVALID`) with stored failure reasons for invalid entries.
 - Run summary outputs with counts for processed, valid, invalid, duplicates, and revalidated adapters.
 - An MCP-compatible metadata retrieval interface (or an MCP-ready contract/specification).
