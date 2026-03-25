@@ -1,0 +1,702 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "sc": "https://schema.org/",
+    "cr": "http://mlcommons.org/croissant/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "dct": "http://purl.org/dc/terms/",
+    "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "samplingRate": "cr:samplingRate",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform"
+  },
+  "@type": "SoftwareSourceCode",
+  "dct:conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
+  "@id": "omnipath-adapter-web",
+  "name": "OmniPath Adapter web",
+  "description": "A BioCypher adapter for Omnipath data",
+  "version": "1.0.0",
+  "license": "MIT",
+  "codeRepository": "https://github.com/biocypher/omnipath-secondary-adapter",
+  "programmingLanguage": "Python",
+  "targetProduct": "BioCypher",
+  "creator": [
+    {
+      "@type": "Person",
+      "name": "Edwin Carreno",
+      "affiliation": "SSC"
+    }
+  ],
+  "keywords": [
+    "knowledge-graphs"
+  ],
+  "hasPart": [
+    {
+      "@type": "sc:Dataset",
+      "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
+      "name": "Networks",
+      "description": "A networks dataset",
+      "version": "1.0.0",
+      "license": "MIT",
+      "url": "https://omnipathdb.org/",
+      "datePublished": "2016-11-01",
+      "citeAs": "https://omnipathdb.org/",
+      "distribution": [
+        {
+          "@type": "cr:FileObject",
+          "@id": "omnipath_webservice_interactions__latest.tsv.gz",
+          "contentUrl": "https://archive.omnipathdb.org/omnipath_webservice_interactions__latest.tsv.gz",
+          "encodingFormat": "text/gz",
+          "name": "omnipath_webservice_interactions__latest.tsv.gz",
+          "sha256": "dc02fd8f8b72aa2a3d5feb05fe9a5f60145c657b7ffa670a1281d59aefca1e52"
+        }
+      ],
+      "recordSet": [
+        {
+          "@type": "cr:RecordSet",
+          "name": "records",
+          "field": [
+            {
+              "@type": "cr:Field",
+              "name": "source",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "P0DP25"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "source"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "target",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "P48995"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "target"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "source_genesymbol",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "CALM3"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "source_genesymbol"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "target_genesymbol",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "TRPC1"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "target_genesymbol"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "is_directed",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "1"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "is_directed"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "is_stimulation",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "0"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "is_stimulation"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "is_inhibition",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "1"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "is_inhibition"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "consensus_direction",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "1"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "consensus_direction"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "consensus_stimulation",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "0"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "consensus_stimulation"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "consensus_inhibition",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "1"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "consensus_inhibition"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "sources",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "TRIP"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "sources"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "references",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "TRIP:11290752;TRIP:11983166;TRIP:12601176"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "references"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "omnipath",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "True"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "omnipath"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "kinaseextra",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "kinaseextra"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "ligrecextra",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "ligrecextra"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "pathwayextra",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "pathwayextra"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "mirnatarget",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "mirnatarget"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "collectri",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "collectri"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "tf_target",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "tf_target"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "lncrna_mrna",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "lncrna_mrna"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "tf_mirna",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "tf_mirna"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "small_molecule",
+              "description": "",
+              "dataType": "sc:Boolean",
+              "examples": [
+                "False"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "small_molecule"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea_curated",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea_curated"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea_chipseq",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea_chipseq"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea_tfbs",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea_tfbs"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea_coexp",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea_coexp"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "dorothea_level",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "dorothea_level"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "type",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "post_translational"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "type"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "curation_effort",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "3"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "curation_effort"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "extra_attrs",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "\"{\"\"TRIP_method\"\":[\"\"Fluorescence probe labeling\"\",\"\"Fusion protein-pull down assay\"\",\"\"Patch clamp\"\",\"\"Calcium measurement\"\"]}\""
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "extra_attrs"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "evidences",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "\"{\"\"id_a\"\":\"\"P0DP25\"\",\"\"id_b\"\":\"\"P48995\"\",\"\"positive\"\":[],\"\"negative\"\":[{\"\"resource\"\":\"\"TRIP\"\",\"\"references\"\":[\"\"12601176\"\",\"\"11290752\"\",\"\"11983166\"\"],\"\"dataset\"\":\"\"omnipath\"\",\"\"via\"\":null,\"\"attrs\"\":{\"\"method\"\":[\"\"Fluorescence probe labeling\"\",\"\"Fusion protein-pull down assay\"\",\"\"Patch clamp\"\",\"\"Calcium measurement\"\"]}}],\"\"directed\"\":[],\"\"undirected\"\":[]}\""
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "evidences"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "ncbi_tax_id_source",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "9606"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "ncbi_tax_id_source"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "entity_type_source",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "protein"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "entity_type_source"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "ncbi_tax_id_target",
+              "description": "",
+              "dataType": "sc:Integer",
+              "examples": [
+                "9606"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "ncbi_tax_id_target"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "name": "entity_type_target",
+              "description": "",
+              "dataType": "sc:Text",
+              "examples": [
+                "protein"
+              ],
+              "source": {
+                "fileObject": {
+                  "@id": "omnipath_webservice_interactions__latest.tsv.gz"
+                },
+                "extract": {
+                  "column": "entity_type_target"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
