@@ -1,0 +1,3 @@
+"""
+Guided metadata generation package.
+"""

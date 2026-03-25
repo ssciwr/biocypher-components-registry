@@ -1,94 +1,157 @@
+from __future__ import annotations
+
 import json
 import os
-import argparse
+from pathlib import Path
+from typing import Any
 
-REGISTRY_DATA_DIR = "registry_data"
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from src.core.constants import METADATA_FILENAME
+from src.core.discovery import fetch_local_metadata, parse_json_metadata
+from src.core.generation.cli_wizard import run_wizard
+from src.core.generation.web_ui import run_server
+from src.core.validator import validate
+
+
 AGGREGATED_FILE = "unified_adapters_metadata.jsonld"
 
+app = typer.Typer(
+    name="biocypher-registry",
+    help="BioCypher Registry — manage adapter metadata.",
+    no_args_is_help=True,
+)
+console = Console()
 
-def list_adapters():
+
+def _load_metadata(path: Path) -> dict[str, Any]:
+    if path.is_dir():
+        _, metadata = fetch_local_metadata(path)
+        return metadata
+
+    if path.is_file():
+        content = path.read_text(encoding="utf-8")
+        return parse_json_metadata(content, str(path))
+
+    raise FileNotFoundError(f"Path not found: {path}")
+
+
+@app.command("generate")
+def generate_cmd(
+    output: str = typer.Option(
+        METADATA_FILENAME,
+        "--output",
+        "-o",
+        help="Destination path for the generated metadata file.",
+    ),
+) -> None:
+    run_wizard(output)
+
+
+@app.command("validate")
+def validate_cmd(
+    path: str = typer.Argument(
+        ...,
+        help="Path to a metadata file or to an adapter repository containing one.",
+    )
+) -> None:
+    metadata = _load_metadata(Path(path))
+    result = validate(metadata)
+    if result.is_valid:
+        console.print(
+            f"[green]VALID[/green] (profile: {result.profile_version})"
+        )
+        return
+    console.print(f"[red]INVALID[/red] (profile: {result.profile_version})")
+    for err in result.errors:
+        console.print(f"  • {err}")
+    raise typer.Exit(code=1)
+
+
+@app.command("web")
+def web_cmd(
+    host: str = typer.Option("127.0.0.1", help="Host to bind the web UI."),
+    port: int = typer.Option(8000, help="Port to bind the web UI."),
+    output_dir: str = typer.Option(".", help="Output directory for metadata."),
+) -> None:
+    console.print(f"[cyan]Serving web UI on http://{host}:{port}[/cyan]")
+    run_server(host=host, port=port, output_dir=output_dir)
+
+
+@app.command("list")
+def list_adapters() -> None:
     if not os.path.isfile(AGGREGATED_FILE):
-        print(
-            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. Please generate it first."
+        console.print(
+            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. "
+            "Please generate it first."
         )
         return
 
-    with open(AGGREGATED_FILE, "r") as f:
-        data = json.load(f)
+    with open(AGGREGATED_FILE, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
         adapters = data.get("@graph", [])
 
     if not adapters:
-        print("No adapters found in the aggregated metadata.")
+        console.print("No adapters found in the aggregated metadata.")
         return
 
-    print("Registered adapters:")
+    table = Table(title="Registered Adapters")
+    table.add_column("Name", style="cyan")
+    table.add_column("Version")
     for adapter in adapters:
         name = adapter.get("name", "Unknown")
         version = adapter.get("version", "Unknown")
-        print(f"- {name} (version: {version})")
+        table.add_row(name, version)
+    console.print(table)
 
 
-def inspect_adapter(name):
+@app.command("inspect")
+def inspect_adapter(
+    name: str = typer.Argument(..., help="Adapter name."),
+) -> None:
     if not os.path.isfile(AGGREGATED_FILE):
-        print(
-            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. Please generate it first."
+        console.print(
+            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. "
+            "Please generate it first."
         )
         return
 
-    with open(AGGREGATED_FILE, "r") as f:
-        data = json.load(f)
+    with open(AGGREGATED_FILE, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
         adapters = data.get("@graph", [])
 
     for adapter in adapters:
         if adapter.get("name") == name:
-            print(json.dumps(adapter, indent=2))
+            console.print_json(json.dumps(adapter, indent=2))
             return
 
-    print(f"Adapter '{name}' not found in the registry.")
+    console.print(f"[red]Adapter '{name}' not found in the registry.[/red]")
 
 
-def export_metadata(output_file):
+@app.command("export")
+def export_metadata(
+    output_file: str = typer.Argument(..., help="File path to export metadata"),
+) -> None:
     if not os.path.isfile(AGGREGATED_FILE):
-        print(
-            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. Please generate it first."
+        console.print(
+            f"Aggregated metadata file '{AGGREGATED_FILE}' not found. "
+            "Please generate it first."
         )
         return
 
-    with open(AGGREGATED_FILE, "r") as f:
-        data = json.load(f)
+    with open(AGGREGATED_FILE, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
 
-    with open(output_file, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(output_file, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
 
-    print(f"Exported aggregated metadata to '{output_file}'")
+    console.print(f"[green]Exported[/green] {output_file}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="BioCypher Adapters Registry CLI")
-    subparsers = parser.add_subparsers(dest="command")
-
-    subparsers.add_parser("list", help="List all registered adapters")
-
-    inspect_parser = subparsers.add_parser(
-        "inspect", help="Inspect metadata of a specific adapter"
-    )
-    inspect_parser.add_argument("name", help="Name of the adapter to inspect")
-
-    export_parser = subparsers.add_parser(
-        "export", help="Export aggregated metadata to a file"
-    )
-    export_parser.add_argument("output_file", help="File path to export metadata")
-
-    args = parser.parse_args()
-
-    if args.command == "list":
-        list_adapters()
-    elif args.command == "inspect":
-        inspect_adapter(args.name)
-    elif args.command == "export":
-        export_metadata(args.output_file)
-    else:
-        parser.print_help()
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":
