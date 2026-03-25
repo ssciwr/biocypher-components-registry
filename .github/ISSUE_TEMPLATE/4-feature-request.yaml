@@ -1,0 +1,69 @@
+title: "[FEAT]: "
+name: "✨ Feature Request"
+description: Submit a proposal/request for a new BioCypher Registry feature
+
+
+labels:
+  - "feature"
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        **Note:** Please write your feature request in English to ensure it can be understood and addressed by the development team.
+
+  #--------------   Feature type    --------------
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: Please select what type of feature request you would like to propose.
+      options:
+        - Change existing registry functionality
+        - Remove existing registry functionality
+        - Improve metadata schema
+        - Other (please specify below)
+      multiple: false
+    validations:
+      required: true
+
+  #--------------   Feature description and motivation    --------------
+  - type: textarea
+    attributes:
+      label: "🚀 The feature and motivation"
+      description: >
+        Provide a clear and concise summary of the proposed feature, including the motivation behind it.
+        If your request addresses a specific problem, describe it (e.g., "I'm working on X and need Y to be achievable").
+        If this is connected to an existing GitHub issue, please include a link.
+      placeholder: |
+        **Feature description**
+          As an adapter maintainer,
+          I need a guided flow to generate croissant.jsonld metadata,
+          so that I can produce valid metadata with low effort and ensure my adapter can be registered in the BioCypher Registry.
+
+        **Motivation**
+          A guided metadata generation flow lowers the barrier for new contributors and improves metadata quality across the registry.
+
+    validations:
+      required: true
+  #--------------   Additional context    --------------
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: >
+        Add any other context or screenshots about the feature request.
+
+  #--------------   Code of Conduct   --------------
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](../CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+
+  - type: markdown
+    attributes:
+      value: >
+        Thank you for your contribution! 🎉 – The BioCypher Team

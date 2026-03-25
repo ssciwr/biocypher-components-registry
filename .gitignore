@@ -140,4 +140,4 @@ cython_debug/
 registry_data/*
 
 # Unified Metadata file
-unified_adapters_metadata.jsonld
+# unified_adapters_metadata.jsonld
