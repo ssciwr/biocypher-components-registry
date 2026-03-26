@@ -22,6 +22,10 @@ from src.core.generation.builder import build_adapter, build_creator, build_data
 from src.core.validator import validate
 
 
+def _slugify_id(text: str) -> str:
+    return text.lower().replace(" ", "-").replace("_", "-").replace("/", "-")
+
+
 _TEMPLATE = r"""
 <!doctype html>
 <html>
@@ -1065,23 +1069,32 @@ _TEMPLATE = r"""
         return SCHEMA_DATATYPES.map(value => `<option value="${value}" ${value === selectedValue ? 'selected' : ''}>${value}</option>`).join('');
       }
 
-      function buildRecordSetFields(dataset) {
+      function buildRecordSetFields(dataset, recordSetNameOverride = null) {
         const previews = summarizeFields(dataset);
-        const rsName = document.getElementById('rs_name').value.trim() || dataset?.recordSet?.[0]?.name || 'records';
+        const rsName = (
+          recordSetNameOverride !== null
+            ? String(recordSetNameOverride || '').trim()
+            : document.getElementById('rs_name').value.trim()
+        ) || dataset?.recordSet?.[0]?.name || 'records';
+        const rsId = rsName.toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-').replace(/\//g, '-');
         const fileObjectId = dataset?.distribution?.[0]?.['@id'] || 'file';
         dataset.uiFieldPreview = previews;
-        dataset.recordSet = dataset.recordSet || [{ '@type': 'cr:RecordSet', name: rsName, field: [] }];
+        dataset.recordSet = dataset.recordSet || [{ '@type': 'cr:RecordSet', '@id': rsId, name: rsName, field: [] }];
         if (dataset.recordSet[0]) {
+          dataset.recordSet[0]['@id'] = dataset.recordSet[0]['@id'] || rsId;
           dataset.recordSet[0].name = rsName;
           dataset.recordSet[0].field = previews.map(field => {
+            const fieldName = field.name || '';
+            const fieldId = `${dataset.recordSet[0]['@id']}/${fieldName.toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-').replace(/\//g, '-')}`;
             const builtField = {
               '@type': 'cr:Field',
-              name: field.name || '',
+              '@id': fieldId,
+              name: fieldName,
               dataType: field.mappedType || 'sc:Text',
               examples: field.example ? [field.example] : [],
               source: {
                 fileObject: { '@id': fileObjectId },
-                extract: { column: field.name || '' },
+                extract: { column: fieldName },
               },
             };
             if (field.description) {
@@ -1950,7 +1963,12 @@ _TEMPLATE = r"""
           date ||
           cite ||
           document.getElementById('dist_url').value.trim() ||
-          document.getElementById('rs_name').value.trim()
+          document.getElementById('dist_format').value.trim() ||
+          document.getElementById('dist_name').value.trim() ||
+          document.getElementById('dist_md5').value.trim() ||
+          document.getElementById('dist_sha256').value.trim() ||
+          document.getElementById('rs_name').value.trim() ||
+          summarizeFields(target).length
         );
         if (currentStatus === 'skipped' && !(hasExistingDetails || hasInputDetails)) {
           if (status && !silent) status.textContent = 'Details remain skipped for this dataset.';
@@ -2223,12 +2241,32 @@ _TEMPLATE = r"""
       window.analyzeFile = analyzeFile;
 
       document.querySelector('form').addEventListener('submit', (e) => {
+        persistCurrentDraft();
+        datasets.forEach((dataset, index) => {
+          const isCurrent = index === Number(datasetSelect.value || 0);
+          const recordSetName = isCurrent
+            ? document.getElementById('rs_name').value.trim()
+            : (dataset?.uiDraftDetails?.recordSetName || dataset?.recordSet?.[0]?.name || '');
+          const hasFieldEntries = summarizeFields(dataset).length > 0;
+          const hasRecordSetName = Boolean(recordSetName);
+          if (hasFieldEntries || hasRecordSetName) {
+            buildRecordSetFields(dataset, recordSetName);
+          }
+        });
+        syncDatasets();
+        const selected = Number(datasetSelect.value || 0);
+        const currentDataset = datasets[selected];
         saveState();
         const hasDetailsInput = Boolean(
           document.getElementById('ds_date').value.trim() ||
           document.getElementById('ds_cite').value.trim() ||
           document.getElementById('dist_url').value.trim() ||
-          document.getElementById('rs_name').value.trim()
+          document.getElementById('dist_format').value.trim() ||
+          document.getElementById('dist_name').value.trim() ||
+          document.getElementById('dist_md5').value.trim() ||
+          document.getElementById('dist_sha256').value.trim() ||
+          document.getElementById('rs_name').value.trim() ||
+          (currentDataset && summarizeFields(currentDataset).length)
         );
         if (hasDetailsInput) {
           applyDetails();
@@ -2711,6 +2749,8 @@ class _Handler(BaseHTTPRequestHandler):
 def _coerce_dataset(data: dict[str, Any]) -> dict[str, Any]:
     distribution = data.get("distribution")
     record_set = data.get("recordSet")
+    ui_field_preview = data.get("uiFieldPreview")
+    ui_draft_details = data.get("uiDraftDetails")
     if isinstance(distribution, list):
         for entry in distribution:
             if isinstance(entry, dict):
@@ -2720,11 +2760,67 @@ def _coerce_dataset(data: dict[str, Any]) -> dict[str, Any]:
                     if not name and isinstance(entry.get("contentUrl"), str):
                         name = entry["contentUrl"].split("?")[0].split("/")[-1]
                     entry["@id"] = name or "file"
+    if (
+        isinstance(ui_field_preview, list)
+        and ui_field_preview
+        and (
+            not isinstance(record_set, list)
+            or not record_set
+            or not isinstance(record_set[0], dict)
+            or not isinstance(record_set[0].get("field"), list)
+            or not record_set[0].get("field")
+        )
+    ):
+        record_set_name = ""
+        if isinstance(ui_draft_details, dict):
+            record_set_name = str(ui_draft_details.get("recordSetName", "") or "").strip()
+        if not record_set_name and isinstance(record_set, list) and record_set and isinstance(record_set[0], dict):
+            record_set_name = str(record_set[0].get("name", "") or "").strip()
+        if not record_set_name:
+            record_set_name = "records"
+        record_set_id = _slugify_id(record_set_name or "records")
+        file_object_id = "file"
+        if isinstance(distribution, list) and distribution:
+            first_distribution = distribution[0]
+            if isinstance(first_distribution, dict):
+                file_object_id = first_distribution.get("@id", "file")
+        record_set = [{
+            "@type": "cr:RecordSet",
+            "@id": record_set_id,
+            "name": record_set_name,
+            "field": [],
+        }]
+        for raw_field in ui_field_preview:
+            if not isinstance(raw_field, dict):
+                continue
+            field_name = str(raw_field.get("name", "") or "").strip()
+            if not field_name:
+                continue
+            built_field: dict[str, Any] = {
+                "@type": "cr:Field",
+                "@id": f"{record_set_id}/{_slugify_id(field_name)}",
+                "name": field_name,
+                "dataType": raw_field.get("mappedType", "sc:Text"),
+                "source": {
+                    "fileObject": {"@id": file_object_id},
+                    "extract": {"column": field_name},
+                },
+            }
+            example = raw_field.get("example")
+            if example not in (None, ""):
+                built_field["examples"] = [example]
+            description = str(raw_field.get("description", "") or "").strip()
+            if description:
+                built_field["description"] = description
+            record_set[0]["field"].append(built_field)
+
     if isinstance(record_set, list):
         for entry in record_set:
             if isinstance(entry, dict):
                 if "@type" not in entry:
                     entry["@type"] = "cr:RecordSet"
+                if "@id" not in entry:
+                    entry["@id"] = _slugify_id(entry.get("name", "records") or "records")
                 fields = entry.get("field")
                 if isinstance(fields, list):
                     file_object_id = "file"
@@ -2733,6 +2829,9 @@ def _coerce_dataset(data: dict[str, Any]) -> dict[str, Any]:
                     for field in fields:
                         if isinstance(field, dict) and "@type" not in field:
                             field["@type"] = "cr:Field"
+                        if isinstance(field, dict) and "@id" not in field:
+                            record_set_id = entry.get("@id", "records")
+                            field["@id"] = f"{record_set_id}/{_slugify_id(field.get('name', 'field') or 'field')}"
                         if isinstance(field, dict) and "source" not in field:
                             field["source"] = {
                                 "fileObject": {"@id": file_object_id},
@@ -2797,9 +2896,10 @@ def _render_result(
         f"<a class='button ghost' href='/?form=1'>Back to form</a>"
         "</div></div>"
     )
-    base = _TEMPLATE.replace("{{NOTICE}}", "")
-    if "<form method=\"post\">" in base:
-        head, tail = base.split("<form method=\"post\">", 1)
+    base = _TEMPLATE.replace("{{NOTICE}}", "").replace("{{BOOTSTRAP}}", "")
+    form_marker = '<form method="post" action="/">'
+    if form_marker in base:
+        head, tail = base.split(form_marker, 1)
         if "</form>" in tail:
             _, rest = tail.split("</form>", 1)
             return head + validation_block + warnings_block + result_block + _result_theme_script() + rest
