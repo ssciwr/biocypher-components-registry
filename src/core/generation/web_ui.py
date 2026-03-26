@@ -1076,12 +1076,13 @@ _TEMPLATE = r"""
             ? String(recordSetNameOverride || '').trim()
             : document.getElementById('rs_name').value.trim()
         ) || dataset?.recordSet?.[0]?.name || 'records';
-        const rsId = rsName.toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-').replace(/\//g, '-');
+        const datasetId = (dataset?.name || 'dataset').toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-').replace(/\//g, '-');
+        const rsId = `${datasetId}-${rsName.toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-').replace(/\//g, '-')}`;
         const fileObjectId = dataset?.distribution?.[0]?.['@id'] || 'file';
         dataset.uiFieldPreview = previews;
         dataset.recordSet = dataset.recordSet || [{ '@type': 'cr:RecordSet', '@id': rsId, name: rsName, field: [] }];
         if (dataset.recordSet[0]) {
-          dataset.recordSet[0]['@id'] = dataset.recordSet[0]['@id'] || rsId;
+          dataset.recordSet[0]['@id'] = rsId;
           dataset.recordSet[0].name = rsName;
           dataset.recordSet[0].field = previews.map(field => {
             const fieldName = field.name || '';
@@ -2778,7 +2779,8 @@ def _coerce_dataset(data: dict[str, Any]) -> dict[str, Any]:
             record_set_name = str(record_set[0].get("name", "") or "").strip()
         if not record_set_name:
             record_set_name = "records"
-        record_set_id = _slugify_id(record_set_name or "records")
+        dataset_id = _slugify_id(data.get("name", "dataset") or "dataset")
+        record_set_id = f"{dataset_id}-{_slugify_id(record_set_name or 'records')}"
         file_object_id = "file"
         if isinstance(distribution, list) and distribution:
             first_distribution = distribution[0]
@@ -2819,8 +2821,11 @@ def _coerce_dataset(data: dict[str, Any]) -> dict[str, Any]:
             if isinstance(entry, dict):
                 if "@type" not in entry:
                     entry["@type"] = "cr:RecordSet"
-                if "@id" not in entry:
-                    entry["@id"] = _slugify_id(entry.get("name", "records") or "records")
+                desired_record_set_id = (
+                    f"{_slugify_id(data.get('name', 'dataset') or 'dataset')}-"
+                    f"{_slugify_id(entry.get('name', 'records') or 'records')}"
+                )
+                entry["@id"] = desired_record_set_id
                 fields = entry.get("field")
                 if isinstance(fields, list):
                     file_object_id = "file"
