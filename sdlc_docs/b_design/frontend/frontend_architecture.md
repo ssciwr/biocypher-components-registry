@@ -181,22 +181,19 @@ flowchart TB
     REG --> SQLITE
 ```
 
-## Recommended API Boundaries
+## Recommended API Boundary
 
-The React frontend should communicate with the backend through explicit JSON endpoints aligned with existing use cases.
+The React frontend should communicate with the backend through explicit JSON
+endpoints aligned with existing use cases.
 
-Suggested endpoints:
+The current screen-by-screen frontend API contract is documented in:
 
-- `POST /api/registrations`
-- `GET /api/registrations/{id}`
-- `POST /api/registrations/{id}/process`
-- `POST /api/registrations/{id}/revalidate`
-- `GET /api/registry/registrations`
-- `POST /api/registry/refreshes`
-- `GET /api/registry/refreshes/latest`
-- `GET /api/registry/entries`
+```text
+sdlc_docs/b_design/frontend/frontend_api_contract.md
+```
 
-These endpoints should call the existing core services instead of reimplementing business behavior in route handlers.
+Current endpoints use the `/api/v1` prefix and should call the existing core
+services instead of reimplementing business behavior in route handlers.
 
 ## Frontend Responsibilities
 

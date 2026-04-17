@@ -86,6 +86,10 @@ Frontend architecture:
 
 - `sdlc_docs/b_design/frontend/frontend_architecture.md`
 
+Frontend API contract:
+
+- `sdlc_docs/b_design/frontend/frontend_api_contract.md`
+
 PNG references:
 
 - `sdlc_docs/b_design/frontend/penpot_first_look/`
@@ -380,29 +384,36 @@ biocypher-components-registry-frontend/
 
 The React frontend should communicate with the backend through explicit JSON APIs.
 
-Initial target endpoints:
+The current frontend-facing API contract is documented in:
 
 ```text
-POST /api/registrations
-GET /api/registrations
-GET /api/registrations/{id}
-POST /api/registrations/{id}/process
-POST /api/registrations/{id}/revalidate
-GET /api/registry/registrations
-POST /api/registry/refreshes
-GET /api/registry/refreshes/latest
+sdlc_docs/b_design/frontend/frontend_api_contract.md
 ```
 
-For the registry sources table, support query parameters such as:
+Current API paths use the major-versioned prefix:
 
 ```text
-GET /api/registry/registrations?status=INVALID&latest_event=FETCH_FAILED
+/api/v1
 ```
 
-Important note:
+Examples:
 
-- `FETCH_FAILED` is currently represented as a latest event type in `registration_events`, not as a public `RegistrationStatus`.
-- The UI should expose both status filtering and latest-event filtering.
+```text
+POST /api/v1/registrations
+GET /api/v1/registrations/{registration_id}
+GET /api/v1/registry/registrations?status=INVALID&latest_event=FETCH_FAILED
+POST /api/v1/registry/refreshes
+GET /api/v1/adapters
+POST /api/v1/metadata/validate
+```
+
+Implementation note:
+
+- Keep the API base URL centralized in the frontend configuration, such as
+  `VITE_API_BASE_URL`.
+- Do not scatter `/api/v1` literals across components.
+- The UI should expose both registration status filtering and latest-event
+  filtering for registry operations.
 
 ## Registration Data Model For Frontend
 
