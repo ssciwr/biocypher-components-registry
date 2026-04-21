@@ -147,7 +147,5 @@ registry.sqlite3
 # Collected metadata files
 registry_data/*
 
-# Unified Metadata file
-# unified_adapters_metadata.jsonld
-
-clones/*
+# Codex file
+.codex
