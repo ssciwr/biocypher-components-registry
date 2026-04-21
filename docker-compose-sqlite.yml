@@ -1,0 +1,62 @@
+# BioCypher Components Registry - Three-Tier Architecture
+# Run all tiers: docker compose up
+
+services:
+  # ===========================================================
+  # Tier 1: Frontend Container (React SPA)
+  # ===========================================================
+  frontend:
+    image: nginx:alpine
+    container_name: biocypher-registry-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      # Placeholder for future React build output
+      - ./frontend-placeholder:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - biocypher-network
+
+  # ===========================================================
+  # Tier 2: Backend Container (FastAPI + Uvicorn)
+  # ===========================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biocypher-registry-backend
+    environment:
+      BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
+    ports:
+      - "8000:8000"
+    volumes:
+      # Tier 3: SQLite database (file-based, persisted here)
+      - biocypher-sqlite-data:/app/data
+    networks:
+      - biocypher-network
+    command:
+      - uv
+      - run
+      - --no-sync
+      - uvicorn
+      - src.api.app:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+
+# ===========================================================
+# Networks
+# ===========================================================
+networks:
+  biocypher-network:
+    driver: bridge
+
+# ===========================================================
+# Volumes (Tier 3: Database)
+# ===========================================================
+volumes:
+  # SQLite database file storage
+  biocypher-sqlite-data:
+    driver: local

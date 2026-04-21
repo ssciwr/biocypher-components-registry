@@ -1,0 +1,88 @@
+# BioCypher Components Registry - Three-Tier Architecture with PostgreSQL
+# Run all tiers: docker compose -f docker-compose-postgresql.yml up
+
+services:
+  # ===========================================================
+  # Tier 1: Frontend Container (React SPA)
+  # ===========================================================
+  frontend:
+    image: nginx:alpine
+    container_name: biocypher-registry-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      # Placeholder for future React build output
+      - ./frontend-placeholder:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - biocypher-network
+
+  # ===========================================================
+  # Tier 2: Backend Container (FastAPI + Uvicorn)
+  # ===========================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biocypher-registry-backend
+    environment:
+      # PostgreSQL connection string
+      DATABASE_URL: postgresql://biocypher:biocypher_password@database:5432/biocypher_registry
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - biocypher-network
+    command:
+      - uv
+      - run
+      - --no-sync
+      - uvicorn
+      - src.api.app:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+
+  # ===========================================================
+  # Tier 3: Database Container (PostgreSQL)
+  # ===========================================================
+  database:
+    image: postgres:16-alpine
+    container_name: biocypher-registry-database
+    environment:
+      POSTGRES_DB: biocypher_registry
+      POSTGRES_USER: biocypher
+      POSTGRES_PASSWORD: biocypher_password
+      # Optimize for development (adjust for production)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"  # Exposed for debugging/admin tools
+    volumes:
+      - biocypher-postgres-data:/var/lib/postgresql/data
+    networks:
+      - biocypher-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biocypher -d biocypher_registry"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+# ===========================================================
+# Networks
+# ===========================================================
+networks:
+  biocypher-network:
+    driver: bridge
+
+# ===========================================================
+# Volumes (Tier 3: Database)
+# ===========================================================
+volumes:
+  # PostgreSQL data directory
+  biocypher-postgres-data:
+    driver: local

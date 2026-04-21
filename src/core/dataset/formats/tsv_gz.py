@@ -1,0 +1,25 @@
+"""Inspector for gzip-compressed TSV files."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from src.core.dataset.formats.base import TSV_MIME, FormatHandler, inspect_delimited_file
+from src.core.dataset.request import FileInspection
+
+
+class TsvGzFormatHandler(FormatHandler):
+    """Inspect ``.tsv.gz`` files."""
+
+    def supports(self, path: Path) -> bool:
+        """Return whether the handler supports the given path."""
+        return path.name.lower().endswith(".tsv.gz")
+
+    def inspect(self, path: Path) -> FileInspection:
+        """Inspect a gzip-compressed tab-separated text file."""
+        return inspect_delimited_file(
+            path=path,
+            delimiter="\t",
+            encoding_format=TSV_MIME,
+            compressed=True,
+        )

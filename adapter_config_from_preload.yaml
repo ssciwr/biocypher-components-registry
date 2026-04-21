@@ -1,0 +1,94 @@
+dataset_generator: auto
+
+validate: true
+
+adapter:
+  output: omnipath_adapter.jsonld
+  name: "OmniPath Adapter"
+  description: "Adapter that produces a knowledge graph of OmniPath secondary interactions for use with BioCypher."
+  version: "1.0.0"
+  license: "MIT"
+  code_repository: "https://github.com/biocypher/omnipath-secondary-adapter"
+  adapter_id: "omnipath-adapter"
+  keywords:
+    - knowledge-graphs
+    - biocypher
+    - omnipath-secondary-adapter
+  creators:
+    - name: "Edwin Carreño"
+      email: ""
+      url: "https://orcid.org/0009-0005-3359-2211"
+    - name: "Matthieu Najm"
+      email: ""
+      url: "https://orcid.org/0000-0001-9757-1499"
+
+datasets:
+  - mode: generate
+    input: /home/edwin/Downloads/OMNIPATH_DB/datasets/omnipath-interactions
+    name: "Networks"
+    description: "A comprehensive dataset capturing diverse interaction relationships between molecular entities, enabling the exploration of complex biological networks and signaling pathways."
+    dataset_version: "1.0.0"
+    license: "MIT"
+    url: "https://archive.omnipathdb.org/omnipath_webservice_interactions__latest.tsv.gz"
+    date_published: "2016-06-01"
+    citation: "https://omnipathdb.org/"
+    creators:
+      - name: "Saezlab"
+        email: ""
+        url: "https://www.saezlab.com/"
+
+  - mode: generate
+    input: /home/edwin/Downloads/OMNIPATH_DB/datasets/omnipath-enz-sub
+    name: "Enzyme-PTM"
+    description: "A detailed dataset describing enzyme-substrate relationships with an emphasis on post-translational modifications, including kinase-driven phosphorylation as well as acetylation and other PTM types."
+    dataset_version: "1.0.0"
+    license: "MIT"
+    url: "https://archive.omnipathdb.org/omnipath_webservice_enz_sub__latest.tsv.gz"
+    date_published: "2016-06-02"
+    citation: "https://omnipathdb.org/"
+    creators:
+      - name: "Saezlab"
+        email: ""
+        url: "https://www.saezlab.com/"
+
+  - mode: generate
+    input: /home/edwin/Downloads/OMNIPATH_DB/datasets/omnipath-complexes
+    name: "Complexes"
+    description: "An integrated dataset compiling information on protein complexes from multiple resources, offering a unified view of macromolecular assemblies and their components."
+    dataset_version: "1.0.0"
+    license: "MIT"
+    url: "https://archive.omnipathdb.org/omnipath_webservice_complexes__latest.tsv.gz"
+    date_published: "2016-06-03"
+    citation: "https://omnipathdb.org/"
+    creators:
+      - name: "Saezlab"
+        email: ""
+        url: "https://www.saezlab.com/"
+
+  - mode: generate
+    input: /home/edwin/Downloads/OMNIPATH_DB/datasets/omnipath-annotations
+    name: "Annotations"
+    description: "A rich dataset providing extensive functional and structural annotations of proteins and genes, including their localization, expression patterns, and biological roles."
+    dataset_version: "1.0.0"
+    license: "MIT"
+    url: "https://archive.omnipathdb.org/omnipath_webservice_annotations__latest.tsv.gz"
+    date_published: "2016-06-04"
+    citation: "https://omnipathdb.org/"
+    creators:
+      - name: "Saezlab"
+        email: ""
+        url: "https://www.saezlab.com/"
+
+  - mode: generate
+    input: /home/edwin/Downloads/OMNIPATH_DB/datasets/omnipath-intercell
+    name: "Intercell"
+    description: "A specialized dataset annotating proteins according to their roles in intercellular communication, such as ligands, receptors, and extracellular matrix components."
+    dataset_version: "1.0.0"
+    license: "MIT"
+    url: "https://archive.omnipathdb.org/omnipath_webservice_intercell__latest.tsv.gz"
+    date_published: "2016-06-05"
+    citation: "https://omnipathdb.org/"
+    creators:
+      - name: "Saezlab"
+        email: ""
+        url: "https://www.saezlab.com/"

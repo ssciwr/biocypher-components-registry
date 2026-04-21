@@ -1,0 +1,1000 @@
+uniprot	genesymbol	entity_type	source	label	value	record_id
+P04217	A1BG	protein	HGNC	mainclass	Immunoglobulin like domain containing	0
+Q9NQ94	A1CF	protein	HGNC	mainclass	RNA binding motif containing	1
+P01023	A2M	protein	HGNC	mainclass	Alpha-2-macroglobulin family	2
+A8K2U0	A2ML1	protein	HGNC	mainclass	Alpha-2-macroglobulin family	3
+U3KPV4	A3GALT2	protein	HGNC	mainclass	Glycosyltransferase family 6	4
+Q9NPC4	A4GALT	protein	HGNC	mainclass	Alpha 1,4-glycosyltransferases	5
+Q9NPC4	A4GALT	protein	HGNC	mainclass	Blood group antigens	6
+Q9UNA3	A4GNT	protein	HGNC	mainclass	Alpha 1,4-glycosyltransferases	7
+Q9NRG9	AAAS	protein	HGNC	mainclass	WD repeat domain containing	8
+Q9NRG9	AAAS	protein	HGNC	mainclass	Nucleoporins	9
+Q86V21	AACS	protein	HGNC	mainclass	Acyl-CoA synthetase family	10
+P22760	AADAC	protein	HGNC	mainclass	Lipases	11
+P22760	AADAC	protein	HGNC	mainclass	Arylacetamide deacetylase family	12
+Q6P093	AADACL2	protein	HGNC	mainclass	Arylacetamide deacetylase family	13
+Q5VUY0	AADACL3	protein	HGNC	mainclass	Arylacetamide deacetylase family	14
+Q5VUY2	AADACL4	protein	HGNC	mainclass	Arylacetamide deacetylase family	15
+Q2M2I8	AAK1	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	16
+Q13685	AAMP	protein	HGNC	mainclass	WD repeat domain containing	17
+Q16613	AANAT	protein	HGNC	mainclass	GCN5 related N-acetyltransferases	18
+P49588	AARS1	protein	HGNC	mainclass	Aminoacyl tRNA synthetases, Class II	19
+Q5JTZ9	AARS2	protein	HGNC	mainclass	Aminoacyl tRNA synthetases, Class II	20
+Q4L235	AASDH	protein	HGNC	mainclass	Acyl-CoA synthetase family	21
+Q9NY61	AATF	protein	HGNC	mainclass	MicroRNA protein coding host genes	22
+Q6ZMQ8	AATK	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	23
+Q6ZMQ8	AATK	protein	HGNC	mainclass	MicroRNA protein coding host genes	24
+Q6ZMQ8	AATK	protein	HGNC	mainclass	Receptor tyrosine kinases	25
+O95477	ABCA1	protein	HGNC	mainclass	ATP binding cassette subfamily A	26
+Q9BZC7	ABCA2	protein	HGNC	mainclass	ATP binding cassette subfamily A	27
+Q99758	ABCA3	protein	HGNC	mainclass	ATP binding cassette subfamily A	28
+P78363	ABCA4	protein	HGNC	mainclass	ATP binding cassette subfamily A	29
+Q8WWZ7	ABCA5	protein	HGNC	mainclass	ATP binding cassette subfamily A	30
+Q8N139	ABCA6	protein	HGNC	mainclass	MicroRNA protein coding host genes	31
+Q8N139	ABCA6	protein	HGNC	mainclass	ATP binding cassette subfamily A	32
+Q8IZY2	ABCA7	protein	HGNC	mainclass	ATP binding cassette subfamily A	33
+O94911	ABCA8	protein	HGNC	mainclass	ATP binding cassette subfamily A	34
+Q8IUA7	ABCA9	protein	HGNC	mainclass	ATP binding cassette subfamily A	35
+Q8WWZ4	ABCA10	protein	HGNC	mainclass	ATP binding cassette subfamily A	36
+Q86UK0	ABCA12	protein	HGNC	mainclass	ATP binding cassette subfamily A	37
+Q86UQ4	ABCA13	protein	HGNC	mainclass	ATP binding cassette subfamily A	38
+P08183	ABCB1	protein	HGNC	mainclass	ATP binding cassette subfamily B	39
+P08183	ABCB1	protein	HGNC	mainclass	CD molecules	40
+P21439	ABCB4	protein	HGNC	mainclass	ATP binding cassette subfamily B	41
+Q2M3G0	ABCB5	protein	HGNC	mainclass	ATP binding cassette subfamily B	42
+Q9NP58	ABCB6	protein	HGNC	mainclass	Blood group antigens	43
+Q9NP58	ABCB6	protein	HGNC	mainclass	ATP binding cassette subfamily B	44
+O75027	ABCB7	protein	HGNC	mainclass	ATP binding cassette subfamily B	45
+Q9NUT2	ABCB8	protein	HGNC	mainclass	ATP binding cassette subfamily B	46
+Q9NP78	ABCB9	protein	HGNC	mainclass	ATP binding cassette subfamily B	47
+Q9NRK6	ABCB10	protein	HGNC	mainclass	ATP binding cassette subfamily B	48
+O95342	ABCB11	protein	HGNC	mainclass	ATP binding cassette subfamily B	49
+P33527	ABCC1	protein	HGNC	mainclass	Blood group antigens	50
+P33527	ABCC1	protein	HGNC	mainclass	ATP binding cassette subfamily C	51
+Q92887	ABCC2	protein	HGNC	mainclass	ATP binding cassette subfamily C	52
+O15438	ABCC3	protein	HGNC	mainclass	ATP binding cassette subfamily C	53
+O15439	ABCC4	protein	HGNC	mainclass	Blood group antigens	54
+O15439	ABCC4	protein	HGNC	mainclass	ATP binding cassette subfamily C	55
+O15440	ABCC5	protein	HGNC	mainclass	ATP binding cassette subfamily C	56
+O95255	ABCC6	protein	HGNC	mainclass	ATP binding cassette subfamily C	57
+Q09428	ABCC8	protein	HGNC	mainclass	ATP binding cassette subfamily C	58
+O60706	ABCC9	protein	HGNC	mainclass	ATP binding cassette subfamily C	59
+Q5T3U5	ABCC10	protein	HGNC	mainclass	MicroRNA protein coding host genes	60
+Q5T3U5	ABCC10	protein	HGNC	mainclass	ATP binding cassette subfamily C	61
+Q96J66	ABCC11	protein	HGNC	mainclass	ATP binding cassette subfamily C	62
+Q96J65	ABCC12	protein	HGNC	mainclass	ATP binding cassette subfamily C	63
+P33897	ABCD1	protein	HGNC	mainclass	ATP binding cassette subfamily D	64
+Q9UBJ2	ABCD2	protein	HGNC	mainclass	ATP binding cassette subfamily D	65
+P28288	ABCD3	protein	HGNC	mainclass	ATP binding cassette subfamily D	66
+P28288	ABCD3	protein	HGNC	mainclass	GOLD domain containing	67
+O14678	ABCD4	protein	HGNC	mainclass	ATP binding cassette subfamily D	68
+P61221	ABCE1	protein	HGNC	mainclass	ATP binding cassette subfamily E	69
+Q8NE71	ABCF1	protein	HGNC	mainclass	ATP binding cassette subfamily F	70
+Q8NE71	ABCF1	protein	HGNC	mainclass	MicroRNA protein coding host genes	71
+Q9UG63	ABCF2	protein	HGNC	mainclass	ATP binding cassette subfamily F	72
+Q9NUQ8	ABCF3	protein	HGNC	mainclass	ATP binding cassette subfamily F	73
+P45844	ABCG1	protein	HGNC	mainclass	ATP binding cassette subfamily G	74
+Q9UNQ0	ABCG2	protein	HGNC	mainclass	Blood group antigens	75
+Q9UNQ0	ABCG2	protein	HGNC	mainclass	ATP binding cassette subfamily G	76
+Q9UNQ0	ABCG2	protein	HGNC	mainclass	CD molecules	77
+Q9H172	ABCG4	protein	HGNC	mainclass	ATP binding cassette subfamily G	78
+Q9H222	ABCG5	protein	HGNC	mainclass	ATP binding cassette subfamily G	79
+Q9H221	ABCG8	protein	HGNC	mainclass	ATP binding cassette subfamily G	80
+Q96SE0	ABHD1	protein	HGNC	mainclass	Abhydrolase domain containing	81
+P08910	ABHD2	protein	HGNC	mainclass	Abhydrolase domain containing	82
+Q8WU67	ABHD3	protein	HGNC	mainclass	Abhydrolase domain containing	83
+Q8TB40	ABHD4	protein	HGNC	mainclass	Abhydrolase domain containing	84
+Q8WTS1	ABHD5	protein	HGNC	mainclass	Abhydrolase domain containing	85
+Q9BV23	ABHD6	protein	HGNC	mainclass	Abhydrolase domain containing	86
+Q96I13	ABHD8	protein	HGNC	mainclass	Abhydrolase domain containing	87
+Q9NUJ1	ABHD10	protein	HGNC	mainclass	Abhydrolase domain containing	88
+Q8NFV4	ABHD11	protein	HGNC	mainclass	Abhydrolase domain containing	89
+Q8N2K0	ABHD12	protein	HGNC	mainclass	Abhydrolase domain containing	90
+Q7Z5M8	ABHD12B	protein	HGNC	mainclass	Abhydrolase domain containing	91
+Q7L211	ABHD13	protein	HGNC	mainclass	Abhydrolase domain containing	92
+Q9BUJ0	ABHD14A	protein	HGNC	mainclass	Abhydrolase domain containing	93
+Q96IU4	ABHD14B	protein	HGNC	mainclass	Abhydrolase domain containing	94
+Q6UXT9	ABHD15	protein	HGNC	mainclass	Abhydrolase domain containing	95
+O95870	ABHD16A	protein	HGNC	mainclass	Abhydrolase domain containing	96
+O95870	ABHD16A	protein	HGNC	mainclass	MicroRNA protein coding host genes	97
+Q9H3Z7	ABHD16B	protein	HGNC	mainclass	Abhydrolase domain containing	98
+Q96GS6	ABHD17A	protein	HGNC	mainclass	Abhydrolase domain containing	99
+Q96GS6	ABHD17A	protein	HGNC	mainclass	Depalmitoylases	100
+Q5VST6	ABHD17B	protein	HGNC	mainclass	Abhydrolase domain containing	101
+Q5VST6	ABHD17B	protein	HGNC	mainclass	Depalmitoylases	102
+Q6PCB6	ABHD17C	protein	HGNC	mainclass	Abhydrolase domain containing	103
+Q6PCB6	ABHD17C	protein	HGNC	mainclass	Depalmitoylases	104
+Q0P651	ABHD18	protein	HGNC	mainclass	Abhydrolase domain containing	105
+Q9NYB9	ABI2	protein	HGNC	mainclass	SCAR/WAVE complex	106
+Q7Z7G0	ABI3BP	protein	HGNC	mainclass	Fibronectin type III domain containing	107
+P00519	ABL1	protein	HGNC	mainclass	Abl family tyrosine kinases	108
+P00519	ABL1	protein	HGNC	mainclass	SH2 domain containing	109
+P42684	ABL2	protein	HGNC	mainclass	Abl family tyrosine kinases	110
+P42684	ABL2	protein	HGNC	mainclass	SH2 domain containing	111
+O14639	ABLIM1	protein	HGNC	mainclass	LIM domain containing	112
+Q6H8Q1	ABLIM2	protein	HGNC	mainclass	MicroRNA protein coding host genes	113
+Q6H8Q1	ABLIM2	protein	HGNC	mainclass	LIM domain containing	114
+O94929	ABLIM3	protein	HGNC	mainclass	LIM domain containing	115
+P16442	ABO	protein	HGNC	mainclass	Blood group antigens	116
+P16442	ABO	protein	HGNC	mainclass	Glycosyltransferase family 6	117
+Q12979	ABR	protein	HGNC	mainclass	Dbl family Rho GEFs	118
+Q12979	ABR	protein	HGNC	mainclass	C2 domain containing	119
+Q12979	ABR	protein	HGNC	mainclass	MicroRNA protein coding host genes	120
+Q12979	ABR	protein	HGNC	mainclass	Pleckstrin homology domain containing	121
+Q6UWZ7	ABRAXAS1	protein	HGNC	mainclass	BRCA1 A complex	122
+Q15018	ABRAXAS2	protein	HGNC	mainclass	BRISC complex	123
+Q9ULW3	ABT1	protein	HGNC	mainclass	SSU processome	124
+Q969K4	ABTB1	protein	HGNC	mainclass	Ankyrin repeat domain containing	125
+Q969K4	ABTB1	protein	HGNC	mainclass	BTB domain containing	126
+Q8N961	ABTB2	protein	HGNC	mainclass	Ankyrin repeat domain containing	127
+Q8N961	ABTB2	protein	HGNC	mainclass	BTB domain containing	128
+A6QL63	ABTB3	protein	HGNC	mainclass	Ankyrin repeat domain containing	129
+A6QL63	ABTB3	protein	HGNC	mainclass	BTB domain containing	130
+Q13085	ACACA	protein	HGNC	mainclass	Acetyl-CoA carboxylase family	131
+O00763	ACACB	protein	HGNC	mainclass	Acetyl-CoA carboxylase family	132
+Q9UKU7	ACAD8	protein	HGNC	mainclass	Flavoproteins	133
+Q9UKU7	ACAD8	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	134
+Q9H845	ACAD9	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	135
+Q9H845	ACAD9	protein	HGNC	mainclass	Flavoproteins	136
+Q9H845	ACAD9	protein	HGNC	mainclass	Mitochondrial complex I assembly complex	137
+Q6JQN1	ACAD10	protein	HGNC	mainclass	Flavoproteins	138
+Q6JQN1	ACAD10	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	139
+Q709F0	ACAD11	protein	HGNC	mainclass	Flavoproteins	140
+Q709F0	ACAD11	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	141
+P28330	ACADL	protein	HGNC	mainclass	Flavoproteins	142
+P28330	ACADL	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	143
+P11310	ACADM	protein	HGNC	mainclass	Flavoproteins	144
+P11310	ACADM	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	145
+P16219	ACADS	protein	HGNC	mainclass	Flavoproteins	146
+P16219	ACADS	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	147
+P45954	ACADSB	protein	HGNC	mainclass	Flavoproteins	148
+P45954	ACADSB	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	149
+P49748	ACADVL	protein	HGNC	mainclass	Flavoproteins	150
+P49748	ACADVL	protein	HGNC	mainclass	Acyl-CoA dehydrogenase family	151
+P16112	ACAN	protein	HGNC	mainclass	C-type lectin domain containing	152
+P16112	ACAN	protein	HGNC	mainclass	Sushi domain containing	153
+P16112	ACAN	protein	HGNC	mainclass	V-set domain containing	154
+P16112	ACAN	protein	HGNC	mainclass	Hyalectan proteoglycans	155
+Q15027	ACAP1	protein	HGNC	mainclass	ArfGAPs	156
+Q15027	ACAP1	protein	HGNC	mainclass	BAR-PH domain containing	157
+Q15027	ACAP1	protein	HGNC	mainclass	Ankyrin repeat domain containing	158
+Q15057	ACAP2	protein	HGNC	mainclass	ArfGAPs	159
+Q15057	ACAP2	protein	HGNC	mainclass	BAR-PH domain containing	160
+Q15057	ACAP2	protein	HGNC	mainclass	Ankyrin repeat domain containing	161
+Q96P50	ACAP3	protein	HGNC	mainclass	MicroRNA protein coding host genes	162
+Q96P50	ACAP3	protein	HGNC	mainclass	ArfGAPs	163
+Q96P50	ACAP3	protein	HGNC	mainclass	BAR-PH domain containing	164
+Q96P50	ACAP3	protein	HGNC	mainclass	Ankyrin repeat domain containing	165
+Q9H3P7	ACBD3	protein	HGNC	mainclass	A-kinase anchoring proteins	166
+Q9BR61	ACBD6	protein	HGNC	mainclass	MicroRNA protein coding host genes	167
+Q9BR61	ACBD6	protein	HGNC	mainclass	Ankyrin repeat domain containing	168
+Q96AP0	ACD	protein	HGNC	mainclass	Shelterin complex	169
+P12821	ACE	protein	HGNC	mainclass	CD molecules	170
+Q8TDN7	ACER1	protein	HGNC	mainclass	Alkaline ceramidases	171
+Q5QJU3	ACER2	protein	HGNC	mainclass	Alkaline ceramidases	172
+Q9NUN7	ACER3	protein	HGNC	mainclass	Alkaline ceramidases	173
+P22303	ACHE	protein	HGNC	mainclass	Cholinesterase family	174
+P22303	ACHE	protein	HGNC	mainclass	Blood group antigens	175
+Q9UKV3	ACIN1	protein	HGNC	mainclass	ASAP complex subunits	176
+Q16570	ACKR1	protein	HGNC	mainclass	Blood group antigens	177
+Q16570	ACKR1	protein	HGNC	mainclass	Atypical chemokine receptors	178
+Q16570	ACKR1	protein	HGNC	mainclass	CD molecules	179
+O00590	ACKR2	protein	HGNC	mainclass	Atypical chemokine receptors	180
+P25106	ACKR3	protein	HGNC	mainclass	Atypical chemokine receptors	181
+Q9NPB9	ACKR4	protein	HGNC	mainclass	Atypical chemokine receptors	182
+O15218	GPR182	protein	HGNC	mainclass	Atypical chemokine receptors	183
+O15218	GPR182	protein	HGNC	mainclass	G protein-coupled receptors, Class A orphans	184
+Q8TDX5	ACMSD	protein	HGNC	mainclass	MicroRNA protein coding host genes	185
+Q86TX2	ACOT1	protein	HGNC	mainclass	Acyl-CoA thioesterases	186
+P49753	ACOT2	protein	HGNC	mainclass	Acyl-CoA thioesterases	187
+Q8N9L9	ACOT4	protein	HGNC	mainclass	Acyl-CoA thioesterases	188
+Q3I5F7	ACOT6	protein	HGNC	mainclass	Acyl-CoA thioesterases	189
+O00154	ACOT7	protein	HGNC	mainclass	Acyl-CoA thioesterases	190
+O14734	ACOT8	protein	HGNC	mainclass	Acyl-CoA thioesterases	191
+Q9Y305	ACOT9	protein	HGNC	mainclass	Acyl-CoA thioesterases	192
+Q8WXI4	ACOT11	protein	HGNC	mainclass	Acyl-CoA thioesterases	193
+Q8WXI4	ACOT11	protein	HGNC	mainclass	StAR related lipid transfer domain containing	194
+Q8WYK0	ACOT12	protein	HGNC	mainclass	Acyl-CoA thioesterases	195
+Q8WYK0	ACOT12	protein	HGNC	mainclass	StAR related lipid transfer domain containing	196
+Q9NPJ3	ACOT13	protein	HGNC	mainclass	Acyl-CoA thioesterases	197
+Q15067	ACOX1	protein	HGNC	mainclass	Flavoproteins	198
+Q99424	ACOX2	protein	HGNC	mainclass	Flavoproteins	199
+O15254	ACOX3	protein	HGNC	mainclass	Flavoproteins	200
+Q9NUZ1	ACOXL	protein	HGNC	mainclass	Flavoproteins	201
+P24666	ACP1	protein	HGNC	mainclass	Acid phosphatases	202
+P24666	ACP1	protein	HGNC	mainclass	Class II Cys-based phosphatases	203
+P11117	ACP2	protein	HGNC	mainclass	Acid phosphatases	204
+P15309	ACP3	protein	HGNC	mainclass	Acid phosphatases	205
+Q9BZG2	ACP4	protein	HGNC	mainclass	Acid phosphatases	206
+P13686	ACP5	protein	HGNC	mainclass	Acid phosphatases	207
+Q9NPH0	ACP6	protein	HGNC	mainclass	Acid phosphatases	208
+Q6ZNF0	ACP7	protein	HGNC	mainclass	Acid phosphatases	209
+Q8NEB7	ACRBP	protein	HGNC	mainclass	Armadillo like helical domain containing	210
+Q96GR2	ACSBG1	protein	HGNC	mainclass	Acyl-CoA synthetase family	211
+Q5FVE4	ACSBG2	protein	HGNC	mainclass	Acyl-CoA synthetase family	212
+Q96CM8	ACSF2	protein	HGNC	mainclass	Acyl-CoA synthetase family	213
+Q4G176	ACSF3	protein	HGNC	mainclass	Acyl-CoA synthetase family	214
+P33121	ACSL1	protein	HGNC	mainclass	Acyl-CoA synthetase family	215
+O95573	ACSL3	protein	HGNC	mainclass	Acyl-CoA synthetase family	216
+O60488	ACSL4	protein	HGNC	mainclass	Acyl-CoA synthetase family	217
+Q9ULC5	ACSL5	protein	HGNC	mainclass	Acyl-CoA synthetase family	218
+Q9UKU0	ACSL6	protein	HGNC	mainclass	Acyl-CoA synthetase family	219
+Q08AH1	ACSM1	protein	HGNC	mainclass	Acyl-CoA synthetase family	220
+Q08AH3	ACSM2A	protein	HGNC	mainclass	Acyl-CoA synthetase family	221
+Q68CK6	ACSM2B	protein	HGNC	mainclass	Acyl-CoA synthetase family	222
+Q53FZ2	ACSM3	protein	HGNC	mainclass	Acyl-CoA synthetase family	223
+P0C7M7	ACSM4	protein	HGNC	mainclass	Acyl-CoA synthetase family	224
+Q6NUN0	ACSM5	protein	HGNC	mainclass	Acyl-CoA synthetase family	225
+Q6P461	ACSM6	protein	HGNC	mainclass	Acyl-CoA synthetase family	226
+Q9NUB1	ACSS1	protein	HGNC	mainclass	Acyl-CoA synthetase family	227
+Q9NR19	ACSS2	protein	HGNC	mainclass	Acyl-CoA synthetase family	228
+Q9H6R3	ACSS3	protein	HGNC	mainclass	MicroRNA protein coding host genes	229
+Q9H6R3	ACSS3	protein	HGNC	mainclass	Acyl-CoA synthetase family	230
+P68133	ACTA1	protein	HGNC	mainclass	Actins	231
+P62736	ACTA2	protein	HGNC	mainclass	Actins	232
+P60709	ACTB	protein	HGNC	mainclass	PBAF complex subunits	233
+P60709	ACTB	protein	HGNC	mainclass	Actins	234
+P60709	ACTB	protein	HGNC	mainclass	BAF complex subunits	235
+P60709	ACTB	protein	HGNC	mainclass	GBAF complex subunits	236
+Q562R1	ACTBL2	protein	HGNC	mainclass	Actins	237
+P68032	ACTC1	protein	HGNC	mainclass	Actins	238
+P63261	ACTG1	protein	HGNC	mainclass	Actins	239
+P63267	ACTG2	protein	HGNC	mainclass	Actins	240
+O96019	ACTL6A	protein	HGNC	mainclass	PBAF complex subunits	241
+O96019	ACTL6A	protein	HGNC	mainclass	BAF complex subunits	242
+O96019	ACTL6A	protein	HGNC	mainclass	INO80 complex	243
+O96019	ACTL6A	protein	HGNC	mainclass	Tip60/Nua4 histone acetyltransferase complex subunits	244
+O96019	ACTL6A	protein	HGNC	mainclass	SRCAP complex	245
+O96019	ACTL6A	protein	HGNC	mainclass	Actin related proteins	246
+O96019	ACTL6A	protein	HGNC	mainclass	GBAF complex subunits	247
+O94805	ACTL6B	protein	HGNC	mainclass	Actin related proteins	248
+O94805	ACTL6B	protein	HGNC	mainclass	PBAF complex subunits	249
+O94805	ACTL6B	protein	HGNC	mainclass	BAF complex subunits	250
+O94805	ACTL6B	protein	HGNC	mainclass	GBAF complex subunits	251
+Q9Y615	ACTL7A	protein	HGNC	mainclass	Actin related proteins	252
+Q9Y614	ACTL7B	protein	HGNC	mainclass	Actin related proteins	253
+Q9H568	ACTL8	protein	HGNC	mainclass	Actin related proteins	254
+Q8TC94	ACTL9	protein	HGNC	mainclass	Actin related proteins	255
+Q5JWF8	ACTL10	protein	HGNC	mainclass	Actin related proteins	256
+P12814	ACTN1	protein	HGNC	mainclass	Actinins	257
+P35609	ACTN2	protein	HGNC	mainclass	Actinins	258
+Q08043	ACTN3	protein	HGNC	mainclass	Actinins	259
+O43707	ACTN4	protein	HGNC	mainclass	Actinins	260
+P61163	ACTR1A	protein	HGNC	mainclass	Actin related proteins	261
+P61163	ACTR1A	protein	HGNC	mainclass	Dynactin subunits	262
+P42025	ACTR1B	protein	HGNC	mainclass	Actin related proteins	263
+P61160	ACTR2	protein	HGNC	mainclass	Actin related protein 2/3 complex subunits	264
+P61160	ACTR2	protein	HGNC	mainclass	Actin related proteins	265
+P61158	ACTR3	protein	HGNC	mainclass	Actin related protein 2/3 complex subunits	266
+P61158	ACTR3	protein	HGNC	mainclass	Actin related proteins	267
+Q9P1U1	ACTR3B	protein	HGNC	mainclass	Actin related proteins	268
+Q9C0K3	ACTR3C	protein	HGNC	mainclass	Actin related proteins	269
+Q9H9F9	ACTR5	protein	HGNC	mainclass	Actin related proteins	270
+Q9H9F9	ACTR5	protein	HGNC	mainclass	INO80 complex	271
+Q9GZN1	ACTR6	protein	HGNC	mainclass	Actin related proteins	272
+Q9GZN1	ACTR6	protein	HGNC	mainclass	SRCAP complex	273
+Q9H981	ACTR8	protein	HGNC	mainclass	Actin related proteins	274
+Q9H981	ACTR8	protein	HGNC	mainclass	INO80 complex	275
+Q9NZ32	ACTR10	protein	HGNC	mainclass	Actin related proteins	276
+Q9NZ32	ACTR10	protein	HGNC	mainclass	Dynactin subunits	277
+Q8TDG2	ACTRT1	protein	HGNC	mainclass	Actin related proteins	278
+Q8TDY3	ACTRT2	protein	HGNC	mainclass	Actin related proteins	279
+Q9BYD9	ACTRT3	protein	HGNC	mainclass	Actin related proteins	280
+Q04771	ACVR1	protein	HGNC	mainclass	Type 1 receptor serine/threonine kinases	281
+P36896	ACVR1B	protein	HGNC	mainclass	Type 1 receptor serine/threonine kinases	282
+Q8NER5	ACVR1C	protein	HGNC	mainclass	Type 1 receptor serine/threonine kinases	283
+P27037	ACVR2A	protein	HGNC	mainclass	Type 2 receptor serine/threonine kinases	284
+Q13705	ACVR2B	protein	HGNC	mainclass	Type 2 receptor serine/threonine kinases	285
+P37023	ACVRL1	protein	HGNC	mainclass	Type 1 receptor serine/threonine kinases	286
+Q03154	ACY1	protein	HGNC	mainclass	M20 metallopeptidases	287
+P00813	ADA	protein	HGNC	mainclass	Adenosine deaminase family	288
+Q9NZK5	ADA2	protein	HGNC	mainclass	Adenosine deaminase family	289
+Q96M93	ADAD1	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	290
+Q8NCV1	ADAD2	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	291
+Q99965	ADAM2	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	292
+Q6NVV9	ADAM5	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	293
+Q6NVV9	ADAM5	protein	HGNC	mainclass	Unitary pseudogenes	294
+Q9H2U9	ADAM7	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	295
+P78325	ADAM8	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	296
+P78325	ADAM8	protein	HGNC	mainclass	CD molecules	297
+Q13443	ADAM9	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	298
+O14672	ADAM10	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	299
+O14672	ADAM10	protein	HGNC	mainclass	CD molecules	300
+O75078	ADAM11	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	301
+O43184	ADAM12	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	302
+Q13444	ADAM15	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	303
+P78536	ADAM17	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	304
+P78536	ADAM17	protein	HGNC	mainclass	CD molecules	305
+Q9Y3Q7	ADAM18	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	306
+Q9H013	ADAM19	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	307
+O43506	ADAM20	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	308
+Q9UKJ8	ADAM21	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	309
+Q9P0K1	ADAM22	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	310
+O75077	ADAM23	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	311
+Q9UKQ2	ADAM28	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	312
+Q9UKF5	ADAM29	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	313
+Q9UKF2	ADAM30	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	314
+Q8TC27	ADAM32	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	315
+Q9BZ11	ADAM33	protein	HGNC	mainclass	ADAM metallopeptidase domain containing	316
+Q9UHI8	ADAMTS1	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	317
+O95450	ADAMTS2	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	318
+O15072	ADAMTS3	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	319
+O75173	ADAMTS4	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	320
+Q9UNA0	ADAMTS5	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	321
+Q9UKP5	ADAMTS6	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	322
+Q9UKP4	ADAMTS7	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	323
+Q9UP79	ADAMTS8	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	324
+Q9P2N4	ADAMTS9	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	325
+Q9H324	ADAMTS10	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	326
+P58397	ADAMTS12	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	327
+Q76LX8	ADAMTS13	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	328
+Q8WXS8	ADAMTS14	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	329
+Q8TE58	ADAMTS15	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	330
+Q8TE57	ADAMTS16	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	331
+Q8TE56	ADAMTS17	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	332
+Q8TE60	ADAMTS18	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	333
+Q8TE59	ADAMTS19	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	334
+P59510	ADAMTS20	protein	HGNC	mainclass	ADAM metallopeptidases with thrombospondin type 1 motif	335
+Q8N6G6	ADAMTSL1	protein	HGNC	mainclass	ADAMTS like	336
+Q8N6G6	ADAMTSL1	protein	HGNC	mainclass	MicroRNA protein coding host genes	337
+Q8N6G6	ADAMTSL1	protein	HGNC	mainclass	I-set domain containing	338
+Q86TH1	ADAMTSL2	protein	HGNC	mainclass	ADAMTS like	339
+P82987	ADAMTSL3	protein	HGNC	mainclass	ADAMTS like	340
+P82987	ADAMTSL3	protein	HGNC	mainclass	Immunoglobulin like domain containing	341
+P82987	ADAMTSL3	protein	HGNC	mainclass	I-set domain containing	342
+Q6UY14	ADAMTSL4	protein	HGNC	mainclass	ADAMTS like	343
+Q6UY14	ADAMTSL4	protein	HGNC	mainclass	MicroRNA protein coding host genes	344
+Q5T5F5	ADAMTSL4-AS1	protein	HGNC	mainclass	Antisense RNAs	345
+Q6ZMM2	ADAMTSL5	protein	HGNC	mainclass	ADAMTS like	346
+O75689	ADAP1	protein	HGNC	mainclass	ArfGAPs	347
+O75689	ADAP1	protein	HGNC	mainclass	Pleckstrin homology domain containing	348
+Q9NPF8	ADAP2	protein	HGNC	mainclass	ArfGAPs	349
+Q9NPF8	ADAP2	protein	HGNC	mainclass	Pleckstrin homology domain containing	350
+P55265	ADAR	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	351
+P78563	ADARB1	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	352
+Q9NS39	ADARB2	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	353
+A8MUL3	ADARB2-AS1	protein	HGNC	mainclass	Antisense RNAs	354
+Q9BUB4	ADAT1	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	355
+Q7Z6V5	ADAT2	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	356
+Q96EY9	ADAT3	protein	HGNC	mainclass	Adenosine deaminases acting on RNA	357
+Q08828	ADCY1	protein	HGNC	mainclass	Adenylate cyclases	358
+Q08462	ADCY2	protein	HGNC	mainclass	Adenylate cyclases	359
+O60266	ADCY3	protein	HGNC	mainclass	Adenylate cyclases	360
+Q8NFM4	ADCY4	protein	HGNC	mainclass	Adenylate cyclases	361
+O95622	ADCY5	protein	HGNC	mainclass	Adenylate cyclases	362
+O43306	ADCY6	protein	HGNC	mainclass	MicroRNA protein coding host genes	363
+O43306	ADCY6	protein	HGNC	mainclass	Adenylate cyclases	364
+P51828	ADCY7	protein	HGNC	mainclass	MicroRNA protein coding host genes	365
+P51828	ADCY7	protein	HGNC	mainclass	Adenylate cyclases	366
+P40145	ADCY8	protein	HGNC	mainclass	Adenylate cyclases	367
+O60503	ADCY9	protein	HGNC	mainclass	Adenylate cyclases	368
+Q96PN6	ADCY10	protein	HGNC	mainclass	Adenylate cyclases	369
+P18509	ADCYAP1	protein	HGNC	mainclass	Neuropeptides	370
+P41586	ADCYAP1R1	protein	HGNC	mainclass	Vasoactive intestinal peptide family receptors	371
+P35611	ADD1	protein	HGNC	mainclass	Adducin family	372
+P35612	ADD2	protein	HGNC	mainclass	Adducin family	373
+Q9UEY8	ADD3	protein	HGNC	mainclass	Adducin family	374
+Q8N7X0	ADGB	protein	HGNC	mainclass	Calpains	375
+Q86SQ6	ADGRA1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily A	376
+Q96PE1	ADGRA2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily A	377
+Q96PE1	ADGRA2	protein	HGNC	mainclass	Immunoglobulin like domain containing	378
+Q8IWK6	ADGRA3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily A	379
+Q8IWK6	ADGRA3	protein	HGNC	mainclass	I-set domain containing	380
+O14514	ADGRB1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily B	381
+O60241	ADGRB2	protein	HGNC	mainclass	MicroRNA protein coding host genes	382
+O60241	ADGRB2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily B	383
+O60242	ADGRB3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily B	384
+Q6QNK2	ADGRD1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily D	385
+Q7Z7M1	ADGRD2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily D	386
+Q14246	ADGRE1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily E	387
+Q9UHX3	ADGRE2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily E	388
+Q9UHX3	ADGRE2	protein	HGNC	mainclass	CD molecules	389
+Q9BY15	ADGRE3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily E	390
+Q86SQ3	ADGRE4P	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily E	391
+Q86SQ3	ADGRE4P	protein	HGNC	mainclass	Unitary pseudogenes	392
+P48960	ADGRE5	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily E	393
+P48960	ADGRE5	protein	HGNC	mainclass	CD molecules	394
+Q5T601	ADGRF1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily F	395
+Q8IZF7	ADGRF2P	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily F	396
+Q8IZF7	ADGRF2P	protein	HGNC	mainclass	Unitary pseudogenes	397
+Q8IZF5	ADGRF3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily F	398
+Q8IZF3	ADGRF4	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily F	399
+Q8IZF2	ADGRF5	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily F	400
+Q8IZF2	ADGRF5	protein	HGNC	mainclass	Immunoglobulin like domain containing	401
+Q8IZF2	ADGRF5	protein	HGNC	mainclass	I-set domain containing	402
+Q9Y653	ADGRG1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	403
+Q8IZP9	ADGRG2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	404
+Q86Y34	ADGRG3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	405
+Q8IZF6	ADGRG4	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	406
+Q8IZF4	ADGRG5	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	407
+Q86SQ4	ADGRG6	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	408
+Q96K78	ADGRG7	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily G	409
+O94910	ADGRL1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily L	410
+O94910	ADGRL1	protein	HGNC	mainclass	Olfactomedin domain containing	411
+O95490	ADGRL2	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily L	412
+O95490	ADGRL2	protein	HGNC	mainclass	Olfactomedin domain containing	413
+Q9HAR2	ADGRL3	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily L	414
+Q9HAR2	ADGRL3	protein	HGNC	mainclass	Olfactomedin domain containing	415
+Q9HBW9	ADGRL4	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily L	416
+Q8WXG9	ADGRV1	protein	HGNC	mainclass	USH2 complex	417
+Q8WXG9	ADGRV1	protein	HGNC	mainclass	Adhesion G protein-coupled receptors, subfamily V	418
+P07327	ADH1A	protein	HGNC	mainclass	Alcohol dehydrogenases	419
+P00325	ADH1B	protein	HGNC	mainclass	Alcohol dehydrogenases	420
+P00326	ADH1C	protein	HGNC	mainclass	Alcohol dehydrogenases	421
+P08319	ADH4	protein	HGNC	mainclass	Alcohol dehydrogenases	422
+P11766	ADH5	protein	HGNC	mainclass	Alcohol dehydrogenases	423
+P28332	ADH6	protein	HGNC	mainclass	Alcohol dehydrogenases	424
+P40394	ADH7	protein	HGNC	mainclass	Alcohol dehydrogenases	425
+Q8IWW8	ADHFE1	protein	HGNC	mainclass	Alcohol dehydrogenases	426
+Q15848	ADIPOQ	protein	HGNC	mainclass	C1q and TNF related	427
+Q96A54	ADIPOR1	protein	HGNC	mainclass	Progestin and adipoQ receptor family	428
+Q96A54	ADIPOR1	protein	HGNC	mainclass	Adiponectin receptors	429
+Q86V24	ADIPOR2	protein	HGNC	mainclass	Progestin and adipoQ receptor family	430
+Q86V24	ADIPOR2	protein	HGNC	mainclass	Adiponectin receptors	431
+P35318	ADM	protein	HGNC	mainclass	Neuropeptides	432
+Q7Z4H4	ADM2	protein	HGNC	mainclass	Neuropeptides	433
+Q9H2P0	ADNP	protein	HGNC	mainclass	ZF class homeoboxes and pseudogenes	434
+Q9H2P0	ADNP	protein	HGNC	mainclass	Zinc fingers C2H2-type	435
+Q6IQ32	ADNP2	protein	HGNC	mainclass	ZF class homeoboxes and pseudogenes	436
+Q6IQ32	ADNP2	protein	HGNC	mainclass	Zinc fingers C2H2-type	437
+P30542	ADORA1	protein	HGNC	mainclass	Adenosine receptors	438
+P29274	ADORA2A	protein	HGNC	mainclass	Adenosine receptors	439
+P86434	ADORA2A-AS1	protein	HGNC	mainclass	Antisense RNAs	440
+P29275	ADORA2B	protein	HGNC	mainclass	Adenosine receptors	441
+P0DMS8	ADORA3	protein	HGNC	mainclass	Adenosine receptors	442
+P0DMS8	ADORA3	protein	HGNC	mainclass	V-set domain containing	443
+Q3LIE5	ADPRM	protein	HGNC	mainclass	Sugar phosphatases	444
+P35348	ADRA1A	protein	HGNC	mainclass	Adrenoceptors	445
+P35368	ADRA1B	protein	HGNC	mainclass	Adrenoceptors	446
+P25100	ADRA1D	protein	HGNC	mainclass	Adrenoceptors	447
+P08913	ADRA2A	protein	HGNC	mainclass	Adrenoceptors	448
+P18089	ADRA2B	protein	HGNC	mainclass	Adrenoceptors	449
+P18825	ADRA2C	protein	HGNC	mainclass	Adrenoceptors	450
+P08588	ADRB1	protein	HGNC	mainclass	Adrenoceptors	451
+P07550	ADRB2	protein	HGNC	mainclass	Adrenoceptors	452
+P13945	ADRB3	protein	HGNC	mainclass	Adrenoceptors	453
+Q16186	ADRM1	protein	HGNC	mainclass	Proteasome	454
+P30566	ADSL	protein	HGNC	mainclass	Purinosome	455
+Q8IUX7	AEBP1	protein	HGNC	mainclass	MicroRNA protein coding host genes	456
+Q8IUX7	AEBP1	protein	HGNC	mainclass	M14 carboxypeptidases	457
+Q6ZN18	AEBP2	protein	HGNC	mainclass	Zinc fingers C2H2-type	458
+Q8WTP8	AEN	protein	HGNC	mainclass	MicroRNA protein coding host genes	459
+Q8WTP8	AEN	protein	HGNC	mainclass	Exonucleases	460
+Q8N556	AFAP1	protein	HGNC	mainclass	Pleckstrin homology domain containing	461
+Q8TED9	AFAP1L1	protein	HGNC	mainclass	Pleckstrin homology domain containing	462
+Q8N4X5	AFAP1L2	protein	HGNC	mainclass	Pleckstrin homology domain containing	463
+P55196	AFDN	protein	HGNC	mainclass	PDZ domain containing	464
+P51825	AFF1	protein	HGNC	mainclass	AF4/FMR2 family	465
+P51825	AFF1	protein	HGNC	mainclass	Super elongation complex	466
+P51816	AFF2	protein	HGNC	mainclass	AF4/FMR2 family	467
+P51816	AFF2	protein	HGNC	mainclass	Super elongation complex	468
+P51826	AFF3	protein	HGNC	mainclass	AF4/FMR2 family	469
+P51826	AFF3	protein	HGNC	mainclass	Super elongation complex	470
+Q9UHB7	AFF4	protein	HGNC	mainclass	AF4/FMR2 family	471
+Q9UHB7	AFF4	protein	HGNC	mainclass	Super elongation complex	472
+Q8NB90	AFG2A	protein	HGNC	mainclass	AAA ATPases	473
+Q9BVQ7	AFG2B	protein	HGNC	mainclass	AAA ATPases	474
+Q9Y4W6	AFG3L2	protein	HGNC	mainclass	AAA ATPases	475
+P43652	AFM	protein	HGNC	mainclass	Albuminoid family	476
+P02771	AFP	protein	HGNC	mainclass	Albuminoid family	477
+Q6ULP2	AFTPH	protein	HGNC	mainclass	MicroRNA protein coding host genes	478
+Q9UPQ3	AGAP1	protein	HGNC	mainclass	ArfGAPs	479
+Q9UPQ3	AGAP1	protein	HGNC	mainclass	BAR-PH domain containing	480
+Q9UPQ3	AGAP1	protein	HGNC	mainclass	Ankyrin repeat domain containing	481
+Q99490	AGAP2	protein	HGNC	mainclass	ArfGAPs	482
+Q99490	AGAP2	protein	HGNC	mainclass	BAR-PH domain containing	483
+Q99490	AGAP2	protein	HGNC	mainclass	Ankyrin repeat domain containing	484
+Q96P47	AGAP3	protein	HGNC	mainclass	ArfGAPs	485
+Q96P47	AGAP3	protein	HGNC	mainclass	BAR-PH domain containing	486
+Q96P47	AGAP3	protein	HGNC	mainclass	Ankyrin repeat domain containing	487
+Q96P64	AGAP4	protein	HGNC	mainclass	ArfGAPs	488
+Q96P64	AGAP4	protein	HGNC	mainclass	BAR-PH domain containing	489
+Q96P64	AGAP4	protein	HGNC	mainclass	Ankyrin repeat domain containing	490
+A6NIR3	AGAP5	protein	HGNC	mainclass	ArfGAPs	491
+A6NIR3	AGAP5	protein	HGNC	mainclass	BAR-PH domain containing	492
+A6NIR3	AGAP5	protein	HGNC	mainclass	Ankyrin repeat domain containing	493
+Q5VW22	AGAP6	protein	HGNC	mainclass	ArfGAPs	494
+Q5VW22	AGAP6	protein	HGNC	mainclass	BAR-PH domain containing	495
+Q5VW22	AGAP6	protein	HGNC	mainclass	Ankyrin repeat domain containing	496
+Q5VUJ5	AGAP7P	protein	HGNC	mainclass	ArfGAPs	497
+Q5VUJ5	AGAP7P	protein	HGNC	mainclass	Ankyrin repeat domain containing	498
+Q5VTM2	AGAP9	protein	HGNC	mainclass	ArfGAPs	499
+Q5VTM2	AGAP9	protein	HGNC	mainclass	BAR-PH domain containing	500
+Q5VTM2	AGAP9	protein	HGNC	mainclass	Ankyrin repeat domain containing	501
+Q8TF27	AGAP11	protein	HGNC	mainclass	ArfGAPs	502
+Q8TF27	AGAP11	protein	HGNC	mainclass	BAR-PH domain containing	503
+Q8TF27	AGAP11	protein	HGNC	mainclass	Ankyrin repeat domain containing	504
+Q96MI9	AGBL1	protein	HGNC	mainclass	M14 carboxypeptidases	505
+Q96MI9	AGBL1	protein	HGNC	mainclass	Armadillo like helical domain containing	506
+Q5U5Z8	AGBL2	protein	HGNC	mainclass	M14 carboxypeptidases	507
+Q8NEM8	AGBL3	protein	HGNC	mainclass	M14 carboxypeptidases	508
+Q5VU57	AGBL4	protein	HGNC	mainclass	M14 carboxypeptidases	509
+Q8NDL9	AGBL5	protein	HGNC	mainclass	M14 carboxypeptidases	510
+Q15109	AGER	protein	HGNC	mainclass	C2-set domain containing	511
+Q15109	AGER	protein	HGNC	mainclass	Scavenger receptors	512
+P52594	AGFG1	protein	HGNC	mainclass	MicroRNA protein coding host genes	513
+P52594	AGFG1	protein	HGNC	mainclass	ArfGAPs	514
+O95081	AGFG2	protein	HGNC	mainclass	ArfGAPs	515
+Q8N302	AGGF1	protein	HGNC	mainclass	G-patch domain containing	516
+P35573	AGL	protein	HGNC	mainclass	Glycoside hydrolase family	517
+Q6ZNB7	AGMO	protein	HGNC	mainclass	Fatty acid hydroxylase domain containing	518
+Q9UL18	AGO1	protein	HGNC	mainclass	Argonaute RISC component family	519
+Q9UL18	AGO1	protein	HGNC	mainclass	RISC loading complex subunits	520
+Q9UKV8	AGO2	protein	HGNC	mainclass	Argonaute RISC component family	521
+Q9UKV8	AGO2	protein	HGNC	mainclass	Endoribonucleases	522
+Q9UKV8	AGO2	protein	HGNC	mainclass	RISC loading complex subunits	523
+Q9H9G7	AGO3	protein	HGNC	mainclass	Argonaute RISC component family	524
+Q9H9G7	AGO3	protein	HGNC	mainclass	RISC loading complex subunits	525
+Q9HCK5	AGO4	protein	HGNC	mainclass	Argonaute RISC component family	526
+Q9HCK5	AGO4	protein	HGNC	mainclass	RISC loading complex subunits	527
+Q99943	AGPAT1	protein	HGNC	mainclass	Lysophospholipid acyltransferases	528
+Q99943	AGPAT1	protein	HGNC	mainclass	MicroRNA protein coding host genes	529
+Q99943	AGPAT1	protein	HGNC	mainclass	1-acylglycerol-3-phosphate O-acyltransferases	530
+O15120	AGPAT2	protein	HGNC	mainclass	Lysophospholipid acyltransferases	531
+O15120	AGPAT2	protein	HGNC	mainclass	1-acylglycerol-3-phosphate O-acyltransferases	532
+Q9NRZ7	AGPAT3	protein	HGNC	mainclass	Lysophospholipid acyltransferases	533
+Q9NRZ7	AGPAT3	protein	HGNC	mainclass	1-acylglycerol-3-phosphate O-acyltransferases	534
+Q9NRZ5	AGPAT4	protein	HGNC	mainclass	Lysophospholipid acyltransferases	535
+Q9NRZ5	AGPAT4	protein	HGNC	mainclass	1-acylglycerol-3-phosphate O-acyltransferases	536
+Q9H0P7	AGPAT4-IT1	protein	HGNC	mainclass	Intronic transcripts	537
+Q9NUQ2	AGPAT5	protein	HGNC	mainclass	Lysophospholipid acyltransferases	538
+Q9NUQ2	AGPAT5	protein	HGNC	mainclass	MicroRNA protein coding host genes	539
+Q9NUQ2	AGPAT5	protein	HGNC	mainclass	1-acylglycerol-3-phosphate O-acyltransferases	540
+O00116	AGPS	protein	HGNC	mainclass	Flavoproteins	541
+O95994	AGR2	protein	HGNC	mainclass	Protein disulfide isomerases	542
+Q8TD06	AGR3	protein	HGNC	mainclass	Protein disulfide isomerases	543
+O00468	AGRN	protein	HGNC	mainclass	Proteoglycans	544
+O00253	AGRP	protein	HGNC	mainclass	Neuropeptides	545
+P01019	AGT	protein	HGNC	mainclass	Neuropeptides	546
+P01019	AGT	protein	HGNC	mainclass	Serpin peptidase inhibitors	547
+Q9UPW5	AGTPBP1	protein	HGNC	mainclass	M14 carboxypeptidases	548
+Q9UPW5	AGTPBP1	protein	HGNC	mainclass	Armadillo like helical domain containing	549
+P30556	AGTR1	protein	HGNC	mainclass	Angiotensin receptors	550
+P50052	AGTR2	protein	HGNC	mainclass	Angiotensin receptors	551
+Q8WYP5	AHCTF1	protein	HGNC	mainclass	Nucleoporins	552
+O43865	AHCYL1	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	553
+Q8N157	AHI1	protein	HGNC	mainclass	WD repeat domain containing	554
+P0C7V0	AHI1-DT	protein	HGNC	mainclass	Divergent transcripts	555
+Q09666	AHNAK	protein	HGNC	mainclass	PDZ domain containing	556
+Q8IVF2	AHNAK2	protein	HGNC	mainclass	PDZ domain containing	557
+P35869	AHR	protein	HGNC	mainclass	Basic helix-loop-helix proteins	558
+P35869	AHR	protein	HGNC	mainclass	PAS domain containing	559
+A9YTQ3	AHRR	protein	HGNC	mainclass	Basic helix-loop-helix proteins	560
+A9YTQ3	AHRR	protein	HGNC	mainclass	PAS domain containing	561
+Q719I0	AHSA2P	protein	HGNC	mainclass	Unitary pseudogenes	562
+P02765	AHSG	protein	HGNC	mainclass	Cystatins, type 4	563
+Q9GZX7	AICDA	protein	HGNC	mainclass	Apolipoprotein B mRNA editing enzyme catalytic subunits	564
+Q96BJ3	AIDA	protein	HGNC	mainclass	C2 domain containing	565
+P55008	AIF1	protein	HGNC	mainclass	EF-hand domain containing	566
+Q9BQI0	AIF1L	protein	HGNC	mainclass	EF-hand domain containing	567
+O95831	AIFM1	protein	HGNC	mainclass	Flavoproteins	568
+Q9BRQ8	AIFM2	protein	HGNC	mainclass	Flavoproteins	569
+O14862	AIM2	protein	HGNC	mainclass	Pyrin domain containing	570
+O14862	AIM2	protein	HGNC	mainclass	Pyrin and HIN domain family	571
+Q12904	AIMP1	protein	HGNC	mainclass	Aminoacyl tRNA synthetase complex interacting multifunctional proteins	572
+Q13155	AIMP2	protein	HGNC	mainclass	Aminoacyl tRNA synthetase complex interacting multifunctional proteins	573
+Q13155	AIMP2	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	574
+O00170	AIP	protein	HGNC	mainclass	MicroRNA protein coding host genes	575
+O00170	AIP	protein	HGNC	mainclass	FKBP prolyl isomerase family	576
+Q9NZN9	AIPL1	protein	HGNC	mainclass	FKBP prolyl isomerase family	577
+O43918	AIRE	protein	HGNC	mainclass	PHD finger proteins	578
+Q96IF1	AJUBA	protein	HGNC	mainclass	Ajuba family	579
+P00568	AK1	protein	HGNC	mainclass	MicroRNA protein coding host genes	580
+P00568	AK1	protein	HGNC	mainclass	Adenylate kinases	581
+P54819	AK2	protein	HGNC	mainclass	Adenylate kinases	582
+Q9UIJ7	AK3	protein	HGNC	mainclass	Adenylate kinases	583
+P27144	AK4	protein	HGNC	mainclass	Adenylate kinases	584
+Q9Y6K8	AK5	protein	HGNC	mainclass	Adenylate kinases	585
+Q9Y3D8	AK6	protein	HGNC	mainclass	Ribosomal biogenesis factors	586
+Q9Y3D8	AK6	protein	HGNC	mainclass	Adenylate kinases	587
+Q96M32	AK7	protein	HGNC	mainclass	Adenylate kinases	588
+Q96M32	AK7	protein	HGNC	mainclass	Cilia and flagella associated	589
+Q96MA6	AK8	protein	HGNC	mainclass	Adenylate kinases	590
+Q5TCS8	AK9	protein	HGNC	mainclass	Adenylate kinases	591
+Q92667	AKAP1	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	592
+Q92667	AKAP1	protein	HGNC	mainclass	Tudor domain containing	593
+Q92667	AKAP1	protein	HGNC	mainclass	A-kinase anchoring proteins	594
+O75969	AKAP3	protein	HGNC	mainclass	A-kinase anchoring proteins	595
+Q5JQC9	AKAP4	protein	HGNC	mainclass	A-kinase anchoring proteins	596
+P24588	AKAP5	protein	HGNC	mainclass	A-kinase anchoring proteins	597
+Q13023	AKAP6	protein	HGNC	mainclass	A-kinase anchoring proteins	598
+Q9P0M2	AKAP7	protein	HGNC	mainclass	A-kinase anchoring proteins	599
+O43687	AKAP7	protein	HGNC	mainclass	A-kinase anchoring proteins	600
+O43823	AKAP8	protein	HGNC	mainclass	A-kinase anchoring proteins	601
+Q99996	AKAP9	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	602
+Q99996	AKAP9	protein	HGNC	mainclass	A-kinase anchoring proteins	603
+O43572	AKAP10	protein	HGNC	mainclass	A-kinase anchoring proteins	604
+Q9UKA4	AKAP11	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	605
+Q9UKA4	AKAP11	protein	HGNC	mainclass	A-kinase anchoring proteins	606
+Q02952	AKAP12	protein	HGNC	mainclass	A-kinase anchoring proteins	607
+Q12802	AKAP13	protein	HGNC	mainclass	Dbl family Rho GEFs	608
+Q12802	AKAP13	protein	HGNC	mainclass	MicroRNA protein coding host genes	609
+Q12802	AKAP13	protein	HGNC	mainclass	Pleckstrin homology domain containing	610
+Q12802	AKAP13	protein	HGNC	mainclass	Minor histocompatibility antigens	611
+Q12802	AKAP13	protein	HGNC	mainclass	A-kinase anchoring proteins	612
+Q86UN6	AKAP14	protein	HGNC	mainclass	A-kinase anchoring proteins	613
+Q02040	AKAP17A	protein	HGNC	mainclass	A-kinase anchoring proteins	614
+Q02040	AKAP17A	protein	HGNC	mainclass	Pseudoautosomal region 1	615
+Q9BSF0	C2orf88	protein	HGNC	mainclass	A-kinase anchoring proteins	616
+P14550	AKR1A1	protein	HGNC	mainclass	Aldo-keto reductases	617
+P15121	AKR1B1	protein	HGNC	mainclass	Aldo-keto reductases	618
+O60218	AKR1B10	protein	HGNC	mainclass	Aldo-keto reductases	619
+C9JRZ8	AKR1B15	protein	HGNC	mainclass	Aldo-keto reductases	620
+Q04828	AKR1C1	protein	HGNC	mainclass	Aldo-keto reductases	621
+P52895	AKR1C2	protein	HGNC	mainclass	Aldo-keto reductases	622
+P42330	AKR1C3	protein	HGNC	mainclass	Aldo-keto reductases	623
+P17516	AKR1C4	protein	HGNC	mainclass	Aldo-keto reductases	624
+Q5T2L2	AKR1C8	protein	HGNC	mainclass	Aldo-keto reductases	625
+P51857	AKR1D1	protein	HGNC	mainclass	Aldo-keto reductases	626
+Q96JD6	AKR1E2	protein	HGNC	mainclass	Aldo-keto reductases	627
+O43488	AKR7A2	protein	HGNC	mainclass	Aldo-keto reductases	628
+O95154	AKR7A3	protein	HGNC	mainclass	Aldo-keto reductases	629
+P31749	AKT1	protein	HGNC	mainclass	Pleckstrin homology domain containing	630
+P31749	AKT1	protein	HGNC	mainclass	AKT kinase family	631
+Q96B36	AKT1S1	protein	HGNC	mainclass	MTOR complex 1	632
+P31751	AKT2	protein	HGNC	mainclass	MicroRNA protein coding host genes	633
+P31751	AKT2	protein	HGNC	mainclass	Pleckstrin homology domain containing	634
+P31751	AKT2	protein	HGNC	mainclass	AKT kinase family	635
+Q9Y243	AKT3	protein	HGNC	mainclass	Pleckstrin homology domain containing	636
+Q9Y243	AKT3	protein	HGNC	mainclass	AKT kinase family	637
+Q9H8T0	AKTIP	protein	HGNC	mainclass	Ubiquitin conjugating enzymes E2	638
+Q9H8T0	AKTIP	protein	HGNC	mainclass	FHF complex	639
+P02768	ALB	protein	HGNC	mainclass	Albuminoid family	640
+Q13740	ALCAM	protein	HGNC	mainclass	Ig-like cell adhesion molecule family	641
+Q13740	ALCAM	protein	HGNC	mainclass	C2-set domain containing	642
+Q13740	ALCAM	protein	HGNC	mainclass	CD molecules	643
+Q13740	ALCAM	protein	HGNC	mainclass	V-set domain containing	644
+P00352	ALDH1A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	645
+O94788	ALDH1A2	protein	HGNC	mainclass	Aldehyde dehydrogenases	646
+P47895	ALDH1A3	protein	HGNC	mainclass	Aldehyde dehydrogenases	647
+P30837	ALDH1B1	protein	HGNC	mainclass	Aldehyde dehydrogenases	648
+O75891	ALDH1L1	protein	HGNC	mainclass	Aldehyde dehydrogenases	649
+Q3SY69	ALDH1L2	protein	HGNC	mainclass	Aldehyde dehydrogenases	650
+P05091	ALDH2	protein	HGNC	mainclass	Aldehyde dehydrogenases	651
+P05091	ALDH2	protein	HGNC	mainclass	MicroRNA protein coding host genes	652
+P30838	ALDH3A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	653
+P51648	ALDH3A2	protein	HGNC	mainclass	Aldehyde dehydrogenases	654
+P43353	ALDH3B1	protein	HGNC	mainclass	Aldehyde dehydrogenases	655
+P48448	ALDH3B2	protein	HGNC	mainclass	Aldehyde dehydrogenases	656
+P30038	ALDH4A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	657
+P30038	ALDH4A1	protein	HGNC	mainclass	MicroRNA protein coding host genes	658
+P51649	ALDH5A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	659
+Q02252	ALDH6A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	660
+P49419	ALDH7A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	661
+Q9H2A2	ALDH8A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	662
+P49189	ALDH9A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	663
+Q8IZ83	ALDH16A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	664
+P54886	ALDH18A1	protein	HGNC	mainclass	Aldehyde dehydrogenases	665
+P04075	ALDOA	protein	HGNC	mainclass	Aldolases	666
+P05062	ALDOB	protein	HGNC	mainclass	Aldolases	667
+P09972	ALDOC	protein	HGNC	mainclass	Endoribonucleases	668
+P09972	ALDOC	protein	HGNC	mainclass	Aldolases	669
+Q9BT22	ALG1	protein	HGNC	mainclass	Glycosyl transferases group 1 domain containing	670
+C9J202	ALG1L2	protein	HGNC	mainclass	Glycosyl transferases group 1 domain containing	671
+Q9H553	ALG2	protein	HGNC	mainclass	Glycosyl transferases group 1 domain containing	672
+Q92685	ALG3	protein	HGNC	mainclass	Dolichyl D-mannosyl phosphate dependent mannosyltransferases	673
+Q9Y673	ALG5	protein	HGNC	mainclass	Glycosyltransferase family 2	674
+Q9Y672	ALG6	protein	HGNC	mainclass	Alpha-1,3-glucosyltransferases	675
+Q9BVK2	ALG8	protein	HGNC	mainclass	Alpha-1,3-glucosyltransferases	676
+Q9H6U8	ALG9	protein	HGNC	mainclass	Dolichyl D-mannosyl phosphate dependent mannosyltransferases	677
+Q5BKT4	ALG10	protein	HGNC	mainclass	Alpha-1,2-glucosyltransferases	678
+Q5I7T1	ALG10B	protein	HGNC	mainclass	Alpha-1,2-glucosyltransferases	679
+Q2TAA5	ALG11	protein	HGNC	mainclass	Glycosyl transferases group 1 domain containing	680
+Q9BV10	ALG12	protein	HGNC	mainclass	Dolichyl D-mannosyl phosphate dependent mannosyltransferases	681
+Q9NP73	ALG13	protein	HGNC	mainclass	OTU domain containing	682
+Q9NP73	ALG13	protein	HGNC	mainclass	UDP-N-acetylglucosaminyltransferase subunits	683
+Q9NP73	ALG13	protein	HGNC	mainclass	Tudor domain containing	684
+Q96F25	ALG14	protein	HGNC	mainclass	UDP-N-acetylglucosaminyltransferase subunits	685
+Q9UM73	ALK	protein	HGNC	mainclass	CD molecules	686
+Q9UM73	ALK	protein	HGNC	mainclass	Receptor tyrosine kinases	687
+Q13686	ALKBH1	protein	HGNC	mainclass	Alkylation repair homologs	688
+Q6NS38	ALKBH2	protein	HGNC	mainclass	Alkylation repair homologs	689
+Q96Q83	ALKBH3	protein	HGNC	mainclass	Alkylation repair homologs	690
+Q9NXW9	ALKBH4	protein	HGNC	mainclass	Alkylation repair homologs	691
+Q6P6C2	ALKBH5	protein	HGNC	mainclass	Alkylation repair homologs	692
+Q3KRA9	ALKBH6	protein	HGNC	mainclass	Alkylation repair homologs	693
+Q9BT30	ALKBH7	protein	HGNC	mainclass	Alkylation repair homologs	694
+Q96BT7	ALKBH8	protein	HGNC	mainclass	DNA/RNA methyltransferases	695
+Q96BT7	ALKBH8	protein	HGNC	mainclass	Alkylation repair homologs	696
+Q96BT7	ALKBH8	protein	HGNC	mainclass	7BS DNA/RNA methyltransferases	697
+Q96BT7	ALKBH8	protein	HGNC	mainclass	RNA binding motif containing	698
+P09917	ALOX5	protein	HGNC	mainclass	Arachidonate lipoxygenases	699
+P18054	ALOX12	protein	HGNC	mainclass	Arachidonate lipoxygenases	700
+O75342	ALOX12B	protein	HGNC	mainclass	Arachidonate lipoxygenases	701
+P16050	ALOX15	protein	HGNC	mainclass	Arachidonate lipoxygenases	702
+O15296	ALOX15B	protein	HGNC	mainclass	Arachidonate lipoxygenases	703
+Q9BYJ1	ALOXE3	protein	HGNC	mainclass	Arachidonate lipoxygenases	704
+P10696	ALPG	protein	HGNC	mainclass	Alkaline phosphatases	705
+P09923	ALPI	protein	HGNC	mainclass	Alkaline phosphatases	706
+Q86TB3	ALPK2	protein	HGNC	mainclass	I-set domain containing	707
+Q96L96	ALPK3	protein	HGNC	mainclass	I-set domain containing	708
+P05186	ALPL	protein	HGNC	mainclass	Alkaline phosphatases	709
+P05187	ALPP	protein	HGNC	mainclass	Alkaline phosphatases	710
+Q96Q42	ALS2	protein	HGNC	mainclass	Dbl family Rho GEFs	711
+Q96Q42	ALS2	protein	HGNC	mainclass	VPS9 domain containing	712
+Q60I27	ALS2CL	protein	HGNC	mainclass	Dbl family Rho GEFs	713
+Q60I27	ALS2CL	protein	HGNC	mainclass	VPS9 domain containing	714
+Q15699	ALX1	protein	HGNC	mainclass	PRD class homeoboxes and pseudogenes	715
+O95076	ALX3	protein	HGNC	mainclass	PRD class homeoboxes and pseudogenes	716
+Q9H161	ALX4	protein	HGNC	mainclass	PRD class homeoboxes and pseudogenes	717
+Q86V81	ALYREF	protein	HGNC	mainclass	THO complex	718
+Q86V81	ALYREF	protein	HGNC	mainclass	RNA binding motif containing	719
+Q9NP70	AMBN	protein	HGNC	mainclass	Secretory calcium-binding phosphoprotein family	720
+P02760	AMBP	protein	HGNC	mainclass	Lipocalins	721
+Q9C0C7	AMBRA1	protein	HGNC	mainclass	MicroRNA protein coding host genes	722
+Q9C0C7	AMBRA1	protein	HGNC	mainclass	WD repeat domain containing	723
+Q9C0C7	AMBRA1	protein	HGNC	mainclass	DDB1 and CUL4 associated factors	724
+Q96NU7	AMDHD1	protein	HGNC	mainclass	M38 metallopeptidases	725
+Q99217	AMELX	protein	HGNC	mainclass	Secretory calcium-binding phosphoprotein family	726
+Q99218	AMELY	protein	HGNC	mainclass	Secretory calcium-binding phosphoprotein family	727
+Q5JTC6	AMER1	protein	HGNC	mainclass	APC membrane recruitment proteins	728
+Q8N7J2	AMER2	protein	HGNC	mainclass	APC membrane recruitment proteins	729
+Q8N944	AMER3	protein	HGNC	mainclass	APC membrane recruitment proteins	730
+Q9UKV5	AMFR	protein	HGNC	mainclass	Ring finger proteins	731
+P03971	AMH	protein	HGNC	mainclass	Transforming growth factor beta superfamily	732
+P03971	AMH	protein	HGNC	mainclass	MicroRNA protein coding host genes	733
+P03971	AMH	protein	HGNC	mainclass	Receptor ligands	734
+Q16671	AMHR2	protein	HGNC	mainclass	Type 2 receptor serine/threonine kinases	735
+Q86WK6	AMIGO1	protein	HGNC	mainclass	V-set domain containing	736
+Q86SJ2	AMIGO2	protein	HGNC	mainclass	Immunoglobulin like domain containing	737
+Q86WK7	AMIGO3	protein	HGNC	mainclass	Immunoglobulin like domain containing	738
+Q9Y4X0	AMMECR1	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	739
+Q4VCS5	AMOT	protein	HGNC	mainclass	MicroRNA protein coding host genes	740
+Q9Y2J4	AMOTL2	protein	HGNC	mainclass	MicroRNA protein coding host genes	741
+P23109	AMPD1	protein	HGNC	mainclass	Adenosine deaminase family	742
+Q01433	AMPD2	protein	HGNC	mainclass	Adenosine deaminase family	743
+Q01432	AMPD3	protein	HGNC	mainclass	Adenosine deaminase family	744
+P49418	AMPH	protein	HGNC	mainclass	N-BAR domain containing	745
+P48728	AMT	protein	HGNC	mainclass	Methyltransferase families	746
+Q6UX39	AMTN	protein	HGNC	mainclass	Secretory calcium-binding phosphoprotein family	747
+P0DUB6	AMY1A	protein	HGNC	mainclass	Amylases alpha	748
+P0DTE7	AMY1B	protein	HGNC	mainclass	Amylases alpha	749
+P0DTE8	AMY1C	protein	HGNC	mainclass	Amylases alpha	750
+P04746	AMY2A	protein	HGNC	mainclass	Amylases alpha	751
+P19961	AMY2B	protein	HGNC	mainclass	Amylases alpha	752
+Q400G9	AMZ1	protein	HGNC	mainclass	M54 metallopeptidase family	753
+Q86W34	AMZ2	protein	HGNC	mainclass	M54 metallopeptidase family	754
+Q9H1A4	ANAPC1	protein	HGNC	mainclass	MicroRNA protein coding host genes	755
+Q9H1A4	ANAPC1	protein	HGNC	mainclass	Anaphase promoting complex	756
+Q9UJX6	ANAPC2	protein	HGNC	mainclass	Anaphase promoting complex	757
+Q9UJX5	ANAPC4	protein	HGNC	mainclass	Anaphase promoting complex	758
+Q9UJX4	ANAPC5	protein	HGNC	mainclass	Anaphase promoting complex	759
+Q9UJX3	ANAPC7	protein	HGNC	mainclass	Tetratricopeptide repeat domain containing	760
+Q9UJX3	ANAPC7	protein	HGNC	mainclass	Anaphase promoting complex	761
+Q9UM13	ANAPC10	protein	HGNC	mainclass	Anaphase promoting complex	762
+Q9NYG5	ANAPC11	protein	HGNC	mainclass	Anaphase promoting complex	763
+Q9NYG5	ANAPC11	protein	HGNC	mainclass	Ring finger proteins	764
+Q9BS18	ANAPC13	protein	HGNC	mainclass	Anaphase promoting complex	765
+P60006	ANAPC15	protein	HGNC	mainclass	Anaphase promoting complex	766
+Q96DE5	ANAPC16	protein	HGNC	mainclass	Anaphase promoting complex	767
+P03950	ANG	protein	HGNC	mainclass	Ribonuclease A family	768
+Q15389	ANGPT1	protein	HGNC	mainclass	Fibrinogen C domain containing	769
+Q15389	ANGPT1	protein	HGNC	mainclass	Receptor ligands	770
+Q15389	ANGPT1	protein	HGNC	mainclass	Angiopoietins	771
+O15123	ANGPT2	protein	HGNC	mainclass	Fibrinogen C domain containing	772
+O15123	ANGPT2	protein	HGNC	mainclass	Receptor ligands	773
+O15123	ANGPT2	protein	HGNC	mainclass	Angiopoietins	774
+Q9Y264	ANGPT4	protein	HGNC	mainclass	Fibrinogen C domain containing	775
+Q9Y264	ANGPT4	protein	HGNC	mainclass	Receptor ligands	776
+Q9Y264	ANGPT4	protein	HGNC	mainclass	Angiopoietins	777
+O95841	ANGPTL1	protein	HGNC	mainclass	Fibrinogen C domain containing	778
+O95841	ANGPTL1	protein	HGNC	mainclass	Angiopoietin like family	779
+O95841	ANGPTL1	protein	HGNC	mainclass	Receptor ligands	780
+Q9UKU9	ANGPTL2	protein	HGNC	mainclass	Fibrinogen C domain containing	781
+Q9UKU9	ANGPTL2	protein	HGNC	mainclass	Angiopoietin like family	782
+Q9Y5C1	ANGPTL3	protein	HGNC	mainclass	Fibrinogen C domain containing	783
+Q9Y5C1	ANGPTL3	protein	HGNC	mainclass	Angiopoietin like family	784
+Q9Y5C1	ANGPTL3	protein	HGNC	mainclass	Receptor ligands	785
+Q9BY76	ANGPTL4	protein	HGNC	mainclass	Fibrinogen C domain containing	786
+Q9BY76	ANGPTL4	protein	HGNC	mainclass	Angiopoietin like family	787
+Q86XS5	ANGPTL5	protein	HGNC	mainclass	Fibrinogen C domain containing	788
+Q86XS5	ANGPTL5	protein	HGNC	mainclass	Angiopoietin like family	789
+Q8NI99	ANGPTL6	protein	HGNC	mainclass	Fibrinogen C domain containing	790
+Q8NI99	ANGPTL6	protein	HGNC	mainclass	Angiopoietin like family	791
+O43827	ANGPTL7	protein	HGNC	mainclass	Fibrinogen C domain containing	792
+O43827	ANGPTL7	protein	HGNC	mainclass	Angiopoietin like family	793
+O43827	ANGPTL7	protein	HGNC	mainclass	Receptor ligands	794
+Q6UXH0	ANGPTL8	protein	HGNC	mainclass	Angiopoietin like family	795
+P16157	ANK1	protein	HGNC	mainclass	ZU5 domain containing	796
+P16157	ANK1	protein	HGNC	mainclass	MicroRNA protein coding host genes	797
+P16157	ANK1	protein	HGNC	mainclass	Ankyrin repeat domain containing	798
+Q01484	ANK2	protein	HGNC	mainclass	ZU5 domain containing	799
+Q01484	ANK2	protein	HGNC	mainclass	MicroRNA protein coding host genes	800
+Q01484	ANK2	protein	HGNC	mainclass	Ankyrin repeat domain containing	801
+Q01484	ANK2	protein	HGNC	mainclass	Cilia and flagella associated	802
+Q12955	ANK3	protein	HGNC	mainclass	ZU5 domain containing	803
+Q12955	ANK3	protein	HGNC	mainclass	Ankyrin repeat domain containing	804
+Q7Z5J8	ANKAR	protein	HGNC	mainclass	Ankyrin repeat domain containing	805
+Q7Z5J8	ANKAR	protein	HGNC	mainclass	Armadillo repeat containing	806
+Q495B1	ANKDD1A	protein	HGNC	mainclass	Ankyrin repeat domain containing	807
+A6NHY2	ANKDD1B	protein	HGNC	mainclass	Ankyrin repeat domain containing	808
+Q9NU02	ANKEF1	protein	HGNC	mainclass	EF-hand domain containing	809
+Q9NU02	ANKEF1	protein	HGNC	mainclass	Ankyrin repeat domain containing	810
+Q8N957	ANKFN1	protein	HGNC	mainclass	Fibronectin type III domain containing	811
+Q8N957	ANKFN1	protein	HGNC	mainclass	Ankyrin repeat domain containing	812
+Q9P2R3	ANKFY1	protein	HGNC	mainclass	Zinc fingers FYVE-type	813
+Q9P2R3	ANKFY1	protein	HGNC	mainclass	Ankyrin repeat domain containing	814
+Q9P2R3	ANKFY1	protein	HGNC	mainclass	BTB domain containing	815
+Q9HCJ1	ANKH	protein	HGNC	mainclass	Solute carrier family 62	816
+Q9HCJ1	ANKH	protein	HGNC	mainclass	MicroRNA protein coding host genes	817
+Q8IWZ3	ANKHD1	protein	HGNC	mainclass	Ankyrin repeat domain containing	818
+Q9P2G1	ANKIB1	protein	HGNC	mainclass	Ankyrin repeat domain containing	819
+Q9P2G1	ANKIB1	protein	HGNC	mainclass	RBR E3 ubiquitin ligases	820
+Q9P2G1	ANKIB1	protein	HGNC	mainclass	Ring finger proteins	821
+Q8NFD2	ANKK1	protein	HGNC	mainclass	Ankyrin repeat domain containing	822
+Q8NAG6	ANKLE1	protein	HGNC	mainclass	LEM domain containing	823
+Q8NAG6	ANKLE1	protein	HGNC	mainclass	GIY-YIG endonuclease domain containing	824
+Q8NAG6	ANKLE1	protein	HGNC	mainclass	Ankyrin repeat domain containing	825
+Q86XL3	ANKLE2	protein	HGNC	mainclass	LEM domain containing	826
+Q86XL3	ANKLE2	protein	HGNC	mainclass	Ankyrin repeat domain containing	827
+Q9P2S6	ANKMY1	protein	HGNC	mainclass	Ankyrin repeat domain containing	828
+Q9P2S6	ANKMY1	protein	HGNC	mainclass	Zinc fingers MYND-type	829
+Q8IV38	ANKMY2	protein	HGNC	mainclass	Ankyrin repeat domain containing	830
+Q8IV38	ANKMY2	protein	HGNC	mainclass	Zinc fingers MYND-type	831
+Q9H9E1	ANKRA2	protein	HGNC	mainclass	Ankyrin repeat domain containing	832
+Q15327	ANKRD1	protein	HGNC	mainclass	Ankyrin repeat domain containing	833
+Q9GZV1	ANKRD2	protein	HGNC	mainclass	Ankyrin repeat domain containing	834
+Q9Y2G4	ANKRD6	protein	HGNC	mainclass	Ankyrin repeat domain containing	835
+Q92527	ANKRD7	protein	HGNC	mainclass	Ankyrin repeat domain containing	836
+Q96BM1	ANKRD9	protein	HGNC	mainclass	Ankyrin repeat domain containing	837
+Q9NXR5	ANKRD10	protein	HGNC	mainclass	Ankyrin repeat domain containing	838
+Q6UB99	ANKRD11	protein	HGNC	mainclass	Ankyrin repeat domain containing	839
+Q6UB98	ANKRD12	protein	HGNC	mainclass	Ankyrin repeat domain containing	840
+Q8IZ07	ANKRD13A	protein	HGNC	mainclass	Ankyrin repeat domain containing	841
+Q86YJ7	ANKRD13B	protein	HGNC	mainclass	Ankyrin repeat domain containing	842
+Q8N6S4	ANKRD13C	protein	HGNC	mainclass	Ankyrin repeat domain containing	843
+Q9XRX5	ANKRD13C-DT	protein	HGNC	mainclass	Divergent transcripts	844
+Q6ZTN6	ANKRD13D	protein	HGNC	mainclass	Ankyrin repeat domain containing	845
+Q6P6B7	ANKRD16	protein	HGNC	mainclass	Ankyrin repeat domain containing	846
+O75179	ANKRD17	protein	HGNC	mainclass	Ankyrin repeat domain containing	847
+Q8IVF6	ANKRD18A	protein	HGNC	mainclass	Ankyrin repeat domain containing	848
+A2A2Z9	ANKRD18B	protein	HGNC	mainclass	Ankyrin repeat domain containing	849
+Q5TYW2	ANKRD20A1	protein	HGNC	mainclass	Ankyrin repeat domain containing	850
+Q5SQ80	ANKRD20A2P	protein	HGNC	mainclass	Ankyrin repeat domain containing	851
+Q5VUR7	ANKRD20A3P	protein	HGNC	mainclass	Ankyrin repeat domain containing	852
+Q4UJ75	ANKRD20A4P	protein	HGNC	mainclass	Ankyrin repeat domain containing	853
+Q5VYY1	ANKRD22	protein	HGNC	mainclass	Ankyrin repeat domain containing	854
+Q86SG2	ANKRD23	protein	HGNC	mainclass	Ankyrin repeat domain containing	855
+Q8TF21	ANKRD24	protein	HGNC	mainclass	Ankyrin repeat domain containing	856
+Q9UPS8	ANKRD26	protein	HGNC	mainclass	Ankyrin repeat domain containing	857
+Q96NW4	ANKRD27	protein	HGNC	mainclass	VPS9 domain containing	858
+Q96NW4	ANKRD27	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	859
+Q96NW4	ANKRD27	protein	HGNC	mainclass	Ankyrin repeat domain containing	860
+O15084	ANKRD28	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	861
+O15084	ANKRD28	protein	HGNC	mainclass	MicroRNA protein coding host genes	862
+O15084	ANKRD28	protein	HGNC	mainclass	Cilia and flagella associated	863
+O15084	ANKRD28	protein	HGNC	mainclass	Ankyrin repeat domain containing	864
+O15084	ANKRD28	protein	HGNC	mainclass	Protein phosphatase 6 regulatory subunits	865
+Q8N6D5	ANKRD29	protein	HGNC	mainclass	Ankyrin repeat domain containing	866
+Q9BXX3	ANKRD30A	protein	HGNC	mainclass	Ankyrin repeat domain containing	867
+Q9BXX2	ANKRD30B	protein	HGNC	mainclass	MicroRNA protein coding host genes	868
+Q9BXX2	ANKRD30B	protein	HGNC	mainclass	Ankyrin repeat domain containing	869
+A7E2S9	ANKRD30BL	protein	HGNC	mainclass	Ankyrin repeat domain containing	870
+Q8N7Z5	ANKRD31	protein	HGNC	mainclass	Ankyrin repeat domain containing	871
+Q7Z3H0	ANKRD33	protein	HGNC	mainclass	Ankyrin repeat domain containing	872
+A6NCL7	ANKRD33B	protein	HGNC	mainclass	Ankyrin repeat domain containing	873
+Q69YU3	ANKRD34A	protein	HGNC	mainclass	Ankyrin repeat domain containing	874
+A5PLL1	ANKRD34B	protein	HGNC	mainclass	Ankyrin repeat domain containing	875
+P0C6C1	ANKRD34C	protein	HGNC	mainclass	Ankyrin repeat domain containing	876
+Q8N283	ANKRD35	protein	HGNC	mainclass	Ankyrin repeat domain containing	877
+A6QL64	ANKRD36	protein	HGNC	mainclass	Ankyrin repeat domain containing	878
+Q8N2N9	ANKRD36B	protein	HGNC	mainclass	Ankyrin repeat domain containing	879
+Q5JPF3	ANKRD36C	protein	HGNC	mainclass	Ankyrin repeat domain containing	880
+Q7Z713	ANKRD37	protein	HGNC	mainclass	Ankyrin repeat domain containing	881
+Q53RE8	ANKRD39	protein	HGNC	mainclass	Ankyrin repeat domain containing	882
+Q6AI12	ANKRD40	protein	HGNC	mainclass	Ankyrin repeat domain containing	883
+Q8N9B4	ANKRD42	protein	HGNC	mainclass	Protein phosphatase 1 regulatory subunits	884
+Q8N9B4	ANKRD42	protein	HGNC	mainclass	Ankyrin repeat domain containing	885
+Q8N8A2	ANKRD44	protein	HGNC	mainclass	Ankyrin repeat domain containing	886
+Q8N8A2	ANKRD44	protein	HGNC	mainclass	Protein phosphatase 6 regulatory subunits	887
+Q5TZF3	ANKRD45	protein	HGNC	mainclass	Ankyrin repeat domain containing	888
+Q86W74	ANKRD46	protein	HGNC	mainclass	Ankyrin repeat domain containing	889
+Q8WVL7	ANKRD49	protein	HGNC	mainclass	Ankyrin repeat domain containing	890
+Q9ULJ7	ANKRD50	protein	HGNC	mainclass	Ankyrin repeat domain containing	891
+Q8NB46	ANKRD52	protein	HGNC	mainclass	Ankyrin repeat domain containing	892
+Q8NB46	ANKRD52	protein	HGNC	mainclass	Protein phosphatase 6 regulatory subunits	893
+Q8N9V6	ANKRD53	protein	HGNC	mainclass	Ankyrin repeat domain containing	894
+Q6NXT1	ANKRD54	protein	HGNC	mainclass	MicroRNA protein coding host genes	895
+Q6NXT1	ANKRD54	protein	HGNC	mainclass	Ankyrin repeat domain containing	896
+Q3KP44	ANKRD55	protein	HGNC	mainclass	Ankyrin repeat domain containing	897
+Q9BZ19	ANKRD60	protein	HGNC	mainclass	Ankyrin repeat domain containing	898
+A6NGH8	ANKRD61	protein	HGNC	mainclass	Ankyrin repeat domain containing	899
+A6NC57	ANKRD62	protein	HGNC	mainclass	Ankyrin repeat domain containing	900
+C9JTQ0	ANKRD63	protein	HGNC	mainclass	Ankyrin repeat domain containing	901
+E5RJM6	ANKRD65	protein	HGNC	mainclass	Ankyrin repeat domain containing	902
+B4E2M5	ANKRD66	protein	HGNC	mainclass	Ankyrin repeat domain containing	903
+Q92625	ANKS1A	protein	HGNC	mainclass	Sterile alpha motif domain containing	904
+Q92625	ANKS1A	protein	HGNC	mainclass	Ankyrin repeat domain containing	905
+Q7Z6G8	ANKS1B	protein	HGNC	mainclass	Sterile alpha motif domain containing	906
+Q7Z6G8	ANKS1B	protein	HGNC	mainclass	Ankyrin repeat domain containing	907
+Q6ZW76	ANKS3	protein	HGNC	mainclass	Sterile alpha motif domain containing	908
+Q6ZW76	ANKS3	protein	HGNC	mainclass	Ankyrin repeat domain containing	909
+Q8N8V4	ANKS4B	protein	HGNC	mainclass	Sterile alpha motif domain containing	910
+Q8N8V4	ANKS4B	protein	HGNC	mainclass	Ankyrin repeat domain containing	911
+Q68DC2	ANKS6	protein	HGNC	mainclass	Sterile alpha motif domain containing	912
+Q68DC2	ANKS6	protein	HGNC	mainclass	Ankyrin repeat domain containing	913
+A6NFN9	ANKUB1	protein	HGNC	mainclass	Ankyrin repeat domain containing	914
+Q9H8Y5	ANKZF1	protein	HGNC	mainclass	Ankyrin repeat domain containing	915
+Q9H8Y5	ANKZF1	protein	HGNC	mainclass	Zinc fingers C2H2-type	916
+Q9NQW6	ANLN	protein	HGNC	mainclass	Pleckstrin homology domain containing	917
+Q5XXA6	ANO1	protein	HGNC	mainclass	Anoctamins	918
+Q9NQ90	ANO2	protein	HGNC	mainclass	Anoctamins	919
+Q9BYT9	ANO3	protein	HGNC	mainclass	Anoctamins	920
+Q32M45	ANO4	protein	HGNC	mainclass	Anoctamins	921
+Q75V66	ANO5	protein	HGNC	mainclass	Anoctamins	922
+Q4KMQ2	ANO6	protein	HGNC	mainclass	Anoctamins	923
+Q6IWH7	ANO7	protein	HGNC	mainclass	Anoctamins	924
+Q9HCE9	ANO8	protein	HGNC	mainclass	Anoctamins	925
+A1A5B4	ANO9	protein	HGNC	mainclass	Anoctamins	926
+Q9NW15	ANO10	protein	HGNC	mainclass	Anoctamins	927
+P23352	ANOS1	protein	HGNC	mainclass	Fibronectin type III domain containing	928
+P23352	ANOS1	protein	HGNC	mainclass	WAP four-disulfide core domain containing	929
+P39687	ANP32A	protein	HGNC	mainclass	ANP32 acidic nuclear phosphoproteins	930
+P39687	ANP32A	protein	HGNC	mainclass	SET complex	931
+P39687	ANP32A	protein	HGNC	mainclass	MicroRNA protein coding host genes	932
+P39687	ANP32A	protein	HGNC	mainclass	INHAT complex	933
+Q92688	ANP32B	protein	HGNC	mainclass	ANP32 acidic nuclear phosphoproteins	934
+O43423	ANP32CP	protein	HGNC	mainclass	ANP32 acidic nuclear phosphoproteins	935
+O95626	ANP32D	protein	HGNC	mainclass	ANP32 acidic nuclear phosphoproteins	936
+Q9BTT0	ANP32E	protein	HGNC	mainclass	ANP32 acidic nuclear phosphoproteins	937
+P15144	ANPEP	protein	HGNC	mainclass	Aminopeptidases	938
+P15144	ANPEP	protein	HGNC	mainclass	M1 metallopeptidases	939
+P15144	ANPEP	protein	HGNC	mainclass	CD molecules	940
+Q9BQD7	ANTKMT	protein	HGNC	mainclass	7BS protein lysine methyltransferases	941
+Q9BQD7	ANTKMT	protein	HGNC	mainclass	Non-histone lysine methyltransferases	942
+Q9H6X2	ANTXR1	protein	HGNC	mainclass	MicroRNA protein coding host genes	943
+P04083	ANXA1	protein	HGNC	mainclass	Annexins	944
+P04083	ANXA1	protein	HGNC	mainclass	Receptor ligands	945
+P07355	ANXA2	protein	HGNC	mainclass	Annexins	946
+P12429	ANXA3	protein	HGNC	mainclass	Annexins	947
+P09525	ANXA4	protein	HGNC	mainclass	Annexins	948
+P08758	ANXA5	protein	HGNC	mainclass	Annexins	949
+P08133	ANXA6	protein	HGNC	mainclass	Annexins	950
+P20073	ANXA7	protein	HGNC	mainclass	Annexins	951
+P13928	ANXA8	protein	HGNC	mainclass	Annexins	952
+Q5VT79	ANXA8L1	protein	HGNC	mainclass	Annexins	953
+O76027	ANXA9	protein	HGNC	mainclass	Annexins	954
+Q9UJ72	ANXA10	protein	HGNC	mainclass	Annexins	955
+P50995	ANXA11	protein	HGNC	mainclass	Annexins	956
+P27216	ANXA13	protein	HGNC	mainclass	Annexins	957
+Q8N6M6	AOPEP	protein	HGNC	mainclass	MicroRNA protein coding host genes	958
+Q8N6M6	AOPEP	protein	HGNC	mainclass	M1 metallopeptidases	959
+Q06278	AOX1	protein	HGNC	mainclass	Flavoproteins	960
+Q10567	AP1B1	protein	HGNC	mainclass	Adaptor related protein complex 1	961
+Q10567	AP1B1	protein	HGNC	mainclass	MicroRNA protein coding host genes	962
+Q10567	AP1B1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	963
+Q10567	AP1B1	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	964
+O43747	AP1G1	protein	HGNC	mainclass	Adaptor related protein complex 1	965
+O43747	AP1G1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	966
+O43747	AP1G1	protein	HGNC	mainclass	Small nucleolar RNA protein coding host genes	967
+O75843	AP1G2	protein	HGNC	mainclass	Adaptor related protein complex 1	968
+O75843	AP1G2	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	969
+Q9BXS5	AP1M1	protein	HGNC	mainclass	Adaptor related protein complex 1	970
+Q9Y6Q5	AP1M2	protein	HGNC	mainclass	Adaptor related protein complex 1	971
+P61966	AP1S1	protein	HGNC	mainclass	Adaptor related protein complex 1	972
+P61966	AP1S1	protein	HGNC	mainclass	MicroRNA protein coding host genes	973
+P56377	AP1S2	protein	HGNC	mainclass	Adaptor related protein complex 1	974
+Q96PC3	AP1S3	protein	HGNC	mainclass	Adaptor related protein complex 1	975
+O95782	AP2A1	protein	HGNC	mainclass	MicroRNA protein coding host genes	976
+O95782	AP2A1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	977
+O95782	AP2A1	protein	HGNC	mainclass	Adaptor related protein complex 2	978
+O94973	AP2A2	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	979
+O94973	AP2A2	protein	HGNC	mainclass	Adaptor related protein complex 2	980
+P63010	AP2B1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	981
+P63010	AP2B1	protein	HGNC	mainclass	Adaptor related protein complex 2	982
+Q96CW1	AP2M1	protein	HGNC	mainclass	Adaptor related protein complex 2	983
+P53680	AP2S1	protein	HGNC	mainclass	Adaptor related protein complex 2	984
+O00203	AP3B1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	985
+O00203	AP3B1	protein	HGNC	mainclass	Adaptor related protein complex 3	986
+Q13367	AP3B2	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	987
+Q13367	AP3B2	protein	HGNC	mainclass	Adaptor related protein complex 3	988
+O14617	AP3D1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	989
+O14617	AP3D1	protein	HGNC	mainclass	Adaptor related protein complex 3	990
+Q9Y2T2	AP3M1	protein	HGNC	mainclass	Adaptor related protein complex 3	991
+P53677	AP3M2	protein	HGNC	mainclass	Adaptor related protein complex 3	992
+Q92572	AP3S1	protein	HGNC	mainclass	Adaptor related protein complex 3	993
+P59780	AP3S2	protein	HGNC	mainclass	MicroRNA protein coding host genes	994
+P59780	AP3S2	protein	HGNC	mainclass	Adaptor related protein complex 3	995
+Q9Y6B7	AP4B1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	996
+Q9Y6B7	AP4B1	protein	HGNC	mainclass	Adaptor related protein complex 4	997
+Q9UPM8	AP4E1	protein	HGNC	mainclass	Clathrin/coatomer adaptor, adaptin-like, N-terminal domain containing	998
