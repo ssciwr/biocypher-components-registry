@@ -1,0 +1,185 @@
+import {
+  ArrowRightIcon,
+  CloudArrowUpIcon,
+  CommandLineIcon,
+  DocumentPlusIcon,
+  MagnifyingGlassIcon,
+  SparklesIcon,
+} from '@heroicons/react/24/outline'
+import bioCypherLogo from './assets/logo-biocypher.png'
+
+const actionCards = [
+  {
+    label: 'Explore adapters',
+    icon: MagnifyingGlassIcon,
+    text: 'Search reusable components and inspect adapter metadata like data sources.',
+    cta: 'Browse adapters',
+    tone: 'bg-cyan-100 text-cyan-700',
+  },
+  {
+    label: 'Create',
+    icon: DocumentPlusIcon,
+    text: 'Create BioCypher adapters and metadata.',
+    cta: 'Start creating',
+    featured: true,
+    tone: 'bg-white/20 text-white',
+  },
+  {
+    label: 'Register adapter',
+    icon: CloudArrowUpIcon,
+    text: 'Submit your adapter repository to our registry, so others can use it.',
+    cta: 'Register now',
+    tone: 'bg-blue-100 text-blue-700',
+  },
+]
+
+const popularAdapters = ['Open Targets', 'OmniPath', 'Collectri adapter']
+
+function App() {
+  return (
+    <main className="min-h-screen bg-slate-100 text-slate-950">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+          <a className="flex items-center gap-2" href="#">
+            <img alt="BioCypher" className="h-7 w-7" src={bioCypherLogo} />
+            <span className="text-base font-semibold">BioCypher</span>
+            <span className="text-sm text-slate-500">| Registry</span>
+          </a>
+          <nav className="hidden items-center gap-16 text-sm text-slate-600 md:flex" aria-label="Main">
+            <a className="hover:text-slate-950" href="#">
+              Explore
+            </a>
+            <a className="hover:text-slate-950" href="#">
+              Create
+            </a>
+            <a className="hover:text-slate-950" href="#">
+              Register
+            </a>
+          </nav>
+          <div className="flex items-center gap-3">
+            <a
+              className="hidden rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600 sm:inline-flex"
+              href="#"
+            >
+              Sign in with GitHub
+            </a>
+            <a
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
+              href="#"
+            >
+              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              <b>Workspace</b>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <section className="bg-blue-50">
+        <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
+            <span className="h-2 w-2 rounded-full bg-lime-500" aria-hidden="true" />
+            Discover adapters, generate metadata, and register components
+          </div>
+          <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
+            Find BioCypher components<br /> for your research
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 md:text-lg">
+            Search adapters, create Croissant metadata, and submit your adapter repository to us
+          </p>
+
+          <label className="mx-auto mt-14 flex max-w-3xl items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm">
+            <MagnifyingGlassIcon className="h-5 w-5 flex-none text-slate-300" aria-hidden="true" />
+            <input
+              aria-label="Search adapters"
+              className="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500"
+              placeholder="Search adapters..."
+              type="search"
+            />
+          </label>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
+            <span>Popular:</span>
+            {popularAdapters.map((adapter) => (
+              <a
+                className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
+                href="#"
+                key={adapter}
+              >
+                {adapter}
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50">
+        <div className="mx-auto max-w-6xl px-6 py-10 md:py-12">
+          <div className="grid gap-8 md:grid-cols-3">
+            {actionCards.map((card) => {
+              const Icon = card.icon
+
+              return (
+                <a
+                  className={`rounded-2xl border p-7 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.featured ? 'border-blue-600 bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700' : 'border-slate-200 bg-white hover:border-blue-200'}`}
+                  href="#"
+                  key={card.label}
+                >
+                  <span
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}
+                  >
+                    <Icon className="h-6 w-6" aria-hidden="true" />
+                    {/* todo: croissant icon/decide on icons */}
+                  </span>
+                  <h2 className={`mt-4 text-xl font-bold ${card.featured ? 'text-white' : 'text-slate-950'}`}>{card.label}</h2>
+                  <p className={`mt-3 min-h-12 text-sm leading-5 ${card.featured ? 'text-blue-50' : 'text-slate-600'}`}>{card.text}</p>
+                  <span className={`mt-8 inline-flex items-center gap-1 text-sm font-medium ${card.featured ? 'text-white' : 'text-blue-600'}`}>
+                    {card.cta}
+                    <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </a>
+              )
+            })}
+          </div>
+
+          <a
+            className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
+            href="#"
+          >
+            <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
+              <CommandLineIcon className="h-7 w-7" aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block text-2xl font-bold text-slate-950">
+                Move into better biology research
+              </span>
+              <span className="mt-2 block text-base text-slate-700">
+                Try our MCP workspace to build adapters for datasets you want to work with, using
+                your LLM.
+              </span>
+              <span className="mt-2 block text-sm leading-6 text-slate-500">
+                Our MCP server guides the workflow and provides examples, helping your research code
+                be written more accurately and thoroughly.
+              </span>
+            </span>
+          </a>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7 text-xs text-slate-500">
+          <a
+            className="hover:text-blue-600"
+            href="https://github.com/ssciwr/biocypher-components-registry"
+            rel="noreferrer"
+            target="_blank"
+          >
+            GitHub
+          </a>
+          <span>BioCypher Components Registry</span>
+        </div>
+      </footer>
+    </main>
+  )
+}
+
+export default App
