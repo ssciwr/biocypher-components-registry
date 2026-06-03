@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 
-from src.api.dependencies import get_registration_store
+from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.errors import (
     registration_not_found_http_error,
     registration_processing_http_error,
@@ -21,6 +21,7 @@ from src.api.schemas.registrations import (
     RegistrationProcessResponse,
     RegistrationRevalidateResponse,
 )
+from src.core.auth.models import AuthSession
 from src.core.registration.service import (
     finish_registration,
     revalidate_registration,
@@ -52,6 +53,7 @@ router = APIRouter()
 def create_registration(
     payload: RegistrationCreateRequest,
     store: RegistrationStore = Depends(get_registration_store),
+    auth_session: AuthSession | None = Depends(get_optional_auth_session),
 ) -> RegistrationCreateResponse:
     """Create and persist a submitted adapter registration."""
     try:
@@ -59,7 +61,11 @@ def create_registration(
             adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
-            contact_email=payload.contact_email,
+            license_value=payload.license_value,
+            doi=payload.doi,
+            submitted_by_github_login=(
+                auth_session.github_login if auth_session is not None else None
+            ),
         )
     except Exception as exc:  # noqa: BLE001
         raise registration_submission_http_error(exc) from exc

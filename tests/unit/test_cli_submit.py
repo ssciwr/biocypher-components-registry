@@ -25,8 +25,8 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
             "submit",
             "--name",
             "Example Adapter",
-            "--contact-email",
-            "maintainer@example.org",
+            "--github-login",
+            "edwinc",
             str(repository),
         ],
     )
@@ -35,7 +35,7 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
     assert "Registration Request" in result.output
     assert "Registration request created" in result.output
     assert "example-adapter" in result.output
-    assert "maintainer@example.org" in result.output
+    assert "edwinc" in result.output
     assert "local" in result.output
 
 
@@ -64,8 +64,6 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
             "submit-registration",
             "--name",
             "Example Adapter",
-            "--contact-email",
-            "maintainer@example.org",
             str(repository),
             "--db-path",
             str(database_path),
@@ -75,7 +73,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
     assert result.exit_code == 0, result.output
     assert "Stored Registration" in result.output
     assert "Registration stored" in result.output
-    assert "maintainer@example.org" in result.output
+    assert "sampleGithubLogin" in result.output
     assert "SUBMITTED" in result.output
 
     with sqlite3.connect(database_path) as connection:
@@ -85,7 +83,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
                 submitted_adapter_name,
                 repository_location,
                 source_kind,
-                contact_email,
+                submitted_by_github_login,
                 is_active
             FROM registration_sources
             """
@@ -95,7 +93,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
             "Example Adapter",
             str(repository.resolve()),
             "local",
-            "maintainer@example.org",
+            "sampleGithubLogin",
             1,
         )
 

@@ -1,12 +1,14 @@
+import { useEffect, useState } from 'react'
 import {
   ArrowRightIcon,
   CloudArrowUpIcon,
   CommandLineIcon,
   DocumentPlusIcon,
   MagnifyingGlassIcon,
-  SparklesIcon,
 } from '@heroicons/react/24/outline'
-import bioCypherLogo from './assets/logo-biocypher.png'
+import AppHeader from './components/AppHeader'
+import type { AuthUser } from './components/AppHeader'
+import RegisterPage from './pages/RegisterPage'
 
 const actionCards = [
   {
@@ -14,6 +16,7 @@ const actionCards = [
     icon: MagnifyingGlassIcon,
     text: 'Search reusable components and inspect adapter metadata like data sources.',
     cta: 'Browse adapters',
+    href: '#',
     tone: 'bg-cyan-100 text-cyan-700',
   },
   {
@@ -21,6 +24,7 @@ const actionCards = [
     icon: DocumentPlusIcon,
     text: 'Create BioCypher adapters and metadata.',
     cta: 'Start creating',
+    href: '#',
     featured: true,
     tone: 'bg-white/20 text-white',
   },
@@ -29,51 +33,62 @@ const actionCards = [
     icon: CloudArrowUpIcon,
     text: 'Submit your adapter repository to our registry, so others can use it.',
     cta: 'Register now',
+    href: '/register',
     tone: 'bg-blue-100 text-blue-700',
   },
 ]
 
 const popularAdapters = ['Open Targets', 'OmniPath', 'Collectri adapter']
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+
 function App() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [pathname, setPathname] = useState(window.location.pathname)
+
+  useEffect(() => {
+    let ignore = false
+
+    fetch(`${apiBaseUrl}/api/v1/auth/me`, { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user: AuthUser | null) => {
+        if (!ignore) {
+          setAuthUser(user)
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAuthUser(null)
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const updatePathname = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', updatePathname)
+    return () => window.removeEventListener('popstate', updatePathname)
+  }, [])
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-          <a className="flex items-center gap-2" href="#">
-            <img alt="BioCypher" className="h-7 w-7" src={bioCypherLogo} />
-            <span className="text-base font-semibold">BioCypher</span>
-            <span className="text-sm text-slate-500">| Registry</span>
-          </a>
-          <nav className="hidden items-center gap-16 text-sm text-slate-600 md:flex" aria-label="Main">
-            <a className="hover:text-slate-950" href="#">
-              Explore
-            </a>
-            <a className="hover:text-slate-950" href="#">
-              Create
-            </a>
-            <a className="hover:text-slate-950" href="#">
-              Register
-            </a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <a
-              className="hidden rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600 sm:inline-flex"
-              href="#"
-            >
-              Sign in with GitHub
-            </a>
-            <a
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
-              href="#"
-            >
-              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-              <b>Workspace</b>
-            </a>
-          </div>
-        </div>
-      </header>
+      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} />
+      {pathname === '/register' ? (
+        <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
+      ) : (
+        <HomePage />
+      )}
+      <Footer />
+    </main>
+  )
+}
 
+function HomePage() {
+  return (
+    <>
       <section className="bg-blue-50">
         <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
@@ -121,14 +136,13 @@ function App() {
               return (
                 <a
                   className={`rounded-2xl border p-7 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.featured ? 'border-blue-600 bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700' : 'border-slate-200 bg-white hover:border-blue-200'}`}
-                  href="#"
+                  href={card.href}
                   key={card.label}
                 >
                   <span
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}
                   >
                     <Icon className="h-6 w-6" aria-hidden="true" />
-                    {/* todo: croissant icon/decide on icons */}
                   </span>
                   <h2 className={`mt-4 text-xl font-bold ${card.featured ? 'text-white' : 'text-slate-950'}`}>{card.label}</h2>
                   <p className={`mt-3 min-h-12 text-sm leading-5 ${card.featured ? 'text-blue-50' : 'text-slate-600'}`}>{card.text}</p>
@@ -164,21 +178,25 @@ function App() {
           </a>
         </div>
       </section>
+    </>
+  )
+}
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7 text-xs text-slate-500">
-          <a
-            className="hover:text-blue-600"
-            href="https://github.com/ssciwr/biocypher-components-registry"
-            rel="noreferrer"
-            target="_blank"
-          >
-            GitHub
-          </a>
-          <span>BioCypher Components Registry</span>
-        </div>
-      </footer>
-    </main>
+function Footer() {
+  return (
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7 text-xs text-slate-500">
+        <a
+          className="hover:text-blue-600"
+          href="https://github.com/ssciwr/biocypher-components-registry"
+          rel="noreferrer"
+          target="_blank"
+        >
+          GitHub
+        </a>
+        <span>BioCypher Components Registry</span>
+      </div>
+    </footer>
   )
 }
 

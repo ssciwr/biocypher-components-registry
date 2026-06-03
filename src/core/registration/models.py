@@ -29,6 +29,9 @@ class StoredRegistration:
         status: Current tracked status for the submission.
         created_at: Timestamp when the submission was stored.
         contact_email: Optional maintainer contact email for status follow-up.
+        license_value: Optional submitted adapter license text.
+        doi: Optional submitted DOI text.
+        submitted_by_github_login: GitHub login that submitted the registration.
         metadata_path: Stored croissant metadata file path when available.
         metadata: Persisted adapter metadata for approved registrations.
         profile_version: Validation profile version used for approval.
@@ -46,6 +49,9 @@ class StoredRegistration:
     status: RegistrationStatus
     created_at: datetime
     contact_email: str | None = None
+    license_value: str | None = None
+    doi: str | None = None
+    submitted_by_github_login: str | None = None
     metadata_path: str | None = None
     metadata: dict[str, Any] | None = None
     profile_version: str | None = None

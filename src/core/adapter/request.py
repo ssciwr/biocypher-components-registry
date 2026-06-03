@@ -73,6 +73,9 @@ class AdapterRegistrationRequest:
         repository_kind: Normalized repository location type.
         source: Original user-provided repository input.
         contact_email: Optional maintainer contact email for status follow-up.
+        license_value: Optional submitted adapter license text.
+        doi: Optional submitted DOI text.
+        submitted_by_github_login: GitHub login for browser submissions.
     """
 
     adapter_name: str
@@ -81,6 +84,9 @@ class AdapterRegistrationRequest:
     repository_kind: Literal["local", "remote"]
     source: str
     contact_email: str | None = None
+    license_value: str | None = None
+    doi: str | None = None
+    submitted_by_github_login: str | None = None
 
     @property
     def repository_path(self) -> Path | None:

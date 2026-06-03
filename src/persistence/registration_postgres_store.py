@@ -67,6 +67,9 @@ class PostgreSQLRegistrationStore:
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
             contact_email=request.contact_email,
+            license_value=request.license_value,
+            doi=request.doi,
+            submitted_by_github_login=request.submitted_by_github_login,
         )
 
         with self.engine.begin() as connection:
@@ -77,6 +80,9 @@ class PostgreSQLRegistrationStore:
                     repository_location=registration.repository_location,
                     source_kind=registration.repository_kind,
                     contact_email=registration.contact_email,
+                    license_value=registration.license_value,
+                    doi=registration.doi,
+                    submitted_by_github_login=registration.submitted_by_github_login,
                     is_active=True,
                     created_at=registration.created_at.isoformat(),
                     updated_at=registration.created_at.isoformat(),
@@ -501,6 +507,25 @@ class PostgreSQLRegistrationStore:
     def _initialize_database(self) -> None:
         """Create the schema if it does not exist."""
         metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE registration_sources "
+                    "ADD COLUMN IF NOT EXISTS license_value VARCHAR"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE registration_sources "
+                    "ADD COLUMN IF NOT EXISTS doi VARCHAR"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE registration_sources "
+                    "ADD COLUMN IF NOT EXISTS submitted_by_github_login VARCHAR"
+                )
+            )
 
     def _build_engine(self) -> Engine:
         """Create the SQLAlchemy engine for PostgreSQL with production settings."""
@@ -512,7 +537,6 @@ class PostgreSQLRegistrationStore:
             pool_recycle=3600,  # Recycle connections after 1 hour
             echo=False,  # Set to True for SQL logging in development
         )
-
 
 
     def _insert_registration_event(
@@ -730,6 +754,9 @@ class PostgreSQLRegistrationStore:
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
             contact_email=source_row.get("contact_email"),
+            license_value=source_row.get("license_value"),
+            doi=source_row.get("doi"),
+            submitted_by_github_login=source_row.get("submitted_by_github_login"),
             metadata_path=self._resolve_metadata_path(source_row),
             metadata=metadata,
             profile_version=self._select_profile_version(current_entry, latest_event),

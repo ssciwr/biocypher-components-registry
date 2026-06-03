@@ -58,6 +58,9 @@ class SQLiteRegistrationStore:
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
             contact_email=request.contact_email,
+            license_value=request.license_value,
+            doi=request.doi,
+            submitted_by_github_login=request.submitted_by_github_login,
         )
 
         with self.engine.begin() as connection:
@@ -68,6 +71,9 @@ class SQLiteRegistrationStore:
                     repository_location=registration.repository_location,
                     source_kind=registration.repository_kind,
                     contact_email=registration.contact_email,
+                    license_value=registration.license_value,
+                    doi=registration.doi,
+                    submitted_by_github_login=registration.submitted_by_github_login,
                     is_active=True,
                     created_at=registration.created_at.isoformat(),
                     updated_at=registration.created_at.isoformat(),
@@ -514,6 +520,18 @@ class SQLiteRegistrationStore:
             connection.execute(
                 text("ALTER TABLE registration_sources ADD COLUMN contact_email VARCHAR")
             )
+        if "license_value" not in columns:
+            connection.execute(
+                text("ALTER TABLE registration_sources ADD COLUMN license_value VARCHAR")
+            )
+        if "doi" not in columns:
+            connection.execute(
+                text("ALTER TABLE registration_sources ADD COLUMN doi VARCHAR")
+            )
+        if "submitted_by_github_login" not in columns:
+            connection.execute(
+                text("ALTER TABLE registration_sources ADD COLUMN submitted_by_github_login VARCHAR")
+            )
 
     def _insert_registration_event(
         self,
@@ -730,6 +748,9 @@ class SQLiteRegistrationStore:
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
             contact_email=source_row.get("contact_email"),
+            license_value=source_row.get("license_value"),
+            doi=source_row.get("doi"),
+            submitted_by_github_login=source_row.get("submitted_by_github_login"),
             metadata_path=self._resolve_metadata_path(source_row),
             metadata=metadata,
             profile_version=self._select_profile_version(current_entry, latest_event),

@@ -45,6 +45,9 @@ def create_registration_request(
     adapter_name: str,
     repository_location: str,
     contact_email: str | None = None,
+    license_value: str | None = None,
+    doi: str | None = None,
+    submitted_by_github_login: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized adapter registration request.
 
@@ -52,6 +55,9 @@ def create_registration_request(
         adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or supported repository URL.
         contact_email: Optional maintainer contact email for status follow-up.
+        license_value: Optional submitted adapter license text.
+        doi: Optional submitted DOI text.
+        submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
         A normalized registration request ready for the registry workflow.
@@ -71,6 +77,8 @@ def create_registration_request(
         raise ValueError("Repository location is required.")
 
     normalized_contact_email = _normalize_contact_email(contact_email)
+    normalized_license_value = _normalize_optional_text(license_value)
+    normalized_doi = _normalize_optional_text(doi)
 
     if normalized_location.startswith(("http://", "https://")):
         _validate_remote_repository(normalized_location)
@@ -89,7 +97,18 @@ def create_registration_request(
         repository_kind=repository_kind,
         source=repository_location,
         contact_email=normalized_contact_email,
+        license_value=normalized_license_value,
+        doi=normalized_doi,
+        submitted_by_github_login=submitted_by_github_login,
     )
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Return stripped optional text."""
+    if value is None:
+        return None
+    normalized_value = value.strip()
+    return normalized_value or None
 
 
 def _normalize_contact_email(contact_email: str | None) -> str | None:

@@ -31,6 +31,9 @@ def submit_registration(
     repository_location: str,
     store: RegistrationStore,
     contact_email: str | None = None,
+    license_value: str | None = None,
+    doi: str | None = None,
+    submitted_by_github_login: str | None = None,
 ) -> StoredRegistration:
     """Create and persist a registration submission.
 
@@ -39,6 +42,9 @@ def submit_registration(
         repository_location: Local repository path or supported repository URL.
         store: Persistence backend used to save the submission.
         contact_email: Optional maintainer contact email for status follow-up.
+        license_value: Optional submitted adapter license text.
+        doi: Optional submitted DOI text.
+        submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
         The stored registration record with a tracked status.
@@ -47,6 +53,9 @@ def submit_registration(
         adapter_name=adapter_name,
         repository_location=repository_location,
         contact_email=contact_email,
+        license_value=license_value,
+        doi=doi,
+        submitted_by_github_login=submitted_by_github_login,
     )
     return store.create_registration(request)
 
