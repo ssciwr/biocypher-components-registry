@@ -1,4 +1,4 @@
-import { SparklesIcon } from '@heroicons/react/24/outline'
+import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
 
 type AuthUser = {
@@ -8,9 +8,10 @@ type AuthUser = {
 type AppHeaderProps = {
   apiBaseUrl: string
   authUser: AuthUser | null
+  onLogout: () => Promise<void>
 }
 
-function AppHeader({ apiBaseUrl, authUser }: AppHeaderProps) {
+function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
@@ -32,8 +33,19 @@ function AppHeader({ apiBaseUrl, authUser }: AppHeaderProps) {
         </nav>
         <div className="flex items-center gap-3">
           {authUser ? (
-            <span className="hidden items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 sm:inline-flex">
-              {authUser.github_login}
+            <span className="hidden items-center gap-2 sm:inline-flex">
+              <span className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700">
+                {authUser.github_login}
+              </span>
+              <button
+                aria-label="Sign out of GitHub"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600"
+                onClick={() => void onLogout()}
+                title="Sign out"
+                type="button"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
+              </button>
             </span>
           ) : (
             <a

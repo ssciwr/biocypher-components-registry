@@ -1,6 +1,10 @@
 services:
   frontend:
     image: ghcr.io/ssciwr/biocypher-components-registry/frontend:v0.1.0
+    env_file: .env
+    environment:
+      # When integrating, adjust this in .env.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     ports:
       - "80:80"
     depends_on:
@@ -9,7 +13,7 @@ services:
       - biocypher-network
 
   backend:
-    image: ghcr.io/ssciwr/biocypher-components-registry/backend:v0.1.0
+    image: ghcr.io/ssciwr/biocypher-components-registry/backend:0.1.0
     env_file: .env
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3

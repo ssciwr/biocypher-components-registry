@@ -176,17 +176,8 @@
         </div>
         
         <div class="info-box">
-            <h2>Access the API</h2>
-            <p>The FastAPI backend is running and accessible. You can explore the API and documentation:</p>
-        </div>
-        
-        <div class="links">
-            <a href="http://localhost:8000/docs" class="btn" target="_blank">
-                📚 API Documentation (Swagger)
-            </a>
-            <a href="http://localhost:8000/redoc" class="btn btn-secondary" target="_blank">
-                📖 API Reference (ReDoc)
-            </a>
+            <h2>Backend status</h2>
+            <p>The frontend checks the backend health endpoint through the configured API proxy.</p>
         </div>
         
         <div class="info-box" style="margin-top: 24px;">
@@ -206,7 +197,7 @@
     
     <script>
         // Check backend health on load
-        fetch('http://localhost:8000/api/v1/health')
+        fetch('/api/v1/health')
             .then(response => response.json())
             .then(data => {
                 console.log('Backend health:', data);

@@ -27,7 +27,7 @@ class ApiSettings:
     github_oauth_client_secret_env: str = "GITHUB_OAUTH_CLIENT_SECRET"
     auth_session_secret_env: str = "AUTH_SESSION_SECRET"
     frontend_base_url_env: str = "FRONTEND_BASE_URL"
-    backend_base_url_env: str = "BACKEND_BASE_URL"
+    api_base_url_env: str = "VITE_API_BASE_URL"
     auth_session_cookie_name: str = "bcr_session"
     auth_state_cookie_name: str = "bcr_oauth_state"
     auth_return_to_cookie_name: str = "bcr_auth_return_to"
@@ -51,19 +51,23 @@ class ApiSettings:
     @property
     def frontend_base_url(self) -> str:
         """Return the frontend base URL used after login."""
-        return os.getenv(self.frontend_base_url_env, "http://127.0.0.1:5173")
+        return os.getenv(self.frontend_base_url_env, "http://localhost:5173")
 
     @property
-    def backend_base_url(self) -> str:
-        """Return the backend base URL registered with GitHub."""
-        return os.getenv(self.backend_base_url_env, "http://127.0.0.1:8000")
+    def api_base_url(self) -> str:
+        """Return the public API base URL used by frontend and OAuth callbacks."""
+        return os.getenv(self.api_base_url_env, "http://localhost:8000")
 
     @property
     def cors_origins(self) -> tuple[str, ...]:
         """Allow the configured local frontend origin."""
         frontend_url = self.frontend_base_url.rstrip("/")
-        alternate = frontend_url.replace("127.0.0.1", "localhost")
-        return tuple(dict.fromkeys((frontend_url, alternate)))
+        local_alias = (
+            frontend_url.replace("localhost", "127.0.0.1")
+            if "localhost" in frontend_url
+            else frontend_url.replace("127.0.0.1", "localhost")
+        )
+        return tuple(dict.fromkeys((frontend_url, local_alias)))
 
 
 settings = ApiSettings()

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRightIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ArrowRightIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 
 type RegisterPageProps = {
@@ -20,6 +20,8 @@ type RegistrationResponse = {
   adapter_name: string
   submitted_by_github_login: string | null
 }
+
+type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 
 const draftKey = 'bcr-register-draft'
 
@@ -68,10 +70,59 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'submitted'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [metadataCheckStatus, setMetadataCheckStatus] = useState<MetadataCheckStatus>('idle')
 
   function updateField(field: keyof RegistrationForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
   }
+
+  const metadataCheckText =
+    metadataCheckStatus === 'found'
+      ? 'has croissant file'
+      : metadataCheckStatus === 'missing'
+        ? 'missing croissant file'
+        : metadataCheckStatus === 'blocked'
+          ? 'CORS blocked'
+          : 'checking file'
+  const metadataCheckClass =
+    metadataCheckStatus === 'found'
+      ? 'bg-emerald-400 text-white'
+      : metadataCheckStatus === 'missing'
+        ? 'bg-red-500 text-white'
+        : metadataCheckStatus === 'blocked'
+          ? 'bg-amber-400 text-slate-950'
+          : 'bg-blue-100 text-blue-700'
+
+  useEffect(() => {
+    const location = form.repositoryLocation.trim().replace(/\/+$/, '')
+    if (!/^https?:\/\/.+/.test(location)) return
+
+    const controller = new AbortController()
+    let repositoryUrl: URL
+    try {
+      repositoryUrl = new URL(location)
+    } catch {
+      return
+    }
+    const parts = repositoryUrl.pathname.split('/').filter(Boolean)
+    const isGitHub = repositoryUrl.hostname === 'github.com' && parts.length >= 2
+    const branch = isGitHub && parts[2] === 'blob' && parts[3] ? parts[3] : 'main'
+    const path = isGitHub && parts[2] === 'blob' ? parts.slice(4).join('/') : 'croissant.jsonld'
+    const metadataUrl = isGitHub
+      ? `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${branch}/${path}`
+      : new URL('croissant.jsonld', location + '/').href
+
+    void fetch(metadataUrl, { signal: controller.signal })
+      .then((response) => {
+        setMetadataCheckStatus(response.ok ? 'found' : response.status === 404 ? 'missing' : 'blocked')
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setMetadataCheckStatus('blocked')
+      })
+
+    return () => controller.abort()
+  }, [form.repositoryLocation])
 
   async function submitRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -144,14 +195,38 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
                 Repository location*
-                <input
-                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                  onChange={(event) => updateField('repositoryLocation', event.target.value)}
-                  placeholder="https://github.com/example/clinical-visit-adapter"
-                  required
-                  type="url"
-                  value={form.repositoryLocation}
-                />
+                <span className="relative block">
+                  <input
+                    className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setMessage(null)
+                      setMetadataCheckStatus(/^https?:\/\/.+/.test(value.trim()) ? 'checking' : 'idle')
+                      updateField('repositoryLocation', value)
+                    }}
+                    placeholder="https://github.com/example/clinical-visit-adapter"
+                    required
+                    type="url"
+                    value={form.repositoryLocation}
+                  />
+                  {metadataCheckStatus !== 'idle' ? (
+                    <span
+                      aria-live="polite"
+                      className={`pointer-events-none absolute right-1.5 top-1/2 inline-flex h-12 -translate-y-1/2 items-center gap-2 rounded-2xl px-4 text-sm font-medium ${metadataCheckClass}`}
+                    >
+                      {metadataCheckStatus === 'found' ? (
+                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                      ) : metadataCheckStatus === 'missing' ? (
+                        <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+                      ) : metadataCheckStatus === 'blocked' ? (
+                        <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
+                      ) : (
+                        <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
+                      )}
+                      {metadataCheckText}
+                    </span>
+                  ) : null}
+                </span>
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">

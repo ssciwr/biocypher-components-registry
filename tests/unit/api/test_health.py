@@ -56,3 +56,4 @@ def test_registration_database_path_uses_environment_override(
     monkeypatch.setenv(settings.registry_db_path_env, str(database_path))
 
     assert get_registration_database_path() == database_path
+

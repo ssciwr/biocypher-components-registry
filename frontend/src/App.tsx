@@ -40,10 +40,38 @@ const actionCards = [
 
 const popularAdapters = ['Open Targets', 'OmniPath', 'Collectri adapter']
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const authUserKey = 'bcr-auth-user' // does not really matter, just needs to be hardcoded between hte save/read.
+
+// To persist if they reopen the browser, not really needed but I found it improves developer experience too as otherwise
+// each time you edit code (e.g. a small AI agent change), the reloaded codebase means you would get logged out before
+function cacheAuthUser(user: AuthUser | null) {
+  if (user) {
+    window.localStorage.setItem(authUserKey, JSON.stringify(user))
+    return
+  }
+  window.localStorage.removeItem(authUserKey)
+}
+
+
+function readCachedAuthUser(): AuthUser | null {
+  const savedUser = window.localStorage.getItem(authUserKey)
+  if (!savedUser) {
+    return null
+  }
+
+  try {
+    const user = JSON.parse(savedUser) as Partial<AuthUser>
+    return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
+  } catch {
+    window.localStorage.removeItem(authUserKey)
+    return null
+  }
+}
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 function App() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
   const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
@@ -54,13 +82,10 @@ function App() {
       .then((user: AuthUser | null) => {
         if (!ignore) {
           setAuthUser(user)
+          cacheAuthUser(user)
         }
       })
-      .catch(() => {
-        if (!ignore) {
-          setAuthUser(null)
-        }
-      })
+      .catch(() => undefined)
 
     return () => {
       ignore = true
@@ -73,9 +98,22 @@ function App() {
     return () => window.removeEventListener('popstate', updatePathname)
   }, [])
 
+
+  async function logOut() {
+    const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => null)
+
+    if (response?.ok) {
+      setAuthUser(null)
+      cacheAuthUser(null)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} />
+      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
       {pathname === '/register' ? (
         <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
       ) : (

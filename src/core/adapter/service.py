@@ -72,7 +72,7 @@ def create_registration_request(
     if not normalized_name:
         raise ValueError("Adapter name is required.")
 
-    normalized_location = repository_location.strip()
+    normalized_location = _normalize_repository_location(repository_location)
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
@@ -101,6 +101,13 @@ def create_registration_request(
         doi=normalized_doi,
         submitted_by_github_login=submitted_by_github_login,
     )
+
+
+def _normalize_repository_location(repository_location: str) -> str:
+    normalized_location = repository_location.strip()
+    if normalized_location.startswith("github.com/"):
+        return f"https://{normalized_location}"
+    return normalized_location
 
 
 def _normalize_optional_text(value: str | None) -> str | None:

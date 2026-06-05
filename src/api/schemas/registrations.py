@@ -14,8 +14,8 @@ from src.core.registration.models import (
 )
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
-    "adapter_name": "Manual Example Adapter",
-    "repository_location": "/tmp/biocypher-api-manual-adapter",
+    "adapter_name": "CollecTRI Adapter",
+    "repository_location": "github.com/biocypher/collectri",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
 }
