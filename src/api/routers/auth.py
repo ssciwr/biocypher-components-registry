@@ -151,7 +151,7 @@ def _github_oauth_config() -> tuple[str, str, str]:
 
 def _github_callback_url() -> str:
     """Build the callback URL registered with GitHub."""
-    return f"{settings.backend_base_url}{settings.api_v1_prefix}/auth/github/callback"
+    return f"{settings.api_base_url}{settings.api_v1_prefix}/auth/github/callback"
 
 
 def _github_access_token(client_id: str, client_secret: str, code: str) -> str:
@@ -221,7 +221,7 @@ def _safe_frontend_path(value: str | None) -> str:
 
 def _secure_cookie() -> bool:
     """Use secure cookies when the backend runs over HTTPS."""
-    return settings.backend_base_url.startswith("https://")
+    return settings.api_base_url.startswith("https://")
 
 
 def _optional_text(value: object) -> str | None:
