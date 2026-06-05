@@ -30,6 +30,7 @@ def submit_registration(
     adapter_name: str,
     repository_location: str,
     store: RegistrationStore,
+    description: str | None = None,
     contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
@@ -41,6 +42,7 @@ def submit_registration(
         adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or supported repository URL.
         store: Persistence backend used to save the submission.
+        description: Optional maintainer-facing adapter summary.
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
@@ -52,6 +54,7 @@ def submit_registration(
     request = create_registration_request(
         adapter_name=adapter_name,
         repository_location=repository_location,
+        description=description,
         contact_email=contact_email,
         license_value=license_value,
         doi=doi,

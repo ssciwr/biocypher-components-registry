@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRightIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 
 type RegisterPageProps = {
@@ -15,10 +15,23 @@ type RegistrationForm = {
   doi: string
 }
 
+type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID' | string
+
 type RegistrationResponse = {
   registration_id: string
   adapter_name: string
+  adapter_id: string
+  repository_location: string
+  status: RegistrationStatus
+  validation_errors?: string[] | null
   submitted_by_github_login: string | null
+}
+
+type RegistrationResultPanelProps = {
+  error: string | null
+  isProcessing: boolean
+  onRevalidate: () => void
+  result: RegistrationResponse
 }
 
 type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
@@ -65,10 +78,114 @@ function initialForm(): RegistrationForm {
   }
 }
 
+
+// Basically this shows errors or successfull registration
+function RegistrationResultPanel({
+  error,
+  isProcessing,
+  onRevalidate,
+  result,
+}: RegistrationResultPanelProps) {
+  const isValid = result.status === 'VALID'
+  const isInvalid = result.status === 'INVALID'
+  const validationErrors = result.validation_errors?.filter(Boolean) ?? []
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
+      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div className="flex gap-4">
+          <span
+            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${
+              isValid
+                ? 'bg-emerald-100 text-emerald-600'
+                : isInvalid
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {isValid ? (
+              <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />
+            ) : (
+              <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />
+            )}
+          </span>
+          <span>
+            <h2 className="text-2xl font-bold text-slate-950">
+              {isValid
+                ? 'Adapter registration successful'
+                : isInvalid
+                  ? 'Sorry, your adapter is not currently valid.'
+                  : 'Registration submitted'}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              {isValid
+                ? `${result.adapter_name} was stored and validated by the registry.`
+                : isInvalid
+                  ? 'Please fix these issues in your GitHub repository, then revalidate.'
+                  : `${result.adapter_name} was stored. Processing feedback is shown below.`}
+            </p>
+          </span>
+        </div>
+
+        {isInvalid ? (
+          <button
+            className="inline-flex h-12 min-w-40 cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            disabled={isProcessing}
+            onClick={onRevalidate}
+            type="button"
+          >
+            {isProcessing ? 'Revalidating...' : 'Revalidate'}
+          </button>
+        ) : null}
+      </div>
+
+      <dl className="mt-8 grid gap-4 border-t border-slate-100 pt-6 text-sm md:grid-cols-3">
+        <div>
+          <dt className="font-semibold text-slate-500">Status</dt>
+          <dd className="mt-1 font-bold text-slate-950">{result.status}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Repository</dt>
+          <dd className="mt-1 break-all text-slate-950">{result.repository_location}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Registration ID</dt>
+          <dd className="mt-1 break-all text-slate-950">{result.registration_id}</dd>
+        </div>
+      </dl>
+
+      {validationErrors.length > 0 ? (
+        <ul className="mt-6 grid gap-3">
+          {validationErrors.map((validationError, index) => (
+            <li
+              className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"
+              key={`${validationError}-${index}`}
+            >
+              {validationError}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {isInvalid && validationErrors.length === 0 ? (
+        <p className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          The backend marked this registration invalid without detailed validation errors.
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
 function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
   const [form, setForm] = useState<RegistrationForm>(initialForm)
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'submitted'>('idle')
-  const [message, setMessage] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
+  const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [metadataCheckStatus, setMetadataCheckStatus] = useState<MetadataCheckStatus>('idle')
 
@@ -127,7 +244,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
   async function submitRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
-    setMessage(null)
+    setResult(null)
 
     if (!authUser) {
       window.localStorage.setItem(draftKey, JSON.stringify(form))
@@ -157,8 +274,46 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
 
     const registration = (await response.json()) as RegistrationResponse
     window.localStorage.removeItem(draftKey)
-    setStatus('submitted')
-    setMessage(`Registration submitted for ${registration.adapter_name}.`)
+    setStatus('processing')
+
+    const processResponse = await fetch(`${apiBaseUrl}/api/v1/registrations/${registration.registration_id}/process`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    const processPayload = (await processResponse.json().catch(() => null)) as
+      | (RegistrationResponse & { detail?: string })
+      | null
+
+    setStatus('idle')
+    if (!processResponse.ok) {
+      setResult(registration)
+      setError(processPayload?.detail ?? 'Registration was saved, but processing failed.')
+      return
+    }
+
+    setResult(processPayload ?? registration)
+  }
+
+  async function revalidateRegistration() {
+    if (!result) return
+
+    setStatus('processing')
+    setError(null)
+    const response = await fetch(`${apiBaseUrl}/api/v1/registrations/${result.registration_id}/revalidate`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    const payload = (await response.json().catch(() => null)) as
+      | (RegistrationResponse & { detail?: string })
+      | null
+
+    setStatus('idle')
+    if (!response.ok) {
+      setError(payload?.detail ?? 'Revalidation failed.')
+      return
+    }
+
+    setResult(payload ?? result)
   }
 
   return (
@@ -173,11 +328,19 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
           </span>
         </div>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_410px]">
-          <form
-            className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10"
-            onSubmit={submitRegistration}
-          >
+        {result ? (
+          <RegistrationResultPanel
+            error={error}
+            isProcessing={status === 'processing'}
+            onRevalidate={() => void revalidateRegistration()}
+            result={result}
+          />
+        ) : (
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_410px]">
+            <form
+              className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10"
+              onSubmit={submitRegistration}
+            >
             <h2 className="text-2xl font-bold text-slate-950">Registration details</h2>
 
             <div className="mt-8 grid gap-6">
@@ -200,7 +363,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
                     className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                     onChange={(event) => {
                       const value = event.target.value
-                      setMessage(null)
+                      setError(null)
                       setMetadataCheckStatus(/^https?:\/\/.+/.test(value.trim()) ? 'checking' : 'idle')
                       updateField('repositoryLocation', value)
                     }}
@@ -257,10 +420,16 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
               </p>
               <button
                 className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                disabled={status === 'submitting'}
+                disabled={status !== 'idle'}
                 type="submit"
               >
-                {authUser ? 'Register adapter' : 'Sign in with GitHub'}
+                {status === 'submitting'
+                  ? 'Submitting...'
+                  : status === 'processing'
+                    ? 'Checking adapter'
+                    : authUser
+                      ? 'Register adapter'
+                      : 'Sign in with GitHub'}
                 {authUser ? (
                   <PlusIcon className="h-5 w-5" aria-hidden="true" />
                 ) : (
@@ -269,11 +438,6 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
               </button>
             </div>
 
-            {message ? (
-              <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                {message}
-              </p>
-            ) : null}
             {error ? (
               <p className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -297,7 +461,8 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
               ))}
             </ol>
           </aside>
-        </div>
+          </div>
+        )}
       </div>
     </section>
   )

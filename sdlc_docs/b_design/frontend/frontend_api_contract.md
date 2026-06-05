@@ -38,7 +38,7 @@ Current API prefix:
 Frontend clients should centralize this value in one configuration point:
 
 ```text
-VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 Do not hardcode `/api/v1` across individual components.
