@@ -66,7 +66,6 @@ class PostgreSQLRegistrationStore:
             repository_kind=request.repository_kind,
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
-            description=request.description,
             contact_email=request.contact_email,
             license_value=request.license_value,
             doi=request.doi,
@@ -78,7 +77,6 @@ class PostgreSQLRegistrationStore:
                 insert(registration_sources_table).values(
                     id=registration.registration_id,
                     submitted_adapter_name=registration.adapter_name,
-                    description=registration.description,
                     repository_location=registration.repository_location,
                     source_kind=registration.repository_kind,
                     contact_email=registration.contact_email,
@@ -513,12 +511,6 @@ class PostgreSQLRegistrationStore:
             connection.execute(
                 text(
                     "ALTER TABLE registration_sources "
-                    "ADD COLUMN IF NOT EXISTS description VARCHAR"
-                )
-            )
-            connection.execute(
-                text(
-                    "ALTER TABLE registration_sources "
                     "ADD COLUMN IF NOT EXISTS license_value VARCHAR"
                 )
             )
@@ -761,7 +753,6 @@ class PostgreSQLRegistrationStore:
             repository_kind=str(source_row["source_kind"]),
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
-            description=source_row.get("description"),
             contact_email=source_row.get("contact_email"),
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),

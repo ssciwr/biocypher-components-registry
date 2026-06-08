@@ -79,7 +79,7 @@ function initialForm(): RegistrationForm {
 }
 
 
-// Basically this shows errors or successfull registration
+// Basically this shows errors or successful registration
 function RegistrationResultPanel({
   error,
   isProcessing,

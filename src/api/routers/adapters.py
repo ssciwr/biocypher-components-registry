@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from src.api.dependencies import get_registration_store
 from src.api.errors import (
@@ -15,8 +15,11 @@ from src.api.schemas.adapters import (
     AdapterCatalogItemResponse,
     AdapterCatalogListResponse,
     AdapterDetailResponse,
+    AdapterLatestListResponse,
+    AdapterLatestItemResponse,
     AdapterMetadataResponse,
     adapter_id_from_uniqueness_key,
+    latest_registry_entry,
 )
 from src.core.registration.models import RegistryEntry
 from src.core.registration.store import RegistrationStore
@@ -53,6 +56,40 @@ def list_adapters(
 
 
 @router.get(
+    "/adapters/latest",
+    response_model=AdapterLatestListResponse,
+    summary="List latest public adapters",
+    description="Return the latest valid adapters with maintainer avatar data for catalog cards.",
+)
+def list_latest_adapters(
+    limit: int = Query(default=10, ge=1, le=50),
+    store: RegistrationStore = Depends(get_registration_store),
+) -> AdapterLatestListResponse:
+    """Return newest unique adapter cards from canonical entries."""
+    seen: set[str] = set()
+    items: list[AdapterLatestItemResponse] = []
+    entries = sorted(
+        store.list_registry_entries(),
+        key=lambda entry: (entry.updated_at, entry.created_at, entry.entry_id),
+        reverse=True,
+    )
+    for entry in entries:
+        adapter_id = adapter_id_from_uniqueness_key(entry.uniqueness_key)
+        if adapter_id in seen:
+            continue
+        seen.add(adapter_id)
+        items.append(
+            AdapterLatestItemResponse.from_entry(
+                entry,
+                store.get_registration(entry.source_id),
+            )
+        )
+        if len(items) >= limit:
+            break
+    return AdapterLatestListResponse(items=items)
+
+
+@router.get(
     "/adapters/{adapter_id}",
     response_model=AdapterDetailResponse,
     summary="Get adapter catalog detail",
@@ -71,7 +108,12 @@ def get_adapter(
     if not entries:
         raise adapter_not_found_http_error(adapter_id)
 
-    return AdapterDetailResponse.from_entries(adapter_id, entries)
+    latest = latest_registry_entry(entries)
+    return AdapterDetailResponse.from_entries(
+        adapter_id,
+        entries,
+        store.get_registration(latest.source_id),
+    )
 
 
 @router.get(

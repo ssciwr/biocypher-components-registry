@@ -1,3 +1,4 @@
+import { XMarkIcon } from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
 
 type GenericModalProps = {
@@ -27,7 +28,7 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
       <section
         aria-modal="true"
         aria-labelledby="generic-modal-title"
-        className="w-full max-w-lg rounded-lg bg-white p-6 text-left shadow-xl dark:bg-zinc-900"
+        className="w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
@@ -40,11 +41,11 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
           </h2>
           <button
             aria-label="Close modal"
-            className="rounded-md px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            className="inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
             type="button"
             onClick={onClose}
           >
-            X
+            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
         <div className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{content}</div>

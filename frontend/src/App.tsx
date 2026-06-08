@@ -9,6 +9,7 @@ import {
 import AppHeader from './components/AppHeader'
 import type { AuthUser } from './components/AppHeader'
 import RegisterPage from './pages/RegisterPage'
+import AdaptersPage from './pages/AdaptersPage'
 
 const actionCards = [
   {
@@ -16,7 +17,7 @@ const actionCards = [
     icon: MagnifyingGlassIcon,
     text: 'Search reusable components and inspect adapter metadata like data sources.',
     cta: 'Browse adapters',
-    href: '#',
+    href: '/adapters',
     tone: 'bg-cyan-100 text-cyan-700',
   },
   {
@@ -111,11 +112,15 @@ function App() {
     }
   }
 
+  const adapterId = pathname.match(/^\/adapters\/([^/]+)$/)?.[1]
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
       {pathname === '/register' ? (
         <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
+      ) : pathname === '/adapters' || adapterId ? (
+        <AdaptersPage adapterId={adapterId} apiBaseUrl={apiBaseUrl} />
       ) : (
         <HomePage />
       )}

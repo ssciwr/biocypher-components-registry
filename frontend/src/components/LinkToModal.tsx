@@ -22,7 +22,7 @@ function LinkToModal({ children, modal }: LinkToModalProps) {
   return (
     <>
       <button
-        className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+        className="cursor-pointer rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
         type="button"
         onClick={() => setOpen(true)}
       >
