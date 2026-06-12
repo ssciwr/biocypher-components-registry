@@ -19,7 +19,7 @@ class ApiSettings:
 
     service_name: str = "biocypher-components-registry"
     app_title: str = "BioCypher Components Registry API"
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
     api_v1_prefix: str = "/api/v1"
     registry_db_path_env: str = core_settings.registry_db_path_env
     default_registry_db_path: Path = core_settings.default_registry_db_path

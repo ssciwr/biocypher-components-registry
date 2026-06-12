@@ -15,7 +15,13 @@ RUN pnpm run build
 FROM nginx:1.27-alpine
 
 ENV BACKEND_INTERNAL_URL=http://backend:8000
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+ENV FRONTEND_SERVER_NAME=registry.biocypher.org
+ENV TLS_CERTIFICATE_PATH=/etc/letsencrypt/live/registry.biocypher.org/fullchain.pem
+ENV TLS_CERTIFICATE_PRIV_PATH=/etc/letsencrypt/live/registry.biocypher.org/privkey.pem
+COPY nginx.conf /etc/nginx/template-options/default.conf.https.template
+COPY nginx-http.conf /etc/nginx/template-options/default.conf.http.template
+COPY docker-entrypoint.d/04-select-nginx-template.sh /docker-entrypoint.d/04-select-nginx-template.sh
+RUN chmod +x /docker-entrypoint.d/04-select-nginx-template.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 80 443
