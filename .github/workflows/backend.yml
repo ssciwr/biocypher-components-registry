@@ -1,0 +1,47 @@
+name: Backend
+
+# Runs backend Python tests for pull requests that touch backend code,
+# backend tests, or backend dependency files. Frontend-only changes are
+# handled by the separate Frontend workflow.
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "cli.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Set up uv
+        # astral-sh/setup-uv v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev --locked --no-build
+
+      - name: Run tests
+        run: uv run  pytest --locked --no-build
+
+      - name: Minimize uv cache
+        run: uv cache prune --ci

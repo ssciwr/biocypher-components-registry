@@ -12,3 +12,10 @@ registry.sqlite3
 *.db
 .env
 .DS_Store
+
+
+**/__pycache__/
+*.py[cod]
+
+*.egg-info/
+**/*.egg-info/

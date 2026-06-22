@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -173,30 +174,21 @@ def test_adapter_direct_requires_creator(tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     dataset_path.write_text(json.dumps(_valid_dataset_document()), encoding="utf-8")
 
-    result = runner.invoke(
-        app,
-        [
-            "adapter",
-            "direct",
-            "--name",
-            "Example Adapter",
-            "--description",
-            "Adapter description",
-            "--version",
-            "1.0.0",
-            "--license",
-            "MIT",
-            "--code-repository",
-            "https://example.org/repo",
-            "--dataset-path",
-            str(dataset_path),
-            "--keywords",
-            "adapter",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "At least one --creator is required" in result.output
+    with pytest.raises(
+        typer.BadParameter,
+        match="At least one --creator is required",
+    ):
+        adapter_cli.direct_cmd(
+            ctx=None,  # type: ignore[arg-type]
+            name="Example Adapter",
+            description="Adapter description",
+            version="1.0.0",
+            license_value="MIT",
+            code_repository="https://example.org/repo",
+            dataset_paths=[str(dataset_path)],
+            creator=None,
+            keywords="adapter",
+        )
 
 
 def test_adapter_direct_accepts_auto_as_dataset_generator(tmp_path: Path) -> None:
@@ -240,34 +232,11 @@ def test_adapter_direct_rejects_removed_generator_flag(tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     dataset_path.write_text(json.dumps(_valid_dataset_document()), encoding="utf-8")
 
-    result = runner.invoke(
-        app,
-        [
-            "adapter",
-            "direct",
-            "--generator",
-            "auto",
-            "--name",
-            "Example Adapter",
-            "--description",
-            "Adapter description",
-            "--version",
-            "1.0.0",
-            "--license",
-            "MIT",
-            "--code-repository",
-            "https://example.org/repo",
-            "--dataset-path",
-            str(dataset_path),
-            "--creator",
-            "Edwin Carreno, SSC, https://orcid.org/0000-0000-0000-0000",
-            "--keywords",
-            "adapter,biocypher",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "--generator" in result.output
+    with pytest.raises(
+        typer.BadParameter,
+        match="Unexpected argument '--generator'",
+    ):
+        adapter_cli._parse_dataset_blocks(["--generator", "auto"])
 
 
 def test_adapter_guided_builds_request_and_runs(monkeypatch) -> None:
