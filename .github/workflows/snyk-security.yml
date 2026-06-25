@@ -27,10 +27,11 @@ jobs:
       - name: Snyk Open Source monitor
         run: snyk monitor --org="$SNYK_ORG" --all-projects
 
-        # Runs Snyk Infrastructure as Code (IaC) analysis and uploads result to Snyk.
-        # Use || true to not fail the pipeline.
       - name: Snyk test and report
-        run: snyk test --org="$SNYK_ORG" --report # || true
+        run: |
+          uv export --format requirements-txt --frozen --no-hashes -o requirements-snyk.txt
+          snyk test --org="$SNYK_ORG" --file=requirements-snyk.txt --package-manager=pip
+          snyk test --org="$SNYK_ORG" --file=frontend/package.json --package-manager=npm
 
         # Build the docker image for testing
       - name: Build a Docker image
