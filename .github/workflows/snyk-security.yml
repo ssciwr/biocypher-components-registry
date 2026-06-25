@@ -24,12 +24,17 @@ jobs:
       - name: Set up Snyk CLI to check for security issues
         uses: snyk/actions/setup@806182742461562b67788a64410098c9d9b96adb
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Export Python deps for Snyk
+        run: uv export --format requirements-txt --frozen --no-hashes -o requirements-snyk.txt
+
       - name: Snyk Open Source monitor
         run: snyk monitor --org="$SNYK_ORG" --all-projects
 
       - name: Snyk test and report
         run: |
-          uv export --format requirements-txt --frozen --no-hashes -o requirements-snyk.txt
           snyk test --org="$SNYK_ORG" --file=requirements-snyk.txt --package-manager=pip
           snyk test --org="$SNYK_ORG" --file=frontend/package.json --package-manager=npm
 
