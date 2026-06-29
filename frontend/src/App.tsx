@@ -10,6 +10,9 @@ import AppHeader from './components/AppHeader'
 import type { AuthUser } from './components/AppHeader'
 import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
+import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
+import { client } from './api/client/client.gen'
+import { apiErrorMessage } from './api/errors'
 
 const actionCards = [
   {
@@ -70,23 +73,36 @@ function readCachedAuthUser(): AuthUser | null {
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi-ts
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
     let ignore = false
 
-    fetch(`${apiBaseUrl}/api/v1/auth/me`, { credentials: 'include' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((user: AuthUser | null) => {
-        if (!ignore) {
-          setAuthUser(user)
-          cacheAuthUser(user)
+    void getMeApiV1AuthMeGet()
+      .then((result) => {
+        if (ignore) return
+
+        if (result.data) {
+          setAuthUser(result.data)
+          cacheAuthUser(result.data)
+          setAuthError(null)
+          return
         }
+
+        if (result.response?.status === 401) {
+          setAuthUser(null)
+          cacheAuthUser(null)
+        }
+        setAuthError(null)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!ignore) setAuthError(null)
+      })
 
     return () => {
       ignore = true
@@ -101,14 +117,19 @@ function App() {
 
 
   async function logOut() {
-    const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    }).catch(() => null)
+    try {
+      const result = await logoutApiV1AuthLogoutPost()
 
-    if (response?.ok) {
+      if (result.error) {
+        setAuthError(apiErrorMessage(result.error, 'Sign out failed.'))
+        return
+      }
+
       setAuthUser(null)
       cacheAuthUser(null)
+      setAuthError(null)
+    } catch (error) {
+      setAuthError(apiErrorMessage(error, 'Sign out failed.'))
     }
   }
 
@@ -116,11 +137,16 @@ function App() {
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
+      <AppHeader authUser={authUser} onLogout={logOut} />
+      {authError ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
+          {authError}
+        </div>
+      ) : null}
       {pathname === '/register' ? (
-        <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
+        <RegisterPage authUser={authUser} />
       ) : pathname === '/adapters' || adapterId ? (
-        <AdaptersPage adapterId={adapterId} apiBaseUrl={apiBaseUrl} />
+        <AdaptersPage adapterId={adapterId} />
       ) : (
         <HomePage />
       )}

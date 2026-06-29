@@ -1,17 +1,17 @@
 import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
+import { client } from '../api/client/client.gen'
 
 type AuthUser = {
   github_login: string
 }
 
 type AppHeaderProps = {
-  apiBaseUrl: string
   authUser: AuthUser | null
   onLogout: () => Promise<void>
 }
 
-function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
+function AppHeader({ authUser, onLogout }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -50,7 +50,7 @@ function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
           ) : (
             <a
               className="hidden cursor-pointer rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600 sm:inline-flex"
-              href={`${apiBaseUrl}/api/v1/auth/github/start`}
+              href={client.buildUrl({ url: '/api/v1/auth/github/start' })}
             >
               Sign in with GitHub
             </a>

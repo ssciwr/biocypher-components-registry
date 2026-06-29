@@ -9,75 +9,58 @@ import {
 } from '@heroicons/react/24/outline'
 import GenericModal from '../components/GenericModal'
 import LinkToModal from '../components/LinkToModal'
+import CitationEndorsement from '../components/CitationEndorsement'
+import {
+  endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
+  getAdapterApiV1AdaptersAdapterIdGet,
+  listLatestAdaptersApiV1AdaptersLatestGet,
+  type AdapterDataSourceResponse,
+  type AdapterDetailResponse,
+  type AdapterLatestItemResponse,
+  type AdapterMaintainerResponse,
+} from '../api/client'
+import { client } from '../api/client/client.gen'
+import { apiErrorMessage } from '../api/errors'
 
-type Maintainer = {
-  github_login: string
-  avatar_url: string
-}
-
-type DataSource = {
-  name: string
-  description: string | null
-  version: string | null
-  license: string | null
-  url: string | null
-  column_count: number | null
-}
-
-type LatestAdapter = {
-  adapter_id: string
-  adapter_name: string
-  latest_version: string
-  description: string | null
-  repository_location: string | null
-  keywords: string[]
-  maintainers: Maintainer[]
-  endorsement_count: number
-  endorsed_by_current_user: boolean
-  updated_at: string
-}
-
-type AdapterDetail = LatestAdapter & {
-  license_value: string | null
-  data_sources: DataSource[]
-}
-
-type AdapterEndorsement = {
-  adapter_id: string
-  endorsement_count: number
-  endorsed_by_current_user: boolean
-}
+type Maintainer = AdapterMaintainerResponse
+type DataSource = AdapterDataSourceResponse
+type LatestAdapter = AdapterLatestItemResponse
+type AdapterDetail = AdapterDetailResponse
 
 type AdaptersPageProps = {
   adapterId?: string
-  apiBaseUrl: string
 }
 
-function AdaptersPage({ adapterId, apiBaseUrl }: AdaptersPageProps) {
+function AdaptersPage({ adapterId }: AdaptersPageProps) {
   return adapterId ? (
-    <AdapterDetailView adapterId={adapterId} apiBaseUrl={apiBaseUrl} />
+    <AdapterDetailView adapterId={adapterId} />
   ) : (
-    <AdapterListView apiBaseUrl={apiBaseUrl} />
+    <AdapterListView />
   )
 }
 
-function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
+function AdapterListView() {
   const [adapters, setAdapters] = useState<LatestAdapter[]>([])
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     let ignore = false
-    fetch(`${apiBaseUrl}/api/v1/adapters/latest?limit=10`, { credentials: 'include' })
-      .then((response) => {
-        if (!response.ok) throw new Error('Adapter API unavailable')
-        return response.json()
-      })
-      .then((payload: { items?: LatestAdapter[] }) => {
-        if (!ignore) {
-          setAdapters(payload.items ?? [])
-          setLoadError(false)
+
+    void listLatestAdaptersApiV1AdaptersLatestGet({
+      query: { limit: 10 },
+    })
+      .then((result) => {
+        if (ignore) return
+
+        if (result.error || !result.data) {
+          setAdapters([])
+          setLoadError(true)
+          return
         }
+
+        setAdapters(result.data.items)
+        setLoadError(false)
       })
       .catch(() => {
         if (!ignore) {
@@ -88,10 +71,10 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
     return () => {
       ignore = true
     }
-  }, [apiBaseUrl])
+  }, [])
 
   const filteredAdapters = adapters.filter((adapter) =>
-    `${adapter.adapter_name} ${adapter.description ?? ''} ${adapter.keywords.join(' ')}`
+    `${adapter.adapter_name} ${adapter.description ?? ''} ${(adapter.keywords ?? []).join(' ')}`
       .toLowerCase()
       .includes(query.toLowerCase()),
   )
@@ -136,7 +119,7 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
                 </p>
               </a>
               <div className="mt-5 flex flex-wrap gap-2">
-                {adapter.keywords.slice(0, 3).map((keyword) => (
+                {(adapter.keywords ?? []).slice(0, 3).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
                   </span>
@@ -147,6 +130,7 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
                 <span className="inline-flex items-center gap-1 text-sm text-slate-500">
                   <span aria-hidden="true">👍</span>
                   <span>{adapter.endorsement_count ?? 0}</span>
+              <span>Endorse</span>
                 </span>
               </div>
             </article>
@@ -157,7 +141,7 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
   )
 }
 
-function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBaseUrl: string }) {
+function AdapterDetailView({ adapterId }: { adapterId: string }) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
@@ -165,16 +149,21 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
 
   useEffect(() => {
     let ignore = false
-    fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}`, { credentials: 'include' })
-      .then((response) => {
-        if (!response.ok) throw new Error('Adapter detail API unavailable')
-        return response.json()
-      })
-      .then((payload: AdapterDetail) => {
-        if (!ignore) {
-          setAdapter(payload)
-          setLoadError(false)
+
+    void getAdapterApiV1AdaptersAdapterIdGet({
+      path: { adapter_id: adapterId },
+    })
+      .then((result) => {
+        if (ignore) return
+
+        if (result.error || !result.data) {
+          setAdapter(null)
+          setLoadError(true)
+          return
         }
+
+        setAdapter(result.data)
+        setLoadError(false)
       })
       .catch(() => {
         if (!ignore) {
@@ -185,18 +174,29 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
     return () => {
       ignore = true
     }
-  }, [adapterId, apiBaseUrl])
+  }, [adapterId])
 
 
-  /*
-   * AI-Generated.
-   */
+
   async function endorseCurrentAdapter() {
     setIsEndorsing(true)
     setEndorsementError(null)
     try {
-      const endorsement = await endorseAdapter(apiBaseUrl, adapterId)
-      if (!endorsement) return
+      const result = await endorseAdapterApiV1AdaptersAdapterIdEndorsePost({
+        path: { adapter_id: adapterId },
+      })
+
+      if (result.response?.status === 401) {
+        window.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: window.location.pathname } })
+        return // send the user to login if they are not logged in yet, hardcoded.
+      }
+
+      if (result.error || !result.data) {
+        setEndorsementError(apiErrorMessage(result.error, 'Could not endorse this adapter. Please try again.'))
+        return
+      }
+
+      const endorsement = result.data
       setAdapter((currentAdapter) => currentAdapter
         ? {
             ...currentAdapter,
@@ -205,8 +205,8 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
           }
         : currentAdapter,
       )
-    } catch {
-      setEndorsementError('Could not endorse this adapter. Please try again.')
+    } catch (error) {
+      setEndorsementError(apiErrorMessage(error, 'Could not endorse this adapter. Please try again.'))
     } finally {
       setIsEndorsing(false)
     }
@@ -228,6 +228,8 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
   }
 
   const adapterRepositoryHref = githubRepositoryUrl(adapter.repository_location) ?? adapter.repository_location ?? '#'
+  const adapterKeywords = adapter.keywords ?? []
+  const adapterDataSources = adapter.data_sources ?? []
 
   return (
     <section className="bg-slate-100">
@@ -239,7 +241,7 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
             <div className="mt-5 rounded-lg border border-slate-200 p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-bold text-slate-950">Overview</h2>
-                {adapter.keywords.slice(0, 4).map((keyword) => (
+                {adapterKeywords.slice(0, 4).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
                   </span>
@@ -268,7 +270,7 @@ bc.run()`}
               Data Sources
             </h2>
             <div className="mt-5 divide-y divide-slate-200 border border-slate-200">
-              {(adapter.data_sources.length ? adapter.data_sources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null }]).map((source) => (
+              {(adapterDataSources.length ? adapterDataSources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null }]).map((source) => (
                 <div className="p-4" key={source.name}>
                   <div className="flex items-center justify-between gap-4">
                     <h3 className="text-base font-semibold text-slate-950">{source.name}</h3>
@@ -305,13 +307,14 @@ bc.run()`}
             </div>
             <button
               aria-label={`Endorse ${adapter.adapter_name}`}
-              className="mt-5 inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:cursor-default disabled:opacity-70"
+              className={`mt-5 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${adapter.endorsed_by_current_user ? 'cursor-default border-blue-600 bg-blue-600 font-semibold text-white' : 'cursor-pointer border-slate-400 bg-white font-medium text-slate-700 hover:border-slate-500 hover:bg-slate-50'} disabled:cursor-default disabled:opacity-80`}
               disabled={isEndorsing || adapter.endorsed_by_current_user}
               onClick={() => void endorseCurrentAdapter()}
               type="button"
             >
               <span aria-hidden="true">👍</span>
               <span>{adapter.endorsement_count ?? 0}</span>
+              <span>Endorse</span>
             </button>
             {endorsementError ? (
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
@@ -322,6 +325,7 @@ bc.run()`}
             </div>
           </section>
 
+
           <section>
             <h2 className="text-2xl font-bold text-slate-950">Maintainer</h2>
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-5">
@@ -329,15 +333,22 @@ bc.run()`}
             </div>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-950">Cite</h2>
-            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-5">
-              <p className="text-sm text-slate-700">Cite this adapter via its .cff file</p>
-              <a className="mt-4 inline-flex cursor-pointer rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white" href={cffUrl(adapter.repository_location)}>
-                Cite
-              </a>
-            </div>
-          </section>
+          {adapter.cff_url || adapter.doi ? (
+            <section>
+              <h2 className="text-2xl font-bold text-slate-950">Cite</h2>
+              <div className="mt-3 grid gap-4 rounded-lg border border-slate-200 bg-white p-5">
+                {adapter.cff_url ? (
+                  <div>
+                    <p className="text-sm text-slate-700">Cite this adapter via its .cff file</p>
+                    <a className="mt-4 inline-flex cursor-pointer rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white" href={adapter.cff_url} rel="noreferrer" target="_blank">
+                      Cite
+                    </a>
+                  </div>
+                ) : null}
+                <CitationEndorsement doi={adapter.doi ?? null} />
+              </div>
+            </section>
+          ) : null}
 
           <section>
             <h2 className="text-2xl font-bold text-slate-950">Report Issue</h2>
@@ -357,7 +368,7 @@ bc.run()`}
   )
 }
 
-function AvatarGroup({ maintainers, showNames = false }: { maintainers: Maintainer[]; showNames?: boolean }) {
+function AvatarGroup({ maintainers = [], showNames = false }: { maintainers?: Maintainer[]; showNames?: boolean }) {
   if (!maintainers.length) return <span className="text-sm text-slate-500">No GitHub maintainer recorded</span>
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -385,7 +396,7 @@ function ColumnModal({ source }: { source: DataSource }) {
   )
 }
 
-function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null }) {
+function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null | undefined }) {
   return (
     <div className="grid gap-4">
       <a className="cursor-pointer rounded-lg bg-blue-600 px-5 py-4 text-center text-base font-semibold text-white" href={issuesUrl(repositoryLocation)} rel="noreferrer" target="_blank">
@@ -398,35 +409,17 @@ function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null
   )
 }
 
-async function endorseAdapter(apiBaseUrl: string, adapterId: string): Promise<AdapterEndorsement | null> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}/endorse`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (response.status === 401) {
-    window.location.href = `${apiBaseUrl}/api/v1/auth/github/start?return_to=${encodeURIComponent(window.location.pathname)}`
-    return null
-  }
-  if (!response.ok) throw new Error('Adapter endorsement API unavailable')
-  return response.json()
-}
-
-function repoLabel(repositoryLocation: string | null) {
+function repoLabel(repositoryLocation: string | null | undefined) {
   const repositoryUrl = githubRepositoryUrl(repositoryLocation)
   return repositoryUrl?.replace('https://github.com/', '') ?? 'Repository not available'
 }
 
-function issuesUrl(repositoryLocation: string | null) {
+function issuesUrl(repositoryLocation: string | null | undefined) {
   const repositoryUrl = githubRepositoryUrl(repositoryLocation)
   return repositoryUrl ? `${repositoryUrl}/issues` : 'https://github.com/biocypher'
 }
 
-function cffUrl(repositoryLocation: string | null) {
-  const repositoryUrl = githubRepositoryUrl(repositoryLocation)
-  return repositoryUrl ? `${repositoryUrl}/blob/main/CITATION.cff` : '#'
-}
-
-function githubRepositoryUrl(repositoryLocation: string | null) {
+function githubRepositoryUrl(repositoryLocation: string | null | undefined) {
   if (!repositoryLocation) return null
   const normalized = repositoryLocation.startsWith('github.com/')
     ? `https://${repositoryLocation}`
