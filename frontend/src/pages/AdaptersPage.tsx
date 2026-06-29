@@ -32,12 +32,20 @@ type LatestAdapter = {
   repository_location: string | null
   keywords: string[]
   maintainers: Maintainer[]
+  endorsement_count: number
+  endorsed_by_current_user: boolean
   updated_at: string
 }
 
 type AdapterDetail = LatestAdapter & {
   license_value: string | null
   data_sources: DataSource[]
+}
+
+type AdapterEndorsement = {
+  adapter_id: string
+  endorsement_count: number
+  endorsed_by_current_user: boolean
 }
 
 type AdaptersPageProps = {
@@ -60,14 +68,16 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   useEffect(() => {
     let ignore = false
-    setLoadError(false)
-    fetch(`${apiBaseUrl}/api/v1/adapters/latest?limit=10`)
+    fetch(`${apiBaseUrl}/api/v1/adapters/latest?limit=10`, { credentials: 'include' })
       .then((response) => {
         if (!response.ok) throw new Error('Adapter API unavailable')
         return response.json()
       })
       .then((payload: { items?: LatestAdapter[] }) => {
-        if (!ignore) setAdapters(payload.items ?? [])
+        if (!ignore) {
+          setAdapters(payload.items ?? [])
+          setLoadError(false)
+        }
       })
       .catch(() => {
         if (!ignore) {
@@ -114,16 +124,17 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
 
         <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
           {filteredAdapters.map((adapter) => (
-            <a
+            <article
               className="flex min-h-72 flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-              href={`/adapters/${adapter.adapter_id}`}
               key={adapter.adapter_id}
             >
-              <h2 className="text-xl font-bold text-slate-950">{adapter.adapter_name}</h2>
-              <p className="mt-2 text-sm text-slate-500">v{adapter.latest_version}</p>
-              <p className="mt-5 line-clamp-4 text-sm leading-5 text-slate-800">
-                {adapter.description ?? 'No adapter description has been submitted yet.'}
-              </p>
+              <a className="block" href={`/adapters/${adapter.adapter_id}`}>
+                <h2 className="text-xl font-bold text-slate-950">{adapter.adapter_name}</h2>
+                <p className="mt-2 text-sm text-slate-500">v{adapter.latest_version}</p>
+                <p className="mt-5 line-clamp-4 text-sm leading-5 text-slate-800">
+                  {adapter.description ?? 'No adapter description has been submitted yet.'}
+                </p>
+              </a>
               <div className="mt-5 flex flex-wrap gap-2">
                 {adapter.keywords.slice(0, 3).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
@@ -131,14 +142,14 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
                   </span>
                 ))}
               </div>
-              <div className="mt-auto flex items-center gap-2 pt-6">
+              <div className="mt-auto flex items-center justify-between gap-2 pt-6">
                 <AvatarGroup maintainers={adapter.maintainers} />
                 <span className="inline-flex items-center gap-1 text-sm text-slate-500">
-                  <StarIcon className="h-4 w-4 text-amber-400" aria-hidden="true" />
-                  {adapter.maintainers.length || 1}
+                  <span aria-hidden="true">👍</span>
+                  <span>{adapter.endorsement_count ?? 0}</span>
                 </span>
               </div>
-            </a>
+            </article>
           ))}
         </div>
       </div>
@@ -149,17 +160,21 @@ function AdapterListView({ apiBaseUrl }: { apiBaseUrl: string }) {
 function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBaseUrl: string }) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [isEndorsing, setIsEndorsing] = useState(false)
+  const [endorsementError, setEndorsementError] = useState<string | null>(null)
 
   useEffect(() => {
     let ignore = false
-    setLoadError(false)
-    fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}`)
+    fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}`, { credentials: 'include' })
       .then((response) => {
         if (!response.ok) throw new Error('Adapter detail API unavailable')
         return response.json()
       })
       .then((payload: AdapterDetail) => {
-        if (!ignore) setAdapter(payload)
+        if (!ignore) {
+          setAdapter(payload)
+          setLoadError(false)
+        }
       })
       .catch(() => {
         if (!ignore) {
@@ -171,6 +186,31 @@ function AdapterDetailView({ adapterId, apiBaseUrl }: { adapterId: string; apiBa
       ignore = true
     }
   }, [adapterId, apiBaseUrl])
+
+
+  /*
+   * AI-Generated.
+   */
+  async function endorseCurrentAdapter() {
+    setIsEndorsing(true)
+    setEndorsementError(null)
+    try {
+      const endorsement = await endorseAdapter(apiBaseUrl, adapterId)
+      if (!endorsement) return
+      setAdapter((currentAdapter) => currentAdapter
+        ? {
+            ...currentAdapter,
+            endorsement_count: endorsement.endorsement_count,
+            endorsed_by_current_user: endorsement.endorsed_by_current_user,
+          }
+        : currentAdapter,
+      )
+    } catch {
+      setEndorsementError('Could not endorse this adapter. Please try again.')
+    } finally {
+      setIsEndorsing(false)
+    }
+  }
 
   if (loadError) {
     return (
@@ -263,6 +303,19 @@ bc.run()`}
                 {adapterRepositoryHref === '#' ? 'Repository URL not available' : adapterRepositoryHref}
               </a>
             </div>
+            <button
+              aria-label={`Endorse ${adapter.adapter_name}`}
+              className="mt-5 inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:cursor-default disabled:opacity-70"
+              disabled={isEndorsing || adapter.endorsed_by_current_user}
+              onClick={() => void endorseCurrentAdapter()}
+              type="button"
+            >
+              <span aria-hidden="true">👍</span>
+              <span>{adapter.endorsement_count ?? 0}</span>
+            </button>
+            {endorsementError ? (
+              <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
+            ) : null}
             <div className="mt-6 flex flex-wrap gap-3 text-xs">
               {adapter.license_value ? <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">{adapter.license_value}</span> : null}
               <span className="rounded-full bg-slate-200 px-3 py-1.5 font-medium text-slate-700">v{adapter.latest_version}</span>
@@ -343,6 +396,22 @@ function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null
       </a>
     </div>
   )
+}
+
+/*
+ * AI-Generated.
+ */
+async function endorseAdapter(apiBaseUrl: string, adapterId: string): Promise<AdapterEndorsement | null> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}/endorsements`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (response.status === 401) {
+    window.location.href = `${apiBaseUrl}/api/v1/auth/github/start?return_to=${encodeURIComponent(window.location.pathname)}`
+    return null
+  }
+  if (!response.ok) throw new Error('Adapter endorsement API unavailable')
+  return response.json()
 }
 
 function repoLabel(repositoryLocation: string | null) {
