@@ -20,6 +20,7 @@ A production-grade registry system for BioCypher adapters with automated validat
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) package manager
 - (Optional) Docker and Docker Compose for containerized deployment
+- pnpm/node for the frontend local development
 
 ### Installation
 
@@ -29,6 +30,7 @@ A production-grade registry system for BioCypher adapters with automated validat
    cd biocypher-components-registry
    ```
 
+#### Installation - backend:
 2. **Install dependencies:**
    ```bash
    uv sync
@@ -38,8 +40,16 @@ A production-grade registry system for BioCypher adapters with automated validat
    ```bash
    source .venv/bin/activate
    ```
+#### Installation - frontend:
+2. **Install dependencies:**
+```bash
+pnpm run install
+```
+
 
 ## Usage
+
+For the frontend, you can launch the webserver this way from `/frontend`: `pnpm run dev` which will open to http://localhost:5173
 
 ### CLI Interface
 
@@ -361,6 +371,10 @@ uv run pytest tests/unit/test_cli_submit.py
 uv run pytest --cov=src
 ```
 
+From the frontend:
+`pnpm run ui-tests`
+this will require having previously ran the *project-specific* cypress installer: `pnpm cypress install`
+
 ### Code Quality
 
 ```bash
@@ -373,6 +387,9 @@ uv run ruff check
 # Type check
 uv run mypy src/
 ```
+
+From /frotnend:
+`pnpm run lint`
 
 ## Documentation
 

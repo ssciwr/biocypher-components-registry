@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "openapi-ts": "cd .. && uv run python scripts/export_openapi.py && cd frontend && openapi-ts"
+    "openapi-ts": "cd .. && uv run python scripts/export_openapi.py && cd frontend && openapi-ts",
+    "ui-tests": "cypress run"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -23,6 +24,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "cypress": "^15.18.0",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
