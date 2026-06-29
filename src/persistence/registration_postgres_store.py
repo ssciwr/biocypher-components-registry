@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import create_engine, insert, select, text, update
+from sqlalchemy import create_engine, func, insert, select, text, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +24,7 @@ from src.core.registration.models import (
     StoredRegistration,
 )
 from src.persistence.tables import (
+    adapter_endorsements_table,
     metadata,
     registration_events_table,
     registration_sources_table,
@@ -69,6 +70,7 @@ class PostgreSQLRegistrationStore:
             contact_email=request.contact_email,
             license_value=request.license_value,
             doi=request.doi,
+            cff_url=request.cff_url,
             submitted_by_github_login=request.submitted_by_github_login,
         )
 
@@ -82,6 +84,7 @@ class PostgreSQLRegistrationStore:
                     contact_email=registration.contact_email,
                     license_value=registration.license_value,
                     doi=registration.doi,
+                    cff_url=registration.cff_url,
                     submitted_by_github_login=registration.submitted_by_github_login,
                     is_active=True,
                     created_at=registration.created_at.isoformat(),
@@ -189,6 +192,43 @@ class PostgreSQLRegistrationStore:
         if row is None:
             return None
         return self._registry_entry_row_to_entry(row)
+
+    def endorse_adapter(self, adapter_id: str, github_login: str) -> None:
+        now = datetime.now(UTC).isoformat()
+        try:
+            with self.engine.begin() as connection:
+                if self._adapter_endorsement_row(connection, adapter_id, github_login):
+                    return
+                connection.execute(
+                    insert(adapter_endorsements_table).values(
+                        id=str(uuid4()),
+                        adapter_id=adapter_id,
+                        github_login=github_login,
+                        created_at=now,
+                    )
+                )
+        except IntegrityError:
+            return
+
+    def count_adapter_endorsements(self, adapter_id: str) -> int:
+        """Count distinct GitHub endorsements for the adapter.
+        """
+        with self.engine.connect() as connection:
+            count = connection.execute(
+                select(func.count())
+                .select_from(adapter_endorsements_table)
+                .where(adapter_endorsements_table.c.adapter_id == adapter_id)
+            ).scalar_one()
+        return int(count)
+
+    def has_adapter_endorsement(self, adapter_id: str, github_login: str) -> bool:
+        """Has this given user (usually the logged in user) already given an endorsement for this adapter?"""
+        with self.engine.connect() as connection:
+            return self._adapter_endorsement_row(
+                connection,
+                adapter_id,
+                github_login,
+            ) is not None
 
     def record_batch_refresh(
         self,
@@ -523,6 +563,12 @@ class PostgreSQLRegistrationStore:
             connection.execute(
                 text(
                     "ALTER TABLE registration_sources "
+                    "ADD COLUMN IF NOT EXISTS cff_url VARCHAR"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE registration_sources "
                     "ADD COLUMN IF NOT EXISTS submitted_by_github_login VARCHAR"
                 )
             )
@@ -628,6 +674,23 @@ class PostgreSQLRegistrationStore:
         return connection.execute(
             select(registry_entries_table).where(
                 registry_entries_table.c.uniqueness_key == uniqueness_key
+            )
+        ).mappings().first()
+
+    def _adapter_endorsement_row(
+        self,
+        connection: Engine | object,
+        adapter_id: str,
+        github_login: str,
+    ) -> RowMapping | None:
+        """AI-Generated.
+
+        Load an endorsement row for one adapter/login pair.
+        """
+        return connection.execute(
+            select(adapter_endorsements_table).where(
+                adapter_endorsements_table.c.adapter_id == adapter_id,
+                adapter_endorsements_table.c.github_login == github_login,
             )
         ).mappings().first()
 
@@ -756,6 +819,7 @@ class PostgreSQLRegistrationStore:
             contact_email=source_row.get("contact_email"),
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),
+            cff_url=source_row.get("cff_url"),
             submitted_by_github_login=source_row.get("submitted_by_github_login"),
             metadata_path=self._resolve_metadata_path(source_row),
             metadata=metadata,
