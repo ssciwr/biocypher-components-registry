@@ -165,6 +165,8 @@ class AdapterDetailResponse(BaseModel):
     description: str | None = None
     repository_location: str | None = None
     license_value: str | None = None
+    doi: str | None = None
+    cff_url: str | None = None
     keywords: list[str] = Field(default_factory=list)
     maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
     data_sources: list[AdapterDataSourceResponse] = Field(default_factory=list)
@@ -196,6 +198,8 @@ class AdapterDetailResponse(BaseModel):
             license_value=(
                 registration.license_value if registration and registration.license_value else _metadata_text(metadata, "license")
             ),
+            doi=registration.doi if registration else None,
+            cff_url=registration.cff_url if registration else None,
             keywords=_metadata_list(metadata, "keywords"),
             maintainers=[AdapterMaintainerResponse.from_login(login)] if login else [],
             data_sources=data_sources_from_metadata(metadata),
