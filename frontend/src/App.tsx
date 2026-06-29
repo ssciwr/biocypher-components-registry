@@ -12,7 +12,6 @@ import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
 import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
 import { client } from './api/client/client.gen'
-import { apiErrorMessage } from './api/errors'
 
 const actionCards = [
   {
@@ -119,9 +118,10 @@ function App() {
   async function logOut() {
     try {
       const result = await logoutApiV1AuthLogoutPost()
+      const logoutError = result.error as unknown
 
-      if (result.error) {
-        setAuthError(apiErrorMessage(result.error, 'Sign out failed.'))
+      if (logoutError) {
+        setAuthError(typeof logoutError === 'string' && logoutError ? logoutError : (logoutError as { details?: string; detail?: string } | undefined)?.details || (logoutError as { details?: string; detail?: string } | undefined)?.detail || 'Sign out failed.')
         return
       }
 
@@ -129,7 +129,7 @@ function App() {
       cacheAuthUser(null)
       setAuthError(null)
     } catch (error) {
-      setAuthError(apiErrorMessage(error, 'Sign out failed.'))
+      setAuthError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Sign out failed.')
     }
   }
 

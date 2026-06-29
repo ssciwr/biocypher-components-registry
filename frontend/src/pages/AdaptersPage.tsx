@@ -20,7 +20,6 @@ import {
   type AdapterMaintainerResponse,
 } from '../api/client'
 import { client } from '../api/client/client.gen'
-import { apiErrorMessage } from '../api/errors'
 
 type Maintainer = AdapterMaintainerResponse
 type DataSource = AdapterDataSourceResponse
@@ -53,7 +52,8 @@ function AdapterListView() {
       .then((result) => {
         if (ignore) return
 
-        if (result.error || !result.data) {
+        const adapterListError = result.error as unknown
+        if (adapterListError || !result.data) {
           setAdapters([])
           setLoadError(true)
           return
@@ -156,7 +156,8 @@ function AdapterDetailView({ adapterId }: { adapterId: string }) {
       .then((result) => {
         if (ignore) return
 
-        if (result.error || !result.data) {
+        const adapterDetailError = result.error as unknown
+        if (adapterDetailError || !result.data) {
           setAdapter(null)
           setLoadError(true)
           return
@@ -191,8 +192,9 @@ function AdapterDetailView({ adapterId }: { adapterId: string }) {
         return // send the user to login if they are not logged in yet, hardcoded.
       }
 
-      if (result.error || !result.data) {
-        setEndorsementError(apiErrorMessage(result.error, 'Could not endorse this adapter. Please try again.'))
+      const endorsementErrorValue = result.error as unknown
+      if (endorsementErrorValue || !result.data) {
+        setEndorsementError(typeof endorsementErrorValue === 'string' && endorsementErrorValue ? endorsementErrorValue : (endorsementErrorValue as { details?: string; detail?: string } | undefined)?.details || (endorsementErrorValue as { details?: string; detail?: string } | undefined)?.detail || 'Could not endorse this adapter. Please try again.')
         return
       }
 
@@ -206,7 +208,7 @@ function AdapterDetailView({ adapterId }: { adapterId: string }) {
         : currentAdapter,
       )
     } catch (error) {
-      setEndorsementError(apiErrorMessage(error, 'Could not endorse this adapter. Please try again.'))
+      setEndorsementError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Could not endorse this adapter. Please try again.')
     } finally {
       setIsEndorsing(false)
     }

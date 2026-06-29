@@ -11,7 +11,6 @@ import {
   type RegistrationRevalidateResponse,
 } from '../api/client'
 import { client } from '../api/client/client.gen'
-import { apiErrorMessage } from '../api/errors'
 
 type RegisterPageProps = {
   authUser: AuthUser | null
@@ -281,9 +280,10 @@ function RegisterPage({ authUser }: RegisterPageProps) {
         },
       })
 
-      if (registrationResult.error || !registrationResult.data) {
+      const registrationError = registrationResult.error as unknown
+      if (registrationError || !registrationResult.data) {
         setStatus('idle')
-        setError(apiErrorMessage(registrationResult.error, 'Registration failed.'))
+        setError(typeof registrationError === 'string' && registrationError ? registrationError : (registrationError as { details?: string; detail?: string } | undefined)?.details || (registrationError as { details?: string; detail?: string } | undefined)?.detail || 'Registration failed.')
         return
       }
 
@@ -296,16 +296,17 @@ function RegisterPage({ authUser }: RegisterPageProps) {
       })
 
       setStatus('idle')
-      if (processResult.error || !processResult.data) {
+      const processError = processResult.error as unknown
+      if (processError || !processResult.data) {
         setResult(registration)
-        setError(apiErrorMessage(processResult.error, 'Registration was saved, but processing failed.'))
+        setError(typeof processError === 'string' && processError ? processError : (processError as { details?: string; detail?: string } | undefined)?.details || (processError as { details?: string; detail?: string } | undefined)?.detail || 'Registration was saved, but processing failed.')
         return
       }
 
       setResult(processResult.data)
     } catch (error) {
       setStatus('idle')
-      setError(apiErrorMessage(error, 'Registration failed.'))
+      setError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Registration failed.')
     }
   }
 
@@ -320,15 +321,16 @@ function RegisterPage({ authUser }: RegisterPageProps) {
       })
 
       setStatus('idle')
-      if (revalidateResult.error || !revalidateResult.data) {
-        setError(apiErrorMessage(revalidateResult.error, 'Revalidation failed.'))
+      const revalidateError = revalidateResult.error as unknown
+      if (revalidateError || !revalidateResult.data) {
+        setError(typeof revalidateError === 'string' && revalidateError ? revalidateError : (revalidateError as { details?: string; detail?: string } | undefined)?.details || (revalidateError as { details?: string; detail?: string } | undefined)?.detail || 'Revalidation failed.')
         return
       }
 
       setResult(revalidateResult.data)
     } catch (error) {
       setStatus('idle')
-      setError(apiErrorMessage(error, 'Revalidation failed.'))
+      setError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Revalidation failed.')
     }
   }
 
