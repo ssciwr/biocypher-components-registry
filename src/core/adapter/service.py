@@ -47,6 +47,7 @@ def create_registration_request(
     contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
+    cff_url: str | None = None,
     submitted_by_github_login: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized adapter registration request.
@@ -57,6 +58,7 @@ def create_registration_request(
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
+        cff_url: Optional submitted Citation File Format URL.
         submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
@@ -79,6 +81,7 @@ def create_registration_request(
     normalized_contact_email = _normalize_contact_email(contact_email)
     normalized_license_value = _normalize_optional_text(license_value)
     normalized_doi = _normalize_optional_text(doi)
+    normalized_cff_url = _normalize_optional_text(cff_url)
 
     if normalized_location.startswith(("http://", "https://")):
         _validate_remote_repository(normalized_location)
@@ -99,6 +102,7 @@ def create_registration_request(
         contact_email=normalized_contact_email,
         license_value=normalized_license_value,
         doi=normalized_doi,
+        cff_url=normalized_cff_url,
         submitted_by_github_login=submitted_by_github_login,
     )
 

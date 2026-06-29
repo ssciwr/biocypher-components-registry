@@ -17,6 +17,7 @@ registration_sources_table = Table(
     Column("contact_email", String, nullable=True),
     Column("license_value", String, nullable=True),
     Column("doi", String, nullable=True),
+    Column("cff_url", String, nullable=True),
     Column("submitted_by_github_login", String, nullable=True),
     Column("is_active", Boolean, nullable=False),
     Column("created_at", String, nullable=False),

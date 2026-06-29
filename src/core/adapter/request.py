@@ -75,6 +75,7 @@ class AdapterRegistrationRequest:
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
+        cff_url: Optional submitted Citation File Format URL.
         submitted_by_github_login: GitHub login for browser submissions.
     """
 
@@ -86,6 +87,7 @@ class AdapterRegistrationRequest:
     contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
+    cff_url: str | None = None
     submitted_by_github_login: str | None = None
 
     @property

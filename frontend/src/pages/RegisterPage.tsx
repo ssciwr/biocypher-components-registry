@@ -2,9 +2,18 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
+import {
+  createRegistrationApiV1RegistrationsPost,
+  processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
+  revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
+  type RegistrationCreateResponse,
+  type RegistrationProcessResponse,
+  type RegistrationRevalidateResponse,
+} from '../api/client'
+import { client } from '../api/client/client.gen'
+import { apiErrorMessage } from '../api/errors'
 
 type RegisterPageProps = {
-  apiBaseUrl: string
   authUser: AuthUser | null
 }
 
@@ -13,19 +22,10 @@ type RegistrationForm = {
   repositoryLocation: string
   licenseValue: string
   doi: string
+  cffUrl: string
 }
 
-type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID' | string
-
-type RegistrationResponse = {
-  registration_id: string
-  adapter_name: string
-  adapter_id: string
-  repository_location: string
-  status: RegistrationStatus
-  validation_errors?: string[] | null
-  submitted_by_github_login: string | null
-}
+type RegistrationResponse = RegistrationCreateResponse | RegistrationProcessResponse | RegistrationRevalidateResponse
 
 type RegistrationResultPanelProps = {
   error: string | null
@@ -43,6 +43,7 @@ const emptyForm: RegistrationForm = {
   repositoryLocation: '',
   licenseValue: '',
   doi: '',
+  cffUrl: '',
 }
 
 const nextSteps = [
@@ -63,6 +64,20 @@ const nextSteps = [
     text: 'The BioCypher team will review your adapter submission',
   },
 ]
+
+// parse quickly on the client side to just keep the part we want to consistently look up the DOI record,
+// whether they provide a link, or just the DOI directly.
+// this takes the 2nd last slash until the end if present or the whole string otherwise.
+function registrationDoiValue(value: string) {
+  const trimmed = value.trim().replace(/^doi:\s*/i, '')
+  if (!trimmed) return ''
+
+  const cleanValue = trimmed.split(/[?#]/)[0].replace(/\/+$/, '')
+  const parts = cleanValue.split('/').filter(Boolean)
+  return /^https?:\/\//i.test(cleanValue) && parts.length >= 2
+    ? parts.slice(-2).join('/')
+    : cleanValue.replace(/^\/+/, '')
+}
 
 function initialForm(): RegistrationForm {
   const savedDraft = window.localStorage.getItem(draftKey)
@@ -88,7 +103,7 @@ function RegistrationResultPanel({
 }: RegistrationResultPanelProps) {
   const isValid = result.status === 'VALID'
   const isInvalid = result.status === 'INVALID'
-  const validationErrors = result.validation_errors?.filter(Boolean) ?? []
+  const validationErrors = ('validation_errors' in result ? result.validation_errors : null)?.filter(Boolean) ?? []
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
@@ -182,7 +197,7 @@ function RegistrationResultPanel({
   )
 }
 
-function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
+function RegisterPage({ authUser }: RegisterPageProps) {
   const [form, setForm] = useState<RegistrationForm>(initialForm)
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
@@ -246,52 +261,52 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
     setError(null)
     setResult(null)
 
+    const doi = registrationDoiValue(form.doi)
+
     if (!authUser) {
-      window.localStorage.setItem(draftKey, JSON.stringify(form))
-      window.location.href = `${apiBaseUrl}/api/v1/auth/github/start?return_to=${encodeURIComponent('/register')}`
+      window.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
+      window.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
       return
     }
 
     setStatus('submitting')
-    const response = await fetch(`${apiBaseUrl}/api/v1/registrations`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adapter_name: form.adapterName,
-        repository_location: form.repositoryLocation,
-        license_value: form.licenseValue.trim() || undefined,
-        doi: form.doi.trim() || undefined,
-      }),
-    })
+    try {
+      const registrationResult = await createRegistrationApiV1RegistrationsPost({
+        body: {
+          adapter_name: form.adapterName,
+          repository_location: form.repositoryLocation,
+          license_value: form.licenseValue.trim() || undefined,
+          doi: doi || undefined,
+          cff_url: form.cffUrl.trim() || undefined,
+        },
+      })
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { detail?: string } | null
+      if (registrationResult.error || !registrationResult.data) {
+        setStatus('idle')
+        setError(apiErrorMessage(registrationResult.error, 'Registration failed.'))
+        return
+      }
+
+      const registration = registrationResult.data
+      window.localStorage.removeItem(draftKey)
+      setStatus('processing')
+
+      const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
+        path: { registration_id: registration.registration_id },
+      })
+
       setStatus('idle')
-      setError(payload?.detail ?? 'Registration failed.')
-      return
+      if (processResult.error || !processResult.data) {
+        setResult(registration)
+        setError(apiErrorMessage(processResult.error, 'Registration was saved, but processing failed.'))
+        return
+      }
+
+      setResult(processResult.data)
+    } catch (error) {
+      setStatus('idle')
+      setError(apiErrorMessage(error, 'Registration failed.'))
     }
-
-    const registration = (await response.json()) as RegistrationResponse
-    window.localStorage.removeItem(draftKey)
-    setStatus('processing')
-
-    const processResponse = await fetch(`${apiBaseUrl}/api/v1/registrations/${registration.registration_id}/process`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    const processPayload = (await processResponse.json().catch(() => null)) as
-      | (RegistrationResponse & { detail?: string })
-      | null
-
-    setStatus('idle')
-    if (!processResponse.ok) {
-      setResult(registration)
-      setError(processPayload?.detail ?? 'Registration was saved, but processing failed.')
-      return
-    }
-
-    setResult(processPayload ?? registration)
   }
 
   async function revalidateRegistration() {
@@ -299,21 +314,22 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
 
     setStatus('processing')
     setError(null)
-    const response = await fetch(`${apiBaseUrl}/api/v1/registrations/${result.registration_id}/revalidate`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    const payload = (await response.json().catch(() => null)) as
-      | (RegistrationResponse & { detail?: string })
-      | null
+    try {
+      const revalidateResult = await revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost({
+        path: { registration_id: result.registration_id },
+      })
 
-    setStatus('idle')
-    if (!response.ok) {
-      setError(payload?.detail ?? 'Revalidation failed.')
-      return
+      setStatus('idle')
+      if (revalidateResult.error || !revalidateResult.data) {
+        setError(apiErrorMessage(revalidateResult.error, 'Revalidation failed.'))
+        return
+      }
+
+      setResult(revalidateResult.data)
+    } catch (error) {
+      setStatus('idle')
+      setError(apiErrorMessage(error, 'Revalidation failed.'))
     }
-
-    setResult(payload ?? result)
   }
 
   return (
@@ -407,10 +423,22 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
                 DOI
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                  onBlur={(event) => updateField('doi', registrationDoiValue(event.target.value))}
                   onChange={(event) => updateField('doi', event.target.value)}
-                  placeholder="10.5281/zenodo.1234567"
+                  placeholder="10.1000/182"
                   type="text"
                   value={form.doi}
+                />
+              </label>
+
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                CFF file link
+                <input
+                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                  onChange={(event) => updateField('cffUrl', event.target.value)}
+                  placeholder="https://github.com/example/adapter/blob/main/CITATION.cff"
+                  type="url"
+                  value={form.cffUrl}
                 />
               </label>
             </div>

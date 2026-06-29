@@ -18,6 +18,7 @@ REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "repository_location": "github.com/biocypher/collectri",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
+    "cff_url": "https://github.com/biocypher/collectri/blob/main/CITATION.cff",
 }
 
 
@@ -47,6 +48,10 @@ class RegistrationCreateRequest(BaseModel):
         default=None,
         description="Optional submitted DOI text.",
     )
+    cff_url: str | None = Field(
+        default=None,
+        description="Optional submitted Citation File Format URL.",
+    )
 
     @field_validator("adapter_name", "repository_location")
     @classmethod
@@ -57,7 +62,7 @@ class RegistrationCreateRequest(BaseModel):
             raise ValueError("Field must not be blank.")
         return normalized_value
 
-    @field_validator("license_value", "doi")
+    @field_validator("license_value", "doi", "cff_url")
     @classmethod
     def _strip_optional_text(cls, value: str | None) -> str | None:
         """Normalize optional text fields."""
@@ -79,6 +84,7 @@ class RegistrationCreateResponse(BaseModel):
     created_at: datetime
     license_value: str | None = None
     doi: str | None = None
+    cff_url: str | None = None
     submitted_by_github_login: str | None = None
 
     @classmethod
@@ -94,6 +100,7 @@ class RegistrationCreateResponse(BaseModel):
             created_at=registration.created_at,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
         )
 
@@ -121,6 +128,7 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
             created_at=registration.created_at,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
             metadata_path=registration.metadata_path,
             metadata=registration.metadata,
@@ -151,6 +159,7 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
             created_at=registration.created_at,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
             profile_version=registration.profile_version,
             updated_at=registration.updated_at,
