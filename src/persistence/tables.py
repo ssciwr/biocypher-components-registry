@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table
+from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table, UniqueConstraint
 
 
 metadata = MetaData()
@@ -48,6 +48,20 @@ registry_entries_table = Table(
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
     Column("is_active", Boolean, nullable=False),
+)
+
+adapter_endorsements_table = Table(
+    "adapter_endorsements",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("adapter_id", String, nullable=False),
+    Column("github_login", String, nullable=False),
+    Column("created_at", String, nullable=False),
+    UniqueConstraint(
+        "adapter_id",
+        "github_login",
+        name="uq_adapter_endorsement_user",
+    ),
 )
 
 registration_events_table = Table(
