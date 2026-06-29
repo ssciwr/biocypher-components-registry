@@ -52,6 +52,8 @@ def build_adapter_creator(
     affiliation: str = "",
     identifier: str = "",
     creator_type: str = "Person",
+    email: str = "",
+    url: str = "",
 ) -> dict[str, Any]:
     """Build a creator node for adapter metadata."""
     normalized_type = (
@@ -62,6 +64,10 @@ def build_adapter_creator(
     creator: dict[str, Any] = {"@type": normalized_type, "name": name}
     if affiliation:
         creator["affiliation"] = affiliation
+    if email:
+        creator["email"] = email
+    if url:
+        creator["url"] = url
     if identifier:
         creator["identifier"] = identifier
     return creator

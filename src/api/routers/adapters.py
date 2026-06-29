@@ -6,7 +6,11 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Query
 
-from src.api.dependencies import get_registration_store
+from src.api.dependencies import (
+    get_current_auth_session,
+    get_optional_auth_session,
+    get_registration_store,
+)
 from src.api.errors import (
     adapter_not_found_http_error,
     adapter_version_not_found_http_error,
@@ -15,12 +19,14 @@ from src.api.schemas.adapters import (
     AdapterCatalogItemResponse,
     AdapterCatalogListResponse,
     AdapterDetailResponse,
+    AdapterEndorsementResponse,
     AdapterLatestListResponse,
     AdapterLatestItemResponse,
     AdapterMetadataResponse,
     adapter_id_from_uniqueness_key,
     latest_registry_entry,
 )
+from src.core.auth.models import AuthSession
 from src.core.registration.models import RegistryEntry
 from src.core.registration.store import RegistrationStore
 
@@ -48,10 +54,15 @@ def list_adapters(
 ) -> AdapterCatalogListResponse:
     """Return public adapters that have at least one canonical registry entry."""
     grouped_entries = _group_entries_by_adapter_id(store.list_registry_entries())
-    items = [
-        AdapterCatalogItemResponse.from_entries(adapter_id, entries)
-        for adapter_id, entries in sorted(grouped_entries.items())
-    ]
+    items: list[AdapterCatalogItemResponse] = []
+    for adapter_id, entries in sorted(grouped_entries.items()):
+        items.append(
+            AdapterCatalogItemResponse.from_entries(
+                adapter_id,
+                entries,
+                endorsement_count=store.count_adapter_endorsements(adapter_id),
+            )
+        )
     return AdapterCatalogListResponse(items=items)
 
 
@@ -82,6 +93,7 @@ def list_latest_adapters(
             AdapterLatestItemResponse.from_entry(
                 entry,
                 store.get_registration(entry.source_id),
+                endorsement_count=store.count_adapter_endorsements(adapter_id),
             )
         )
         if len(items) >= limit:
@@ -99,8 +111,13 @@ def list_latest_adapters(
         "version metadata endpoint."
     ),
 )
+
+def endorsed_by_current_user(auth_session, store, adapter_id):
+    return  auth_session is not None  and store.has_adapter_endorsement(adapter_id, auth_session.github_login)
+
 def get_adapter(
     adapter_id: str,
+    auth_session: AuthSession | None = Depends(get_optional_auth_session),
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterDetailResponse:
     """Return one public adapter with all registered canonical versions."""
@@ -112,7 +129,32 @@ def get_adapter(
     return AdapterDetailResponse.from_entries(
         adapter_id,
         entries,
-        store.get_registration(latest.source_id),
+        store.get_registration(latest.source_id), # this is a bit messy to have/store multiple registrations
+        # creates a lot of extra code to iterate entries/get latest one . not sure we even need that info.
+        endorsement_count=store.count_adapter_endorsements(adapter_id),
+        endorsed_by_current_user=endorsed_by_current_user(auth_session, store, adapter_id),
+    )
+
+
+@router.post(
+    "/adapters/{adapter_id}/endorse",
+    response_model=AdapterEndorsementResponse,
+    summary="Endorse an adapter",
+    description="Record that the signed-in user endorses this adapter.",
+)
+def endorse_adapter(
+    adapter_id: str,
+    auth_session: AuthSession = Depends(get_current_auth_session),
+    store: RegistrationStore = Depends(get_registration_store),
+) -> AdapterEndorsementResponse:
+    entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
+    if not entries:
+        raise adapter_not_found_http_error(adapter_id)
+    store.endorse_adapter(adapter_id, auth_session.github_login)
+    return AdapterEndorsementResponse(
+        adapter_id=adapter_id,
+        endorsement_count=store.count_adapter_endorsements(adapter_id),
+        endorsed_by_current_user=endorsed_by_current_user(auth_session, store, adapter_id),
     )
 
 

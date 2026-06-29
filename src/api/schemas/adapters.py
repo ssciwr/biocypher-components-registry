@@ -15,6 +15,14 @@ from src.core.registration.models import RegistryEntry, StoredRegistration
 # ===========================================================
 
 
+class AdapterEndorsementResponse(BaseModel):
+    """Current endorsement state for one adapter."""
+
+    adapter_id: str
+    endorsement_count: int
+    endorsed_by_current_user: bool = False
+
+
 class AdapterMaintainerResponse(BaseModel):
     """GitHub maintainer identity for adapter catalog display."""
 
@@ -75,12 +83,14 @@ class AdapterCatalogItemResponse(BaseModel):
     adapter_name: str
     latest_version: str
     version_count: int
+    endorsement_count: int = 0
 
     @classmethod
     def from_entries(
         cls,
         adapter_id: str,
         entries: list[RegistryEntry],
+        endorsement_count: int = 0,
     ) -> "AdapterCatalogItemResponse":
         """Build one catalog item from the canonical entries for an adapter."""
         latest = latest_registry_entry(entries)
@@ -89,6 +99,7 @@ class AdapterCatalogItemResponse(BaseModel):
             adapter_name=latest.adapter_name,
             latest_version=latest.adapter_version,
             version_count=len(entries),
+            endorsement_count=endorsement_count,
         )
 
 
@@ -102,6 +113,8 @@ class AdapterLatestItemResponse(BaseModel):
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
     maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
+    endorsement_count: int = 0
+    endorsed_by_current_user: bool = False
     updated_at: datetime
 
     @classmethod
@@ -109,6 +122,8 @@ class AdapterLatestItemResponse(BaseModel):
         cls,
         entry: RegistryEntry,
         registration: StoredRegistration | None,
+        endorsement_count: int = 0,
+        endorsed_by_current_user: bool = False,
     ) -> "AdapterLatestItemResponse":
         """Build a compact catalog card from entry and source data."""
         metadata = entry.metadata or {}
@@ -123,6 +138,8 @@ class AdapterLatestItemResponse(BaseModel):
             ),
             keywords=_metadata_list(metadata, "keywords"),
             maintainers=[AdapterMaintainerResponse.from_login(login)] if login else [],
+            endorsement_count=endorsement_count,
+            endorsed_by_current_user=endorsed_by_current_user,
             updated_at=entry.updated_at,
         )
 
@@ -152,6 +169,8 @@ class AdapterDetailResponse(BaseModel):
     maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
     data_sources: list[AdapterDataSourceResponse] = Field(default_factory=list)
     versions: list[AdapterVersionResponse]
+    endorsement_count: int = 0
+    endorsed_by_current_user: bool = False
 
     @classmethod
     def from_entries(
@@ -159,6 +178,8 @@ class AdapterDetailResponse(BaseModel):
         adapter_id: str,
         entries: list[RegistryEntry],
         registration: StoredRegistration | None = None,
+        endorsement_count: int = 0,
+        endorsed_by_current_user: bool = False,
     ) -> "AdapterDetailResponse":
         """Build adapter detail from canonical versions and source data."""
         latest = latest_registry_entry(entries)
@@ -179,6 +200,8 @@ class AdapterDetailResponse(BaseModel):
             maintainers=[AdapterMaintainerResponse.from_login(login)] if login else [],
             data_sources=data_sources_from_metadata(metadata),
             versions=[AdapterVersionResponse.from_entry(entry) for entry in entries],
+            endorsement_count=endorsement_count,
+            endorsed_by_current_user=endorsed_by_current_user,
         )
 
 
