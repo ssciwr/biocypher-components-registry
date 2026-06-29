@@ -111,10 +111,6 @@ def list_latest_adapters(
         "version metadata endpoint."
     ),
 )
-
-def endorsed_by_current_user(auth_session, store, adapter_id):
-    return  auth_session is not None  and store.has_adapter_endorsement(adapter_id, auth_session.github_login)
-
 def get_adapter(
     adapter_id: str,
     auth_session: AuthSession | None = Depends(get_optional_auth_session),
@@ -134,6 +130,14 @@ def get_adapter(
         endorsement_count=store.count_adapter_endorsements(adapter_id),
         endorsed_by_current_user=endorsed_by_current_user(auth_session, store, adapter_id),
     )
+
+
+def endorsed_by_current_user(
+    auth_session: AuthSession | None,
+    store: RegistrationStore,
+    adapter_id,
+) -> bool:
+    return  auth_session is not None and store.has_adapter_endorsement(adapter_id, auth_session.github_login)
 
 
 @router.post(

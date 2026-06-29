@@ -398,11 +398,8 @@ function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null
   )
 }
 
-/*
- * AI-Generated.
- */
 async function endorseAdapter(apiBaseUrl: string, adapterId: string): Promise<AdapterEndorsement | null> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}/endorsements`, {
+  const response = await fetch(`${apiBaseUrl}/api/v1/adapters/${adapterId}/endorse`, {
     method: 'POST',
     credentials: 'include',
   })
