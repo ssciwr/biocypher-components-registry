@@ -38,10 +38,10 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --group dev --locked --no-build
+        run: uv sync --group dev --locked
 
       - name: Run tests
-        run: uv run  pytest --locked --no-build
+        run: uv run  pytest --locked
 
       - name: Minimize uv cache
         run: uv cache prune --ci
