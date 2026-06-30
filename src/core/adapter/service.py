@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from src.core.adapter.request import (
     AdapterGenerationRequest,
@@ -54,7 +55,7 @@ def create_registration_request(
 
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
-        repository_location: Local repository path or supported repository URL.
+        repository_location: Local repository path or remote repository URL.
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
@@ -68,7 +69,7 @@ def create_registration_request(
         ValueError: If the adapter name or location is empty.
         ValueError: If the contact email is provided but invalid.
         FileNotFoundError: If a submitted local repository path does not exist.
-        InvalidRepoURLError: If a submitted URL is not a supported repository URL.
+        InvalidRepoURLError: If a submitted URL is not a valid remote repository URL.
     """
     normalized_name = adapter_name.strip()
     if not normalized_name:
@@ -110,7 +111,9 @@ def create_registration_request(
 def _normalize_repository_location(repository_location: str) -> str:
     normalized_location = repository_location.strip()
     if normalized_location.startswith("github.com/"):
-        return f"https://{normalized_location}"
+        normalized_location = f"https://{normalized_location}"
+    if normalized_location.startswith(("http://", "https://")):
+        return normalized_location.rstrip("/")
     return normalized_location
 
 
@@ -147,6 +150,7 @@ def _normalize_local_repository(repository_location: str) -> str:
 
 
 def _validate_remote_repository(repository_location: str) -> None:
-    """Validate that a remote repository URL is currently supported."""
-    if "github.com" not in repository_location:
+    """Validate that a remote repository URL can be fetched over HTTP."""
+    parsed = urlparse(repository_location)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise InvalidRepoURLError(repository_location)

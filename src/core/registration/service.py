@@ -40,7 +40,7 @@ def submit_registration(
 
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
-        repository_location: Local repository path or supported repository URL.
+        repository_location: Local repository path or remote repository URL.
         store: Persistence backend used to save the submission.
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.

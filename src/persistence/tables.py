@@ -25,6 +25,10 @@ registration_sources_table = Table(
     Column("last_checked_at", String, nullable=True),
     Column("last_seen_at", String, nullable=True),
     Column("current_registry_entry_id", String, nullable=True),
+    UniqueConstraint(
+        "repository_location",
+        name="uq_registration_source_repository_location",
+    ),
 )
 
 auth_sessions_table = Table(
