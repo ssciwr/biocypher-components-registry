@@ -69,22 +69,56 @@ def list_adapters(
 @router.get(
     "/adapters/latest",
     response_model=AdapterLatestListResponse,
-    summary="List latest public adapters",
-    description="Return the latest valid adapters with maintainer avatar data for catalog cards.",
+    summary="List latest (30) public adapters",
+    description="Return the latest valid adapters",
 )
 def list_latest_adapters(
-    limit: int = Query(default=10, ge=1, le=50),
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterLatestListResponse:
     """Return newest unique adapter cards from canonical entries."""
+    return AdapterLatestListResponse(
+        items=_latest_adapter_items(store.list_registry_entries(), store) # latest 30
+    )
+
+
+@router.get(
+    "/adapters/search",
+    response_model=AdapterLatestListResponse,
+    summary="Search public adapters",
+    description="Return public adapter cards whose title matches the search term.",
+)
+def search_adapters(
+    query: str = Query(min_length=1),
+    store: RegistrationStore = Depends(get_registration_store),
+) -> AdapterLatestListResponse:
+    """AI-Generated.
+
+    Return adapter cards from the PostgreSQL-backed title search.
+    """
+    search_entries = getattr(store, "search_registry_entries_by_adapter_name", None)
+    if not callable(search_entries):
+        return AdapterLatestListResponse(items=[])
+
+    return AdapterLatestListResponse(
+        items=_latest_adapter_items(search_entries(query, 120), store) # for search results have a safer default max amount
+    )
+
+
+def _latest_adapter_items(
+    entries: list[RegistryEntry],
+    store: RegistrationStore,
+) -> list[AdapterLatestItemResponse]:
+    """
+    Build newest unique adapter cards from canonical registry entries as utility for search/latest list
+    """
     seen: set[str] = set()
     items: list[AdapterLatestItemResponse] = []
-    entries = sorted(
-        store.list_registry_entries(),
+    sorted_entries = sorted(
+        entries,
         key=lambda entry: (entry.updated_at, entry.created_at, entry.entry_id),
         reverse=True,
     )
-    for entry in entries:
+    for entry in sorted_entries:
         adapter_id = adapter_id_from_uniqueness_key(entry.uniqueness_key)
         if adapter_id in seen:
             continue
@@ -96,9 +130,9 @@ def list_latest_adapters(
                 endorsement_count=store.count_adapter_endorsements(adapter_id),
             )
         )
-        if len(items) >= limit:
+        if len(items) >= 30: # show the last 30 by default(3-wide columns x 10).
             break
-    return AdapterLatestListResponse(items=items)
+    return items
 
 
 @router.get(

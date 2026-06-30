@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from urllib.parse import ParseResult, quote, urljoin, urlparse
 
+import requests
 from pydantic import BaseModel, Field
+from requests import RequestException
 
 from src.core.registration.models import RegistryEntry, StoredRegistration
 
@@ -24,18 +27,37 @@ class AdapterEndorsementResponse(BaseModel):
 
 
 class AdapterMaintainerResponse(BaseModel):
-    """GitHub maintainer identity for adapter catalog display."""
+    """Repository maintainer identity for adapter catalog display."""
 
-    github_login: str
+    username: str
     avatar_url: str
+    provider: str
+    profile_url: str | None = None
 
     @classmethod
-    def from_login(cls, github_login: str) -> "AdapterMaintainerResponse":
-        """Build a public GitHub avatar reference from a login."""
-        return cls(
-            github_login=github_login,
-            avatar_url=f"https://github.com/{github_login}.png",
-        )
+    def from_repository_location(
+        cls,
+        repository_location: str | None,
+    ) -> "AdapterMaintainerResponse | None":
+        """
+        Resolve public maintainer avatar data from the repository URL at response time.
+        """
+        repository_url = _repository_url(repository_location)
+        if repository_url is None:
+            return None
+        owner = _repository_owner(repository_url)
+        if not owner:
+            return None
+        if repository_url.netloc.lower() == "github.com":
+            return _github_maintainer_from_username(owner)
+        gitlab_maintainer = _gitlab_maintainer_from_owner(repository_url, owner)
+        if gitlab_maintainer is not None:
+            return gitlab_maintainer
+        redirected_url = _redirected_repository_url(repository_url)
+        redirected_owner = _repository_owner(redirected_url) if redirected_url else None
+        if redirected_url and redirected_owner and redirected_url.netloc.lower() == "github.com":
+            return _github_maintainer_from_username(redirected_owner)
+        return None
 
 
 class AdapterDataSourceResponse(BaseModel):
@@ -127,17 +149,16 @@ class AdapterLatestItemResponse(BaseModel):
     ) -> "AdapterLatestItemResponse":
         """Build a compact catalog card from entry and source data."""
         metadata = entry.metadata or {}
-        login = registration.submitted_by_github_login if registration else None
+        repository_location = _entry_repository_location(registration, metadata)
+        maintainer = AdapterMaintainerResponse.from_repository_location(repository_location)
         return cls(
             adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
             adapter_name=entry.adapter_name,
             latest_version=entry.adapter_version,
             description=_metadata_text(metadata, "description"),
-            repository_location=(
-                registration.repository_location if registration else _metadata_text(metadata, "codeRepository")
-            ),
+            repository_location=repository_location,
             keywords=_metadata_list(metadata, "keywords"),
-            maintainers=[AdapterMaintainerResponse.from_login(login)] if login else [],
+            maintainers=[maintainer] if maintainer else [],
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
             updated_at=entry.updated_at,
@@ -186,22 +207,21 @@ class AdapterDetailResponse(BaseModel):
         """Build adapter detail from canonical versions and source data."""
         latest = latest_registry_entry(entries)
         metadata = latest.metadata or {}
-        login = registration.submitted_by_github_login if registration else None
+        repository_location = _entry_repository_location(registration, metadata)
+        maintainer = AdapterMaintainerResponse.from_repository_location(repository_location)
         return cls(
             adapter_id=adapter_id,
             adapter_name=latest.adapter_name,
             latest_version=latest.adapter_version,
             description=_metadata_text(metadata, "description"),
-            repository_location=(
-                registration.repository_location if registration else _metadata_text(metadata, "codeRepository")
-            ),
+            repository_location=repository_location,
             license_value=(
                 registration.license_value if registration and registration.license_value else _metadata_text(metadata, "license")
             ),
             doi=registration.doi if registration else None,
             cff_url=registration.cff_url if registration else None,
             keywords=_metadata_list(metadata, "keywords"),
-            maintainers=[AdapterMaintainerResponse.from_login(login)] if login else [],
+            maintainers=[maintainer] if maintainer else [],
             data_sources=data_sources_from_metadata(metadata),
             versions=[AdapterVersionResponse.from_entry(entry) for entry in entries],
             endorsement_count=endorsement_count,
@@ -241,6 +261,165 @@ def adapter_id_from_uniqueness_key(uniqueness_key: str) -> str:
 def latest_registry_entry(entries: list[RegistryEntry]) -> RegistryEntry:
     """Return the most recently updated entry from a non-empty entry list."""
     return max(entries, key=lambda entry: (entry.updated_at, entry.created_at))
+
+
+def _entry_repository_location(
+    registration: StoredRegistration | None,
+    metadata: dict[str, Any],
+) -> str | None:
+    """AI-Generated.
+
+    Prefer the tracked registration source over metadata repository hints.
+    """
+    if registration is not None:
+        return registration.repository_location
+    return _metadata_text(metadata, "codeRepository")
+
+
+def _repository_url(repository_location: str | None) -> ParseResult | None:
+    """
+    Normalize supported repository URLs for maintainer avatar resolution.
+    """
+    if not repository_location:
+        return None
+    normalized = (
+        f"https://{repository_location}"
+        if repository_location.startswith(("github.com/", "gitlab.com/"))
+        else repository_location
+    )
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return parsed
+
+
+def _repository_owner(repository_url: ParseResult) -> str | None:
+    """
+    Use the first repository path segment as the public owner/user candidate. (consistent between Github/Gitlab)
+    """
+    parts = [part for part in repository_url.path.strip("/").split("/") if part]
+    if len(parts) < 2:
+        return None
+    return parts[0]
+
+
+def _github_maintainer_from_username(username: str) -> AdapterMaintainerResponse:
+    """AI-Generated.
+
+    Build GitHub maintainer avatar data from a public repository owner.
+    """
+    return AdapterMaintainerResponse(
+        username=username,
+        avatar_url=f"https://github.com/{username}.png",
+        provider="github",
+        profile_url=f"https://github.com/{username}",
+    )
+
+
+def _gitlab_maintainer_from_owner(
+    repository_url: ParseResult,
+    owner: str,
+) -> AdapterMaintainerResponse | None:
+    """AI-Generated.
+
+    Resolve GitLab user or group avatars through public API endpoints.
+    """
+    origin = f"{repository_url.scheme}://{repository_url.netloc}"
+    api_url = f"{origin}/api/v4/users?username={quote(owner)}"
+    try:
+        response = requests.get(api_url, timeout=2)
+        response.raise_for_status()
+        users = response.json()
+    except (RequestException, ValueError, TypeError):
+        users = []
+
+    if not isinstance(users, list):
+        users = []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        if str(user.get("username", "")).lower() != owner.lower():
+            continue
+        avatar_url = _absolute_url(origin, user.get("avatar_url"))
+        if not avatar_url:
+            continue
+        return AdapterMaintainerResponse(
+            username=str(user["username"]),
+            avatar_url=avatar_url,
+            provider="gitlab",
+            profile_url=_absolute_url(origin, user.get("web_url")),
+        )
+
+    project_path = repository_url.path.strip("/").removesuffix(".git")
+    api_url = f"{origin}/api/v4/projects/{quote(project_path, safe='')}"
+    try:
+        response = requests.get(api_url, timeout=2)
+        response.raise_for_status()
+        project = response.json()
+    except (RequestException, ValueError, TypeError):
+        project = None
+    if isinstance(project, dict):
+        namespace = project.get("namespace")
+        if isinstance(namespace, dict):
+            full_path = str(namespace.get("full_path") or namespace.get("path") or "")
+            if full_path.split("/", maxsplit=1)[0].lower() == owner.lower():
+                avatar_url = _absolute_url(origin, namespace.get("avatar_url"))
+                if avatar_url:
+                    return AdapterMaintainerResponse(
+                        username=full_path,
+                        avatar_url=avatar_url,
+                        provider="gitlab",
+                        profile_url=_absolute_url(origin, namespace.get("web_url")),
+                    )
+
+    api_url = f"{origin}/api/v4/groups/{quote(owner, safe='')}?with_projects=false"
+    try:
+        response = requests.get(api_url, timeout=2)
+        response.raise_for_status()
+        group = response.json()
+    except (RequestException, ValueError, TypeError):
+        return None
+    if not isinstance(group, dict):
+        return None
+
+    full_path = str(group.get("full_path") or group.get("path") or "")
+    if full_path.lower() != owner.lower():
+        return None
+    avatar_url = _absolute_url(origin, group.get("avatar_url"))
+    if not avatar_url:
+        return None
+    return AdapterMaintainerResponse(
+        username=full_path,
+        avatar_url=avatar_url,
+        provider="gitlab",
+        profile_url=_absolute_url(origin, group.get("web_url")),
+    )
+
+
+def _redirected_repository_url(repository_url: ParseResult) -> ParseResult | None:
+    """AI-Generated.
+
+    Follow migrated repository URLs when the original host no longer has public user API data.
+    """
+    try:
+        response = requests.head(repository_url.geturl(), allow_redirects=True, timeout=2)
+        response.raise_for_status()
+    except RequestException:
+        return None
+    redirected = urlparse(response.url)
+    if redirected.scheme not in {"http", "https"} or not redirected.netloc:
+        return None
+    return redirected
+
+
+def _absolute_url(origin: str, value: object) -> str | None:
+    """AI-Generated.
+
+    Return an absolute URL for public profile/avatar fields.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    return urljoin(origin, value)
 
 
 def data_sources_from_metadata(metadata: dict[str, Any]) -> list[AdapterDataSourceResponse]:
