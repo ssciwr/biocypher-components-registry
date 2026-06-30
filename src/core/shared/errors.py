@@ -60,13 +60,13 @@ class InvalidRepoURLError(ValueError):
 
 
 class MetadataNotFoundError(RemoteResourceNotFoundError):
-    """Raised when metadata is not found in any expected branch."""
+    """Raised when remote croissant metadata cannot be found."""
 
     def __init__(self, repo_url: str) -> None:
         super().__init__(
             repo_url,
             status_code=404,
-            message="Metadata file not found at repo root in 'main' or 'master' branch",
+            message="Metadata file not found for repository URL.",
         )
 
 __all__ = [
