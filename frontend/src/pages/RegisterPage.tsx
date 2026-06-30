@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 import {
+  checkRegistrationMetadataApiV1RegistrationsMetadataCheckGet,
   createRegistrationApiV1RegistrationsPost,
   processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
   revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
@@ -225,27 +226,22 @@ function RegisterPage({ authUser }: RegisterPageProps) {
           : 'bg-blue-100 text-blue-700'
 
   useEffect(() => {
-    const location = form.repositoryLocation.trim().replace(/\/+$/, '')
-    if (!/^https?:\/\/.+/.test(location)) return
+    const repositoryLocation = form.repositoryLocation.trim()
+    if (!/^https?:\/\/.+/.test(repositoryLocation)) return
 
     const controller = new AbortController()
-    let repositoryUrl: URL
-    try {
-      repositoryUrl = new URL(location)
-    } catch {
-      return
-    }
-    const parts = repositoryUrl.pathname.split('/').filter(Boolean)
-    const isGitHub = repositoryUrl.hostname === 'github.com' && parts.length >= 2
-    const branch = isGitHub && parts[2] === 'blob' && parts[3] ? parts[3] : 'main'
-    const path = isGitHub && parts[2] === 'blob' ? parts.slice(4).join('/') : 'croissant.jsonld'
-    const metadataUrl = isGitHub
-      ? `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${branch}/${path}`
-      : new URL('croissant.jsonld', location + '/').href
 
-    void fetch(metadataUrl, { signal: controller.signal })
-      .then((response) => {
-        setMetadataCheckStatus(response.ok ? 'found' : response.status === 404 ? 'missing' : 'blocked')
+    void checkRegistrationMetadataApiV1RegistrationsMetadataCheckGet({
+      query: { repository_url: repositoryLocation },
+      signal: controller.signal,
+    })
+      .then((metadataResult) => {
+        if (controller.signal.aborted) return
+        if (metadataResult.error || !metadataResult.data) {
+          setMetadataCheckStatus('blocked')
+          return
+        }
+        setMetadataCheckStatus(metadataResult.data.has_metadata ? 'found' : 'missing')
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return

@@ -14,6 +14,7 @@ import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
   getAdapterApiV1AdaptersAdapterIdGet,
   listLatestAdaptersApiV1AdaptersLatestGet,
+  searchAdaptersApiV1AdaptersSearchGet,
   type AdapterDataSourceResponse,
   type AdapterDetailResponse,
   type AdapterLatestItemResponse,
@@ -45,10 +46,14 @@ function AdapterListView() {
 
   useEffect(() => {
     let ignore = false
+    const searchTerm = query.trim()
+    const adapterRequest = searchTerm
+      ? searchAdaptersApiV1AdaptersSearchGet({
+          query: { query: searchTerm },
+        })
+      : listLatestAdaptersApiV1AdaptersLatestGet()
 
-    void listLatestAdaptersApiV1AdaptersLatestGet({
-      query: { limit: 10 },
-    })
+    void adapterRequest
       .then((result) => {
         if (ignore) return
 
@@ -71,13 +76,7 @@ function AdapterListView() {
     return () => {
       ignore = true
     }
-  }, [])
-
-  const filteredAdapters = adapters.filter((adapter) =>
-    `${adapter.adapter_name} ${adapter.description ?? ''} ${(adapter.keywords ?? []).join(' ')}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  )
+  }, [query])
 
 
   return (
@@ -106,7 +105,7 @@ function AdapterListView() {
         ) : null}
 
         <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-          {filteredAdapters.map((adapter) => (
+          {adapters.map((adapter) => (
             <article
               className="flex min-h-72 flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-200 hover:shadow-md"
               key={adapter.adapter_id}
@@ -229,7 +228,7 @@ function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
     return <section className="px-6 py-20 text-center text-slate-500">Loading adapter...</section>
   }
 
-  const adapterRepositoryHref = githubRepositoryUrl(adapter.repository_location)
+  const adapterRepositoryHref = repositoryHref(adapter.repository_location)
   const adapterKeywords = adapter.keywords ?? []
   const adapterDataSources = adapter.data_sources ?? []
 
@@ -385,17 +384,24 @@ bc.run()`}
   )
 }
 
+// A pure function, render only, no looking up /guessing the profile picture by the url.
 function AvatarGroup({ maintainers = [], showNames = false }: Readonly<{ maintainers?: Maintainer[]; showNames?: boolean }>) {
-  if (!maintainers.length) return <span className="text-sm text-slate-500">No GitHub maintainer recorded</span>
+  if (!maintainers.length) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
   return (
     <div className="flex flex-wrap items-center gap-4">
       {maintainers.map((maintainer) => (
-        <span className="flex items-center gap-3" key={maintainer.github_login}>
-          <img alt={maintainer.github_login} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
+        <span className="flex items-center gap-3" key={`${maintainer.provider}:${maintainer.username}`}>
+          <img alt={maintainer.username} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
           {showNames ? (
             <span>
-              <span className="block text-sm font-medium text-slate-950">{maintainer.github_login}</span>
-              <span className="block text-xs text-slate-500">@{maintainer.github_login}</span>
+              {maintainer.profile_url ? (
+                <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={maintainer.profile_url} rel="noreferrer" target="_blank">
+                  {maintainer.username}
+                </a>
+              ) : (
+                <span className="block text-sm font-medium text-slate-950">{maintainer.username}</span>
+              )}
+              <span className="block text-xs text-slate-500">{maintainer.provider}</span>
             </span>
           ) : null}
         </span>
@@ -427,27 +433,33 @@ function ReportLinks({ repositoryLocation }: Readonly<{ repositoryLocation: stri
 }
 
 function repoLabel(repositoryLocation: string | null | undefined) {
-  const repositoryUrl = githubRepositoryUrl(repositoryLocation)
-  return repositoryUrl?.replace('https://github.com/', '') ?? 'Repository not available'
+  const repositoryUrl = repositoryHref(repositoryLocation)
+  return repositoryUrl?.replace(/^https?:\/\//, '') ?? 'Repository not available'
 }
 
 function issuesUrl(repositoryLocation: string | null | undefined) {
-  const repositoryUrl = githubRepositoryUrl(repositoryLocation)
-  return repositoryUrl ? `${repositoryUrl}/issues` : 'https://github.com/biocypher'
+  const repositoryUrl = repositoryHref(repositoryLocation)
+  if (!repositoryUrl) return 'https://github.com/biocypher'
+  try {
+    const url = new URL(repositoryUrl)
+    return url.hostname === 'github.com'
+      ? `${repositoryUrl}/issues`
+      : `${repositoryUrl}/-/issues`
+  } catch {
+    return repositoryUrl
+  }
 }
 
-function githubRepositoryUrl(repositoryLocation: string | null | undefined) {
+
+function repositoryHref(repositoryLocation: string | null | undefined) {
   if (!repositoryLocation) return null
-  const normalized = repositoryLocation.startsWith('github.com/')
-    ? `https://${repositoryLocation}`
-    : repositoryLocation
+  const normalized = repositoryLocation.startsWith('https://') // if it has  https
+    ?  repositoryLocation// keep it
+    : `https://${repositoryLocation}` // otherwise add it
 
   try {
     const url = new URL(normalized)
-    const [owner, repo] = url.pathname.split('/').filter(Boolean)
-    return url.hostname === 'github.com' && owner && repo
-      ? `https://github.com/${owner}/${repo}`
-      : null
+    return url.href.replace(/\/+$/, '')
   } catch {
     return null
   }

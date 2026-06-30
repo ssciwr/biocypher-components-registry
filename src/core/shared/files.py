@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urljoin, urlparse
 
 import requests
 from requests import HTTPError, RequestException
@@ -117,37 +117,111 @@ def fetch_local_metadata(repo_path: str | Path) -> tuple[Path, dict[str, Any]]:
 
 
 def fetch_remote_metadata(repo_url: str) -> dict[str, Any]:
-    """Fetch ``croissant.jsonld`` from a supported GitHub repository URL.
+    """Fetch ``croissant.jsonld`` from a remote repository URL (Github or Gitlab by default)
 
     Args:
-        repo_url: GitHub repository URL.
+        repo_url: Remote repository URL.
 
     Returns:
         The parsed remote metadata document.
     """
     parsed = urlparse(repo_url)
-    if not parsed.netloc or not parsed.path:
-        raise InvalidRepoURLError(repo_url)
-    if not parsed.netloc.endswith("github.com"):
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise InvalidRepoURLError(repo_url)
 
-    parts = [p for p in parsed.path.strip("/").split("/") if p]
-    if len(parts) < 2:
-        raise InvalidRepoURLError(repo_url)
-
-    owner, repo = parts[0], parts[1]
-    if repo.endswith(".git"):
-        repo = repo[:-4]
-    branches = ["main", "master"]
-    for branch in branches:
-        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{METADATA_FILENAME}"
+    for metadata_url in _remote_metadata_urls(repo_url, parsed):
         try:
-            content = fetch_remote_file(raw_url)
-            return parse_json_metadata(content, raw_url)
+            content = fetch_remote_file(metadata_url)
+            return parse_json_metadata(content, metadata_url)
         except RemoteResourceNotFoundError:
             continue
 
     raise MetadataNotFoundError(repo_url)
+
+
+def remote_metadata_exists(repo_url: str) -> bool:
+    """
+    Check whether a remote repository exposes the expected metadata file.
+    """
+    parsed = urlparse(repo_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise InvalidRepoURLError(repo_url)
+
+    for metadata_url in _remote_metadata_urls(repo_url, parsed):
+        try:
+            fetch_remote_file(metadata_url)
+            return True
+        except RemoteResourceNotFoundError:
+            continue
+
+    return False
+
+
+def _remote_metadata_urls(repo_url: str, parsed: ParseResult) -> list[str]:
+    """Build candidate croissant URLs without requiring a GitHub-owned repository."""
+    normalized_path = parsed.path.rstrip("/")
+
+    if parsed.netloc.lower() == "github.com":
+        github_urls = _github_metadata_urls(parsed)
+        if github_urls:
+            return github_urls
+
+    if "/-/" in normalized_path: # this is a sign it is Github
+        gitlab_urls = _gitlab_metadata_urls(parsed)
+        if gitlab_urls:
+            return gitlab_urls
+
+    if normalized_path.endswith(f"/{METADATA_FILENAME}"):
+        return [parsed._replace(path=normalized_path).geturl()]
+
+    gitlab_urls = _gitlab_metadata_urls(parsed)
+    if gitlab_urls:
+        return gitlab_urls
+
+    return [urljoin(repo_url.rstrip("/") + "/", METADATA_FILENAME)]
+
+
+def _github_metadata_urls(parsed: ParseResult) -> list[str]:
+    # treat as typical github url
+    parts = [p for p in parsed.path.strip("/").split("/") if p]
+    if len(parts) < 2:
+        return []
+
+    owner, repo = parts[0], parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if len(parts) >= 5 and parts[2] == "blob":
+        return [
+            "https://raw.githubusercontent.com/"
+            f"{owner}/{repo}/{parts[3]}/{'/'.join(parts[4:])}"
+        ]
+    return [
+        f"https://raw.githubusercontent.com/{owner}/{repo}/main/{METADATA_FILENAME}",
+        f"https://raw.githubusercontent.com/{owner}/{repo}/master/{METADATA_FILENAME}",
+    ]
+
+
+def _gitlab_metadata_urls(parsed: ParseResult) -> list[str]:
+    """Build GitLab raw metadata URLs from project roots or blob/raw file URLs."""
+    parts = [p for p in parsed.path.strip("/").split("/") if p]
+    if len(parts) < 2:
+        return []
+
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    # if '/-/' is in the url it is a specific branch link, we ignore those and only use main/master
+    # to avoid confusion is the user was to look up code and there is mismatch with what they see on main
+    # and what the adapter register used.
+
+
+
+    owner, repo = parts[0], parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    project_path = f"{owner}/{repo}"
+    return [
+        f"{base_url}/{project_path}/-/raw/main/{METADATA_FILENAME}",
+        f"{base_url}/{project_path}/-/raw/master/{METADATA_FILENAME}",
+    ]
 
 
 __all__ = [
@@ -156,4 +230,5 @@ __all__ = [
     "fetch_remote_file",
     "fetch_remote_metadata",
     "parse_json_metadata",
+    "remote_metadata_exists",
 ]

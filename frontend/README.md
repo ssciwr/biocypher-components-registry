@@ -38,6 +38,44 @@ pnpm run openapi-ts
 [ ] - Document how to perform migrations via SSH (from which directory) to make future project updates
 [ ] - Soon the MCP Workspace will need to be integrated too, need to research that.
 
+## Cross component reliably risks/areas:
+We discovered at the BioCypher Workshop that some researchers are mandated to use their own insitutions instances to store source code (e.g. GitLab). Therefore, the backend needs to be able to parse at least Github and Gitlab urls for the repository croissant files and ideally, maintainer information (if possible)
+[x] - I added a backend test and changed the backend parsing code and approach so for the gitlab/github difference, (A) the backend is the source of truth (B) its URL-parsing logic/system is used to verify whether the submitted repository url has a croissant file for feedback on the frontend, not duplicated code in the frontend.
+Specific test:
+for each of these urls:
+[https://github.com/biocypher/collectri/, https://gitlab.com/gitlab-org/gitlab]
+run the utility function _repository_url() to standardize it, then check:
+AdapterMaintainerResponse can be extracted and from the web request:
+(A) the adapter maintainer username is extracted
+(B) the avatar url exists
+(C) the avatar url returns 200
+
+[ ] - Duplicated adapters can in theory be submitted by submitting both a master and main branch.
+Based on the risk of people submitting adapters multiple times, I made it so we extract the repository url and then look up main/master only
+(rather than supporting e.g. registering a "biocypher_ready_adapter" branch). However, users can still register using a "master" branch if "main" is already present.
+We should write special code to prevent that and add a test.
+
+## Types of test
+### Performance tests
+Current assessment: Not needed given our data is minimal. I checked the codebase and changed the search/latest listings to safe defaults for even very small VM resources (1GB of RAM etc)
+
+### Static Verification
+Improved by Linting, SonarQube and our Software Development Life Cycle/Gherkin docs
+
+### Security Testing
+Partially tested by SonarQube, we need to look at how we keep the most sensitive data (email for registration / Github information)
+The Github token access should be reviewed
+
+### Domain Review
+We consulted with experts and adjusted the description we need, one minor feedback point was to use a dropdown for standard licenses rather than freetext for confident ease of use of the adapters
+
+### Beta testing
+We should plan a beta test once the croissant file generator part is implemented in the frontend
+
+### User errors/issues:
+We corrected search functionality behaviour (unclear system status in Nielens Usability terms) as it gave too little feedback.
+
+
 ## Manual testing in July 2026:
 [ ] - Run manual test of the website and changing between pages
 [ ] - Test adding adapter on slow 3G mode
