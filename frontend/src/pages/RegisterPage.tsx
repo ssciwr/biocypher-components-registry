@@ -375,7 +375,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                Repository location*
+                Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
                 <span className="relative block">
                   <input
                     className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
@@ -385,7 +385,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
                       setMetadataCheckStatus(/^https?:\/\/.+/.test(value.trim()) ? 'checking' : 'idle')
                       updateField('repositoryLocation', value)
                     }}
-                    placeholder="https://github.com/example/clinical-visit-adapter"
+                    placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
                     required
                     type="url"
                     value={form.repositoryLocation}
@@ -446,7 +446,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
             </div>
             <div className="mt-10 flex flex-col gap-4 border-t border-slate-100 pt-8 md:flex-row md:items-center md:justify-end">
               <p className="text-sm leading-6 text-slate-500 md:max-w-sm md:text-right">
-                We use GitHub to attach your login to the registration.
+                Sign in once so we can attach your login to the registration.
               </p>
               <button
                 className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
