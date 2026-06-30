@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from requests import RequestException
 
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.errors import (
@@ -16,6 +17,7 @@ from src.api.schemas.registrations import (
     RegistrationDetailResponse,
     RegistrationEventListResponse,
     RegistrationEventResponse,
+    RegistrationMetadataCheckResponse,
     RegistrationListItemResponse,
     RegistrationListResponse,
     RegistrationProcessResponse,
@@ -28,6 +30,8 @@ from src.core.registration.service import (
     submit_registration,
 )
 from src.core.registration.store import RegistrationStore
+from src.core.shared.errors import InvalidRepoURLError
+from src.core.shared.files import remote_metadata_exists
 
 
 router = APIRouter()
@@ -45,7 +49,7 @@ router = APIRouter()
     summary="Submit an adapter registration",
     description=(
         "Store one adapter repository as a tracked registration request. "
-        "The repository may be a local path or supported remote URL and should "
+        "The repository may be a local path or remote URL and should "
         "contain a root-level croissant.jsonld file. Processing happens later "
         "through the process endpoint or a registry refresh."
     ),
@@ -95,6 +99,31 @@ def list_registrations(
     ]
 
     return RegistrationListResponse(items=items)
+
+
+@router.get(
+    "/registrations/metadata-check",
+    response_model=RegistrationMetadataCheckResponse,
+    summary="Check registration metadata",
+    description="Return whether a remote repository exposes root-level croissant.jsonld.",
+)
+def check_registration_metadata(
+    repository_url: str = Query(..., min_length=1),
+) -> RegistrationMetadataCheckResponse:
+    """
+    A quick http call that the frontend can make to check if the users submitted repository has data we can use for registration (the croissant file)
+    Check remote metadata presence for the registration form.
+    """
+    try:
+        has_metadata = remote_metadata_exists(repository_url)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="We could not check the repository url you provided (we tried to check if a raw croissant.jsonld file could be found by our system) Is your file hosted on GitHub or a Gitlab instance?",
+        ) from exc
+    return RegistrationMetadataCheckResponse(has_metadata=has_metadata)
+# previously this happened on the frontend but with Gitlab + Github support it became quite messy.
+# Adding Gitlab support has added about 30 lines to the project, but we keep it simpler conceptually by only hcecking on the backend.
 
 
 @router.get(

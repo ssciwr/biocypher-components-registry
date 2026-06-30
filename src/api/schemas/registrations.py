@@ -15,10 +15,10 @@ from src.core.registration.models import (
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "adapter_name": "CollecTRI Adapter",
-    "repository_location": "github.com/biocypher/collectri",
+    "repository_location": "https://gitlab.example.org/biocypher/collectri",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
-    "cff_url": "https://github.com/biocypher/collectri/blob/main/CITATION.cff",
+    "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
 }
 
 
@@ -36,7 +36,7 @@ class RegistrationCreateRequest(BaseModel):
         ...,
         min_length=1,
         description=(
-            "Local repository path or supported remote repository URL containing "
+            "Local repository path or remote repository URL containing "
             "a root-level croissant.jsonld file."
         ),
     )
@@ -171,6 +171,12 @@ class RegistrationListResponse(BaseModel):
     """Response model for a registration list."""
 
     items: list[RegistrationListItemResponse]
+
+
+class RegistrationMetadataCheckResponse(BaseModel):
+    """Response model for a remote registration metadata presence check."""
+
+    has_metadata: bool
 
 
 class RegistrationEventResponse(BaseModel):
