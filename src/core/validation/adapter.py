@@ -78,7 +78,7 @@ def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationR
 
     This is the registry-level adapter validation contract used by user-facing
     interfaces. It keeps the adapter schema/compliance checks and embedded
-    dataset checks together so the API, CLI, web UI, and registration workflow
+    dataset checks together so the API, CLI, and registration workflow
     agree on what a valid adapter means.
     """
     adapter_result = validate_adapter(data)

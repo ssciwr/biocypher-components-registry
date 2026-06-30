@@ -18,9 +18,3 @@ Feature: Non-blocking batch registration
     When the batch registration workflow runs
     Then the source is reprocessed immediately
     And the registry records a VALID_CREATED outcome for the corrected source
-
-  Scenario: Manual batch refresh is visible in the web UI
-    Given active sources include valid and invalid adapters
-    When the batch registration workflow is triggered from the web UI
-    Then the UI shows the batch summary
-    And the latest per-source outcomes are visible

@@ -9,7 +9,7 @@ from pathlib import Path
 
 @dataclass(frozen=True, slots=True)
 class CoreSettings:
-    """Configuration values shared by API, CLI, and legacy web delivery layers."""
+    """Configuration values shared by API, CLI, and registration workflows."""
 
     database_url_env: str = "DATABASE_URL"
     registry_db_path_env: str = "BIOCYPHER_REGISTRY_DB_PATH"
