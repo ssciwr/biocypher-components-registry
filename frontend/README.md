@@ -23,13 +23,21 @@ pnpm run openapi-ts
 
 # Integration and deployment plan
 
-## Already done/planned before
+## Integration deliberate design/decisions
 [x] - Have a dynamic, env set base URL and do not use hardcoded URLs (except external third party services with static URLs)
+- Test ground/basic actions (e.g. backend call, taking action, results change upon interaction)
+- For major user stories, add an integration test before full HTTPS integration, which should pass with HTTPS integration:
+  - 1) A user can register an adapter with a github URL, the details are successfully fetched including avatar picture cross ref citation count.
+  - 2) A user can generate a croissant file (which uses croissant baker under the hood) via providing manually the data sample and fields. When they update a specific field (e.g. a description), that is saved and seen in the generated croissant file
+  - 3) A user can endorse an adapter, and after that the endorsement count increases
 
-## Securing better integration:
+
+## Smoke testing key inter-service calls/actions:
+
 [x] - Add a Cypress test that confirms functionality of client-browser load with mocked API data (check a GET request is made to the backend for the adapter details of a single adapter, and that its description appears, and its returned DOI is looked up and provided as the citation count by the CrossRef API integration on the page)
-[ ] - Add a way to mock or manually log in users for testing via their emails.
+[ ] - Add a way in Cypress to mock or manually log in users for testing via their emails.
 [ ] - Add a Cypress test that checks if backend actually saves information once frontend triggers and update (e.g. endorsement)
+[x] - Add an adapter test which tests calling the API to endorse an adapter (A) increases the endorsement count by 1 (B) for the given mocked user shows that they themselves have endorsed it
 
 ## Deployment integration priorities
 [ ] - We need the A record set up for the DNS so we can use/test out https containers docker configuration.
@@ -80,3 +88,23 @@ We corrected search functionality behaviour (unclear system status in Nielens Us
 [ ] - Run manual test of the website and changing between pages
 [ ] - Test adding adapter on slow 3G mode
 [ ] - Manually Test loading and searching on mobile slow 3G mode
+
+## Use of AI
+### For tests and integration
+- I (James) use AI for creating backend tests and for fixing Cypress tests
+- 50% of the time I outline the test cases and the process I want each to follow and then ask the AI to develop the test, to fail first.
+- I do check the mock data/input data which is used and always ask: Is mocking and testing against this useful? Is the example relevant?
+
+- I plan frontend tests/integration well upfront more in terms of user stories and see that as where testing can be completed mainly
+- The docker compose file and env set up with BASE_URLS should be kept as is with no more complexity from AI.
+-
+### For main UI elements
+- I use AI to generate components in React with use tailwind classes, since that can finnicky
+- However, I design and iterate on the fine parts of the choices/position both before and after using AI
+- I make choices like whether the AdapterPage should have a separate view for a single adapter or that should be a separate page/component
+
+### For backend code
+- I try to avoid editing it too much as I focus on the frontend, so I mostly edit it when it makes sense to e.g. have a clear decision that the backend should be the soruce of truth (e.g. the Croissant meta file existence check for a given repository url)
+- I tend to write a pseudo-code style algorithm or speicfy e.g. properties that need to be saved
+- I check and review the schema and make sure AI adds a comment to each AI function; I remove that once I have read the function. I work to simplify anything which seems overly done.
+- I check what existing tests are present and if those seem AI generated or not. I lean towards creating new test files, if something seems like it should be tested

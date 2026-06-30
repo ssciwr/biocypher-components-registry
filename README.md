@@ -10,7 +10,7 @@ A production-grade registry system for BioCypher adapters with automated validat
 - **Batch Processing**: Non-blocking registry refresh with isolated error handling
 - **Multiple Interfaces**: CLI, Web UI, and REST API
 - **Event Sourcing**: Complete audit trail of all registration attempts
-- **Duplicate Prevention**: Enforced uniqueness by adapter_id + version
+- **Duplicate Prevention**: Enforced uniqueness by adapter id
 - **On-Demand Revalidation**: Fix and reprocess failed registrations
 
 ## Quick Start
