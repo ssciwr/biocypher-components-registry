@@ -12,9 +12,9 @@ import {
 } from '../api/client'
 import { client } from '../api/client/client.gen'
 
-type RegisterPageProps = {
+type RegisterPageProps = Readonly<{
   authUser: AuthUser | null
-}
+}>
 
 type RegistrationForm = {
   adapterName: string
@@ -26,12 +26,12 @@ type RegistrationForm = {
 
 type RegistrationResponse = RegistrationCreateResponse | RegistrationProcessResponse | RegistrationRevalidateResponse
 
-type RegistrationResultPanelProps = {
+type RegistrationResultPanelProps = Readonly<{
   error: string | null
   isProcessing: boolean
   onRevalidate: () => void
   result: RegistrationResponse
-}
+}>
 
 type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 

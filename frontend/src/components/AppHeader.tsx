@@ -2,14 +2,14 @@ import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/out
 import bioCypherLogo from '../assets/logo-biocypher.png'
 import { client } from '../api/client/client.gen'
 
-type AuthUser = {
+type AuthUser = Readonly<{
   github_login: string
-}
+}>
 
-type AppHeaderProps = {
+type AppHeaderProps = Readonly<{
   authUser: AuthUser | null
   onLogout: () => Promise<void>
-}
+}>
 
 function AppHeader({ authUser, onLogout }: AppHeaderProps) {
   return (
@@ -24,7 +24,7 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
           <a className="hover:text-slate-950" href="/adapters">
             Explore
           </a>
-          <a className="hover:text-slate-950" href="#">
+          <a className="hover:text-slate-950" href="/register">
             Create
           </a>
           <a className="hover:text-slate-950" href="/register">
@@ -55,13 +55,14 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
               Sign in with GitHub
             </a>
           )}
-          <a
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
-            href="#"
+          <button
+            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-slate-300 px-5 py-3 text-base text-white"
+            disabled
+            type="button"
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
             <b>MCP Workspace</b>
-          </a>
+          </button>
         </div>
       </div>
     </header>

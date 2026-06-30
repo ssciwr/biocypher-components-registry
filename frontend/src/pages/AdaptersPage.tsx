@@ -26,9 +26,9 @@ type DataSource = AdapterDataSourceResponse
 type LatestAdapter = AdapterLatestItemResponse
 type AdapterDetail = AdapterDetailResponse
 
-type AdaptersPageProps = {
+type AdaptersPageProps = Readonly<{
   adapterId?: string
-}
+}>
 
 function AdaptersPage({ adapterId }: AdaptersPageProps) {
   return adapterId ? (
@@ -40,7 +40,7 @@ function AdaptersPage({ adapterId }: AdaptersPageProps) {
 
 function AdapterListView() {
   const [adapters, setAdapters] = useState<LatestAdapter[]>([])
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('query') ?? '')
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
@@ -141,7 +141,7 @@ function AdapterListView() {
   )
 }
 
-function AdapterDetailView({ adapterId }: { adapterId: string }) {
+function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
@@ -229,7 +229,7 @@ function AdapterDetailView({ adapterId }: { adapterId: string }) {
     return <section className="px-6 py-20 text-center text-slate-500">Loading adapter...</section>
   }
 
-  const adapterRepositoryHref = githubRepositoryUrl(adapter.repository_location) ?? adapter.repository_location ?? '#'
+  const adapterRepositoryHref = githubRepositoryUrl(adapter.repository_location)
   const adapterKeywords = adapter.keywords ?? []
   const adapterDataSources = adapter.data_sources ?? []
 
@@ -292,20 +292,35 @@ bc.run()`}
 
         <aside className="grid min-w-0 content-start gap-6">
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <a
-              className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700 sm:min-h-14 sm:text-lg"
-              href={adapterRepositoryHref}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <RocketLaunchIcon className="h-7 w-7" aria-hidden="true" />
-              Use this Adapter
-            </a>
+            {adapterRepositoryHref ? (
+              <a
+                className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700 sm:min-h-14 sm:text-lg"
+                href={adapterRepositoryHref}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <RocketLaunchIcon className="h-7 w-7" aria-hidden="true" />
+                Use this Adapter
+              </a>
+            ) : (
+              <button
+                className="inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-lg bg-slate-300 px-5 py-3 text-base font-semibold text-white sm:min-h-14 sm:text-lg"
+                disabled
+                type="button"
+              >
+                <RocketLaunchIcon className="h-7 w-7" aria-hidden="true" />
+                Use this Adapter
+              </button>
+            )}
             <div className="mt-7 flex items-start gap-3 text-sm text-slate-700">
               <StarIcon className="h-5 w-5 text-amber-400" aria-hidden="true" />
-              <a className="break-all text-blue-600 hover:text-blue-700" href={adapterRepositoryHref} rel="noreferrer" target="_blank">
-                {adapterRepositoryHref === '#' ? 'Repository URL not available' : adapterRepositoryHref}
-              </a>
+              {adapterRepositoryHref ? (
+                <a className="break-all text-blue-600 hover:text-blue-700" href={adapterRepositoryHref} rel="noreferrer" target="_blank">
+                  {adapterRepositoryHref}
+                </a>
+              ) : (
+                <span className="break-all text-slate-500">Repository URL not available</span>
+              )}
             </div>
             <button
               aria-label={`Endorse ${adapter.adapter_name}`}
@@ -370,7 +385,7 @@ bc.run()`}
   )
 }
 
-function AvatarGroup({ maintainers = [], showNames = false }: { maintainers?: Maintainer[]; showNames?: boolean }) {
+function AvatarGroup({ maintainers = [], showNames = false }: Readonly<{ maintainers?: Maintainer[]; showNames?: boolean }>) {
   if (!maintainers.length) return <span className="text-sm text-slate-500">No GitHub maintainer recorded</span>
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -389,7 +404,7 @@ function AvatarGroup({ maintainers = [], showNames = false }: { maintainers?: Ma
   )
 }
 
-function ColumnModal({ source }: { source: DataSource }) {
+function ColumnModal({ source }: Readonly<{ source: DataSource }>) {
   // todo: show real field/column metadata when backend exposes parsed recordSet fields.
   return (
     <LinkToModal modal={<GenericModal title={`Data Source "${source.name}" - ${source.column_count} Columns`} content={<div className="text-sm text-slate-700">Column metadata is not exposed by the adapter API yet.</div>} />}>
@@ -398,7 +413,7 @@ function ColumnModal({ source }: { source: DataSource }) {
   )
 }
 
-function ReportLinks({ repositoryLocation }: { repositoryLocation: string | null | undefined }) {
+function ReportLinks({ repositoryLocation }: Readonly<{ repositoryLocation: string | null | undefined }>) {
   return (
     <div className="grid gap-4">
       <a className="cursor-pointer rounded-lg bg-blue-600 px-5 py-4 text-center text-base font-semibold text-white" href={issuesUrl(repositoryLocation)} rel="noreferrer" target="_blank">

@@ -27,7 +27,7 @@ const actionCards = [
     icon: DocumentPlusIcon,
     text: 'Create BioCypher adapters and metadata.',
     cta: 'Start creating',
-    href: '#',
+    href: '/register',
     featured: true,
     tone: 'bg-white/20 text-white',
   },
@@ -186,7 +186,7 @@ function HomePage() {
             {popularAdapters.map((adapter) => (
               <a
                 className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
-                href="#"
+                href={`/adapters?query=${encodeURIComponent(adapter)}`}
                 key={adapter}
               >
                 {adapter}
@@ -226,7 +226,7 @@ function HomePage() {
 
           <a
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            href="#"
+            href="/adapters"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />

@@ -1,12 +1,12 @@
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
-type GenericModalProps = {
+type GenericModalProps = Readonly<{
   title: string
   content: ReactNode
   open?: boolean
   onClose?: () => void
-}
+}>
 
 /**
  * A helper so you can create a Modal quickly for any content you need to show, or that is not important to show immediately, but have available by reference.
@@ -17,21 +17,35 @@ type GenericModalProps = {
  * @constructor
  */
 function GenericModal({ title, content, open = false, onClose }: GenericModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!open || !dialog) return
+
+    if (!dialog.open) dialog.showModal()
+
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [open])
+
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      role="presentation"
-      onClick={onClose}
+    <dialog
+      aria-labelledby="generic-modal-title"
+      className="fixed inset-0 z-50 m-0 flex h-dvh max-h-none w-dvw max-w-none items-center justify-center border-0 bg-transparent p-4 backdrop:bg-black/40"
+      ref={dialogRef}
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose?.()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose?.()
+      }}
     >
-      <section
-        aria-modal="true"
-        aria-labelledby="generic-modal-title"
-        className="w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6"
-        role="dialog"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <section className="w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <h2
             className="m-0 text-xl font-semibold text-zinc-950 dark:text-zinc-50"
@@ -50,7 +64,7 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
         </div>
         <div className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{content}</div>
       </section>
-    </div>
+    </dialog>
   )
 }
 

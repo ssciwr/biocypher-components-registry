@@ -1,14 +1,14 @@
 import { cloneElement, isValidElement, type ReactElement, type ReactNode, useState } from 'react'
 
-type ModalElement = ReactElement<{
+type ModalElement = ReactElement<Readonly<{
   open?: boolean
   onClose?: () => void
-}>
+}>>
 
-type LinkToModalProps = {
+type LinkToModalProps = Readonly<{
   children: ReactNode
   modal: ModalElement
-}
+}>
 
 /**
  * A helper so you can easily create a modal based around any JSX element.

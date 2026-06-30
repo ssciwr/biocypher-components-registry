@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { BookOpenIcon } from '@heroicons/react/24/outline'
 
-type CitationEndorsementProps = {
+type CitationEndorsementProps = Readonly<{
   doi: string | null
-}
+}>
 
 type CrossrefWork = {
   count: number
