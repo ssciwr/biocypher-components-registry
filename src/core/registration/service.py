@@ -246,12 +246,9 @@ def _build_uniqueness_key(
 ) -> str:
     """Build the configured uniqueness key for duplicate detection."""
     adapter_id = _resolve_adapter_id(metadata, fallback_adapter_id)
-    version = str(metadata.get("version", "")).strip()
-    if not adapter_id or not version:
-        raise ValueError(
-            "Registration uniqueness key requires adapter id and version."
-        )
-    return f"{adapter_id}::{version}"
+    if not adapter_id:
+        raise ValueError("Registration uniqueness key requires adapter id.")
+    return adapter_id
 
 
 def _resolve_adapter_id(

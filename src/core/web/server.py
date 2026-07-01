@@ -257,7 +257,7 @@ def _render_registration_page(
           <div class="field">
             <label for="repository_location">Repository location</label>
             <input id="repository_location" name="repository_location" value="{repository_location}" required>
-            <div class="hint">Use either a local repository path or a supported GitHub repository URL.</div>
+            <div class="hint">Use either a local repository path or a remote repository URL.</div>
           </div>
           <div class="field">
             <label for="contact_email">Contact email</label>
@@ -411,7 +411,6 @@ def _render_registration_detail(
         <div class="grid">
           <div class="metric"><div class="label">Entry ID</div><div class="value">{html.escape(current_entry.entry_id)}</div></div>
           <div class="metric"><div class="label">Adapter Name</div><div class="value">{html.escape(current_entry.adapter_name)}</div></div>
-          <div class="metric"><div class="label">Version</div><div class="value">{html.escape(current_entry.adapter_version)}</div></div>
           <div class="metric"><div class="label">Uniqueness Key</div><div class="value">{html.escape(current_entry.uniqueness_key)}</div></div>
           <div class="metric"><div class="label">Profile</div><div class="value">{html.escape(current_entry.profile_version or "n/a")}</div></div>
           <div class="metric"><div class="label">Checksum</div><div class="value">{html.escape(current_entry.metadata_checksum or "n/a")}</div></div>

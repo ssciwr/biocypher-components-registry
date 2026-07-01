@@ -328,7 +328,6 @@ class SQLAlchemyRegistrationStore:
         updated_at = datetime.now(UTC)
         metadata_payload = json.dumps(metadata, sort_keys=True)
         adapter_name = str(metadata.get("name", "")).strip()
-        adapter_version = str(metadata.get("version", "")).strip()
         pending_duplicate_error: str | None = None
 
         try:
@@ -380,14 +379,14 @@ class SQLAlchemyRegistrationStore:
                     message = (
                         "Duplicate canonical registry entry rejected."
                         if event_type == "DUPLICATE"
-                        else "Changed metadata for the same adapter_id and version was rejected."
+                        else "Changed metadata for the same adapter id was rejected."
                     )
                     error_message = (
                         f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
                         if event_type == "DUPLICATE"
                         else (
                             "Registration rejected because metadata changed for an existing "
-                            f"adapter_id and version: {uniqueness_key}. Please bump the version."
+                            f"adapter id: {uniqueness_key}."
                         )
                     )
                     connection.execute(
@@ -420,7 +419,6 @@ class SQLAlchemyRegistrationStore:
                             id=registry_entry_id,
                             source_id=registration_id,
                             adapter_name=adapter_name,
-                            adapter_version=adapter_version,
                             profile_version=profile_version,
                             uniqueness_key=uniqueness_key,
                             metadata_checksum=observed_checksum,
@@ -742,7 +740,6 @@ class SQLAlchemyRegistrationStore:
             entry_id=str(entry_row["id"]),
             source_id=str(entry_row["source_id"]),
             adapter_name=str(entry_row["adapter_name"]),
-            adapter_version=str(entry_row["adapter_version"]),
             profile_version=(
                 str(entry_row["profile_version"])
                 if entry_row["profile_version"] is not None
@@ -869,16 +866,13 @@ class SQLAlchemyRegistrationStore:
         """Build a uniqueness key from available metadata when possible."""
         if metadata_payload is None:
             return None
-        version = str(metadata_payload.get("version", "")).strip()
-        if not version:
-            return None
         adapter_id = self._resolve_registration_adapter_id(
             metadata=metadata_payload,
             submitted_adapter_name=submitted_adapter_name,
         )
         if not adapter_id:
             return None
-        return f"{adapter_id}::{version}"
+        return adapter_id
 
     def _derive_status(
         self,

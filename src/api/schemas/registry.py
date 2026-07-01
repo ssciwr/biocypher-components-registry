@@ -133,7 +133,6 @@ class RegistryEntryResponse(BaseModel):
     entry_id: str
     source_id: str
     adapter_name: str
-    adapter_version: str
     profile_version: str | None = None
     uniqueness_key: str
     metadata_checksum: str | None = None
@@ -148,7 +147,6 @@ class RegistryEntryResponse(BaseModel):
             entry_id=entry.entry_id,
             source_id=entry.source_id,
             adapter_name=entry.adapter_name,
-            adapter_version=entry.adapter_version,
             profile_version=entry.profile_version,
             uniqueness_key=entry.uniqueness_key,
             metadata_checksum=entry.metadata_checksum,

@@ -45,7 +45,6 @@ registry_entries_table = Table(
     Column("id", String, primary_key=True),
     Column("source_id", String, nullable=False),
     Column("adapter_name", String, nullable=False),
-    Column("adapter_version", String, nullable=False),
     Column("profile_version", String, nullable=True),
     Column("uniqueness_key", String, nullable=False, unique=True),
     Column("metadata_checksum", String, nullable=True),
