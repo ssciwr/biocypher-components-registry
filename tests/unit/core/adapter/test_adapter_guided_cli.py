@@ -27,7 +27,7 @@ adapter:
       email: creator@example.org
 datasets:
   - mode: existing
-    path: /tmp/dataset.jsonld
+    path: /data/dataset.jsonld
 """.strip(),
         encoding="utf-8",
     )
@@ -121,7 +121,7 @@ def test_prompt_for_adapter_request_collects_generated_dataset_values(monkeypatc
             "SSC",
             "https://orcid.org/0000-0000-0000-0000",
             "generate",
-            "/tmp/data",
+            "/data/example",
             "Generated Dataset",
             "Generated description",
             "https://example.org/dataset",
@@ -154,7 +154,7 @@ def test_prompt_for_adapter_request_collects_generated_dataset_values(monkeypatc
     assert len(request.generated_datasets) == 1
     dataset = request.generated_datasets[0]
     assert isinstance(dataset, GenerationRequest)
-    assert dataset.input_path == "/tmp/data"
+    assert dataset.input_path == "/data/example"
     assert dataset.name == "Generated Dataset"
     assert dataset.creators == ["Denes Turei, denes@example.org, https://example.org/denes"]
 

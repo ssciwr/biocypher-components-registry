@@ -21,7 +21,7 @@ from src.core.registration.models import (
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "adapter_name": "Manual Example Adapter",
-    "repository_location": "/tmp/biocypher-api-manual-adapter",
+    "repository_location": "https://github.com/example-org/example-adapter",
     "contact_email": "maintainer@example.org",
 }
 

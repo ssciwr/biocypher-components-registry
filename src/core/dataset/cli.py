@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import Optional
+from typing import Callable, Optional
 
 import typer
 from rich.console import Console
@@ -23,6 +23,7 @@ from src.core.dataset.service import (
 
 
 console = Console()
+_GENERATOR_HELP = "Dataset generator implementation."
 app = typer.Typer(
     help="Generate dataset Croissant metadata using pluggable generators.",
     no_args_is_help=True,
@@ -175,7 +176,7 @@ def guided_cmd(
     generator: str = typer.Option(
         "croissant-baker",
         "--generator",
-        help="Dataset generator implementation.",
+        help=_GENERATOR_HELP,
     ),
     input_path: Optional[str] = typer.Option(
         None,
@@ -213,7 +214,7 @@ def config_cmd(
     generator: str = typer.Option(
         "croissant-baker",
         "--generator",
-        help="Dataset generator implementation.",
+        help=_GENERATOR_HELP,
     ),
     output: Optional[str] = typer.Option(
         None,
@@ -238,7 +239,7 @@ def direct_cmd(
     generator: str = typer.Option(
         "croissant-baker",
         "--generator",
-        help="Dataset generator implementation.",
+        help=_GENERATOR_HELP,
     ),
     input_path: str = typer.Option(
         ...,
@@ -356,73 +357,88 @@ def _prompt_optional(label: str, default: str = "") -> str | None:
     return value or None
 
 
+def _edit_input(request: DatasetGenerationRequest) -> None:
+    request.input_path = typer.prompt(
+        "Dataset input directory [required]",
+        default=request.input_path,
+    )
+
+
+def _edit_output(request: DatasetGenerationRequest) -> None:
+    request.output_path = typer.prompt(
+        "Output JSON-LD file",
+        default=request.output_path,
+    )
+
+
+def _edit_validate(request: DatasetGenerationRequest) -> None:
+    request.validate = typer.confirm(
+        "Validate generated metadata?",
+        default=request.validate,
+    )
+
+
+def _edit_name(request: DatasetGenerationRequest) -> None:
+    request.name = _prompt_optional("Dataset name", default=request.name or "")
+
+
+def _edit_description(request: DatasetGenerationRequest) -> None:
+    request.description = _prompt_optional("Description", default=request.description or "")
+
+
+def _edit_url(request: DatasetGenerationRequest) -> None:
+    request.url = _prompt_optional("Dataset URL", default=request.url or "")
+
+
+def _edit_license(request: DatasetGenerationRequest) -> None:
+    request.license_value = _prompt_optional("License", default=request.license_value or "")
+
+
+def _edit_citation(request: DatasetGenerationRequest) -> None:
+    request.citation = _prompt_optional("Citation", default=request.citation or "")
+
+
+def _edit_dataset_version(request: DatasetGenerationRequest) -> None:
+    request.dataset_version = _prompt_optional(
+        "Dataset version", default=request.dataset_version or ""
+    )
+
+
+def _edit_date_published(request: DatasetGenerationRequest) -> None:
+    request.date_published = _prompt_optional(
+        "Date published (YYYY-MM-DD)",
+        default=request.date_published or "",
+    )
+
+
+def _edit_creators_field(request: DatasetGenerationRequest) -> None:
+    request.creators = _edit_creators(request.creators)
+
+
+_REQUEST_EDIT_HANDLERS: dict[str, Callable[[DatasetGenerationRequest], None]] = {
+    "input": _edit_input,
+    "output": _edit_output,
+    "validate": _edit_validate,
+    "name": _edit_name,
+    "description": _edit_description,
+    "url": _edit_url,
+    "license": _edit_license,
+    "citation": _edit_citation,
+    "dataset-version": _edit_dataset_version,
+    "date-published": _edit_date_published,
+    "creators": _edit_creators_field,
+}
+
+
 def review_request(request: DatasetGenerationRequest) -> None:
     """Show the current dataset request and let the user edit fields."""
-    edit_choices = {
-        "input",
-        "output",
-        "validate",
-        "name",
-        "description",
-        "url",
-        "license",
-        "citation",
-        "dataset-version",
-        "date-published",
-        "creators",
-    }
     while True:
         _print_request_summary(request)
         if typer.confirm("Proceed with these values?", default=True):
             return
 
-        choice = _prompt_choice(
-            "What do you want to edit?",
-            edit_choices,
-        )
-
-        if choice == "input":
-            request.input_path = typer.prompt(
-                "Dataset input directory [required]",
-                default=request.input_path,
-            )
-        elif choice == "output":
-            request.output_path = typer.prompt(
-                "Output JSON-LD file",
-                default=request.output_path,
-            )
-        elif choice == "validate":
-            request.validate = typer.confirm(
-                "Validate generated metadata?",
-                default=request.validate,
-            )
-        elif choice == "name":
-            request.name = _prompt_optional("Dataset name", default=request.name or "")
-        elif choice == "description":
-            request.description = _prompt_optional(
-                "Description", default=request.description or ""
-            )
-        elif choice == "url":
-            request.url = _prompt_optional("Dataset URL", default=request.url or "")
-        elif choice == "license":
-            request.license_value = _prompt_optional(
-                "License", default=request.license_value or ""
-            )
-        elif choice == "citation":
-            request.citation = _prompt_optional(
-                "Citation", default=request.citation or ""
-            )
-        elif choice == "dataset-version":
-            request.dataset_version = _prompt_optional(
-                "Dataset version", default=request.dataset_version or ""
-            )
-        elif choice == "date-published":
-            request.date_published = _prompt_optional(
-                "Date published (YYYY-MM-DD)",
-                default=request.date_published or "",
-            )
-        elif choice == "creators":
-            request.creators = _edit_creators(request.creators)
+        choice = _prompt_choice("What do you want to edit?", set(_REQUEST_EDIT_HANDLERS))
+        _REQUEST_EDIT_HANDLERS[choice](request)
 
 
 def _print_request_summary(request: DatasetGenerationRequest) -> None:
@@ -445,9 +461,44 @@ def _print_request_summary(request: DatasetGenerationRequest) -> None:
         console.print("  creators: -")
 
 
+def _add_creator(creators: list[str]) -> None:
+    """Append a newly prompted creator to the list, in place."""
+    creators.append(_prompt_creator())
+
+
+def _replace_creator(creators: list[str]) -> None:
+    """Replace one existing creator, chosen by number, in place."""
+    if not creators:
+        console.print("[yellow]There are no creators to replace.[/yellow]")
+        return
+    index = typer.prompt("Creator number to replace", type=int)
+    if 1 <= index <= len(creators):
+        creators[index - 1] = _prompt_creator(existing=creators[index - 1])
+    else:
+        console.print("[yellow]Invalid creator number.[/yellow]")
+
+
+def _remove_creator(creators: list[str]) -> None:
+    """Remove one existing creator, chosen by number, in place."""
+    if not creators:
+        console.print("[yellow]There are no creators to remove.[/yellow]")
+        return
+    index = typer.prompt("Creator number to remove", type=int)
+    if 1 <= index <= len(creators):
+        creators.pop(index - 1)
+    else:
+        console.print("[yellow]Invalid creator number.[/yellow]")
+
+
+_CREATOR_ACTION_HANDLERS: dict[str, Callable[[list[str]], None]] = {
+    "add": _add_creator,
+    "replace": _replace_creator,
+    "remove": _remove_creator,
+}
+
+
 def _edit_creators(creators: list[str]) -> list[str]:
     """Edit the list of serialized dataset creators interactively."""
-    creator_actions = {"add", "replace", "remove", "done"}
     while True:
         console.print("\n[bold]Creators[/bold]")
         if creators:
@@ -458,34 +509,13 @@ def _edit_creators(creators: list[str]) -> list[str]:
 
         action = _prompt_choice(
             "Choose creator action",
-            creator_actions,
+            {*_CREATOR_ACTION_HANDLERS, "done"},
             default="done",
         )
 
         if action == "done":
             return creators
-        if action == "add":
-            creators.append(_prompt_creator())
-            continue
-        if action == "replace":
-            if not creators:
-                console.print("[yellow]There are no creators to replace.[/yellow]")
-                continue
-            index = typer.prompt("Creator number to replace", type=int)
-            if 1 <= index <= len(creators):
-                creators[index - 1] = _prompt_creator(existing=creators[index - 1])
-            else:
-                console.print("[yellow]Invalid creator number.[/yellow]")
-            continue
-        if action == "remove":
-            if not creators:
-                console.print("[yellow]There are no creators to remove.[/yellow]")
-                continue
-            index = typer.prompt("Creator number to remove", type=int)
-            if 1 <= index <= len(creators):
-                creators.pop(index - 1)
-            else:
-                console.print("[yellow]Invalid creator number.[/yellow]")
+        _CREATOR_ACTION_HANDLERS[action](creators)
 
 
 def _prompt_creator(existing: str = "") -> str:

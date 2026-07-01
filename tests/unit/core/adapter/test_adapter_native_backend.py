@@ -227,7 +227,7 @@ def test_native_adapter_generator_includes_generated_dataset_report(monkeypatch,
         dataset_generator="auto",
         generated_datasets=[
             GenerationRequest(
-                input_path="/tmp/data",
+                input_path="/data/example",
                 output_path="",
                 name="Generated Dataset",
             )

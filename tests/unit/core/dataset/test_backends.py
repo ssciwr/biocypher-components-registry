@@ -11,7 +11,7 @@ from src.core.shared.errors import UnsupportedGeneratorError
 
 
 def test_generation_request_validates_by_default() -> None:
-    request = GenerationRequest(input_path="/tmp/data.csv", output_path="out.jsonld")
+    request = GenerationRequest(input_path="/data/example.csv", output_path="out.jsonld")
 
     assert request.validate is True
 

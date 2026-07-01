@@ -10,7 +10,7 @@ from src.core.dataset.service import build_croissant_baker_command
 
 def test_build_croissant_baker_command_includes_known_flags() -> None:
     request = DatasetGenerationRequest(
-        input_path="/tmp/data",
+        input_path="/data/example",
         output_path="croissant.jsonld",
         validate=True,
         description="OmniPath dataset",
@@ -29,7 +29,7 @@ def test_build_croissant_baker_command_includes_known_flags() -> None:
     assert command == [
         "croissant-baker",
         "--input",
-        "/tmp/data",
+        "/data/example",
         "--output",
         "croissant.jsonld",
         "--validate",
@@ -107,7 +107,7 @@ def test_format_command_preview_uses_multiline_shell_layout() -> None:
     command = [
         "croissant-baker",
         "--input",
-        "/tmp/data dir",
+        "/data/example dir",
         "--output",
         "croissant.jsonld",
         "--validate",
@@ -118,7 +118,7 @@ def test_format_command_preview_uses_multiline_shell_layout() -> None:
     assert preview == (
         "```bash\n"
         "croissant-baker \\\n"
-        "--input '/tmp/data dir' \\\n"
+        "--input '/data/example dir' \\\n"
         "--output croissant.jsonld \\\n"
         "--validate\n"
         "```"

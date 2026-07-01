@@ -97,7 +97,7 @@ def test_create_registration_request_rejects_empty_adapter_name() -> None:
     with pytest.raises(ValueError, match="Adapter name is required."):
         create_registration_request(
             adapter_name="   ",
-            repository_location="/tmp/example-adapter",
+            repository_location="/data/example-adapter",
         )
 
 
@@ -115,7 +115,7 @@ def test_create_registration_request_rejects_missing_local_repository() -> None:
     with pytest.raises(FileNotFoundError, match="Repository path not found"):
         create_registration_request(
             adapter_name="Example Adapter",
-            repository_location="/tmp/definitely-missing-adapter-repository",
+            repository_location="/data/definitely-missing-adapter-repository",
         )
 
 
