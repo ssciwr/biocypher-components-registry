@@ -1,9 +1,10 @@
 # The frontend
-The frontend is a simple React application that uses generated `@hey-api/openapi-ts` functions from the backend server to show, save and update information on BioCypher adapters.
+The frontend is a simple React application that uses generated `@hey-api/openapi-ts` functions it can import in JS - which are generated automatically from backned endpoints - to show, save and update information on BioCypher adapters.
 
 Frontend ---> `@hey-api/openapi-ts` client ---> FastAPI backend <---> Postgres
 
-e.g. Full tool chain example for the adapter list:
+## Example of how requests map between our components:
+Full tool chain example for the adapter list:
 
 1. User visits `/adapters`.
 2. `AdaptersPage` renders `AdapterListView`.
@@ -15,11 +16,30 @@ e.g. Full tool chain example for the adapter list:
 8. FastAPI `search_adapters` asks Postgres for adapter title matches and returns matching `AdapterLatestItemResponse` cards.
 9. `AdapterListView` renders matching adapter cards with name, latest version, description, up to three keywords, maintainers, and endorsement count.
 
-The generated client is rebuilt with:
+# Local development advice
+I recommend to run the frontend with `pnpm run dev` and to run the backend using `uv` concurrently for local dev. That will use SQLite for the DB.
 
-```bash
-pnpm run openapi-ts
-```
+When you make updates to the backend which frontend needs to see (changing parameters), rerun this command which regenerates the functions. Then after that, import those functions in the frontend:
+`pnpm run openapi-ts`
+
+OpenAPI-ts just provides javascript(ts/typescript technically) functions you can call easily that run what your API provides.
+
+
+# How to deploy
+## 1. Build and tag relevant changed images locally for services that have changed
+
+e.g. if only the frontend changed, you only need to build/retag the frontend version to a higher version:
+
+## 2. Push images to GitHub Container Registry (GHCR)
+- This requires that you have created a GHCR token for the project and logged in to the container registry via `docker login`
+
+
+After this, the images should be on GHCR.
+
+## 3. SSH into the remote, and then manually pull the updated images
+`docker compose -f pr`
+
+If pull fails, check if your GHCR token is up to date on both the instance and locally, and that you pushed successfully
 
 # Integration and deployment plan
 
@@ -30,7 +50,13 @@ pnpm run openapi-ts
   - 1) A user can register an adapter with a github URL, the details are successfully fetched including avatar picture cross ref citation count.
   - 2) A user can generate a croissant file (which uses croissant baker under the hood) via providing manually the data sample and fields. When they update a specific field (e.g. a description), that is saved and seen in the generated croissant file
   - 3) A user can endorse an adapter, and after that the endorsement count increases
+[x] to use GHCR images for the production builds
+[x] to run on HeiCloud (instance already created and set up until docker-compose stage by Inga)
+[x] not to automatically pull new images every night with a watcher (instead manual updates of the docker images are preferred as described in the "How to Deploy" above)
 
+## Decisions to make
+[ ] - How to mock backend for Cypress/full integration tests (SQLlite DB and run backend concurrently? That limits performance testing but as assessed below that is not a testing goal for this application)
+[ ] - How to mock authentication/login for those tests(probably write mock code)
 
 ## Smoke testing key inter-service calls/actions:
 
@@ -41,6 +67,7 @@ pnpm run openapi-ts
 
 ## Deployment integration priorities
 [ ] - We need the A record set up for the DNS so we can use/test out https containers docker configuration.
+[ ] - We need to improve the GHCR management and document the process for images/what tagging system we will use (how to tag, push, how to update from a specific tag on production, which branches you should build images for (--> soon, only main))
 [ ] - We need to document docker compose commands for bringing up/down services via docker compose -f specified chosen files without removing the volumes (v) so we keep the data in postgres
 [ ] - Agree on a date when we decide what data the backend will collect about adapters and from then onwards have a production build in use, and use migrations for all future changes.
 [ ] - Document how to perform migrations via SSH (from which directory) to make future project updates
@@ -83,7 +110,6 @@ We should plan a beta test once the croissant file generator part is implemented
 ### User errors/issues:
 We corrected search functionality behaviour (unclear system status in Nielens Usability terms) as it gave too little feedback.
 
-
 ## Manual testing in July 2026:
 [ ] - Run manual test of the website and changing between pages
 [ ] - Test adding adapter on slow 3G mode
@@ -97,8 +123,13 @@ We corrected search functionality behaviour (unclear system status in Nielens Us
 
 - I plan frontend tests/integration well upfront more in terms of user stories and see that as where testing can be completed mainly
 - The docker compose file and env set up with BASE_URLS should be kept as is with no more complexity from AI.
--
-### For main UI elements
+
+### For documentation
+- This documentation is 100% handwritten, except the full tool chain example, which I use AI to keep up to date with any changes.
+- Comment documentation can be AI-written, but I either edit comments to be more accurate, rewrite them, or write them myself in functions to clarify thought process as I manually write code or annotate AI code
+- I prohibit AI from adding todos and add those manually
+
+### For frontend main UI elements
 - I use AI to generate components in React with use tailwind classes, since that can finnicky
 - However, I design and iterate on the fine parts of the choices/position both before and after using AI
 - I make choices like whether the AdapterPage should have a separate view for a single adapter or that should be a separate page/component
