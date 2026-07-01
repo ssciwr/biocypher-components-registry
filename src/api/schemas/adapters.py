@@ -31,7 +31,6 @@ class AdapterMaintainerResponse(BaseModel):
 
     username: str
     avatar_url: str
-    provider: str
     profile_url: str | None = None
 
     @classmethod
@@ -71,40 +70,11 @@ class AdapterDataSourceResponse(BaseModel):
     column_count: int | None = None
 
 
-class AdapterVersionResponse(BaseModel):
-    """Response model for one registered adapter version."""
-
-    adapter_id: str
-    adapter_name: str
-    adapter_version: str
-    registry_entry_id: str
-    profile_version: str | None = None
-    metadata_checksum: str | None = None
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_entry(cls, entry: RegistryEntry) -> "AdapterVersionResponse":
-        """Build an adapter version response from a canonical registry entry."""
-        return cls(
-            adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
-            adapter_name=entry.adapter_name,
-            adapter_version=entry.adapter_version,
-            registry_entry_id=entry.entry_id,
-            profile_version=entry.profile_version,
-            metadata_checksum=entry.metadata_checksum,
-            created_at=entry.created_at,
-            updated_at=entry.updated_at,
-        )
-
-
 class AdapterCatalogItemResponse(BaseModel):
     """Response model for one adapter catalog item."""
 
     adapter_id: str
     adapter_name: str
-    latest_version: str
-    version_count: int
     endorsement_count: int = 0
 
     @classmethod
@@ -119,8 +89,6 @@ class AdapterCatalogItemResponse(BaseModel):
         return cls(
             adapter_id=adapter_id,
             adapter_name=latest.adapter_name,
-            latest_version=latest.adapter_version,
-            version_count=len(entries),
             endorsement_count=endorsement_count,
         )
 
@@ -130,7 +98,6 @@ class AdapterLatestItemResponse(BaseModel):
 
     adapter_id: str
     adapter_name: str
-    latest_version: str
     description: str | None = None
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -154,7 +121,6 @@ class AdapterLatestItemResponse(BaseModel):
         return cls(
             adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
             adapter_name=entry.adapter_name,
-            latest_version=entry.adapter_version,
             description=_metadata_text(metadata, "description"),
             repository_location=repository_location,
             keywords=_metadata_list(metadata, "keywords"),
@@ -178,11 +144,10 @@ class AdapterLatestListResponse(BaseModel):
 
 
 class AdapterDetailResponse(BaseModel):
-    """Response model for one adapter and its registered versions."""
+    """Response model for one adapter."""
 
     adapter_id: str
     adapter_name: str
-    latest_version: str
     description: str | None = None
     repository_location: str | None = None
     license_value: str | None = None
@@ -191,7 +156,6 @@ class AdapterDetailResponse(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
     data_sources: list[AdapterDataSourceResponse] = Field(default_factory=list)
-    versions: list[AdapterVersionResponse]
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
 
@@ -204,7 +168,7 @@ class AdapterDetailResponse(BaseModel):
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
     ) -> "AdapterDetailResponse":
-        """Build adapter detail from canonical versions and source data."""
+        """Build adapter detail from canonical entry and source data."""
         latest = latest_registry_entry(entries)
         metadata = latest.metadata or {}
         repository_location = _entry_repository_location(registration, metadata)
@@ -212,7 +176,6 @@ class AdapterDetailResponse(BaseModel):
         return cls(
             adapter_id=adapter_id,
             adapter_name=latest.adapter_name,
-            latest_version=latest.adapter_version,
             description=_metadata_text(metadata, "description"),
             repository_location=repository_location,
             license_value=(
@@ -223,17 +186,15 @@ class AdapterDetailResponse(BaseModel):
             keywords=_metadata_list(metadata, "keywords"),
             maintainers=[maintainer] if maintainer else [],
             data_sources=data_sources_from_metadata(metadata),
-            versions=[AdapterVersionResponse.from_entry(entry) for entry in entries],
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
         )
 
 
 class AdapterMetadataResponse(BaseModel):
-    """Response model for one adapter version's full Croissant metadata."""
+    """Response model for one adapter's full Croissant metadata."""
 
     adapter_id: str
-    adapter_version: str
     registry_entry_id: str
     metadata: dict[str, Any]
 
@@ -242,7 +203,6 @@ class AdapterMetadataResponse(BaseModel):
         """Build a metadata response from a canonical registry entry."""
         return cls(
             adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
-            adapter_version=entry.adapter_version,
             registry_entry_id=entry.entry_id,
             metadata=entry.metadata or {},
         )
@@ -254,8 +214,8 @@ class AdapterMetadataResponse(BaseModel):
 
 
 def adapter_id_from_uniqueness_key(uniqueness_key: str) -> str:
-    """Extract the adapter id from the canonical adapter_id::version key."""
-    return uniqueness_key.rsplit("::", maxsplit=1)[0]
+    """Extract the adapter id from the canonical uniqueness key."""
+    return uniqueness_key
 
 
 def latest_registry_entry(entries: list[RegistryEntry]) -> RegistryEntry:
@@ -311,7 +271,6 @@ def _github_maintainer_from_username(username: str) -> AdapterMaintainerResponse
     return AdapterMaintainerResponse(
         username=username,
         avatar_url=f"https://github.com/{username}.png",
-        provider="github",
         profile_url=f"https://github.com/{username}",
     )
 
@@ -346,7 +305,6 @@ def _gitlab_maintainer_from_owner(
         return AdapterMaintainerResponse(
             username=str(user["username"]),
             avatar_url=avatar_url,
-            provider="gitlab",
             profile_url=_absolute_url(origin, user.get("web_url")),
         )
 
@@ -368,7 +326,6 @@ def _gitlab_maintainer_from_owner(
                     return AdapterMaintainerResponse(
                         username=full_path,
                         avatar_url=avatar_url,
-                        provider="gitlab",
                         profile_url=_absolute_url(origin, namespace.get("web_url")),
                     )
 
@@ -391,7 +348,6 @@ def _gitlab_maintainer_from_owner(
     return AdapterMaintainerResponse(
         username=full_path,
         avatar_url=avatar_url,
-        provider="gitlab",
         profile_url=_absolute_url(origin, group.get("web_url")),
     )
 

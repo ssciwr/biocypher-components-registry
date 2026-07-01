@@ -13,7 +13,6 @@ from src.api.dependencies import (
 )
 from src.api.errors import (
     adapter_not_found_http_error,
-    adapter_version_not_found_http_error,
 )
 from src.api.schemas.adapters import (
     AdapterCatalogItemResponse,
@@ -140,9 +139,8 @@ def _latest_adapter_items(
     response_model=AdapterDetailResponse,
     summary="Get adapter catalog detail",
     description=(
-        "Return one public adapter with its registered canonical versions. The "
-        "response is metadata-light; fetch full Croissant metadata through the "
-        "version metadata endpoint."
+        "Return one public adapter. The response is metadata-light; fetch full "
+        "Croissant metadata through the adapter metadata endpoint."
     ),
 )
 def get_adapter(
@@ -150,7 +148,7 @@ def get_adapter(
     auth_session: AuthSession | None = Depends(get_optional_auth_session),
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterDetailResponse:
-    """Return one public adapter with all registered canonical versions."""
+    """Return one public adapter."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
     if not entries:
         raise adapter_not_found_http_error(adapter_id)
@@ -197,29 +195,21 @@ def endorse_adapter(
 
 
 @router.get(
-    "/adapters/{adapter_id}/versions/{version}/metadata",
+    "/adapters/{adapter_id}/metadata",
     response_model=AdapterMetadataResponse,
-    summary="Get adapter version metadata",
-    description=(
-        "Return the full stored Croissant metadata document for one canonical "
-        "adapter version."
-    ),
+    summary="Get adapter metadata",
+    description="Return the full stored Croissant metadata document for one adapter.",
 )
-def get_adapter_version_metadata(
+def get_adapter_metadata(
     adapter_id: str,
-    version: str,
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterMetadataResponse:
-    """Return full Croissant metadata for one public adapter version."""
+    """Return full Croissant metadata for one public adapter."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
     if not entries:
         raise adapter_not_found_http_error(adapter_id)
 
-    entry = _entry_for_adapter_version(version, entries)
-    if entry is None:
-        raise adapter_version_not_found_http_error(adapter_id, version)
-
-    return AdapterMetadataResponse.from_entry(entry)
+    return AdapterMetadataResponse.from_entry(latest_registry_entry(entries))
 
 
 # ===========================================================
@@ -238,7 +228,7 @@ def _group_entries_by_adapter_id(
         )
 
     return {
-        adapter_id: _sort_entries_by_version(entries)
+        adapter_id: _sort_entries(entries)
         for adapter_id, entries in grouped_entries.items()
     }
 
@@ -247,8 +237,8 @@ def _entries_for_adapter(
     adapter_id: str,
     entries: list[RegistryEntry],
 ) -> list[RegistryEntry]:
-    """Return canonical entries for one adapter in stable version order."""
-    return _sort_entries_by_version(
+    """Return canonical entries for one adapter in stable order."""
+    return _sort_entries(
         [
             entry
             for entry in entries
@@ -257,20 +247,9 @@ def _entries_for_adapter(
     )
 
 
-def _sort_entries_by_version(entries: list[RegistryEntry]) -> list[RegistryEntry]:
-    """Sort entries by creation order and version text for stable responses."""
+def _sort_entries(entries: list[RegistryEntry]) -> list[RegistryEntry]:
+    """Sort entries by creation order for stable responses."""
     return sorted(
         entries,
-        key=lambda entry: (entry.created_at, entry.adapter_version, entry.entry_id),
+        key=lambda entry: (entry.created_at, entry.entry_id),
     )
-
-
-def _entry_for_adapter_version(
-    version: str,
-    entries: list[RegistryEntry],
-) -> RegistryEntry | None:
-    """Return one canonical entry matching the requested adapter version."""
-    for entry in entries:
-        if entry.adapter_version == version:
-            return entry
-    return None

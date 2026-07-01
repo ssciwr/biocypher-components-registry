@@ -89,7 +89,6 @@ class RegistryEntry:
     entry_id: str
     source_id: str
     adapter_name: str
-    adapter_version: str
     uniqueness_key: str
     created_at: datetime
     updated_at: datetime

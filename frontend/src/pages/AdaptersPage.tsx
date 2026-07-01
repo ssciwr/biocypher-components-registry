@@ -112,7 +112,6 @@ function AdapterListView() {
             >
               <a className="block" href={`/adapters/${adapter.adapter_id}`}>
                 <h2 className="text-xl font-bold text-slate-950">{adapter.adapter_name}</h2>
-                <p className="mt-2 text-sm text-slate-500">v{adapter.latest_version}</p>
                 <p className="mt-5 line-clamp-4 text-sm leading-5 text-slate-800">
                   {adapter.description ?? 'No adapter description has been submitted yet.'}
                 </p>
@@ -337,7 +336,6 @@ bc.run()`}
             ) : null}
             <div className="mt-6 flex flex-wrap gap-3 text-xs">
               {adapter.license_value ? <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">{adapter.license_value}</span> : null}
-              <span className="rounded-full bg-slate-200 px-3 py-1.5 font-medium text-slate-700">v{adapter.latest_version}</span>
             </div>
           </section>
 
@@ -390,7 +388,7 @@ function AvatarGroup({ maintainers = [], showNames = false }: Readonly<{ maintai
   return (
     <div className="flex flex-wrap items-center gap-4">
       {maintainers.map((maintainer) => (
-        <span className="flex items-center gap-3" key={`${maintainer.provider}:${maintainer.username}`}>
+        <span className="flex items-center gap-3" key={`${maintainer.profile_url ?? maintainer.username}:${maintainer.avatar_url}`}>
           <img alt={maintainer.username} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
           {showNames ? (
             <span>
@@ -401,7 +399,6 @@ function AvatarGroup({ maintainers = [], showNames = false }: Readonly<{ maintai
               ) : (
                 <span className="block text-sm font-medium text-slate-950">{maintainer.username}</span>
               )}
-              <span className="block text-xs text-slate-500">{maintainer.provider}</span>
             </span>
           ) : null}
         </span>

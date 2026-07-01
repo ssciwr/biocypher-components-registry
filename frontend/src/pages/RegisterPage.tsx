@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 import {
-  checkRegistrationMetadataApiV1RegistrationsMetadataCheckGet,
+  checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet,
   createRegistrationApiV1RegistrationsPost,
   processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
   revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
@@ -231,7 +231,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
 
     const controller = new AbortController()
 
-    void checkRegistrationMetadataApiV1RegistrationsMetadataCheckGet({
+    void checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet({
       query: { repository_url: repositoryLocation },
       signal: controller.signal,
     })
@@ -241,7 +241,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
           setMetadataCheckStatus('blocked')
           return
         }
-        setMetadataCheckStatus(metadataResult.data.has_metadata ? 'found' : 'missing')
+        setMetadataCheckStatus(metadataResult.data.has_croissant_file ? 'found' : 'missing')
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return
