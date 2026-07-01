@@ -1,4 +1,6 @@
 const doi = '10.5555/12345678'
+const citationCount = 15
+const expectedCitationCount = 15
 
 const adapter = {
   adapter_id: 'crossref-test-adapter',
@@ -11,7 +13,7 @@ const crossrefWork = {
   message: {
     title: ['Mocked Crossref work'],
     author: [{ name: 'Crossref Tester' }],
-    'is-referenced-by-count': 3,
+    'is-referenced-by-count': citationCount,
   },
 }
 
@@ -25,7 +27,9 @@ describe('Crossref citation endorsement test', () => {
     cy.wait('@crossrefWork')
     cy.contains('section', 'Cite').within(() => {
       cy.contains('Cited by').should('be.visible')
-      cy.contains('3').should('be.visible')
+      cy.contains('p', new RegExp(`^${expectedCitationCount}$`)).should('be.visible') // is-referenced-by-count output from crossref.
+      cy.contains('p', /^0$/).should('not.exist')
+      cy.contains('p', /^15$/).should('exist')
       cy.contains('Mocked Crossref work').should('be.visible')
     })
   })
