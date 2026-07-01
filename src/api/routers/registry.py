@@ -46,7 +46,6 @@ RegistryLatestEvent = Literal[
 
 @router.get(
     "/registry/registrations",
-    response_model=RegistryRegistrationListResponse,
     summary="List registry registrations",
     description=(
         "Return maintainer/operator rows for active registrations, including "
@@ -92,7 +91,6 @@ def list_registry_registrations(
 
 @router.get(
     "/registry/entries",
-    response_model=RegistryEntryListResponse,
     summary="List registry entries",
     description=(
         "Return canonical valid registry entries. This endpoint does not return "
@@ -111,7 +109,6 @@ def list_registry_entries(
 
 @router.get(
     "/registry/entries/{entry_id}",
-    response_model=RegistryEntryResponse,
     summary="Get registry entry",
     description=(
         "Return one canonical valid registry entry by registry entry id. The "
@@ -132,7 +129,6 @@ def get_registry_entry(
 
 @router.get(
     "/registry/refreshes/latest",
-    response_model=RegistryRefreshLatestResponse,
     summary="Get latest registry refresh",
     description=(
         "Return the latest persisted batch refresh summary. Returns 404 if no "
@@ -152,7 +148,6 @@ def get_latest_registry_refresh(
 
 @router.post(
     "/registry/refreshes",
-    response_model=RegistryRefreshResponse,
     summary="Run registry refresh",
     description=(
         "Process every active registration once, continue past per-source "

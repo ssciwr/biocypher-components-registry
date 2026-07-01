@@ -32,7 +32,6 @@ router = APIRouter()
 
 @router.get(
     "/adapters",
-    response_model=AdapterCatalogListResponse,
     summary="List public adapters",
     description=(
         "Return the public adapter catalog derived from canonical valid registry "
@@ -54,7 +53,6 @@ def list_adapters(
 
 @router.get(
     "/adapters/{adapter_id}",
-    response_model=AdapterDetailResponse,
     summary="Get adapter catalog detail",
     description=(
         "Return one public adapter with its registered canonical versions. The "
@@ -76,7 +74,6 @@ def get_adapter(
 
 @router.get(
     "/adapters/{adapter_id}/versions/{version}/metadata",
-    response_model=AdapterMetadataResponse,
     summary="Get adapter version metadata",
     description=(
         "Return the full stored Croissant metadata document for one canonical "
