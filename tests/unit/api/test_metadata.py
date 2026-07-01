@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from src.api.routers import metadata as metadata_router
 from src.api.app import create_app
 from src.api.schemas.metadata import (
@@ -14,6 +12,7 @@ from src.api.schemas.metadata import (
 )
 from src.core.adapter.document import build_adapter_creator, build_adapter_document
 from src.core.dataset.request import GenerationResult
+from tests.support.test_client import TestClient
 
 
 METADATA_VALIDATE_PATH = "/api/v1/metadata/validate"

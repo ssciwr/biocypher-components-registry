@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 from src.api.app import create_app
 from src.api.dependencies import get_registration_database_path
 from src.api.settings import settings
+from tests.support.test_client import TestClient
 
 
 # ===========================================================

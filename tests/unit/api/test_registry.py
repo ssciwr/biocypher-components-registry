@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from src.api.app import create_app
 from src.api.dependencies import get_registration_store
 from src.core.registration.service import submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.test_client import TestClient
 
 
 # ===========================================================

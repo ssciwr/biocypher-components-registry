@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterator
 
 from src.core.settings import get_registration_database_path as core_database_path
 from src.core.registration.store import RegistrationStore  # Port
@@ -19,6 +20,10 @@ def get_registration_database_path() -> Path:
     return core_database_path()
 
 
-def get_registration_store() -> RegistrationStore:
+def get_registration_store() -> Iterator[RegistrationStore]:
     """Create the registration store used by API routes."""
-    return build_registration_store()
+    store = build_registration_store()
+    try:
+        yield store
+    finally:
+        store.close()

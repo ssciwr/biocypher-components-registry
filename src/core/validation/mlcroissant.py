@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+import warnings
 
 import mlcroissant as mlc
 
@@ -17,7 +18,14 @@ def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
         A list of validation error messages.
     """
     try:
-        mlc.Dataset(document)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="ConjunctiveGraph is deprecated, use Dataset instead.",
+                category=DeprecationWarning,
+                module=r"rdflib\.plugins\.parsers\.jsonld",
+            )
+            mlc.Dataset(document)
     except mlc.ValidationError as exc:
         return _parse_validation_error(str(exc))
     return []
