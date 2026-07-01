@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -263,7 +264,7 @@ def run_records_a_fetch_failed_outcome(
     summary = batch_registration_context["summary"]
 
     assert summary.fetch_failed == 1
-    with sqlite3.connect(batch_registration_context["database_path"]) as connection:
+    with closing(sqlite3.connect(batch_registration_context["database_path"])) as connection:
         row = connection.execute(
             """
             SELECT source_id, event_type
@@ -295,7 +296,7 @@ def registry_records_valid_created_for_corrected_source(
     batch_registration_context: dict[str, Any],
 ) -> None:
     """Assert that the corrected source now produces a valid canonical entry."""
-    with sqlite3.connect(batch_registration_context["database_path"]) as connection:
+    with closing(sqlite3.connect(batch_registration_context["database_path"])) as connection:
         row = connection.execute(
             """
             SELECT source_id, event_type
@@ -311,4 +312,3 @@ def registry_records_valid_created_for_corrected_source(
         batch_registration_context["corrected_registration_id"],
         "VALID_CREATED",
     )
-

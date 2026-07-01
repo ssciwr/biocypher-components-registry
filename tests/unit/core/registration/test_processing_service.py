@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -193,7 +194,7 @@ def test_finish_registration_records_unchanged_event_for_repeat_processing(
 
     import sqlite3
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         entry_count = connection.execute(
             "SELECT COUNT(*) FROM registry_entries"
         ).fetchone()
@@ -244,7 +245,7 @@ def test_finish_registration_rejects_same_version_changed_file_and_records_event
 
     import sqlite3
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         rejected_events = connection.execute(
             """
             SELECT COUNT(*)
@@ -334,7 +335,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
 
     import sqlite3
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         fetch_failed_events = connection.execute(
             """
             SELECT COUNT(*)
@@ -367,7 +368,7 @@ def test_refresh_active_registrations_counts_duplicate_outcomes(
     (repo_b / "croissant.jsonld").write_text(json.dumps(metadata), encoding="utf-8")
 
     first = submit_registration("Duplicate Adapter", str(repo_a), store)
-    second = submit_registration("Duplicate Adapter Copy", str(repo_b), store)
+    submit_registration("Duplicate Adapter Copy", str(repo_b), store)
     finish_registration(first.registration_id, store)
 
     summary = refresh_active_registrations(store)
@@ -410,7 +411,7 @@ def test_revalidate_registration_reprocesses_corrected_invalid_source(
 
     import sqlite3
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         revalidated_events = connection.execute(
             """
             SELECT COUNT(*)

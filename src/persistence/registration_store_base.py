@@ -48,6 +48,18 @@ class SQLAlchemyRegistrationStore:
 
     engine: Engine
 
+    def close(self) -> None:
+        """Close pooled database connections owned by this store."""
+        self.engine.dispose()
+
+    def __enter__(self) -> SQLAlchemyRegistrationStore:
+        """Return this store for use as a context manager."""
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        """Release database resources when leaving a context manager."""
+        self.close()
+
     def create_registration(
         self,
         request: AdapterRegistrationRequest,

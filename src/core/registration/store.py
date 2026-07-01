@@ -19,6 +19,9 @@ from src.core.registration.models import (
 class RegistrationStore(Protocol):
     """Defines the methods required to persist registration requests."""
 
+    def close(self) -> None:
+        """Release resources owned by the store."""
+
     def create_registration(
         self,
         request: AdapterRegistrationRequest,

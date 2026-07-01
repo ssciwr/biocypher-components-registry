@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
@@ -32,7 +33,7 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
 
     def _build_engine(self) -> Engine:
         """Create the SQLAlchemy engine for the configured SQLite database."""
-        return create_engine(f"sqlite+pysqlite:///{self.database_path}")
+        return create_engine(f"sqlite+pysqlite:///{self.database_path}", poolclass=NullPool)
 
     def _ensure_registration_sources_columns(self, connection: Engine | object) -> None:
         """Add missing registration source columns for existing SQLite databases."""

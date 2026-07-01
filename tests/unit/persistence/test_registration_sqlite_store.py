@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,7 +16,7 @@ def test_sqlite_store_creates_registration_table(tmp_path: Path) -> None:
 
     SQLiteRegistrationStore(database_path)
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         tables = {
             row[0]
             for row in connection.execute(
@@ -47,7 +48,7 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
 
     assert stored.status == RegistrationStatus.SUBMITTED
     assert stored.contact_email == "maintainer@example.org"
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         source_row = connection.execute(
             """
             SELECT
@@ -192,7 +193,7 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     assert updated.updated_at is not None
     assert updated.uniqueness_key == "example-adapter::1.0.0"
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         entry_row = connection.execute(
             """
             SELECT source_id, adapter_name, adapter_version, uniqueness_key, is_active
@@ -231,7 +232,7 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     assert event_row[3] == "v1"
     assert source_row[1] is not None
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         checksum_row = connection.execute(
             """
             SELECT metadata_checksum
@@ -280,7 +281,7 @@ def test_sqlite_store_marks_registration_invalid_and_persists_errors(
     assert updated.profile_version == "v1"
     assert updated.metadata == {"@id": "example-adapter", "name": "Example Adapter"}
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         event_row = connection.execute(
             """
             SELECT source_id, event_type, profile_version, error_details
@@ -296,7 +297,7 @@ def test_sqlite_store_marks_registration_invalid_and_persists_errors(
     assert event_row[2] == "v1"
     assert "Missing required property: version" in event_row[3]
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         observed_checksum_row = connection.execute(
             """
             SELECT observed_checksum

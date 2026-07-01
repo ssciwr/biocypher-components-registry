@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -78,7 +79,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
     assert "maintainer@example.org" in result.output
     assert "SUBMITTED" in result.output
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         row = connection.execute(
             """
             SELECT
