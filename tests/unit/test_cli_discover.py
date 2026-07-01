@@ -65,7 +65,7 @@ def _valid_adapter_document() -> dict:
             "citeAs": "cr:citeAs",
             "column": "cr:column",
             "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
+            "cr": "https://mlcommons.org/croissant/",
             "rai": "http://mlcommons.org/croissant/RAI/",
             "data": {"@id": "cr:data", "@type": "@json"},
             "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
@@ -154,7 +154,7 @@ def test_discover_command_reports_ambiguous_metadata_files(tmp_path: Path) -> No
 
 
 def test_discover_command_rejects_http_repository_url() -> None:
-    result = runner.invoke(app, ["discover", "http://github.com/example/repo"])
+    result = runner.invoke(app, ["discover", "https://github.com/example/repo"])
 
     assert result.exit_code == 1
     assert "Only HTTPS repository URLs are supported" in result.output
