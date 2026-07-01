@@ -68,6 +68,7 @@ _DEMO_ADAPTERS: list[dict[str, Any]] = [
         "adapter_id": "sample-omics-adapter",
         "version": "0.1.0",
         "repository_location": "https://github.com/biocypher/sample-omics-adapter",
+        "doi": "10.5555/12345678",
         "description": "Example adapter describing lightweight multi-omics sample annotations.",
         "keywords": ["omics", "samples", "demo"],
         "data_source": "Sample Omics",
@@ -745,6 +746,7 @@ def seed_demo_adapters_cmd(
                 adapter_name=str(spec["adapter_name"]),
                 repository_location=str(spec["repository_location"]),
                 store=store,
+                doi=spec.get("doi"),
                 submitted_by_github_login=_DEMO_GITHUB_LOGIN,
             )
             store.mark_registration_valid(

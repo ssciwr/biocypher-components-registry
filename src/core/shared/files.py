@@ -166,7 +166,7 @@ def _remote_metadata_urls(repo_url: str, parsed: ParseResult) -> list[str]:
         if github_urls:
             return github_urls
 
-    if "/-/" in normalized_path: # this is a sign it is Github
+    if "/-/" in normalized_path:
         gitlab_urls = _gitlab_metadata_urls(parsed)
         if gitlab_urls:
             return gitlab_urls
@@ -208,11 +208,15 @@ def _gitlab_metadata_urls(parsed: ParseResult) -> list[str]:
         return []
 
     base_url = f"{parsed.scheme}://{parsed.netloc}"
-    # if '/-/' is in the url it is a specific branch link, we ignore those and only use main/master
-    # to avoid confusion is the user was to look up code and there is mismatch with what they see on main
-    # and what the adapter register used.
-
-
+    if "-" in parts:
+        marker = parts.index("-")
+        if marker >= 2 and marker + 2 < len(parts) and parts[marker + 1] in {"blob", "raw"}:
+            project_path = "/".join(parts[:marker])
+            branch = parts[marker + 2]
+            return [
+                f"{base_url}/{project_path}/-/raw/{branch}/{METADATA_FILENAME}"
+            ]
+        return []
 
     owner, repo = parts[0], parts[1]
     if repo.endswith(".git"):
