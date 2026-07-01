@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status
 
 from src.api.dependencies import get_registration_store
@@ -31,6 +33,8 @@ from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
 
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+
 
 # ===========================================================
 # Registration Routes
@@ -50,7 +54,7 @@ router = APIRouter()
 )
 def create_registration(
     payload: RegistrationCreateRequest,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationCreateResponse:
     """Create and persist a submitted adapter registration."""
     try:
@@ -76,7 +80,7 @@ def create_registration(
     ),
 )
 def list_registrations(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationListResponse:
     """Return active stored adapter registrations."""
     registrations = store.list_active_registrations()
@@ -98,7 +102,7 @@ def list_registrations(
 )
 def list_registration_events(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationEventListResponse:
     """Return the event history for one stored adapter registration."""
     registration = store.get_registration(registration_id)
@@ -122,7 +126,7 @@ def list_registration_events(
 )
 def get_registration(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationDetailResponse:
     """Return one stored adapter registration by identifier."""
     registration = store.get_registration(registration_id)
@@ -143,7 +147,7 @@ def get_registration(
 )
 def process_registration(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationProcessResponse:
     """Discover, validate, and persist one stored registration result."""
     try:
@@ -167,7 +171,7 @@ def process_registration(
 )
 def revalidate_registration_route(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationRevalidateResponse:
     """Reprocess one previously invalid or fetch-failed registration."""
     try:

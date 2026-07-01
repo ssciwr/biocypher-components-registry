@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -25,6 +25,7 @@ from src.core.registration.store import RegistrationStore
 
 
 router = APIRouter()
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
 RegistryLatestEvent = Literal[
     "SUBMITTED",
     "VALID_CREATED",
@@ -54,18 +55,24 @@ RegistryLatestEvent = Literal[
     ),
 )
 def list_registry_registrations(
-    status: RegistrationStatus | None = Query(
-        default=None,
-        description="Filter registry registrations by public registration status.",
-    ),
-    latest_event: RegistryLatestEvent | None = Query(
-        default=None,
-        description=(
-            "Filter by latest registration event type, such as VALID_CREATED, "
-            "INVALID_SCHEMA, or FETCH_FAILED."
+    store: RegistrationStoreDep,
+    status: Annotated[
+        RegistrationStatus | None,
+        Query(
+            description=(
+                "Filter registry registrations by public registration status."
+            )
         ),
-    ),
-    store: RegistrationStore = Depends(get_registration_store),
+    ] = None,
+    latest_event: Annotated[
+        RegistryLatestEvent | None,
+        Query(
+            description=(
+                "Filter by latest registration event type, such as VALID_CREATED, "
+                "INVALID_SCHEMA, or FETCH_FAILED."
+            )
+        ),
+    ] = None,
 ) -> RegistryRegistrationListResponse:
     """Return registry registration overview rows with latest event information."""
     items: list[RegistryRegistrationResponse] = []
@@ -98,7 +105,7 @@ def list_registry_registrations(
     ),
 )
 def list_registry_entries(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryEntryListResponse:
     """Return canonical valid registry entries."""
     entries = store.list_registry_entries()
@@ -117,7 +124,7 @@ def list_registry_entries(
 )
 def get_registry_entry(
     entry_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryEntryResponse:
     """Return one canonical valid registry entry by identifier."""
     entry = store.get_registry_entry(entry_id)
@@ -136,7 +143,7 @@ def get_registry_entry(
     ),
 )
 def get_latest_registry_refresh(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryRefreshLatestResponse:
     """Return the latest persisted registry refresh summary."""
     refresh = store.get_latest_batch_refresh()
@@ -156,7 +163,7 @@ def get_latest_registry_refresh(
     ),
 )
 def create_registry_refresh(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryRefreshResponse:
     """Process all active registration sources once."""
     return _refresh_registry_response(store)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -24,6 +25,8 @@ from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
 
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+
 
 # ===========================================================
 # Adapter Catalog Routes
@@ -40,7 +43,7 @@ router = APIRouter()
     ),
 )
 def list_adapters(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterCatalogListResponse:
     """Return public adapters that have at least one canonical registry entry."""
     grouped_entries = _group_entries_by_adapter_id(store.list_registry_entries())
@@ -62,7 +65,7 @@ def list_adapters(
 )
 def get_adapter(
     adapter_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterDetailResponse:
     """Return one public adapter with all registered canonical versions."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
@@ -83,7 +86,7 @@ def get_adapter(
 def get_adapter_version_metadata(
     adapter_id: str,
     version: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterMetadataResponse:
     """Return full Croissant metadata for one public adapter version."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())

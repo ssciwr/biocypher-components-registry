@@ -41,7 +41,18 @@ jobs:
         run: uv sync --locked --group dev 
 
       - name: Run tests
-        run: uv run --locked pytest
+        run: uv run --locked pytest --cov --cov-branch --cov-report=xml
 
+      - name: Check coverage report
+        run: ls -lh coverage.xml
+
+      - name: Upload coverage to Codecov
+        # codecov/codecov-action v7.0.0
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: true
+    
       - name: Minimize uv cache
         run: uv cache prune --ci
