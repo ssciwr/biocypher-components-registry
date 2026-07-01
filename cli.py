@@ -430,7 +430,6 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
     table = Table(title="Registry Entries")
     table.add_column("Entry ID", style="cyan")
     table.add_column("Adapter")
-    table.add_column("Version")
     table.add_column("Uniqueness Key")
     table.add_column("Profile")
     table.add_column("Updated At")
@@ -438,7 +437,6 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
         table.add_row(
             entry.entry_id,
             entry.adapter_name,
-            entry.adapter_version,
             entry.uniqueness_key,
             entry.profile_version or "n/a",
             entry.updated_at.isoformat(),
