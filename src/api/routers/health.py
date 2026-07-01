@@ -16,7 +16,6 @@ router = APIRouter()
 
 @router.get(
     "/health",
-    response_model=HealthResponse,
     summary="Check API health",
     description="Return a lightweight liveness response for the API process.",
 )

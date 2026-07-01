@@ -39,7 +39,6 @@ router = APIRouter()
 
 @router.post(
     "/registrations",
-    response_model=RegistrationCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Submit an adapter registration",
     description=(
@@ -69,7 +68,6 @@ def create_registration(
 
 @router.get(
     "/registrations",
-    response_model=RegistrationListResponse,
     summary="List registrations",
     description=(
         "Return active registration summary rows. This list is intentionally "
@@ -92,7 +90,6 @@ def list_registrations(
 
 @router.get(
     "/registrations/{registration_id}/events",
-    response_model=RegistrationEventListResponse,
     summary="List registration events",
     description=(
         "Return the event history recorded while submitting, processing, "
@@ -116,7 +113,6 @@ def list_registration_events(
 
 @router.get(
     "/registrations/{registration_id}",
-    response_model=RegistrationDetailResponse,
     summary="Get registration detail",
     description=(
         "Return one operator-facing registration detail record. This endpoint "
@@ -138,7 +134,6 @@ def get_registration(
 
 @router.post(
     "/registrations/{registration_id}/process",
-    response_model=RegistrationProcessResponse,
     summary="Process one registration",
     description=(
         "Discover the submitted repository metadata, validate the adapter and "
@@ -164,7 +159,6 @@ def process_registration(
 
 @router.post(
     "/registrations/{registration_id}/revalidate",
-    response_model=RegistrationRevalidateResponse,
     summary="Revalidate one registration",
     description=(
         "Reprocess one registration whose current status is INVALID or whose "
