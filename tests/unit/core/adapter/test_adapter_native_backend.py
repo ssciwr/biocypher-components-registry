@@ -1,53 +1,19 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from subprocess import CompletedProcess
 
 from src.core.adapter.backends.native import NativeAdapterGenerator
 from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationRequest, GenerationResult
+from src.core.shared.constants import STANDARD_CONTEXT
 
 
 def _valid_dataset_document() -> dict:
     return {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "citeAs": "cr:citeAs",
-            "column": "cr:column",
-            "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
-            "rai": "http://mlcommons.org/croissant/RAI/",
-            "data": {"@id": "cr:data", "@type": "@json"},
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-            "dct": "http://purl.org/dc/terms/",
-            "examples": {"@id": "cr:examples", "@type": "@json"},
-            "extract": "cr:extract",
-            "field": "cr:field",
-            "fileProperty": "cr:fileProperty",
-            "fileObject": "cr:fileObject",
-            "fileSet": "cr:fileSet",
-            "format": "cr:format",
-            "includes": "cr:includes",
-            "isLiveDataset": "cr:isLiveDataset",
-            "jsonPath": "cr:jsonPath",
-            "key": "cr:key",
-            "md5": "cr:md5",
-            "parentField": "cr:parentField",
-            "path": "cr:path",
-            "recordSet": "cr:recordSet",
-            "references": "cr:references",
-            "regex": "cr:regex",
-            "repeated": "cr:repeated",
-            "replace": "cr:replace",
-            "samplingRate": "cr:samplingRate",
-            "sc": "https://schema.org/",
-            "separator": "cr:separator",
-            "source": "cr:source",
-            "subField": "cr:subField",
-            "transform": "cr:transform",
-        },
+        "@context": deepcopy(STANDARD_CONTEXT),
         "@type": "sc:Dataset",
         "name": "Example dataset",
         "description": "Example dataset",
