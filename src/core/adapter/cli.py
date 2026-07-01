@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Callable, Optional
 
 import typer
 from rich.console import Console
@@ -24,6 +24,11 @@ from src.core.shared.ids import slugify_identifier
 console = Console()
 _ADAPTER_GENERATOR = "native"
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+")
+_DEFAULT_DATASET_GENERATOR = "croissant-baker"
+_DEFAULT_ADAPTER_OUTPUT = "croissant_adapter.jsonld"
+_DATASET_GENERATOR_HELP = (
+    "Dataset generator backend used for all generated datasets in this adapter."
+)
 app = typer.Typer(
     help="Generate adapter Croissant metadata.",
     no_args_is_help=True,
@@ -130,14 +135,14 @@ def _run_request_with_recovery(request: AdapterGenerationRequest, generator: str
     ),
 )
 def direct_cmd(
-    ctx: typer.Context,
+    ctx: typer.Context,  # NOSONAR
     dataset_generator: str = typer.Option(
-        "croissant-baker",
+        _DEFAULT_DATASET_GENERATOR,
         "--dataset-generator",
-        help="Dataset generator backend used for all generated datasets in this adapter.",
+        help=_DATASET_GENERATOR_HELP,
     ),
     output: str = typer.Option(
-        "croissant_adapter.jsonld",
+        _DEFAULT_ADAPTER_OUTPUT,
         "--output",
         "-o",
         help="Destination JSON-LD file.",
@@ -189,7 +194,14 @@ def direct_cmd(
         help="Optional explicit adapter @id.",
     ),
 ) -> None:
-    """Generate adapter metadata directly from CLI flags and dataset inputs."""
+    """Generate adapter metadata directly from CLI flags and dataset inputs.
+
+    This command intentionally exposes one parameter per CLI flag so Typer can
+    derive ``--help`` documentation and argument parsing for each option; the
+    flags cannot be merged or wrapped without breaking the existing public CLI
+    contract. Request construction and dataset parsing are delegated to small,
+    independently tested helpers below.
+    """
     if not creator:
         raise typer.BadParameter(
             "At least one --creator is required for adapter generation."
@@ -232,12 +244,12 @@ def direct_cmd(
 )
 def guided_cmd(
     dataset_generator: str = typer.Option(
-        "croissant-baker",
+        _DEFAULT_DATASET_GENERATOR,
         "--dataset-generator",
-        help="Dataset generator backend used for all generated datasets in this adapter.",
+        help=_DATASET_GENERATOR_HELP,
     ),
     output: str = typer.Option(
-        "croissant_adapter.jsonld",
+        _DEFAULT_ADAPTER_OUTPUT,
         "--output",
         "-o",
         help="Destination JSON-LD file.",
@@ -266,9 +278,9 @@ def config_cmd(
         help="YAML configuration file for adapter generation.",
     ),
     dataset_generator: str = typer.Option(
-        "croissant-baker",
+        _DEFAULT_DATASET_GENERATOR,
         "--dataset-generator",
-        help="Dataset generator backend used for all generated datasets in this adapter.",
+        help=_DATASET_GENERATOR_HELP,
     ),
     output: Optional[str] = typer.Option(
         None,
@@ -295,7 +307,28 @@ def _dataset_request_from_config_path(config_path: str) -> GenerationRequest:
     return dataset_request_from_config(config_path=config_path)
 
 
-dataset_request_from_config = _dataset_request_from_config_path
+def _apply_dataset_block_token(
+    tokens: list[str],
+    index: int,
+    current: dict[str, object],
+) -> int:
+    """Apply one ``--dataset`` block token to ``current`` and return next index."""
+    token = tokens[index]
+    if token not in _DATASET_FLAG_MAP:
+        raise typer.BadParameter(f"Unsupported dataset block option '{token}'.")
+
+    if index + 1 >= len(tokens):
+        raise typer.BadParameter(f"Missing value for dataset block option '{token}'.")
+
+    value = tokens[index + 1]
+    field_name = _DATASET_FLAG_MAP[token]
+    if field_name == "creators":
+        creators = current.setdefault("creators", [])
+        assert isinstance(creators, list)
+        creators.append(value)
+    else:
+        current[field_name] = value
+    return index + 2
 
 
 def _parse_dataset_blocks(tokens: list[str]) -> list[GenerationRequest]:
@@ -320,28 +353,40 @@ def _parse_dataset_blocks(tokens: list[str]) -> list[GenerationRequest]:
                 f"Unexpected argument '{token}'. Dataset block arguments must follow '--dataset'."
             )
 
-        if token not in _DATASET_FLAG_MAP:
-            raise typer.BadParameter(
-                f"Unsupported dataset block option '{token}'."
-            )
-
-        if index + 1 >= len(tokens):
-            raise typer.BadParameter(f"Missing value for dataset block option '{token}'.")
-
-        value = tokens[index + 1]
-        field_name = _DATASET_FLAG_MAP[token]
-        if field_name == "creators":
-            creators = current.setdefault("creators", [])
-            assert isinstance(creators, list)
-            creators.append(value)
-        else:
-            current[field_name] = value
-        index += 2
+        index = _apply_dataset_block_token(tokens, index, current)
 
     if current is not None:
         datasets.append(_build_dataset_request_from_block(current))
 
     return datasets
+
+
+def _build_generation_request(
+    *,
+    input_path: str,
+    name: str | None = None,
+    description: str | None = None,
+    url: str | None = None,
+    license_value: str | None = None,
+    citation: str | None = None,
+    dataset_version: str | None = None,
+    date_published: str | None = None,
+    creators: list[str] | None = None,
+) -> GenerationRequest:
+    """Build one nested dataset request shared by CLI-block and prompt paths."""
+    return GenerationRequest(
+        input_path=input_path,
+        output_path="",
+        validate=True,
+        name=name,
+        description=description,
+        url=url,
+        license_value=license_value,
+        citation=citation,
+        dataset_version=dataset_version,
+        date_published=date_published,
+        creators=creators or [],
+    )
 
 
 def _build_dataset_request_from_block(payload: dict[str, object]) -> GenerationRequest:
@@ -354,10 +399,8 @@ def _build_dataset_request_from_block(payload: dict[str, object]) -> GenerationR
     if not isinstance(creators, list):
         creators = []
 
-    return GenerationRequest(
+    return _build_generation_request(
         input_path=input_path,
-        output_path="",
-        validate=True,
         name=_optional_block_string(payload, "name"),
         description=_optional_block_string(payload, "description"),
         url=_optional_block_string(payload, "url"),
@@ -379,7 +422,7 @@ def _optional_block_string(payload: dict[str, object], key: str) -> str | None:
 
 def prompt_for_adapter_request(
     output_path: str,
-    dataset_generator: str = "croissant-baker",
+    dataset_generator: str = _DEFAULT_DATASET_GENERATOR,
 ) -> AdapterGenerationRequest:
     """Interactively collect adapter metadata and nested dataset inputs."""
     console.print("\n[bold cyan]Adapter Metadata[/bold cyan]")
@@ -431,65 +474,89 @@ def prompt_for_adapter_request(
     return request
 
 
+def _edit_name(request: AdapterGenerationRequest) -> None:
+    request.name = typer.prompt("Adapter name [required]", default=request.name)
+
+
+def _edit_description(request: AdapterGenerationRequest) -> None:
+    request.description = typer.prompt("Description [required]", default=request.description)
+
+
+def _edit_version(request: AdapterGenerationRequest) -> None:
+    request.version = _prompt_semver("Version [required]", default=request.version)
+
+
+def _edit_license(request: AdapterGenerationRequest) -> None:
+    request.license_value = typer.prompt(
+        "License (URL or SPDX identifier) [required]",
+        default=request.license_value,
+    )
+
+
+def _edit_code_repository(request: AdapterGenerationRequest) -> None:
+    request.code_repository = typer.prompt(
+        "Code repository URL [required]",
+        default=request.code_repository,
+    )
+
+
+def _edit_output(request: AdapterGenerationRequest) -> None:
+    request.output_path = typer.prompt("Output JSON-LD file", default=request.output_path)
+
+
+def _edit_validate(request: AdapterGenerationRequest) -> None:
+    request.validate = typer.confirm("Validate generated metadata?", default=request.validate)
+
+
+def _edit_dataset_generator(request: AdapterGenerationRequest) -> None:
+    request.dataset_generator = typer.prompt(
+        "Dataset generator backend",
+        default=request.dataset_generator,
+    )
+    ensure_supported_dataset_backend(request.dataset_generator)
+
+
+def _edit_keywords(request: AdapterGenerationRequest) -> None:
+    request.keywords = _prompt_required_keywords("Keywords (comma-separated) [required]")
+
+
+def _edit_creators(request: AdapterGenerationRequest) -> None:
+    request.creators = _prompt_creators()
+
+
+def _edit_datasets(request: AdapterGenerationRequest) -> None:
+    request.dataset_paths, request.generated_datasets = _prompt_dataset_inputs()
+
+
+def _edit_adapter_id(request: AdapterGenerationRequest) -> None:
+    request.adapter_id = _prompt_optional("Adapter @id", default=request.adapter_id or "")
+
+
+_REQUEST_EDIT_HANDLERS: dict[str, Callable[[AdapterGenerationRequest], None]] = {
+    "name": _edit_name,
+    "description": _edit_description,
+    "version": _edit_version,
+    "license": _edit_license,
+    "code-repository": _edit_code_repository,
+    "output": _edit_output,
+    "validate": _edit_validate,
+    "dataset-generator": _edit_dataset_generator,
+    "keywords": _edit_keywords,
+    "creators": _edit_creators,
+    "datasets": _edit_datasets,
+    "adapter-id": _edit_adapter_id,
+}
+
+
 def review_adapter_request(request: AdapterGenerationRequest) -> None:
     """Show the current adapter request and let the user edit fields."""
-    edit_choices = {
-        "name",
-        "description",
-        "version",
-        "license",
-        "code-repository",
-        "output",
-        "validate",
-        "dataset-generator",
-        "keywords",
-        "creators",
-        "datasets",
-        "adapter-id",
-    }
     while True:
         _print_request_summary(request)
         if typer.confirm("Proceed with these values?", default=True):
             return
 
-        choice = _prompt_choice("What do you want to edit?", edit_choices)
-        if choice == "name":
-            request.name = typer.prompt("Adapter name [required]", default=request.name)
-        elif choice == "description":
-            request.description = typer.prompt("Description [required]", default=request.description)
-        elif choice == "version":
-            request.version = _prompt_semver("Version [required]", default=request.version)
-        elif choice == "license":
-            request.license_value = typer.prompt(
-                "License (URL or SPDX identifier) [required]",
-                default=request.license_value,
-            )
-        elif choice == "code-repository":
-            request.code_repository = typer.prompt(
-                "Code repository URL [required]",
-                default=request.code_repository,
-            )
-        elif choice == "output":
-            request.output_path = typer.prompt("Output JSON-LD file", default=request.output_path)
-        elif choice == "validate":
-            request.validate = typer.confirm(
-                "Validate generated metadata?",
-                default=request.validate,
-            )
-        elif choice == "dataset-generator":
-            request.dataset_generator = typer.prompt(
-                "Dataset generator backend",
-                default=request.dataset_generator,
-            )
-            ensure_supported_dataset_backend(request.dataset_generator)
-        elif choice == "keywords":
-            request.keywords = _prompt_required_keywords("Keywords (comma-separated) [required]")
-        elif choice == "creators":
-            request.creators = _prompt_creators()
-        elif choice == "datasets":
-            request.dataset_paths, request.generated_datasets = _prompt_dataset_inputs()
-        elif choice == "adapter-id":
-            request.adapter_id = _prompt_optional("Adapter @id", default=request.adapter_id or "")
+        choice = _prompt_choice("What do you want to edit?", set(_REQUEST_EDIT_HANDLERS))
+        _REQUEST_EDIT_HANDLERS[choice](request)
 
 
 def _print_request_summary(request: AdapterGenerationRequest) -> None:
@@ -548,6 +615,11 @@ def _prompt_required_keywords(label: str) -> list[str]:
         console.print("[red]At least one keyword is required.[/red]")
 
 
+def _join_non_empty(parts: list[str]) -> str:
+    """Join non-empty parts with a comma, dropping blanks."""
+    return ", ".join(part for part in parts if part)
+
+
 def _prompt_creators() -> list[str]:
     """Collect one or more adapter creators interactively."""
     console.print("\n[bold]Creators / developers[/bold]")
@@ -557,7 +629,7 @@ def _prompt_creators() -> list[str]:
         name = typer.prompt("  Full name [required]")
         affiliation = typer.prompt("  Affiliation [optional]", default="")
         identifier = typer.prompt("  ORCID or identifier [optional]", default="")
-        creators.append(", ".join(part for part in [name, affiliation, identifier] if part))
+        creators.append(_join_non_empty([name, affiliation, identifier]))
         if not typer.confirm("Add another creator?", default=False):
             break
     return creators
@@ -601,10 +673,8 @@ def _prompt_generated_dataset() -> GenerationRequest:
     creators: list[str] = []
     while typer.confirm("  Add a dataset creator?", default=not creators):
         creators.append(_prompt_dataset_creator())
-    return GenerationRequest(
+    return _build_generation_request(
         input_path=input_path,
-        output_path="",
-        validate=True,
         name=name,
         description=description,
         url=url,
@@ -621,7 +691,7 @@ def _prompt_dataset_creator() -> str:
     name = typer.prompt("    Creator name [required]")
     email = typer.prompt("    Creator email [optional]", default="")
     url = typer.prompt("    Creator URL [optional]", default="")
-    return ", ".join(part for part in [name, email, url] if part)
+    return _join_non_empty([name, email, url])
 
 
 def _prompt_choice(
