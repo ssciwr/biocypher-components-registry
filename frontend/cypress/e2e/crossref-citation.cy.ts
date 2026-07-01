@@ -3,7 +3,6 @@ const doi = '10.5555/12345678'
 const adapter = {
   adapter_id: 'crossref-test-adapter',
   adapter_name: 'Crossref Test Adapter',
-  latest_version: '0.1.0',
   doi,
   cff_url: null,
 }
