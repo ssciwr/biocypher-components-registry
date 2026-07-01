@@ -257,126 +257,45 @@ class PostgreSQLRegistrationStore:
         try:
             with self.engine.begin() as connection:
                 current_entry = self._current_registry_entry(connection, registration_id)
-                if (
-                    current_entry is not None
-                    and str(current_entry["metadata_checksum"] or "") == observed_checksum
-                ):
-                    connection.execute(
-                        update(registration_sources_table)
-                        .where(registration_sources_table.c.id == registration_id)
-                        .values(
-                            updated_at=updated_at.isoformat(),
-                            last_checked_at=updated_at.isoformat(),
-                            last_seen_at=updated_at.isoformat(),
-                        )
-                    )
-                    self._insert_registration_event(
-                        connection,
-                        source_id=registration_id,
-                        registry_entry_id=str(current_entry["id"]),
-                        event_type="UNCHANGED",
-                        profile_version=profile_version,
-                        metadata_json=metadata_payload,
-                        error_details=None,
-                        message="Metadata checksum unchanged; canonical entry preserved.",
-                        started_at=updated_at.isoformat(),
-                        finished_at=updated_at.isoformat(),
-                        mlcroissant_valid=True,
-                        schema_valid=True,
-                        observed_checksum=observed_checksum,
-                    )
-                    updated_registration = self.get_registration(registration_id)
-                    if updated_registration is None:
-                        raise ValueError(f"Registration not found: {registration_id}")
-                    return replace(updated_registration, metadata_path=metadata_path)
+                unchanged_result = self._finalize_unchanged_registration(
+                    connection,
+                    current_entry,
+                    observed_checksum,
+                    registration_id=registration_id,
+                    metadata_path=metadata_path,
+                    profile_version=profile_version,
+                    metadata_payload=metadata_payload,
+                    updated_at=updated_at,
+                )
+                if unchanged_result is not None:
+                    return unchanged_result
 
                 existing_entry = self._registry_entry_by_uniqueness_key(
                     connection,
                     uniqueness_key,
                 )
                 if existing_entry is not None:
-                    event_type = (
-                        "DUPLICATE"
-                        if str(existing_entry["metadata_checksum"] or "") == observed_checksum
-                        else "REJECTED_SAME_VERSION_CHANGED"
-                    )
-                    message = (
-                        "Duplicate canonical registry entry rejected."
-                        if event_type == "DUPLICATE"
-                        else "Changed metadata for the same adapter_id and version was rejected."
-                    )
-                    error_message = (
-                        f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
-                        if event_type == "DUPLICATE"
-                        else (
-                            "Registration rejected because metadata changed for an existing "
-                            f"adapter_id and version: {uniqueness_key}. Please bump the version."
-                        )
-                    )
-                    connection.execute(
-                        update(registration_sources_table)
-                        .where(registration_sources_table.c.id == registration_id)
-                        .values(
-                            updated_at=updated_at.isoformat(),
-                            last_checked_at=updated_at.isoformat(),
-                            last_seen_at=updated_at.isoformat(),
-                        )
-                    )
-                    self._insert_registration_event(
+                    pending_duplicate_error = self._reject_duplicate_registration(
                         connection,
-                        source_id=registration_id,
-                        registry_entry_id=str(existing_entry["id"]),
-                        event_type=event_type,
+                        existing_entry,
+                        observed_checksum,
+                        registration_id=registration_id,
+                        uniqueness_key=uniqueness_key,
                         profile_version=profile_version,
-                        metadata_json=metadata_payload,
-                        error_details=json.dumps([error_message]),
-                        message=message,
-                        started_at=updated_at.isoformat(),
-                        finished_at=updated_at.isoformat(),
-                        observed_checksum=observed_checksum,
+                        metadata_payload=metadata_payload,
+                        updated_at=updated_at,
                     )
-                    pending_duplicate_error = error_message
                 else:
-                    registry_entry_id = str(uuid4())
-                    connection.execute(
-                        insert(registry_entries_table).values(
-                            id=registry_entry_id,
-                            source_id=registration_id,
-                            adapter_name=adapter_name,
-                            adapter_version=adapter_version,
-                            profile_version=profile_version,
-                            uniqueness_key=uniqueness_key,
-                            metadata_checksum=observed_checksum,
-                            metadata_json=metadata_payload,
-                            created_at=updated_at.isoformat(),
-                            updated_at=updated_at.isoformat(),
-                            is_active=True,
-                        )
-                    )
-                    connection.execute(
-                        update(registration_sources_table)
-                        .where(registration_sources_table.c.id == registration_id)
-                        .values(
-                            updated_at=updated_at.isoformat(),
-                            last_checked_at=updated_at.isoformat(),
-                            last_seen_at=updated_at.isoformat(),
-                            current_registry_entry_id=registry_entry_id,
-                        )
-                    )
-                    self._insert_registration_event(
+                    self._create_valid_registry_entry(
                         connection,
-                        source_id=registration_id,
-                        registry_entry_id=registry_entry_id,
-                        event_type="VALID_CREATED",
+                        registration_id=registration_id,
+                        adapter_name=adapter_name,
+                        adapter_version=adapter_version,
                         profile_version=profile_version,
-                        metadata_json=metadata_payload,
-                        error_details=None,
-                        message="Canonical valid registry entry created.",
-                        started_at=updated_at.isoformat(),
-                        finished_at=updated_at.isoformat(),
-                        mlcroissant_valid=True,
-                        schema_valid=True,
+                        uniqueness_key=uniqueness_key,
                         observed_checksum=observed_checksum,
+                        metadata_payload=metadata_payload,
+                        updated_at=updated_at,
                     )
         except IntegrityError as exc:
             raise DuplicateRegistrationError(
@@ -389,6 +308,169 @@ class PostgreSQLRegistrationStore:
         if pending_duplicate_error is not None:
             raise DuplicateRegistrationError(pending_duplicate_error)
         return replace(updated_registration, metadata_path=metadata_path)
+
+    def _finalize_unchanged_registration(
+        self,
+        connection: Engine | object,
+        current_entry: RowMapping | None,
+        observed_checksum: str,
+        *,
+        registration_id: str,
+        metadata_path: str | None,
+        profile_version: str,
+        metadata_payload: str,
+        updated_at: datetime,
+    ) -> StoredRegistration | None:
+        """Preserve the canonical entry when the metadata checksum is unchanged.
+
+        Returns the finalized registration when the checksum matched, or
+        ``None`` when the caller should continue with duplicate/creation handling.
+        """
+        if (
+            current_entry is None
+            or str(current_entry["metadata_checksum"] or "") != observed_checksum
+        ):
+            return None
+
+        connection.execute(
+            update(registration_sources_table)
+            .where(registration_sources_table.c.id == registration_id)
+            .values(
+                updated_at=updated_at.isoformat(),
+                last_checked_at=updated_at.isoformat(),
+                last_seen_at=updated_at.isoformat(),
+            )
+        )
+        self._insert_registration_event(
+            connection,
+            source_id=registration_id,
+            registry_entry_id=str(current_entry["id"]),
+            event_type="UNCHANGED",
+            profile_version=profile_version,
+            metadata_json=metadata_payload,
+            error_details=None,
+            message="Metadata checksum unchanged; canonical entry preserved.",
+            started_at=updated_at.isoformat(),
+            finished_at=updated_at.isoformat(),
+            mlcroissant_valid=True,
+            schema_valid=True,
+            observed_checksum=observed_checksum,
+        )
+        updated_registration = self.get_registration(registration_id)
+        if updated_registration is None:
+            raise ValueError(f"Registration not found: {registration_id}")
+        return replace(updated_registration, metadata_path=metadata_path)
+
+    def _reject_duplicate_registration(
+        self,
+        connection: Engine | object,
+        existing_entry: RowMapping,
+        observed_checksum: str,
+        *,
+        registration_id: str,
+        uniqueness_key: str,
+        profile_version: str,
+        metadata_payload: str,
+        updated_at: datetime,
+    ) -> str:
+        """Record a rejected duplicate/changed registration and return the error message."""
+        event_type = (
+            "DUPLICATE"
+            if str(existing_entry["metadata_checksum"] or "") == observed_checksum
+            else "REJECTED_SAME_VERSION_CHANGED"
+        )
+        message = (
+            "Duplicate canonical registry entry rejected."
+            if event_type == "DUPLICATE"
+            else "Changed metadata for the same adapter_id and version was rejected."
+        )
+        error_message = (
+            f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
+            if event_type == "DUPLICATE"
+            else (
+                "Registration rejected because metadata changed for an existing "
+                f"adapter_id and version: {uniqueness_key}. Please bump the version."
+            )
+        )
+        connection.execute(
+            update(registration_sources_table)
+            .where(registration_sources_table.c.id == registration_id)
+            .values(
+                updated_at=updated_at.isoformat(),
+                last_checked_at=updated_at.isoformat(),
+                last_seen_at=updated_at.isoformat(),
+            )
+        )
+        self._insert_registration_event(
+            connection,
+            source_id=registration_id,
+            registry_entry_id=str(existing_entry["id"]),
+            event_type=event_type,
+            profile_version=profile_version,
+            metadata_json=metadata_payload,
+            error_details=json.dumps([error_message]),
+            message=message,
+            started_at=updated_at.isoformat(),
+            finished_at=updated_at.isoformat(),
+            observed_checksum=observed_checksum,
+        )
+        return error_message
+
+    def _create_valid_registry_entry(
+        self,
+        connection: Engine | object,
+        *,
+        registration_id: str,
+        adapter_name: str,
+        adapter_version: str,
+        profile_version: str,
+        uniqueness_key: str,
+        observed_checksum: str,
+        metadata_payload: str,
+        updated_at: datetime,
+    ) -> None:
+        """Create a new canonical registry entry for a valid registration."""
+        registry_entry_id = str(uuid4())
+        connection.execute(
+            insert(registry_entries_table).values(
+                id=registry_entry_id,
+                source_id=registration_id,
+                adapter_name=adapter_name,
+                adapter_version=adapter_version,
+                profile_version=profile_version,
+                uniqueness_key=uniqueness_key,
+                metadata_checksum=observed_checksum,
+                metadata_json=metadata_payload,
+                created_at=updated_at.isoformat(),
+                updated_at=updated_at.isoformat(),
+                is_active=True,
+            )
+        )
+        connection.execute(
+            update(registration_sources_table)
+            .where(registration_sources_table.c.id == registration_id)
+            .values(
+                updated_at=updated_at.isoformat(),
+                last_checked_at=updated_at.isoformat(),
+                last_seen_at=updated_at.isoformat(),
+                current_registry_entry_id=registry_entry_id,
+            )
+        )
+        self._insert_registration_event(
+            connection,
+            source_id=registration_id,
+            registry_entry_id=registry_entry_id,
+            event_type="VALID_CREATED",
+            profile_version=profile_version,
+            metadata_json=metadata_payload,
+            error_details=None,
+            message="Canonical valid registry entry created.",
+            started_at=updated_at.isoformat(),
+            finished_at=updated_at.isoformat(),
+            mlcroissant_valid=True,
+            schema_valid=True,
+            observed_checksum=observed_checksum,
+        )
 
     def mark_registration_invalid(
         self,

@@ -140,25 +140,8 @@ def _semantic_errors(data: dict[str, Any]) -> list[str]:
 
 def _duplicate_id_errors(data: dict[str, Any]) -> list[str]:
     occurrences: dict[str, list[str]] = {}
+    _collect_id_occurrences(data, "", occurrences)
 
-    def walk(node: Any, path: str) -> None:
-        if isinstance(node, dict):
-            node_id = node.get("@id")
-            if (
-                isinstance(node_id, str)
-                and node_id
-                and _is_node_definition(node)
-            ):
-                occurrences.setdefault(node_id, []).append(path or "$")
-            for key, value in node.items():
-                child_path = f"{path}.{key}" if path else key
-                walk(value, child_path)
-        elif isinstance(node, list):
-            for index, value in enumerate(node):
-                child_path = f"{path}[{index}]" if path else f"[{index}]"
-                walk(value, child_path)
-
-    walk(data, "")
     errors: list[str] = []
     for node_id, paths in sorted(occurrences.items()):
         if len(paths) > 1:
@@ -167,6 +150,30 @@ def _duplicate_id_errors(data: dict[str, Any]) -> list[str]:
                 f"Duplicate @id {node_id!r} found in multiple nodes: {locations}."
             )
     return errors
+
+
+def _collect_id_occurrences(
+    node: Any, path: str, occurrences: dict[str, list[str]]
+) -> None:
+    """Recursively record ``@id`` occurrences and the paths where they appear."""
+    if isinstance(node, dict):
+        _record_node_id(node, path, occurrences)
+        for key, value in node.items():
+            child_path = f"{path}.{key}" if path else key
+            _collect_id_occurrences(value, child_path, occurrences)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            child_path = f"{path}[{index}]" if path else f"[{index}]"
+            _collect_id_occurrences(value, child_path, occurrences)
+
+
+def _record_node_id(
+    node: dict[str, Any], path: str, occurrences: dict[str, list[str]]
+) -> None:
+    """Record a node's ``@id`` occurrence when it defines (not just references) one."""
+    node_id = node.get("@id")
+    if isinstance(node_id, str) and node_id and _is_node_definition(node):
+        occurrences.setdefault(node_id, []).append(path or "$")
 
 
 def _is_node_definition(node: dict[str, Any]) -> bool:
@@ -185,49 +192,104 @@ def _file_object_reference_errors(data: dict[str, Any]) -> list[str]:
     for dataset_index, dataset in enumerate(has_part):
         if not isinstance(dataset, dict):
             continue
-        dataset_name = str(dataset.get("name") or f"dataset[{dataset_index}]")
-        distribution_ids = _distribution_ids(dataset)
-        record_sets = dataset.get("recordSet")
-        if not isinstance(record_sets, list):
-            continue
-        for record_set_index, record_set in enumerate(record_sets):
-            if not isinstance(record_set, dict):
-                continue
-            record_set_name = str(
-                record_set.get("name")
-                or record_set.get("@id")
-                or f"recordSet[{record_set_index}]"
-            )
-            fields = record_set.get("field")
-            if not isinstance(fields, list):
-                continue
-            for field_index, field in enumerate(fields):
-                if not isinstance(field, dict):
-                    continue
-                field_name = str(field.get("name") or f"field[{field_index}]")
-                source = field.get("source")
-                if isinstance(source, list):
-                    errors.append(
-                        f"[hasPart[{dataset_index}] {dataset_name} → recordSet[{record_set_index}] {record_set_name} → field[{field_index}] {field_name}] "
-                        "Field 'source' must be a single object, not a list."
-                    )
-                    continue
-                if not isinstance(source, dict):
-                    continue
-                file_object = source.get("fileObject")
-                if not isinstance(file_object, dict):
-                    continue
-                file_object_id = file_object.get("@id")
-                if (
-                    isinstance(file_object_id, str)
-                    and file_object_id
-                    and file_object_id not in distribution_ids
-                ):
-                    errors.append(
-                        f"[hasPart[{dataset_index}] {dataset_name} → recordSet[{record_set_index}] {record_set_name} → field[{field_index}] {field_name}] "
-                        f"Referenced fileObject @id {file_object_id!r} is not defined in this dataset's distribution."
-                    )
+        errors.extend(_dataset_file_object_errors(dataset_index, dataset))
     return errors
+
+
+def _dataset_file_object_errors(dataset_index: int, dataset: dict[str, Any]) -> list[str]:
+    """Validate ``fileObject`` references for every recordSet in a dataset."""
+    dataset_name = str(dataset.get("name") or f"dataset[{dataset_index}]")
+    distribution_ids = _distribution_ids(dataset)
+    record_sets = dataset.get("recordSet")
+    if not isinstance(record_sets, list):
+        return []
+
+    errors: list[str] = []
+    for record_set_index, record_set in enumerate(record_sets):
+        if not isinstance(record_set, dict):
+            continue
+        errors.extend(
+            _record_set_file_object_errors(
+                dataset_index,
+                dataset_name,
+                record_set_index,
+                record_set,
+                distribution_ids,
+            )
+        )
+    return errors
+
+
+def _record_set_file_object_errors(
+    dataset_index: int,
+    dataset_name: str,
+    record_set_index: int,
+    record_set: dict[str, Any],
+    distribution_ids: set[str],
+) -> list[str]:
+    """Validate ``fileObject`` references for every field in a recordSet."""
+    record_set_name = str(
+        record_set.get("name")
+        or record_set.get("@id")
+        or f"recordSet[{record_set_index}]"
+    )
+    fields = record_set.get("field")
+    if not isinstance(fields, list):
+        return []
+
+    errors: list[str] = []
+    for field_index, field in enumerate(fields):
+        if not isinstance(field, dict):
+            continue
+        error = _field_file_object_error(
+            dataset_index,
+            dataset_name,
+            record_set_index,
+            record_set_name,
+            field_index,
+            field,
+            distribution_ids,
+        )
+        if error is not None:
+            errors.append(error)
+    return errors
+
+
+def _field_file_object_error(
+    dataset_index: int,
+    dataset_name: str,
+    record_set_index: int,
+    record_set_name: str,
+    field_index: int,
+    field: dict[str, Any],
+    distribution_ids: set[str],
+) -> str | None:
+    """Return an error message when a field's ``fileObject`` reference is invalid."""
+    field_name = str(field.get("name") or f"field[{field_index}]")
+    location = (
+        f"[hasPart[{dataset_index}] {dataset_name} → "
+        f"recordSet[{record_set_index}] {record_set_name} → "
+        f"field[{field_index}] {field_name}] "
+    )
+    source = field.get("source")
+    if isinstance(source, list):
+        return f"{location}Field 'source' must be a single object, not a list."
+    if not isinstance(source, dict):
+        return None
+    file_object = source.get("fileObject")
+    if not isinstance(file_object, dict):
+        return None
+    file_object_id = file_object.get("@id")
+    if (
+        isinstance(file_object_id, str)
+        and file_object_id
+        and file_object_id not in distribution_ids
+    ):
+        return (
+            f"{location}Referenced fileObject @id {file_object_id!r} is not "
+            "defined in this dataset's distribution."
+        )
+    return None
 
 
 def _distribution_ids(dataset: dict[str, Any]) -> set[str]:

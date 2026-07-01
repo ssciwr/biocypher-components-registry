@@ -362,12 +362,12 @@ def test_adapter_guided_retries_after_backend_failure(monkeypatch) -> None:
 
 def test_adapter_direct_supports_generated_dataset_configs(tmp_path: Path, monkeypatch) -> None:
     dataset_config = tmp_path / "dataset.yaml"
-    dataset_config.write_text("input: /tmp/data\n", encoding="utf-8")
+    dataset_config.write_text("input: /data/example\n", encoding="utf-8")
     captured: dict[str, object] = {}
 
     def fake_dataset_request_from_config(config_path: str) -> GenerationRequest:
         captured["config_path"] = config_path
-        return GenerationRequest(input_path="/tmp/data", output_path="croissant.jsonld")
+        return GenerationRequest(input_path="/data/example", output_path="croissant.jsonld")
 
     def fake_execute_adapter_request(
         request: AdapterGenerationRequest,

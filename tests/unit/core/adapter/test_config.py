@@ -16,7 +16,7 @@ def test_adapter_generation_request_validates_by_default() -> None:
         version="1.0.0",
         license_value="MIT",
         code_repository="https://example.org/repo",
-        dataset_paths=["/tmp/dataset.jsonld"],
+        dataset_paths=["/data/dataset.jsonld"],
     )
 
     assert request.validate is True
@@ -45,7 +45,7 @@ def test_build_adapter_request_from_mapping_supports_existing_and_generated() ->
                 ],
             },
             "datasets": [
-                {"mode": "existing", "path": "/tmp/dataset.jsonld"},
+                {"mode": "existing", "path": "/data/dataset.jsonld"},
                 {
                     "mode": "generate",
                     "input": "data/in/sample_networks_omnipath.tsv",
@@ -64,7 +64,7 @@ def test_build_adapter_request_from_mapping_supports_existing_and_generated() ->
 
     assert request.dataset_generator == "auto"
     assert request.validate is False
-    assert request.dataset_paths == ["/tmp/dataset.jsonld"]
+    assert request.dataset_paths == ["/data/dataset.jsonld"]
     assert len(request.generated_datasets) == 1
     assert request.generated_datasets[0].input_path == "data/in/sample_networks_omnipath.tsv"
 

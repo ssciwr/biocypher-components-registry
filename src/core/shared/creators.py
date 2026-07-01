@@ -28,24 +28,9 @@ def parse_dataset_creator_string(raw: str) -> CreatorSpec | None:
     """
     typed = _typed_creator_parts(raw)
     if typed is not None:
-        return CreatorSpec(
-            creator_type=typed[0],
-            name=typed[1] if len(typed) > 1 else "",
-            affiliation=typed[2] if len(typed) > 2 else "",
-            email=typed[3] if len(typed) > 3 else "",
-            url=typed[4] if len(typed) > 4 else "",
-            identifier=typed[5] if len(typed) > 5 else "",
-        )
-
+        return _dataset_creator_from_typed(typed)
     parts = _split_untyped(raw, "|" if "|" in raw else ",")
-    name = parts[0] if parts else ""
-    if not name:
-        return None
-    return CreatorSpec(
-        name=name,
-        email=parts[1] if len(parts) > 1 else "",
-        url=parts[2] if len(parts) > 2 else "",
-    )
+    return _dataset_creator_from_untyped(parts)
 
 
 def parse_adapter_creator_string(raw: str) -> CreatorSpec | None:
@@ -59,24 +44,62 @@ def parse_adapter_creator_string(raw: str) -> CreatorSpec | None:
     """
     typed = _typed_creator_parts(raw)
     if typed is not None:
-        identifier = typed[5] if len(typed) > 5 else (typed[4] if len(typed) > 4 else "")
-        return CreatorSpec(
-            creator_type=typed[0],
-            name=typed[1] if len(typed) > 1 else "",
-            affiliation=typed[2] if len(typed) > 2 else "",
-            email=typed[3] if len(typed) > 3 else "",
-            url=typed[4] if len(typed) > 4 else "",
-            identifier=identifier,
-        )
-
+        return _adapter_creator_from_typed(typed)
     parts = _split_untyped(raw, "|" if "|" in raw else ",")
-    name = parts[0] if parts else ""
+    return _adapter_creator_from_untyped(parts)
+
+
+def _part(parts: list[str], index: int, default: str = "") -> str:
+    """Return the part at ``index``, or ``default`` when it is not present."""
+    return parts[index] if len(parts) > index else default
+
+
+def _dataset_creator_from_typed(typed: list[str]) -> CreatorSpec:
+    """Build a dataset ``CreatorSpec`` from pipe-delimited typed parts."""
+    return CreatorSpec(
+        creator_type=typed[0],
+        name=_part(typed, 1),
+        affiliation=_part(typed, 2),
+        email=_part(typed, 3),
+        url=_part(typed, 4),
+        identifier=_part(typed, 5),
+    )
+
+
+def _dataset_creator_from_untyped(parts: list[str]) -> CreatorSpec | None:
+    """Build a dataset ``CreatorSpec`` from untyped comma/pipe-delimited parts."""
+    name = _part(parts, 0)
     if not name:
         return None
     return CreatorSpec(
         name=name,
-        affiliation=parts[1] if len(parts) > 1 else "",
-        identifier=parts[2] if len(parts) > 2 else "",
+        email=_part(parts, 1),
+        url=_part(parts, 2),
+    )
+
+
+def _adapter_creator_from_typed(typed: list[str]) -> CreatorSpec:
+    """Build an adapter ``CreatorSpec`` from pipe-delimited typed parts."""
+    identifier = typed[5] if len(typed) > 5 else _part(typed, 4)
+    return CreatorSpec(
+        creator_type=typed[0],
+        name=_part(typed, 1),
+        affiliation=_part(typed, 2),
+        email=_part(typed, 3),
+        url=_part(typed, 4),
+        identifier=identifier,
+    )
+
+
+def _adapter_creator_from_untyped(parts: list[str]) -> CreatorSpec | None:
+    """Build an adapter ``CreatorSpec`` from untyped comma/pipe-delimited parts."""
+    name = _part(parts, 0)
+    if not name:
+        return None
+    return CreatorSpec(
+        name=name,
+        affiliation=_part(parts, 1),
+        identifier=_part(parts, 2),
     )
 
 
