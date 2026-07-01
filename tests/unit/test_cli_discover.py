@@ -119,7 +119,9 @@ def _valid_adapter_document() -> dict:
     }
 
 
-def test_discover_command_discovers_and_validates_local_repository(tmp_path: Path) -> None:
+def test_discover_command_discovers_and_validates_local_repository(
+    tmp_path: Path,
+) -> None:
     repo_path = tmp_path / "adapter-repo"
     repo_path.mkdir()
     (repo_path / "croissant.jsonld").write_text(
@@ -149,3 +151,10 @@ def test_discover_command_reports_ambiguous_metadata_files(tmp_path: Path) -> No
 
     assert result.exit_code == 1
     assert "Multiple 'croissant.jsonld' files found" in result.output
+
+
+def test_discover_command_rejects_http_repository_url() -> None:
+    result = runner.invoke(app, ["discover", "http://github.com/example/repo"])
+
+    assert result.exit_code == 1
+    assert "Only HTTPS repository URLs are supported" in result.output

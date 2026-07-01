@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
@@ -26,7 +27,9 @@ from src.core.registration.service import (
 from src.core.registration.service import (
     revalidate_registration as revalidate_registration_record,
 )
-from src.core.registration.service import submit_registration as submit_registration_record
+from src.core.registration.service import (
+    submit_registration as submit_registration_record,
+)
 from src.core.registration.models import (
     BatchRefreshRecord,
     RegistrationEvent,
@@ -44,11 +47,25 @@ from src.core.validation.results import ValidationResult
 from src.persistence.factory import build_registration_store
 
 
+# ============================================================================
+# Constants
+# ============================================================================
+
+STYLE_SECTION_HEADING = "bold cyan"
+REGISTRATION_ID_HELP = "Stored registration identifier."
+HTTPS_SCHEME = "https"
+HTTP_SCHEME = "http"
+
 _DB_PATH_HELP = (
     "SQLite database path for stored registrations. Defaults to "
     f"{core_settings.registry_db_path_env} or "
     f"{core_settings.default_registry_db_path}."
 )
+
+
+# ============================================================================
+# Typer application
+# ============================================================================
 
 app = typer.Typer(
     name="biocypher-registry",
@@ -58,6 +75,11 @@ app = typer.Typer(
 console = Console()
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(adapter_app, name="adapter")
+
+
+# ============================================================================
+# Metadata and validation helpers
+# ============================================================================
 
 
 def _load_metadata(path: Path) -> dict[str, Any]:
@@ -91,6 +113,24 @@ def _run_validation(metadata: dict[str, Any], kind: str) -> ValidationResult:
     return validate_adapter_with_embedded_datasets(metadata)
 
 
+def _validate_path(path: str, kind: str | None = None) -> None:
+    try:
+        metadata = _load_metadata(Path(path))
+    except (ValueError, OSError, typer.BadParameter) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    resolved_kind = kind or _detect_metadata_kind(metadata)
+    _print_validation_target(path, resolved_kind)
+    result = _run_validation(metadata, resolved_kind)
+    _print_validation_result(result, resolved_kind)
+
+
+# ============================================================================
+# Console rendering helpers
+# ============================================================================
+
+
 def _print_validation_result(
     result: ValidationResult,
     kind: str,
@@ -99,14 +139,12 @@ def _print_validation_result(
 
     if result.is_valid:
         console.print(
-            f"[green]VALID[/green] {kind} metadata "
-            f"(profile: {result.profile_version})"
+            f"[green]VALID[/green] {kind} metadata (profile: {result.profile_version})"
         )
         return
 
     console.print(
-        f"[red]INVALID[/red] {kind} metadata "
-        f"(profile: {result.profile_version})"
+        f"[red]INVALID[/red] {kind} metadata (profile: {result.profile_version})"
     )
     for err in result.errors:
         console.print(f"  • {err}")
@@ -128,7 +166,7 @@ def _print_validation_checks(result: ValidationResult) -> None:
 
 def _print_validation_target(path: str, kind: str) -> None:
     body = Text()
-    body.append("Detected Type\n", style="bold cyan")
+    body.append("Detected Type\n", style=STYLE_SECTION_HEADING)
     body.append(f"{kind}\n\n", style="white")
     body.append("Input\n", style="bold")
     body.append(path, style="white")
@@ -148,7 +186,7 @@ def _print_discovery_target(
     location_kind: str,
 ) -> None:
     body = Text()
-    body.append("Source\n", style="bold cyan")
+    body.append("Source\n", style=STYLE_SECTION_HEADING)
     body.append(f"{source}\n\n", style="white")
     body.append("Location\n", style="bold")
     body.append(f"{location_kind}\n\n", style="white")
@@ -172,7 +210,7 @@ def _print_submission_request(
     contact_email: str | None,
 ) -> None:
     body = Text()
-    body.append("Adapter\n", style="bold cyan")
+    body.append("Adapter\n", style=STYLE_SECTION_HEADING)
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Adapter ID\n", style="bold")
     body.append(f"{adapter_id}\n\n", style="white")
@@ -202,7 +240,7 @@ def _print_registration_result(
     validation_errors: list[str] | None = None,
 ) -> None:
     body = Text()
-    body.append("Registration ID\n", style="bold cyan")
+    body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
     body.append("Adapter\n", style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
@@ -255,7 +293,7 @@ def _print_batch_refresh_summary(
 def _print_latest_batch_refresh(refresh: BatchRefreshRecord) -> None:
     """Print the latest persisted batch refresh summary."""
     body = Text()
-    body.append("Refresh ID\n", style="bold cyan")
+    body.append("Refresh ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{refresh.refresh_id}\n\n", style="white")
     body.append("Started At\n", style="bold")
     body.append(f"{refresh.started_at.isoformat()}\n\n", style="white")
@@ -290,7 +328,7 @@ def _print_stored_registration(
     contact_email: str | None,
 ) -> None:
     body = Text()
-    body.append("Registration ID\n", style="bold cyan")
+    body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
     body.append("Adapter\n", style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
@@ -378,17 +416,9 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
     console.print(table)
 
 
-def _validate_path(path: str, kind: str | None = None) -> None:
-    try:
-        metadata = _load_metadata(Path(path))
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
-
-    resolved_kind = kind or _detect_metadata_kind(metadata)
-    _print_validation_target(path, resolved_kind)
-    result = _run_validation(metadata, resolved_kind)
-    _print_validation_result(result, resolved_kind)
+# ============================================================================
+# CLI commands
+# ============================================================================
 
 
 @app.command(
@@ -420,7 +450,7 @@ def submit_cmd(
             repository_location=repository_location,
             contact_email=contact_email,
         )
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -436,9 +466,7 @@ def submit_cmd(
 
 @app.command(
     "submit-registration",
-    help=(
-        "Submit and persist an adapter registration in the configured database."
-    ),
+    help=("Submit and persist an adapter registration in the configured database."),
 )
 def submit_registration_cmd(
     adapter_name: str = typer.Option(
@@ -469,7 +497,7 @@ def submit_registration_cmd(
             store=store,
             contact_email=contact_email,
         )
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -492,7 +520,7 @@ def submit_registration_cmd(
     ),
 )
 def finish_registration_cmd(
-    registration_id: str = typer.Argument(..., help="Stored registration identifier."),
+    registration_id: str = typer.Argument(..., help=REGISTRATION_ID_HELP),
     db_path: str | None = typer.Option(
         None,
         "--db-path",
@@ -505,7 +533,7 @@ def finish_registration_cmd(
             registration_id=registration_id,
             store=store,
         )
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -539,7 +567,7 @@ def refresh_registry_cmd(
     try:
         store = build_registration_store(db_path)
         summary = refresh_active_registrations_record(store=store)
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -561,7 +589,7 @@ def refresh_registry_cmd(
     help="Reprocess one previously invalid or fetch-failed registration immediately.",
 )
 def revalidate_registration_cmd(
-    registration_id: str = typer.Argument(..., help="Stored registration identifier."),
+    registration_id: str = typer.Argument(..., help=REGISTRATION_ID_HELP),
     db_path: str | None = typer.Option(
         None,
         "--db-path",
@@ -574,7 +602,7 @@ def revalidate_registration_cmd(
             registration_id=registration_id,
             store=store,
         )
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -587,7 +615,9 @@ def revalidate_registration_cmd(
         validation_errors=registration.validation_errors,
     )
     if registration.status.value == "INVALID":
-        console.print("[red]Registration revalidation finished with validation errors[/red]")
+        console.print(
+            "[red]Registration revalidation finished with validation errors[/red]"
+        )
         raise typer.Exit(code=1)
     console.print("[green]Registration revalidated[/green]")
 
@@ -608,11 +638,12 @@ def list_registrations_cmd(
         registrations = [
             (
                 registration,
-                store.get_latest_event_type(registration.registration_id) or "SUBMITTED",
+                store.get_latest_event_type(registration.registration_id)
+                or "SUBMITTED",
             )
             for registration in store.list_active_registrations()
         ]
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -624,7 +655,7 @@ def list_registrations_cmd(
     help="Show event history for one stored registration.",
 )
 def show_registration_events_cmd(
-    registration_id: str = typer.Argument(..., help="Stored registration identifier."),
+    registration_id: str = typer.Argument(..., help=REGISTRATION_ID_HELP),
     db_path: str | None = typer.Option(
         None,
         "--db-path",
@@ -636,7 +667,7 @@ def show_registration_events_cmd(
         if store.get_registration(registration_id) is None:
             raise ValueError(f"Registration not found: {registration_id}")
         events = store.list_registration_events(registration_id)
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -657,7 +688,7 @@ def list_registry_entries_cmd(
     try:
         store = build_registration_store(db_path)
         entries = store.list_registry_entries()
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -680,7 +711,7 @@ def show_latest_refresh_cmd(
         refresh = store.get_latest_batch_refresh()
         if refresh is None:
             raise ValueError("No registry refresh has been recorded.")
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -701,20 +732,29 @@ def discover_cmd(
     ),
 ) -> None:
     try:
-        if source.startswith(("http://", "https://")):
+        source_scheme = urlparse(source).scheme
+        if source_scheme == HTTPS_SCHEME:
             discovered = discover_remote_adapter(source)
             location_kind = "remote repository"
+        elif source_scheme == HTTP_SCHEME:
+            raise typer.BadParameter(
+                "Only HTTPS repository URLs are supported for remote discovery."
+            )
+        elif source_scheme:
+            raise typer.BadParameter("Unsupported repository URL scheme.")
         else:
             discovered = discover_local_adapter(source)
             location_kind = "local repository"
         discovered = validate_discovered_adapter(discovered)
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
     _print_discovery_target(
         source=source,
-        metadata_path=str(discovered.metadata_path) if discovered.metadata_path else None,
+        metadata_path=str(discovered.metadata_path)
+        if discovered.metadata_path
+        else None,
         location_kind=location_kind,
     )
     console.print("[green]Discovery succeeded[/green]")
@@ -730,51 +770,39 @@ def discover_cmd(
 
 @app.command(
     "validate",
-    help=(
-        "Validate a Croissant file with automatic type detection."
-    ),
+    help=("Validate a Croissant file with automatic type detection."),
 )
 def validate_cmd(
     path: str = typer.Argument(
         ...,
-        help=(
-            "Path to a JSON-LD file or a repository containing one metadata file."
-        ),
-    )
+        help=("Path to a JSON-LD file or a repository containing one metadata file."),
+    ),
 ) -> None:
     _validate_path(path)
 
 
 @app.command(
     "validate-adapter",
-    help=(
-        "Validate input as adapter metadata."
-    ),
+    help=("Validate input as adapter metadata."),
 )
 def validate_adapter_cmd(
     path: str = typer.Argument(
         ...,
-        help=(
-            "Path to adapter metadata or a repository containing it."
-        ),
-    )
+        help=("Path to adapter metadata or a repository containing it."),
+    ),
 ) -> None:
     _validate_path(path, kind="adapter")
 
 
 @app.command(
     "validate-dataset",
-    help=(
-        "Validate input as dataset metadata."
-    ),
+    help=("Validate input as dataset metadata."),
 )
 def validate_dataset_cmd(
     path: str = typer.Argument(
         ...,
-        help=(
-            "Path to dataset metadata or a repository containing it."
-        ),
-    )
+        help=("Path to dataset metadata or a repository containing it."),
+    ),
 ) -> None:
     _validate_path(path, kind="dataset")
 
@@ -789,6 +817,7 @@ def web_cmd(
 
     console.print(f"[cyan]Serving web UI on http://{host}:{port}[/cyan]")
     run_server(host=host, port=port, output_dir=output_dir)
+
 
 def main() -> None:
     app()
