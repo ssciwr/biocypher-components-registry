@@ -49,15 +49,15 @@ const authUserKey = 'bcr-auth-user' // does not really matter, just needs to be 
 // each time you edit code (e.g. a small AI agent change), the reloaded codebase means you would get logged out before
 function cacheAuthUser(user: AuthUser | null) {
   if (user) {
-    window.localStorage.setItem(authUserKey, JSON.stringify(user))
+    globalThis.localStorage.setItem(authUserKey, JSON.stringify(user))
     return
   }
-  window.localStorage.removeItem(authUserKey)
+  globalThis.localStorage.removeItem(authUserKey)
 }
 
 
 function readCachedAuthUser(): AuthUser | null {
-  const savedUser = window.localStorage.getItem(authUserKey)
+  const savedUser = globalThis.localStorage.getItem(authUserKey)
   if (!savedUser) {
     return null
   }
@@ -66,7 +66,7 @@ function readCachedAuthUser(): AuthUser | null {
     const user = JSON.parse(savedUser) as Partial<AuthUser>
     return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
   } catch {
-    window.localStorage.removeItem(authUserKey)
+    globalThis.localStorage.removeItem(authUserKey)
     return null
   }
 }
@@ -77,7 +77,7 @@ client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
   const [authError, setAuthError] = useState<string | null>(null)
-  const [pathname, setPathname] = useState(window.location.pathname)
+  const [pathname, setPathname] = useState(globalThis.location.pathname)
 
   useEffect(() => {
     let ignore = false
@@ -109,9 +109,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const updatePathname = () => setPathname(window.location.pathname)
-    window.addEventListener('popstate', updatePathname)
-    return () => window.removeEventListener('popstate', updatePathname)
+    const updatePathname = () => setPathname(globalThis.location.pathname)
+    globalThis.addEventListener('popstate', updatePathname)
+    return () => globalThis.removeEventListener('popstate', updatePathname)
   }, [])
 
 
@@ -121,7 +121,8 @@ function App() {
       const logoutError = result.error as unknown
 
       if (logoutError) {
-        setAuthError(typeof logoutError === 'string' && logoutError ? logoutError : (logoutError as { details?: string; detail?: string } | undefined)?.details || (logoutError as { details?: string; detail?: string } | undefined)?.detail || 'Sign out failed.')
+        const logoutErrorDetails = logoutError as { details?: string; detail?: string }
+        setAuthError(typeof logoutError === 'string' ? logoutError : logoutErrorDetails.details || logoutErrorDetails.detail || 'Sign out failed.')
         return
       }
 
@@ -134,6 +135,13 @@ function App() {
   }
 
   const adapterId = pathname.match(/^\/adapters\/([^/]+)$/)?.[1]
+  let page = <HomePage />
+
+  if (pathname === '/register') {
+    page = <RegisterPage authUser={authUser} />
+  } else if (pathname === '/adapters' || adapterId) {
+    page = <AdaptersPage adapterId={adapterId} />
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
@@ -143,13 +151,7 @@ function App() {
           {authError}
         </div>
       ) : null}
-      {pathname === '/register' ? (
-        <RegisterPage authUser={authUser} />
-      ) : pathname === '/adapters' || adapterId ? (
-        <AdaptersPage adapterId={adapterId} />
-      ) : (
-        <HomePage />
-      )}
+      {page}
       <Footer />
     </main>
   )
