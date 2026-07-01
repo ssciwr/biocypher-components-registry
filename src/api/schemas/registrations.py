@@ -173,10 +173,10 @@ class RegistrationListResponse(BaseModel):
     items: list[RegistrationListItemResponse]
 
 
-class RegistrationMetadataCheckResponse(BaseModel):
-    """Response model for a remote registration metadata presence check."""
+class RegistrationCroissantFilePresentCheckResponse(BaseModel):
+    """Response model for a remote croissant.jsonld presence check."""
 
-    has_metadata: bool
+    has_croissant_file: bool
 
 
 class RegistrationEventResponse(BaseModel):

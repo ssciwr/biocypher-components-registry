@@ -14,10 +14,10 @@ from src.api.errors import (
 from src.api.schemas.registrations import (
     RegistrationCreateRequest,
     RegistrationCreateResponse,
+    RegistrationCroissantFilePresentCheckResponse,
     RegistrationDetailResponse,
     RegistrationEventListResponse,
     RegistrationEventResponse,
-    RegistrationMetadataCheckResponse,
     RegistrationListItemResponse,
     RegistrationListResponse,
     RegistrationProcessResponse,
@@ -102,26 +102,28 @@ def list_registrations(
 
 
 @router.get(
-    "/registrations/metadata-check",
-    response_model=RegistrationMetadataCheckResponse,
-    summary="Check registration metadata",
+    "/registrations/croissant-file-present-check",
+    response_model=RegistrationCroissantFilePresentCheckResponse,
+    summary="Check registration Croissant file presence",
     description="Return whether a remote repository exposes root-level croissant.jsonld.",
 )
-def check_registration_metadata(
+def check_registration_croissant_file_presence(
     repository_url: str = Query(..., min_length=1),
-) -> RegistrationMetadataCheckResponse:
-    """
+) -> RegistrationCroissantFilePresentCheckResponse:
+    """AI-Generated.
+
     A quick http call that the frontend can make to check if the users submitted repository has data we can use for registration (the croissant file)
-    Check remote metadata presence for the registration form.
     """
     try:
-        has_metadata = remote_metadata_exists(repository_url)
+        has_croissant_file = remote_metadata_exists(repository_url)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="We could not check the repository url you provided (we tried to check if a raw croissant.jsonld file could be found by our system) Is your file hosted on GitHub or a Gitlab instance?",
         ) from exc
-    return RegistrationMetadataCheckResponse(has_metadata=has_metadata)
+    return RegistrationCroissantFilePresentCheckResponse(
+        has_croissant_file=has_croissant_file
+    )
 # previously this happened on the frontend but with Gitlab + Github support it became quite messy.
 # Adding Gitlab support has added about 30 lines to the project, but we keep it simpler conceptually by only hcecking on the backend.
 
