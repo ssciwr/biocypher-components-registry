@@ -12,7 +12,7 @@ Key capabilities:
 - **Batch Processing**: Non-blocking registry refresh with isolated error handling
 - **Multiple Interfaces**: CLI, Web UI, and REST API
 - **Event Sourcing**: Complete audit trail of all registration attempts
-- **Duplicate Prevention**: Enforced uniqueness by adapter id
+- **Duplicate Prevention**: Enforced uniqueness by adapter id and metadata version
 - **On-Demand Revalidation**: Fix and reprocess failed registrations
 
 The project contains:

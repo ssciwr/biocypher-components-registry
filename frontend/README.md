@@ -80,15 +80,25 @@ Specific test:
 for each of these urls:
 [https://github.com/biocypher/collectri/, https://gitlab.com/gitlab-org/gitlab]
 run the utility function _repository_url() to standardize it, then check:
-AdapterMaintainerResponse can be extracted and from the web request:
+AdapterMaintainerResponse can be extracted from the repository URL:
 (A) the adapter maintainer username is extracted
-(B) the avatar url exists
-(C) the avatar url returns 200
+(B) GitHub gets a deterministic avatar URL
+(C) GitLab/institutional/self-hosted repositories keep the owner profile URL and the frontend renders an initials fallback when no avatar URL is available
 
 [ ] - Duplicated adapters can in theory be submitted by submitting both a master and main branch.
 Based on the risk of people submitting adapters multiple times, I made it so we extract the repository url and then look up main/master only
 (rather than supporting e.g. registering a "biocypher_ready_adapter" branch). However, users can still register using a "master" branch if "main" is already present.
 We should write special code to prevent that and add a test.
+
+## Server management
+Until official release, the instance running on the server should be kept down with docker compose outside of testing windows (e.g. the Workshop),
+but it can also be taken down without the "-v" option so that the volumes remain (so: use docker-compose -f <file> down") without the -v flag for removing volumes,
+unless the volumes/existing adapters and data needs to be overwritten when a new data model comes out.
+
+## Getting the repository to a useful state
+We need to make sure we kickstart the repository manually which means having a number of adapters with croissant files which are useful.
+(and possibly also the sample knowledge graph output from running create_knowledge_graph.py in the backend part)
+We should probably seed 5-10 adapters manually so we have some existing content and that encourages other people to add their Adapters too.
 
 ## Types of test
 ### Performance tests
