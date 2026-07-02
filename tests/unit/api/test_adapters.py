@@ -99,6 +99,7 @@ def test_get_adapter_metadata_endpoint_returns_full_metadata(
     assert payload["metadata"] == {
         "@id": "example-adapter",
         "name": "Example Adapter",
+        "version": "1.0.0",
     }
 
 

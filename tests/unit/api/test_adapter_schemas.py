@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import Mock
-
 import pytest
-import requests
 
 from src.api.schemas.adapters import AdapterMaintainerResponse, _repository_url
 
@@ -14,55 +11,50 @@ from src.api.schemas.adapters import AdapterMaintainerResponse, _repository_url
 
 
 @pytest.mark.parametrize(
-    ("repository_location", "expected_username"),
+    ("repository_location", "expected_username", "expected_avatar", "expected_profile"),
     [
-        ("https://github.com/biocypher/collectri/", "biocypher"),
-        ("https://gitlab.com/gitlab-org/gitlab", "gitlab-org"),
+        (
+            "https://github.com/biocypher/collectri/",
+            "biocypher",
+            "https://github.com/biocypher.png",
+            "https://github.com/biocypher",
+        ),
+        (
+            "https://gitlab.com/gitlab-org/gitlab",
+            "gitlab-org",
+            None,
+            "https://gitlab.com/gitlab-org",
+        ),
     ],
-) # Gitlab example is the second one; we have no real BioCypher Gitlab examples for now.
-def test_repository_maintainer_avatar_url_is_public(
+) # GitLab example is the second one; we have no real BioCypher GitLab examples for now.
+def test_repository_maintainer_uses_repository_owner(
     repository_location: str,
     expected_username: str,
+    expected_avatar: str | None,
+    expected_profile: str,
 ) -> None:
     """
-    Can we resolve public maintainer avatar URLs from supported repository locations, whether Gitlab or Github repos?
+    Resolve public maintainer display data from supported repository locations.
     """
     repository_url = _repository_url(repository_location)
     maintainer = AdapterMaintainerResponse.from_repository_location(repository_location)
+
     assert repository_url is not None
     assert maintainer is not None
-    response = requests.get(maintainer.avatar_url, timeout=5)
-    print(maintainer.avatar_url)
-
     assert maintainer.username == expected_username
-    assert maintainer.avatar_url
-    assert response.status_code == 200
+    assert maintainer.avatar_url == expected_avatar
+    assert maintainer.profile_url == expected_profile
 
 
-def test_repository_maintainer_uses_gitlab_group_avatar(monkeypatch) -> None:
+def test_repository_maintainer_supports_self_hosted_gitlab_owner() -> None:
     """
-    Resolve GitLab owners that are public groups rather than users.
+    Resolve self-hosted GitLab owners without a public avatar lookup.
     """
-    user_response = Mock(json=Mock(return_value=[]))
-    project_response = Mock(
-        json=Mock(
-            return_value={
-                "namespace": {
-                    "full_path": "gitlab-org",
-                    "avatar_url": "/uploads/group.png",
-                    "web_url": "https://gitlab.example.org/groups/gitlab-org",
-                }
-            }
-        )
-    ) # based on mock real response
-    monkeypatch.setattr(
-        "src.api.schemas.adapters.requests.get",
-        Mock(side_effect=[user_response, project_response]),
-    )
     maintainer = AdapterMaintainerResponse.from_repository_location(
         "https://gitlab.example.org/gitlab-org/gitlab"
     )
 
     assert maintainer is not None
     assert maintainer.username == "gitlab-org"
-    assert maintainer.avatar_url == "https://gitlab.example.org/uploads/group.png"
+    assert maintainer.avatar_url is None
+    assert maintainer.profile_url == "https://gitlab.example.org/gitlab-org"

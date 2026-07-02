@@ -120,9 +120,9 @@ def test_create_registration_request_rejects_missing_local_repository() -> None:
 
 
 def test_create_registration_request_rejects_unsupported_remote_repository() -> None:
-    """Reject a submission when the remote repository host is unsupported."""
+    """Reject a submission when the remote repository URL scheme is unsupported."""
     with pytest.raises(InvalidRepoURLError):
         create_registration_request(
             adapter_name="Example Adapter",
-            repository_location="https://gitlab.com/example/example-adapter",
+            repository_location="http://example.com/example/example-adapter",
         )

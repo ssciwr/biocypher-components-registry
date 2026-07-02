@@ -310,12 +310,12 @@ class TestFetchRemoteMetadata:
         with pytest.raises(InvalidRepoURLError):
             fetch_remote_metadata("not-a-url")
 
-    def test_non_github_url(self) -> None:
+    def test_unsupported_remote_url_scheme(self) -> None:
         """
-        Test remote discovery when the repository URL is not GitHub.
+        Test remote discovery when the repository URL scheme is unsupported.
         """
         with pytest.raises(InvalidRepoURLError):
-            fetch_remote_metadata("https://gitlab.com/org/repo")
+            fetch_remote_metadata("ftp://gitlab.com/org/repo")
 
     def test_metadata_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """

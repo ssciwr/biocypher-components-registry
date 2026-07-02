@@ -195,7 +195,7 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     with sqlite3.connect(database_path) as connection:
         entry_row = connection.execute(
             """
-            SELECT source_id, adapter_name, adapter_version, uniqueness_key, is_active
+            SELECT source_id, adapter_name, uniqueness_key, is_active
             FROM registry_entries
             """
         ).fetchone()
@@ -219,7 +219,6 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     assert entry_row == (
         created.registration_id,
         "Example Adapter",
-        "1.0.0",
         "example-adapter::1.0.0",
         1,
     )
