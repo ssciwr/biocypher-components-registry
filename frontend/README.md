@@ -85,11 +85,6 @@ AdapterMaintainerResponse can be extracted from the repository URL:
 (B) GitHub gets a deterministic avatar URL
 (C) GitLab/institutional/self-hosted repositories keep the owner profile URL and the frontend renders an initials fallback when no avatar URL is available
 
-[ ] - Duplicated adapters can in theory be submitted by submitting both a master and main branch.
-Based on the risk of people submitting adapters multiple times, I made it so we extract the repository url and then look up main/master only
-(rather than supporting e.g. registering a "biocypher_ready_adapter" branch). However, users can still register using a "master" branch if "main" is already present.
-We should write special code to prevent that and add a test.
-
 ## Server management
 Until official release, the instance running on the server should be kept down with docker compose outside of testing windows (e.g. the Workshop),
 but it can also be taken down without the "-v" option so that the volumes remain (so: use docker-compose -f <file> down") without the -v flag for removing volumes,
