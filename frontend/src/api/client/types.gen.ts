@@ -19,14 +19,6 @@ export type AdapterCatalogItemResponse = {
      */
     adapter_name: string;
     /**
-     * Latest Version
-     */
-    latest_version: string;
-    /**
-     * Version Count
-     */
-    version_count: number;
-    /**
      * Endorsement Count
      */
     endorsement_count?: number;
@@ -79,7 +71,7 @@ export type AdapterDataSourceResponse = {
 /**
  * AdapterDetailResponse
  *
- * Response model for one adapter and its registered versions.
+ * Response model for one adapter.
  */
 export type AdapterDetailResponse = {
     /**
@@ -90,10 +82,6 @@ export type AdapterDetailResponse = {
      * Adapter Name
      */
     adapter_name: string;
-    /**
-     * Latest Version
-     */
-    latest_version: string;
     /**
      * Description
      */
@@ -126,10 +114,6 @@ export type AdapterDetailResponse = {
      * Data Sources
      */
     data_sources?: Array<AdapterDataSourceResponse>;
-    /**
-     * Versions
-     */
-    versions: Array<AdapterVersionResponse>;
     /**
      * Endorsement Count
      */
@@ -229,10 +213,6 @@ export type AdapterLatestItemResponse = {
      */
     adapter_name: string;
     /**
-     * Latest Version
-     */
-    latest_version: string;
-    /**
      * Description
      */
     description?: string | null;
@@ -277,17 +257,21 @@ export type AdapterLatestListResponse = {
 /**
  * AdapterMaintainerResponse
  *
- * GitHub maintainer identity for adapter catalog display.
+ * Repository maintainer identity for adapter catalog display.
  */
 export type AdapterMaintainerResponse = {
     /**
-     * Github Login
+     * Username
      */
-    github_login: string;
+    username: string;
     /**
      * Avatar Url
      */
     avatar_url: string;
+    /**
+     * Profile Url
+     */
+    profile_url?: string | null;
 };
 
 /**
@@ -396,17 +380,13 @@ export type AdapterMetadataGenerateResponse = {
 /**
  * AdapterMetadataResponse
  *
- * Response model for one adapter version's full Croissant metadata.
+ * Response model for one adapter's full Croissant metadata.
  */
 export type AdapterMetadataResponse = {
     /**
      * Adapter Id
      */
     adapter_id: string;
-    /**
-     * Adapter Version
-     */
-    adapter_version: string;
     /**
      * Registry Entry Id
      */
@@ -417,46 +397,6 @@ export type AdapterMetadataResponse = {
     metadata: {
         [key: string]: unknown;
     };
-};
-
-/**
- * AdapterVersionResponse
- *
- * Response model for one registered adapter version.
- */
-export type AdapterVersionResponse = {
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Version
-     */
-    adapter_version: string;
-    /**
-     * Registry Entry Id
-     */
-    registry_entry_id: string;
-    /**
-     * Profile Version
-     */
-    profile_version?: string | null;
-    /**
-     * Metadata Checksum
-     */
-    metadata_checksum?: string | null;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * Updated At
-     */
-    updated_at: string;
 };
 
 /**
@@ -673,7 +613,7 @@ export type RegistrationCreateRequest = {
     /**
      * Repository Location
      *
-     * Local repository path or supported remote repository URL containing a root-level croissant.jsonld file.
+     * Local repository path or remote repository URL containing a root-level croissant.jsonld file.
      */
     repository_location: string;
     /**
@@ -743,6 +683,18 @@ export type RegistrationCreateResponse = {
      * Submitted By Github Login
      */
     submitted_by_github_login?: string | null;
+};
+
+/**
+ * RegistrationCroissantFilePresentCheckResponse
+ *
+ * Response model for a remote croissant.jsonld presence check.
+ */
+export type RegistrationCroissantFilePresentCheckResponse = {
+    /**
+     * Has Croissant File
+     */
+    has_croissant_file: boolean;
 };
 
 /**
@@ -1149,10 +1101,6 @@ export type RegistryEntryResponse = {
      */
     adapter_name: string;
     /**
-     * Adapter Version
-     */
-    adapter_version: string;
-    /**
      * Profile Version
      */
     profile_version?: string | null;
@@ -1444,23 +1392,9 @@ export type ListAdaptersApiV1AdaptersGetResponse = ListAdaptersApiV1AdaptersGetR
 export type ListLatestAdaptersApiV1AdaptersLatestGetData = {
     body?: never;
     path?: never;
-    query?: {
-        /**
-         * Limit
-         */
-        limit?: number;
-    };
+    query?: never;
     url: '/api/v1/adapters/latest';
 };
-
-export type ListLatestAdaptersApiV1AdaptersLatestGetErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ListLatestAdaptersApiV1AdaptersLatestGetError = ListLatestAdaptersApiV1AdaptersLatestGetErrors[keyof ListLatestAdaptersApiV1AdaptersLatestGetErrors];
 
 export type ListLatestAdaptersApiV1AdaptersLatestGetResponses = {
     /**
@@ -1470,6 +1404,36 @@ export type ListLatestAdaptersApiV1AdaptersLatestGetResponses = {
 };
 
 export type ListLatestAdaptersApiV1AdaptersLatestGetResponse = ListLatestAdaptersApiV1AdaptersLatestGetResponses[keyof ListLatestAdaptersApiV1AdaptersLatestGetResponses];
+
+export type SearchAdaptersApiV1AdaptersSearchGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Query
+         */
+        query: string;
+    };
+    url: '/api/v1/adapters/search';
+};
+
+export type SearchAdaptersApiV1AdaptersSearchGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SearchAdaptersApiV1AdaptersSearchGetError = SearchAdaptersApiV1AdaptersSearchGetErrors[keyof SearchAdaptersApiV1AdaptersSearchGetErrors];
+
+export type SearchAdaptersApiV1AdaptersSearchGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdapterLatestListResponse;
+};
+
+export type SearchAdaptersApiV1AdaptersSearchGetResponse = SearchAdaptersApiV1AdaptersSearchGetResponses[keyof SearchAdaptersApiV1AdaptersSearchGetResponses];
 
 export type GetAdapterApiV1AdaptersAdapterIdGetData = {
     body?: never;
@@ -1531,39 +1495,35 @@ export type EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses = {
 
 export type EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponse = EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses[keyof EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses];
 
-export type GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetData = {
+export type GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetData = {
     body?: never;
     path: {
         /**
          * Adapter Id
          */
         adapter_id: string;
-        /**
-         * Version
-         */
-        version: string;
     };
     query?: never;
-    url: '/api/v1/adapters/{adapter_id}/versions/{version}/metadata';
+    url: '/api/v1/adapters/{adapter_id}/metadata';
 };
 
-export type GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors = {
+export type GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetError = GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors[keyof GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors];
+export type GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetError = GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors[keyof GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors];
 
-export type GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses = {
+export type GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses = {
     /**
      * Successful Response
      */
     200: AdapterMetadataResponse;
 };
 
-export type GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponse = GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses[keyof GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses];
+export type GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponse = GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses[keyof GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses];
 
 export type ValidateMetadataApiV1MetadataValidatePostData = {
     body: MetadataValidationRequest;
@@ -1680,6 +1640,36 @@ export type CreateRegistrationApiV1RegistrationsPostResponses = {
 };
 
 export type CreateRegistrationApiV1RegistrationsPostResponse = CreateRegistrationApiV1RegistrationsPostResponses[keyof CreateRegistrationApiV1RegistrationsPostResponses];
+
+export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Repository Url
+         */
+        repository_url: string;
+    };
+    url: '/api/v1/registrations/croissant-file-present-check';
+};
+
+export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetError = CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors[keyof CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors];
+
+export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: RegistrationCroissantFilePresentCheckResponse;
+};
+
+export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponse = CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses[keyof CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses];
 
 export type ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetData = {
     body?: never;

@@ -147,20 +147,40 @@
         "tags": [
           "adapters"
         ],
-        "summary": "List latest public adapters",
-        "description": "Return the latest valid adapters with maintainer avatar data for catalog cards.",
+        "summary": "List latest (30) public adapters",
+        "description": "Return the latest valid adapters",
         "operationId": "list_latest_adapters_api_v1_adapters_latest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterLatestListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/search": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Search public adapters",
+        "description": "Return public adapter cards whose title matches the search term.",
+        "operationId": "search_adapters_api_v1_adapters_search_get",
         "parameters": [
           {
-            "name": "limit",
+            "name": "query",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
-              "type": "integer",
-              "maximum": 50,
-              "minimum": 1,
-              "default": 10,
-              "title": "Limit"
+              "type": "string",
+              "minLength": 1,
+              "title": "Query"
             }
           }
         ],
@@ -194,7 +214,7 @@
           "adapters"
         ],
         "summary": "Get adapter catalog detail",
-        "description": "Return one public adapter with its registered canonical versions. The response is metadata-light; fetch full Croissant metadata through the version metadata endpoint.",
+        "description": "Return one public adapter. The response is metadata-light; fetch full Croissant metadata through the adapter metadata endpoint.",
         "operationId": "get_adapter_api_v1_adapters__adapter_id__get",
         "parameters": [
           {
@@ -306,14 +326,14 @@
         }
       }
     },
-    "/api/v1/adapters/{adapter_id}/versions/{version}/metadata": {
+    "/api/v1/adapters/{adapter_id}/metadata": {
       "get": {
         "tags": [
           "adapters"
         ],
-        "summary": "Get adapter version metadata",
-        "description": "Return the full stored Croissant metadata document for one canonical adapter version.",
-        "operationId": "get_adapter_version_metadata_api_v1_adapters__adapter_id__versions__version__metadata_get",
+        "summary": "Get adapter metadata",
+        "description": "Return the full stored Croissant metadata document for one adapter.",
+        "operationId": "get_adapter_metadata_api_v1_adapters__adapter_id__metadata_get",
         "parameters": [
           {
             "name": "adapter_id",
@@ -322,15 +342,6 @@
             "schema": {
               "type": "string",
               "title": "Adapter Id"
-            }
-          },
-          {
-            "name": "version",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Version"
             }
           }
         ],
@@ -490,7 +501,7 @@
           "registrations"
         ],
         "summary": "Submit an adapter registration",
-        "description": "Store one adapter repository as a tracked registration request. The repository may be a local path or supported remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.",
+        "description": "Store one adapter repository as a tracked registration request. The repository may be a local path or remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.",
         "operationId": "create_registration_api_v1_registrations_post",
         "parameters": [
           {
@@ -557,6 +568,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistrationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/croissant-file-present-check": {
+      "get": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Check registration Croissant file presence",
+        "description": "Return whether a remote repository exposes root-level croissant.jsonld.",
+        "operationId": "check_registration_croissant_file_presence_api_v1_registrations_croissant_file_present_check_get",
+        "parameters": [
+          {
+            "name": "repository_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Repository Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCroissantFilePresentCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -940,14 +995,6 @@
             "type": "string",
             "title": "Adapter Name"
           },
-          "latest_version": {
-            "type": "string",
-            "title": "Latest Version"
-          },
-          "version_count": {
-            "type": "integer",
-            "title": "Version Count"
-          },
           "endorsement_count": {
             "type": "integer",
             "title": "Endorsement Count",
@@ -957,9 +1004,7 @@
         "type": "object",
         "required": [
           "adapter_id",
-          "adapter_name",
-          "latest_version",
-          "version_count"
+          "adapter_name"
         ],
         "title": "AdapterCatalogItemResponse",
         "description": "Response model for one adapter catalog item."
@@ -1060,10 +1105,6 @@
             "type": "string",
             "title": "Adapter Name"
           },
-          "latest_version": {
-            "type": "string",
-            "title": "Latest Version"
-          },
           "description": {
             "anyOf": [
               {
@@ -1140,13 +1181,6 @@
             "type": "array",
             "title": "Data Sources"
           },
-          "versions": {
-            "items": {
-              "$ref": "#/components/schemas/AdapterVersionResponse"
-            },
-            "type": "array",
-            "title": "Versions"
-          },
           "endorsement_count": {
             "type": "integer",
             "title": "Endorsement Count",
@@ -1161,12 +1195,10 @@
         "type": "object",
         "required": [
           "adapter_id",
-          "adapter_name",
-          "latest_version",
-          "versions"
+          "adapter_name"
         ],
         "title": "AdapterDetailResponse",
-        "description": "Response model for one adapter and its registered versions."
+        "description": "Response model for one adapter."
       },
       "AdapterEmbeddedDatasetGenerateRequest": {
         "properties": {
@@ -1314,10 +1346,6 @@
             "type": "string",
             "title": "Adapter Name"
           },
-          "latest_version": {
-            "type": "string",
-            "title": "Latest Version"
-          },
           "description": {
             "anyOf": [
               {
@@ -1374,7 +1402,6 @@
         "required": [
           "adapter_id",
           "adapter_name",
-          "latest_version",
           "updated_at"
         ],
         "title": "AdapterLatestItemResponse",
@@ -1399,22 +1426,33 @@
       },
       "AdapterMaintainerResponse": {
         "properties": {
-          "github_login": {
+          "username": {
             "type": "string",
-            "title": "Github Login"
+            "title": "Username"
           },
           "avatar_url": {
             "type": "string",
             "title": "Avatar Url"
+          },
+          "profile_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Url"
           }
         },
         "type": "object",
         "required": [
-          "github_login",
+          "username",
           "avatar_url"
         ],
         "title": "AdapterMaintainerResponse",
-        "description": "GitHub maintainer identity for adapter catalog display."
+        "description": "Repository maintainer identity for adapter catalog display."
       },
       "AdapterMetadataGenerateRequest": {
         "properties": {
@@ -1631,10 +1669,6 @@
             "type": "string",
             "title": "Adapter Id"
           },
-          "adapter_version": {
-            "type": "string",
-            "title": "Adapter Version"
-          },
           "registry_entry_id": {
             "type": "string",
             "title": "Registry Entry Id"
@@ -1648,75 +1682,11 @@
         "type": "object",
         "required": [
           "adapter_id",
-          "adapter_version",
           "registry_entry_id",
           "metadata"
         ],
         "title": "AdapterMetadataResponse",
-        "description": "Response model for one adapter version's full Croissant metadata."
-      },
-      "AdapterVersionResponse": {
-        "properties": {
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_version": {
-            "type": "string",
-            "title": "Adapter Version"
-          },
-          "registry_entry_id": {
-            "type": "string",
-            "title": "Registry Entry Id"
-          },
-          "profile_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Version"
-          },
-          "metadata_checksum": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata Checksum"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "adapter_id",
-          "adapter_name",
-          "adapter_version",
-          "registry_entry_id",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "AdapterVersionResponse",
-        "description": "Response model for one registered adapter version."
+        "description": "Response model for one adapter's full Croissant metadata."
       },
       "AuthMeResponse": {
         "properties": {
@@ -2136,7 +2106,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Repository Location",
-            "description": "Local repository path or supported remote repository URL containing a root-level croissant.jsonld file."
+            "description": "Local repository path or remote repository URL containing a root-level croissant.jsonld file."
           },
           "license_value": {
             "anyOf": [
@@ -2184,10 +2154,10 @@
         "description": "Request body for creating an adapter registration.",
         "example": {
           "adapter_name": "CollecTRI Adapter",
-          "cff_url": "https://github.com/biocypher/collectri/blob/main/CITATION.cff",
+          "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
           "doi": "10.5281/zenodo.1234567",
           "license_value": "MIT",
-          "repository_location": "github.com/biocypher/collectri"
+          "repository_location": "https://gitlab.example.org/biocypher/collectri"
         }
       },
       "RegistrationCreateResponse": {
@@ -2288,6 +2258,20 @@
         ],
         "title": "RegistrationCreateResponse",
         "description": "Response returned after creating an adapter registration."
+      },
+      "RegistrationCroissantFilePresentCheckResponse": {
+        "properties": {
+          "has_croissant_file": {
+            "type": "boolean",
+            "title": "Has Croissant File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_croissant_file"
+        ],
+        "title": "RegistrationCroissantFilePresentCheckResponse",
+        "description": "Response model for a remote croissant.jsonld presence check."
       },
       "RegistrationDetailResponse": {
         "properties": {
@@ -3135,10 +3119,6 @@
             "type": "string",
             "title": "Adapter Name"
           },
-          "adapter_version": {
-            "type": "string",
-            "title": "Adapter Version"
-          },
           "profile_version": {
             "anyOf": [
               {
@@ -3185,7 +3165,6 @@
           "entry_id",
           "source_id",
           "adapter_name",
-          "adapter_version",
           "uniqueness_key",
           "created_at",
           "updated_at",

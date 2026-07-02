@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateRegistrationApiV1RegistrationsPostData, CreateRegistrationApiV1RegistrationsPostErrors, CreateRegistrationApiV1RegistrationsPostResponses, CreateRegistryRefreshApiV1RegistryRefreshesPostData, CreateRegistryRefreshApiV1RegistryRefreshesPostResponses, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostData, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostErrors, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostData, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostErrors, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostResponses, GetAdapterApiV1AdaptersAdapterIdGetData, GetAdapterApiV1AdaptersAdapterIdGetErrors, GetAdapterApiV1AdaptersAdapterIdGetResponses, GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetData, GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors, GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses, GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetData, GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses, GetMeApiV1AuthMeGetData, GetMeApiV1AuthMeGetErrors, GetMeApiV1AuthMeGetResponses, GetRegistrationApiV1RegistrationsRegistrationIdGetData, GetRegistrationApiV1RegistrationsRegistrationIdGetErrors, GetRegistrationApiV1RegistrationsRegistrationIdGetResponses, GetRegistryEntryApiV1RegistryEntriesEntryIdGetData, GetRegistryEntryApiV1RegistryEntriesEntryIdGetErrors, GetRegistryEntryApiV1RegistryEntriesEntryIdGetResponses, HealthCheckApiV1HealthGetData, HealthCheckApiV1HealthGetResponses, ListAdaptersApiV1AdaptersGetData, ListAdaptersApiV1AdaptersGetResponses, ListLatestAdaptersApiV1AdaptersLatestGetData, ListLatestAdaptersApiV1AdaptersLatestGetErrors, ListLatestAdaptersApiV1AdaptersLatestGetResponses, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetData, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetErrors, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetResponses, ListRegistrationsApiV1RegistrationsGetData, ListRegistrationsApiV1RegistrationsGetResponses, ListRegistryEntriesApiV1RegistryEntriesGetData, ListRegistryEntriesApiV1RegistryEntriesGetResponses, ListRegistryRegistrationsApiV1RegistryRegistrationsGetData, ListRegistryRegistrationsApiV1RegistryRegistrationsGetErrors, ListRegistryRegistrationsApiV1RegistryRegistrationsGetResponses, LogoutApiV1AuthLogoutPostData, LogoutApiV1AuthLogoutPostErrors, LogoutApiV1AuthLogoutPostResponses, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostData, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostData, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses, ValidateMetadataApiV1MetadataValidatePostData, ValidateMetadataApiV1MetadataValidatePostErrors, ValidateMetadataApiV1MetadataValidatePostResponses } from './types.gen';
+import type { CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetData, CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors, CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses, CreateRegistrationApiV1RegistrationsPostData, CreateRegistrationApiV1RegistrationsPostErrors, CreateRegistrationApiV1RegistrationsPostResponses, CreateRegistryRefreshApiV1RegistryRefreshesPostData, CreateRegistryRefreshApiV1RegistryRefreshesPostResponses, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostData, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostErrors, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostData, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostErrors, GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors, GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostResponses, GetAdapterApiV1AdaptersAdapterIdGetData, GetAdapterApiV1AdaptersAdapterIdGetErrors, GetAdapterApiV1AdaptersAdapterIdGetResponses, GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetData, GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors, GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses, GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetData, GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses, GetMeApiV1AuthMeGetData, GetMeApiV1AuthMeGetErrors, GetMeApiV1AuthMeGetResponses, GetRegistrationApiV1RegistrationsRegistrationIdGetData, GetRegistrationApiV1RegistrationsRegistrationIdGetErrors, GetRegistrationApiV1RegistrationsRegistrationIdGetResponses, GetRegistryEntryApiV1RegistryEntriesEntryIdGetData, GetRegistryEntryApiV1RegistryEntriesEntryIdGetErrors, GetRegistryEntryApiV1RegistryEntriesEntryIdGetResponses, HealthCheckApiV1HealthGetData, HealthCheckApiV1HealthGetResponses, ListAdaptersApiV1AdaptersGetData, ListAdaptersApiV1AdaptersGetResponses, ListLatestAdaptersApiV1AdaptersLatestGetData, ListLatestAdaptersApiV1AdaptersLatestGetResponses, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetData, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetErrors, ListRegistrationEventsApiV1RegistrationsRegistrationIdEventsGetResponses, ListRegistrationsApiV1RegistrationsGetData, ListRegistrationsApiV1RegistrationsGetResponses, ListRegistryEntriesApiV1RegistryEntriesGetData, ListRegistryEntriesApiV1RegistryEntriesGetResponses, ListRegistryRegistrationsApiV1RegistryRegistrationsGetData, ListRegistryRegistrationsApiV1RegistryRegistrationsGetErrors, ListRegistryRegistrationsApiV1RegistryRegistrationsGetResponses, LogoutApiV1AuthLogoutPostData, LogoutApiV1AuthLogoutPostErrors, LogoutApiV1AuthLogoutPostResponses, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostData, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors, ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostData, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors, RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses, SearchAdaptersApiV1AdaptersSearchGetData, SearchAdaptersApiV1AdaptersSearchGetErrors, SearchAdaptersApiV1AdaptersSearchGetResponses, ValidateMetadataApiV1MetadataValidatePostData, ValidateMetadataApiV1MetadataValidatePostErrors, ValidateMetadataApiV1MetadataValidatePostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -47,16 +47,23 @@ export const healthCheckApiV1HealthGet = <ThrowOnError extends boolean = false>(
 export const listAdaptersApiV1AdaptersGet = <ThrowOnError extends boolean = false>(options?: Options<ListAdaptersApiV1AdaptersGetData, ThrowOnError>): RequestResult<ListAdaptersApiV1AdaptersGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAdaptersApiV1AdaptersGetResponses, unknown, ThrowOnError>({ url: '/api/v1/adapters', ...options });
 
 /**
- * List latest public adapters
+ * List latest (30) public adapters
  *
- * Return the latest valid adapters with maintainer avatar data for catalog cards.
+ * Return the latest valid adapters
  */
-export const listLatestAdaptersApiV1AdaptersLatestGet = <ThrowOnError extends boolean = false>(options?: Options<ListLatestAdaptersApiV1AdaptersLatestGetData, ThrowOnError>): RequestResult<ListLatestAdaptersApiV1AdaptersLatestGetResponses, ListLatestAdaptersApiV1AdaptersLatestGetErrors, ThrowOnError> => (options?.client ?? client).get<ListLatestAdaptersApiV1AdaptersLatestGetResponses, ListLatestAdaptersApiV1AdaptersLatestGetErrors, ThrowOnError>({ url: '/api/v1/adapters/latest', ...options });
+export const listLatestAdaptersApiV1AdaptersLatestGet = <ThrowOnError extends boolean = false>(options?: Options<ListLatestAdaptersApiV1AdaptersLatestGetData, ThrowOnError>): RequestResult<ListLatestAdaptersApiV1AdaptersLatestGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListLatestAdaptersApiV1AdaptersLatestGetResponses, unknown, ThrowOnError>({ url: '/api/v1/adapters/latest', ...options });
+
+/**
+ * Search public adapters
+ *
+ * Return public adapter cards whose title matches the search term.
+ */
+export const searchAdaptersApiV1AdaptersSearchGet = <ThrowOnError extends boolean = false>(options: Options<SearchAdaptersApiV1AdaptersSearchGetData, ThrowOnError>): RequestResult<SearchAdaptersApiV1AdaptersSearchGetResponses, SearchAdaptersApiV1AdaptersSearchGetErrors, ThrowOnError> => (options.client ?? client).get<SearchAdaptersApiV1AdaptersSearchGetResponses, SearchAdaptersApiV1AdaptersSearchGetErrors, ThrowOnError>({ url: '/api/v1/adapters/search', ...options });
 
 /**
  * Get adapter catalog detail
  *
- * Return one public adapter with its registered canonical versions. The response is metadata-light; fetch full Croissant metadata through the version metadata endpoint.
+ * Return one public adapter. The response is metadata-light; fetch full Croissant metadata through the adapter metadata endpoint.
  */
 export const getAdapterApiV1AdaptersAdapterIdGet = <ThrowOnError extends boolean = false>(options: Options<GetAdapterApiV1AdaptersAdapterIdGetData, ThrowOnError>): RequestResult<GetAdapterApiV1AdaptersAdapterIdGetResponses, GetAdapterApiV1AdaptersAdapterIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetAdapterApiV1AdaptersAdapterIdGetResponses, GetAdapterApiV1AdaptersAdapterIdGetErrors, ThrowOnError>({ url: '/api/v1/adapters/{adapter_id}', ...options });
 
@@ -68,11 +75,11 @@ export const getAdapterApiV1AdaptersAdapterIdGet = <ThrowOnError extends boolean
 export const endorseAdapterApiV1AdaptersAdapterIdEndorsePost = <ThrowOnError extends boolean = false>(options: Options<EndorseAdapterApiV1AdaptersAdapterIdEndorsePostData, ThrowOnError>): RequestResult<EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostErrors, ThrowOnError> => (options.client ?? client).post<EndorseAdapterApiV1AdaptersAdapterIdEndorsePostResponses, EndorseAdapterApiV1AdaptersAdapterIdEndorsePostErrors, ThrowOnError>({ url: '/api/v1/adapters/{adapter_id}/endorse', ...options });
 
 /**
- * Get adapter version metadata
+ * Get adapter metadata
  *
- * Return the full stored Croissant metadata document for one canonical adapter version.
+ * Return the full stored Croissant metadata document for one adapter.
  */
-export const getAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGet = <ThrowOnError extends boolean = false>(options: Options<GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetData, ThrowOnError>): RequestResult<GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses, GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors, ThrowOnError> => (options.client ?? client).get<GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetResponses, GetAdapterVersionMetadataApiV1AdaptersAdapterIdVersionsVersionMetadataGetErrors, ThrowOnError>({ url: '/api/v1/adapters/{adapter_id}/versions/{version}/metadata', ...options });
+export const getAdapterMetadataApiV1AdaptersAdapterIdMetadataGet = <ThrowOnError extends boolean = false>(options: Options<GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetData, ThrowOnError>): RequestResult<GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses, GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors, ThrowOnError> => (options.client ?? client).get<GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetResponses, GetAdapterMetadataApiV1AdaptersAdapterIdMetadataGetErrors, ThrowOnError>({ url: '/api/v1/adapters/{adapter_id}/metadata', ...options });
 
 /**
  * Validate metadata
@@ -126,7 +133,7 @@ export const listRegistrationsApiV1RegistrationsGet = <ThrowOnError extends bool
 /**
  * Submit an adapter registration
  *
- * Store one adapter repository as a tracked registration request. The repository may be a local path or supported remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.
+ * Store one adapter repository as a tracked registration request. The repository may be a local path or remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.
  */
 export const createRegistrationApiV1RegistrationsPost = <ThrowOnError extends boolean = false>(options: Options<CreateRegistrationApiV1RegistrationsPostData, ThrowOnError>): RequestResult<CreateRegistrationApiV1RegistrationsPostResponses, CreateRegistrationApiV1RegistrationsPostErrors, ThrowOnError> => (options.client ?? client).post<CreateRegistrationApiV1RegistrationsPostResponses, CreateRegistrationApiV1RegistrationsPostErrors, ThrowOnError>({
     url: '/api/v1/registrations',
@@ -136,6 +143,13 @@ export const createRegistrationApiV1RegistrationsPost = <ThrowOnError extends bo
         ...options.headers
     }
 });
+
+/**
+ * Check registration Croissant file presence
+ *
+ * Return whether a remote repository exposes root-level croissant.jsonld.
+ */
+export const checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet = <ThrowOnError extends boolean = false>(options: Options<CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetData, ThrowOnError>): RequestResult<CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses, CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors, ThrowOnError> => (options.client ?? client).get<CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetResponses, CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetErrors, ThrowOnError>({ url: '/api/v1/registrations/croissant-file-present-check', ...options });
 
 /**
  * List registration events

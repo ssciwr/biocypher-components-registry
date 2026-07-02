@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from sqlalchemy import update
 
 from src.core.adapter.discovery import (
     discover_local_adapter,
@@ -42,6 +44,7 @@ from src.core.validation import (
 )
 from src.core.validation.results import ValidationResult
 from src.persistence.factory import build_registration_store
+from src.persistence.tables import registration_sources_table
 
 
 _DEFAULT_GITHUB_LOGIN = "sampleGithubLogin"
@@ -130,6 +133,37 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
             }
         ],
     }
+
+
+def _backfill_demo_adapter_doi(
+    store: Any,
+    repository_location: str,
+    doi: str | None,
+) -> bool:
+    """AI-Generated.
+
+    Backfill DOI for existing demo seeds without overwriting maintainer data.
+    """
+    if doi is None:
+        return False
+
+    engine = getattr(store, "engine", None)
+    if engine is None:
+        return False
+
+    with engine.begin() as connection:
+        result = connection.execute(
+            update(registration_sources_table)
+            .where(
+                registration_sources_table.c.repository_location == repository_location
+            )
+            .where(registration_sources_table.c.is_active.is_(True))
+            .where(registration_sources_table.c.doi.is_(None))
+            .values(doi=doi, updated_at=datetime.now(UTC).isoformat())
+        )
+
+    return bool(result.rowcount)
+
 
 def _load_metadata(path: Path) -> dict[str, Any]:
     if path.is_dir():
@@ -737,9 +771,17 @@ def seed_demo_adapters_cmd(
         }
         seeded = 0
         skipped = 0
+        updated = 0
         for spec in _DEMO_ADAPTERS:
             uniqueness_key = f"{spec['adapter_id']}::{spec['version']}"
             if uniqueness_key in existing_keys:
+                updated += int(
+                    _backfill_demo_adapter_doi(
+                        store,
+                        str(spec["repository_location"]),
+                        spec.get("doi"),
+                    )
+                )
                 skipped += 1
                 continue
             registration = submit_registration_record(
@@ -765,7 +807,8 @@ def seed_demo_adapters_cmd(
 
     console.print(
         f"[green]Seeded {seeded} demo adapters[/green] "
-        f"([yellow]skipped {skipped} existing[/yellow])"
+        f"([yellow]skipped {skipped} existing[/yellow], "
+        f"[cyan]updated {updated} existing[/cyan])"
     )
 
 

@@ -84,7 +84,7 @@ def create_registration_request(
     normalized_doi = _normalize_optional_text(doi)
     normalized_cff_url = _normalize_optional_text(cff_url)
 
-    if normalized_location.startswith(("http://", "https://")):
+    if urlparse(normalized_location).scheme:
         _validate_remote_repository(normalized_location)
         repository_kind = "remote"
         normalized_repository_location = normalized_location
@@ -112,7 +112,7 @@ def _normalize_repository_location(repository_location: str) -> str:
     normalized_location = repository_location.strip()
     if normalized_location.startswith("github.com/"):
         normalized_location = f"https://{normalized_location}"
-    if normalized_location.startswith(("http://", "https://")):
+    if urlparse(normalized_location).scheme:
         return normalized_location.rstrip("/")
     return normalized_location
 
@@ -150,7 +150,7 @@ def _normalize_local_repository(repository_location: str) -> str:
 
 
 def _validate_remote_repository(repository_location: str) -> None:
-    """Validate that a remote repository URL can be fetched over HTTP."""
+    """Validate that a remote repository URL can be fetched over HTTPS."""
     parsed = urlparse(repository_location)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if parsed.scheme != "https" or not parsed.netloc:
         raise InvalidRepoURLError(repository_location)
