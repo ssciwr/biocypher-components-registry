@@ -20,6 +20,7 @@ def create_adapter_entry(
     *,
     adapter_id: str,
     adapter_name: str,
+    version: str = "1.0.0",
     doi: str | None = None,
     cff_url: str | None = None,
     repository_location: str | None = None,
@@ -45,10 +46,10 @@ def create_adapter_entry(
     )
     store.mark_registration_valid(
         registration_id=registration.registration_id,
-        metadata={"@id": adapter_id, "name": adapter_name},
+        metadata={"@id": adapter_id, "name": adapter_name, "version": version},
         metadata_path=metadata_path,
         profile_version="v1",
-        uniqueness_key=adapter_id,
+        uniqueness_key=f"{adapter_id}::{version}",
         observed_checksum=f"checksum-{adapter_id}",
     )
 

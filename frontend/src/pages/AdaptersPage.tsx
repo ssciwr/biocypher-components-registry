@@ -387,22 +387,31 @@ function AvatarGroup({ maintainers = [], showNames = false }: Readonly<{ maintai
   if (!maintainers.length) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
   return (
     <div className="flex flex-wrap items-center gap-4">
-      {maintainers.map((maintainer) => (
-        <span className="flex items-center gap-3" key={`${maintainer.profile_url ?? maintainer.username}:${maintainer.avatar_url}`}>
-          <img alt={maintainer.username} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
-          {showNames ? (
-            <span>
-              {maintainer.profile_url ? (
-                <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={maintainer.profile_url} rel="noreferrer" target="_blank">
-                  {maintainer.username}
-                </a>
-              ) : (
-                <span className="block text-sm font-medium text-slate-950">{maintainer.username}</span>
-              )}
-            </span>
-          ) : null}
-        </span>
-      ))}
+      {maintainers.map((maintainer) => {
+        const fallbackLabel = (maintainer.username.slice(0, 2).toUpperCase() || '?')
+        return (
+          <span className="flex items-center gap-3" key={`${maintainer.profile_url ?? maintainer.username}:${maintainer.avatar_url ?? 'fallback'}`}>
+            {maintainer.avatar_url ? (
+              <img alt={maintainer.username} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
+            ) : (
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-sm font-semibold text-slate-700" aria-hidden="true">
+                {fallbackLabel}
+              </span>
+            )}
+            {showNames ? (
+              <span>
+                {maintainer.profile_url ? (
+                  <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={maintainer.profile_url} rel="noreferrer" target="_blank">
+                    {maintainer.username}
+                  </a>
+                ) : (
+                  <span className="block text-sm font-medium text-slate-950">{maintainer.username}</span>
+                )}
+              </span>
+            ) : null}
+          </span>
+        )
+      })}
     </div>
   )
 }

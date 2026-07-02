@@ -97,6 +97,19 @@ class RegistryEntry:
     metadata_checksum: str | None = None
     is_active: bool = True
 
+    @property
+    def adapter_version(self) -> str | None:
+        """AI-Generated.
+
+        Return the adapter version stored in the persisted Croissant metadata.
+        """
+        if self.metadata is None:
+            return None
+        version = self.metadata.get("version")
+        if version is None:
+            return None
+        return str(version).strip() or None
+
 
 @dataclass(slots=True, frozen=True)
 class BatchRefreshSummary:

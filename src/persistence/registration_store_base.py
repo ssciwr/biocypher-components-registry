@@ -379,14 +379,14 @@ class SQLAlchemyRegistrationStore:
                     message = (
                         "Duplicate canonical registry entry rejected."
                         if event_type == "DUPLICATE"
-                        else "Changed metadata for the same adapter id was rejected."
+                        else "Changed metadata for the same adapter id and version was rejected."
                     )
                     error_message = (
                         f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
                         if event_type == "DUPLICATE"
                         else (
                             "Registration rejected because metadata changed for an existing "
-                            f"adapter id: {uniqueness_key}."
+                            f"adapter id and version: {uniqueness_key}. Please bump the version."
                         )
                     )
                     connection.execute(
@@ -866,13 +866,16 @@ class SQLAlchemyRegistrationStore:
         """Build a uniqueness key from available metadata when possible."""
         if metadata_payload is None:
             return None
+        version = str(metadata_payload.get("version", "")).strip()
+        if not version:
+            return None
         adapter_id = self._resolve_registration_adapter_id(
             metadata=metadata_payload,
             submitted_adapter_name=submitted_adapter_name,
         )
         if not adapter_id:
             return None
-        return adapter_id
+        return f"{adapter_id}::{version}"
 
     def _derive_status(
         self,
