@@ -79,6 +79,17 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(globalThis.location.pathname)
 
+  /*
+   * AI-Generated.
+   */
+  useEffect(() => {
+    const loader = globalThis.document.getElementById('app-loader')
+    if (!loader) return
+
+    loader.classList.add('app-loader--hidden')
+    loader.setAttribute('aria-hidden', 'true')
+  }, [])
+
   useEffect(() => {
     let ignore = false
 
