@@ -995,6 +995,17 @@
             "type": "string",
             "title": "Adapter Name"
           },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "endorsement_count": {
             "type": "integer",
             "title": "Endorsement Count",
@@ -1104,6 +1115,17 @@
           "adapter_name": {
             "type": "string",
             "title": "Adapter Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
           },
           "description": {
             "anyOf": [
@@ -1346,6 +1368,17 @@
             "type": "string",
             "title": "Adapter Name"
           },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "description": {
             "anyOf": [
               {
@@ -1431,7 +1464,14 @@
             "title": "Username"
           },
           "avatar_url": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Avatar Url"
           },
           "profile_url": {
@@ -1448,8 +1488,7 @@
         },
         "type": "object",
         "required": [
-          "username",
-          "avatar_url"
+          "username"
         ],
         "title": "AdapterMaintainerResponse",
         "description": "Repository maintainer identity for adapter catalog display."
@@ -1585,7 +1624,7 @@
               "date_published": "2026-04-17",
               "description": "Small people dataset.",
               "extra_args": [],
-              "input": "/tmp/biocypher-api-adapter-demo",
+              "input": "/srv/biocypher/examples/adapter-demo",
               "license": "https://opensource.org/licenses/MIT",
               "name": "People Dataset",
               "url": "https://example.org/people",
@@ -1834,7 +1873,7 @@
           "description": "Small CSV dataset used to verify generation.",
           "extra_args": [],
           "generator": "native",
-          "input_path": "/tmp/biocypher-api-dataset-demo",
+          "input_path": "/srv/biocypher/examples/dataset-demo",
           "license": "https://opensource.org/licenses/MIT",
           "name": "People Demo Dataset",
           "url": "https://example.org/people-demo",
@@ -1985,20 +2024,49 @@
             "@context": {
               "@language": "en",
               "@vocab": "https://schema.org/",
+              "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
+              "citeAs": "cr:citeAs",
               "column": "cr:column",
               "conformsTo": "dct:conformsTo",
               "cr": "http://mlcommons.org/croissant/",
+              "data": {
+                "@id": "cr:data",
+                "@type": "@json"
+              },
               "dataType": {
                 "@id": "cr:dataType",
                 "@type": "@vocab"
               },
               "dct": "http://purl.org/dc/terms/",
+              "examples": {
+                "@id": "cr:examples",
+                "@type": "@json"
+              },
               "extract": "cr:extract",
               "field": "cr:field",
               "fileObject": "cr:fileObject",
+              "fileProperty": "cr:fileProperty",
+              "fileSet": "cr:fileSet",
+              "format": "cr:format",
+              "includes": "cr:includes",
+              "isLiveDataset": "cr:isLiveDataset",
+              "jsonPath": "cr:jsonPath",
+              "key": "cr:key",
+              "md5": "cr:md5",
+              "parentField": "cr:parentField",
+              "path": "cr:path",
+              "rai": "http://mlcommons.org/croissant/RAI/",
               "recordSet": "cr:recordSet",
+              "references": "cr:references",
+              "regex": "cr:regex",
+              "repeated": "cr:repeated",
+              "replace": "cr:replace",
+              "samplingRate": "cr:samplingRate",
               "sc": "https://schema.org/",
-              "source": "cr:source"
+              "separator": "cr:separator",
+              "source": "cr:source",
+              "subField": "cr:subField",
+              "transform": "cr:transform"
             },
             "@type": "sc:Dataset",
             "citeAs": "https://example.org/people-demo",
@@ -3118,6 +3186,17 @@
           "adapter_name": {
             "type": "string",
             "title": "Adapter Name"
+          },
+          "adapter_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Version"
           },
           "profile_version": {
             "anyOf": [

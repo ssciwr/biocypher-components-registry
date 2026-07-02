@@ -19,6 +19,10 @@ export type AdapterCatalogItemResponse = {
      */
     adapter_name: string;
     /**
+     * Version
+     */
+    version?: string | null;
+    /**
      * Endorsement Count
      */
     endorsement_count?: number;
@@ -82,6 +86,10 @@ export type AdapterDetailResponse = {
      * Adapter Name
      */
     adapter_name: string;
+    /**
+     * Version
+     */
+    version?: string | null;
     /**
      * Description
      */
@@ -213,6 +221,10 @@ export type AdapterLatestItemResponse = {
      */
     adapter_name: string;
     /**
+     * Version
+     */
+    version?: string | null;
+    /**
      * Description
      */
     description?: string | null;
@@ -267,7 +279,7 @@ export type AdapterMaintainerResponse = {
     /**
      * Avatar Url
      */
-    avatar_url: string;
+    avatar_url?: string | null;
     /**
      * Profile Url
      */
@@ -1100,6 +1112,10 @@ export type RegistryEntryResponse = {
      * Adapter Name
      */
     adapter_name: string;
+    /**
+     * Adapter Version
+     */
+    adapter_version?: string | null;
     /**
      * Profile Version
      */

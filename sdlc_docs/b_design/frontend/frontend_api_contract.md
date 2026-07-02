@@ -488,7 +488,7 @@ Version fields:
 ```text
 adapter_id
 adapter_name
-adapter_version
+adapter_version derived from metadata.version
 registry_entry_id
 profile_version
 metadata_checksum
@@ -500,7 +500,7 @@ Metadata response fields:
 
 ```text
 adapter_id
-adapter_version
+adapter_version derived from metadata.version
 registry_entry_id
 metadata
 ```
