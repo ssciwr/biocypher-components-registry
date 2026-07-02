@@ -9,6 +9,13 @@ from tests.unit.api.adapter_test_helpers import (
 )
 
 
+'''
+The production code behind these I manually wrote or drafted over with AI, the tests here are however AI-written based on
+other API tests and follow the same structure. As is the adapter helper utility file which allows `create_adapter_entry`.
+Feel free to update or change how these tests work, they are for the new endorsement functionality that came out of
+the workshop feedback for what users want from the registry.
+'''
+
 def test_post_adapter_endorsement_records_single_github_user(tmp_path: Path) -> None:
     """AI-Generated.
 
