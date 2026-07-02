@@ -21,7 +21,11 @@ ENV TLS_CERTIFICATE_PRIV_PATH=/etc/letsencrypt/live/registry.biocypher.org/privk
 COPY nginx.conf /etc/nginx/template-options/default.conf.https.template
 COPY nginx-http.conf /etc/nginx/template-options/default.conf.http.template
 COPY docker-entrypoint.d/04-select-nginx-template.sh /docker-entrypoint.d/04-select-nginx-template.sh
-RUN chmod +x /docker-entrypoint.d/04-select-nginx-template.sh
+RUN mkdir -p /etc/nginx/templates \
+    && chown -R nginx:nginx /etc/nginx/templates /etc/nginx/conf.d /var/cache/nginx /var/run \
+    && chmod +x /docker-entrypoint.d/04-select-nginx-template.sh
 COPY --from=build /app/dist /usr/share/nginx/html
+
+USER nginx
 
 EXPOSE 80 443
