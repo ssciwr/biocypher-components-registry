@@ -7,13 +7,12 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from src.persistence.sqlalchemy_registration_store import SQLAlchemyRegistrationStore
+from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
 
 
 class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
-    """SQLite engine and migration wrapper for tests and local development.
-    """
+    """SQLite engine and migration wrapper for tests and local development."""
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)

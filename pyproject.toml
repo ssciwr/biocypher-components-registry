@@ -1,9 +1,9 @@
 [project]
 name = "biocypher-components-registry"
 version = "0.2.0"
-description = "Add your description here"
+description = "Registry system for BioCypher adapters with metadata validation, registration workflows"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "croissant-baker @ git+https://github.com/MIT-LCP/croissant-baker.git@main",
     "mlcroissant>=1.0.22",
@@ -23,19 +23,19 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28",
-    "pre-commit>=3.8.0",
-    "pytest==8.4.2",
-    "pytest-bdd>=8.1.0",
-    "pytest-cov==6.2.1",
+    "httpx",
+    "pre-commit",
+    "pytest",
+    "pytest-bdd",
+    "pytest-cov",
 ]
 
 api-client = [
-    "httpie==3.2.4",
+    "httpie",
 ]
 
 performance = [
-    "locust>=2.15.0",
+    "locust",
 ]
 
 [tool.pytest.ini_options]

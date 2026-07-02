@@ -144,8 +144,9 @@ registry.sqlite3
 *.sqlite3
 *.db
 
-# Collected metadata files
-registry_data/*
 
 # Codex file
 .codex
+
+# VS Code settings
+.vscode/settings.json

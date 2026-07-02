@@ -36,7 +36,6 @@ router = APIRouter()
 
 @router.post(
     "/metadata/validate",
-    response_model=MetadataValidationResponse,
     summary="Validate metadata",
     description=(
         "Validate an inline Croissant adapter or dataset document without "
@@ -56,7 +55,6 @@ def validate_metadata(
 
 @router.post(
     "/metadata/datasets/generate",
-    response_model=DatasetMetadataGenerateResponse,
     summary="Generate dataset metadata",
     description=(
         "Generate dataset Croissant metadata from a server-side input path. "
@@ -84,7 +82,7 @@ def generate_dataset_metadata(
                 document=result.document,
                 output_path=output_path,
             )
-        except (json.JSONDecodeError, OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
@@ -108,7 +106,6 @@ def generate_dataset_metadata(
 
 @router.post(
     "/metadata/adapters/generate",
-    response_model=AdapterMetadataGenerateResponse,
     summary="Generate adapter metadata",
     description=(
         "Generate adapter Croissant metadata from existing dataset metadata "
@@ -137,7 +134,7 @@ def generate_adapter_metadata(
                 document=result.document,
                 output_path=output_path,
             )
-        except (json.JSONDecodeError, OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),

@@ -42,42 +42,10 @@ def build_adapter_request_from_mapping(
     if not isinstance(adapter, dict):
         raise typer.BadParameter("'adapter' must be a mapping if provided.")
 
-    dataset_generator = dataset_generator_override or raw.get(
-        "dataset_generator",
-        raw.get("dataset-generator", "croissant-baker"),
-    )
-    if not isinstance(dataset_generator, str) or not dataset_generator:
-        raise typer.BadParameter("'dataset_generator' must be a non-empty string.")
-    ensure_supported_dataset_backend(dataset_generator)
-
-    datasets_raw = raw.get("datasets", [])
-    if datasets_raw in (None, ""):
-        datasets_raw = []
-    if not isinstance(datasets_raw, list):
-        raise typer.BadParameter("'datasets' must be a list.")
-
-    dataset_paths: list[str] = []
-    generated_datasets: list[GenerationRequest] = []
-    for entry in datasets_raw:
-        if not isinstance(entry, dict):
-            raise typer.BadParameter("Each dataset entry must be a mapping.")
-        mode = str(entry.get("mode", "existing")).strip().lower()
-        if mode == "existing":
-            dataset_paths.append(required_string(entry, "path"))
-        elif mode == "generate":
-            generated_datasets.append(build_generated_dataset_request(entry))
-        else:
-            raise typer.BadParameter("Dataset mode must be one of: existing, generate.")
-
-    creators = parse_creator_strings(adapter.get("creators", []))
-    keywords = parse_keyword_list(adapter.get("keywords", []))
-    if not keywords:
-        raise typer.BadParameter("Adapter config must define at least one keyword.")
-    if not creators:
-        raise typer.BadParameter("Adapter config must define at least one creator.")
-    for dataset in generated_datasets:
-        if not dataset.creators:
-            dataset.creators = list(creators)
+    dataset_generator = _resolve_dataset_generator(raw, dataset_generator_override)
+    dataset_paths, generated_datasets = _parse_dataset_entries(raw)
+    creators, keywords = _resolve_creators_and_keywords(adapter)
+    _apply_default_creators(generated_datasets, creators)
 
     return AdapterGenerationRequest(
         output_path=output_override or str(adapter.get("output", "croissant_adapter.jsonld")),
@@ -98,6 +66,76 @@ def build_adapter_request_from_mapping(
         dataset_generator=dataset_generator,
         generated_datasets=generated_datasets,
     )
+
+
+def _resolve_dataset_generator(
+    raw: dict[str, Any],
+    dataset_generator_override: str | None,
+) -> str:
+    """Resolve and validate the dataset generator backend name."""
+    dataset_generator = dataset_generator_override or raw.get(
+        "dataset_generator",
+        raw.get("dataset-generator", "croissant-baker"),
+    )
+    if not isinstance(dataset_generator, str) or not dataset_generator:
+        raise typer.BadParameter("'dataset_generator' must be a non-empty string.")
+    ensure_supported_dataset_backend(dataset_generator)
+    return dataset_generator
+
+
+def _parse_dataset_entries(
+    raw: dict[str, Any],
+) -> tuple[list[str], list[GenerationRequest]]:
+    """Parse the 'datasets' list into existing paths and generated requests."""
+    datasets_raw = raw.get("datasets", [])
+    if datasets_raw in (None, ""):
+        datasets_raw = []
+    if not isinstance(datasets_raw, list):
+        raise typer.BadParameter("'datasets' must be a list.")
+
+    dataset_paths: list[str] = []
+    generated_datasets: list[GenerationRequest] = []
+    for entry in datasets_raw:
+        _apply_dataset_entry(entry, dataset_paths, generated_datasets)
+    return dataset_paths, generated_datasets
+
+
+def _apply_dataset_entry(
+    entry: Any,
+    dataset_paths: list[str],
+    generated_datasets: list[GenerationRequest],
+) -> None:
+    """Route one dataset config entry to the paths list or generated list."""
+    if not isinstance(entry, dict):
+        raise typer.BadParameter("Each dataset entry must be a mapping.")
+    mode = str(entry.get("mode", "existing")).strip().lower()
+    if mode == "existing":
+        dataset_paths.append(required_string(entry, "path"))
+    elif mode == "generate":
+        generated_datasets.append(build_generated_dataset_request(entry))
+    else:
+        raise typer.BadParameter("Dataset mode must be one of: existing, generate.")
+
+
+def _resolve_creators_and_keywords(adapter: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Parse and validate adapter creators and keywords."""
+    creators = parse_creator_strings(adapter.get("creators", []))
+    keywords = parse_keyword_list(adapter.get("keywords", []))
+    if not keywords:
+        raise typer.BadParameter("Adapter config must define at least one keyword.")
+    if not creators:
+        raise typer.BadParameter("Adapter config must define at least one creator.")
+    return creators, keywords
+
+
+def _apply_default_creators(
+    generated_datasets: list[GenerationRequest],
+    creators: list[str],
+) -> None:
+    """Fall back generated datasets without creators to the adapter's creators."""
+    for dataset in generated_datasets:
+        if not dataset.creators:
+            dataset.creators = list(creators)
 
 
 def build_generated_dataset_request(entry: dict[str, Any]) -> GenerationRequest:

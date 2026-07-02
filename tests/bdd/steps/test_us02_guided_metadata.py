@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.core.adapter.config import build_adapter_request_from_mapping
 from src.core.adapter.service import execute_request as execute_adapter_request
-from src.core.shared.constants import METADATA_FILENAME
+from src.core.shared.constants import METADATA_FILENAME, STANDARD_CONTEXT
 from src.core.validation import validate_adapter, validate_embedded_dataset
 
 
@@ -28,43 +29,7 @@ def guidance_context() -> dict[str, Any]:
 
 def _valid_dataset_document() -> dict[str, Any]:
     return {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "citeAs": "cr:citeAs",
-            "column": "cr:column",
-            "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
-            "rai": "http://mlcommons.org/croissant/RAI/",
-            "data": {"@id": "cr:data", "@type": "@json"},
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-            "dct": "http://purl.org/dc/terms/",
-            "examples": {"@id": "cr:examples", "@type": "@json"},
-            "extract": "cr:extract",
-            "field": "cr:field",
-            "fileProperty": "cr:fileProperty",
-            "fileObject": "cr:fileObject",
-            "fileSet": "cr:fileSet",
-            "format": "cr:format",
-            "includes": "cr:includes",
-            "isLiveDataset": "cr:isLiveDataset",
-            "jsonPath": "cr:jsonPath",
-            "key": "cr:key",
-            "md5": "cr:md5",
-            "parentField": "cr:parentField",
-            "path": "cr:path",
-            "recordSet": "cr:recordSet",
-            "references": "cr:references",
-            "regex": "cr:regex",
-            "repeated": "cr:repeated",
-            "replace": "cr:replace",
-            "samplingRate": "cr:samplingRate",
-            "sc": "https://schema.org/",
-            "separator": "cr:separator",
-            "source": "cr:source",
-            "subField": "cr:subField",
-            "transform": "cr:transform",
-        },
+        "@context": deepcopy(STANDARD_CONTEXT),
         "@type": "sc:Dataset",
         "name": "Example dataset",
         "description": "Dataset description",

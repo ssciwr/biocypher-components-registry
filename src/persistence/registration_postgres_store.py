@@ -5,16 +5,25 @@ from __future__ import annotations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from src.persistence.sqlalchemy_registration_store import SQLAlchemyRegistrationStore
+from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
 
 
 class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
-    """
-    PostgreSQL engine and migration wrapper for the shared store.
+    """Persist registration requests in PostgreSQL through SQLAlchemy Core.
+
+    This adapter is optimized for production use with PostgreSQL and includes
+    connection pooling, automatic reconnection, and production-grade settings.
     """
 
     def __init__(self, database_url: str) -> None:
+        """Create a store that reads and writes registrations to PostgreSQL.
+
+        Args:
+            database_url: PostgreSQL connection string, e.g.,
+                         'postgresql://user:pass@localhost:5432/dbname'
+                         or 'postgresql+psycopg2://user:pass@localhost:5432/dbname'
+        """
         self.database_url = database_url
         self.engine = self._build_engine()
         self._initialize_database()

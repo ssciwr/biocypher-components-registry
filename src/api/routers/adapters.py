@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -32,6 +33,8 @@ from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
 
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+
 
 # ===========================================================
 # Adapter Catalog Routes
@@ -40,7 +43,6 @@ router = APIRouter()
 
 @router.get(
     "/adapters",
-    response_model=AdapterCatalogListResponse,
     summary="List public adapters",
     description=(
         "Return the public adapter catalog derived from canonical valid registry "
@@ -49,7 +51,7 @@ router = APIRouter()
     ),
 )
 def list_adapters(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterCatalogListResponse:
     """Return public adapters that have at least one canonical registry entry."""
     grouped_entries = _group_entries_by_adapter_id(store.list_registry_entries())
@@ -136,7 +138,6 @@ def _latest_adapter_items(
 
 @router.get(
     "/adapters/{adapter_id}",
-    response_model=AdapterDetailResponse,
     summary="Get adapter catalog detail",
     description=(
         "Return one public adapter. The response is metadata-light; fetch full "
