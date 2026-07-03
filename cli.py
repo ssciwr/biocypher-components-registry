@@ -52,6 +52,7 @@ STYLE_SECTION_HEADING = "bold cyan"
 REGISTRATION_ID_HELP = "Stored registration identifier."
 HTTPS_SCHEME = "https"
 HTTP_SCHEME = "http"
+JSONLD_TYPE = "@type"
 
 _DB_PATH_HELP = (
     "SQLite database path for stored registrations. Defaults to "
@@ -104,7 +105,7 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
     adapter_id = str(spec["adapter_id"])
     data_source = str(spec["data_source"])
     return {
-        "@type": "SoftwareSourceCode",
+        JSONLD_TYPE: "SoftwareSourceCode",
         "@id": adapter_id,
         "name": spec["adapter_name"],
         "description": spec["description"],
@@ -113,11 +114,11 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
         "codeRepository": spec["repository_location"],
         "programmingLanguage": "Python",
         "targetProduct": "BioCypher",
-        "creator": [{"@type": "Person", "name": _DEMO_GITHUB_LOGIN}],
+        "creator": [{JSONLD_TYPE: "Person", "name": _DEMO_GITHUB_LOGIN}],
         "keywords": spec["keywords"],
         "hasPart": [
             {
-                "@type": "sc:Dataset",
+                JSONLD_TYPE: "sc:Dataset",
                 "name": data_source,
                 "description": f"Vague demo dataset backing the {spec['adapter_name']}.",
                 "version": "2026.1",
@@ -151,7 +152,7 @@ def _load_metadata(path: Path) -> dict[str, Any]:
 
 
 def _detect_metadata_kind(metadata: dict[str, Any]) -> str:
-    root_type = metadata.get("@type")
+    root_type = metadata.get(JSONLD_TYPE)
     if root_type in {"Dataset", "sc:Dataset"}:
         return "dataset"
     if root_type in {"SoftwareSourceCode", "sc:SoftwareSourceCode"}:
@@ -777,7 +778,7 @@ def seed_demo_adapters_cmd(
             )
             existing_keys.add(uniqueness_key)
             seeded += 1
-    except (FileNotFoundError, ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 

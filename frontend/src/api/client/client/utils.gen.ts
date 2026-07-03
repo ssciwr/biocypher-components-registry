@@ -15,7 +15,7 @@ export const createQuerySerializer = <T = unknown>({
   parameters = {},
   ...args
 }: QuerySerializerOptions = {}): ((queryParams: T) => string) => {
-  const querySerializer = (queryParams: T): string => {
+  const querySerializer = (queryParams: T): string => { // NOSONAR: generated @hey-api/openapi-ts serializer; keep generated query behavior unchanged.
     const search: string[] = [];
     if (queryParams && typeof queryParams === 'object') {
       for (const name in queryParams) {
@@ -185,7 +185,7 @@ const headersEntries = (headers: Headers): Array<[string, string]> => {
 
 export const mergeHeaders = (
   ...headers: Array<Required<Config>['headers'] | undefined>
-): Headers => {
+): Headers => { // NOSONAR: generated @hey-api/openapi-ts header merge; keep generated behavior unchanged.
   const mergedHeaders = new Headers();
   for (const header of headers) {
     if (!header) {

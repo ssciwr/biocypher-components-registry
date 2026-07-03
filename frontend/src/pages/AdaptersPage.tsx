@@ -186,7 +186,7 @@ function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
       })
 
       if (result.response?.status === 401) {
-        window.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: window.location.pathname } })
+        globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: globalThis.location.pathname } })
         return // send the user to login if they are not logged in yet, hardcoded.
       }
 

@@ -314,8 +314,9 @@ class TestFetchRemoteMetadata:
         """
         Test remote discovery when the repository URL scheme is unsupported.
         """
+        unsupported_scheme = "ftp"
         with pytest.raises(InvalidRepoURLError):
-            fetch_remote_metadata("ftp://gitlab.com/org/repo")
+            fetch_remote_metadata(f"{unsupported_scheme}://gitlab.com/org/repo")
 
     def test_metadata_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """

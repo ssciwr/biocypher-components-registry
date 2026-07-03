@@ -103,7 +103,7 @@ function stripEmptySlots(params: Params): void {
   }
 }
 
-export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsConfig): Params {
+export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsConfig): Params { // NOSONAR: generated @hey-api/openapi-ts mapper; keep generated request behavior unchanged.
   const params: Params = {
     headers: Object.create(null),
     path: Object.create(null),

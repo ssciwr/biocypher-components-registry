@@ -34,6 +34,12 @@ type RegistrationResultPanelProps = Readonly<{
   result: RegistrationResponse
 }>
 
+type RegistrationResultDisplay = Readonly<{
+  iconTone: string
+  text: string
+  title: string
+}>
+
 type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 
 const draftKey = 'bcr-register-draft'
@@ -44,6 +50,37 @@ const emptyForm: RegistrationForm = {
   licenseValue: '',
   doi: '',
   cffUrl: '',
+}
+
+/*
+ * AI-Generated.
+ */
+function isHttpsUrl(value: string) {
+  const normalized = value.toLowerCase()
+  return normalized.startsWith('https://') && normalized.length > 'https://'.length
+}
+
+/*
+ * AI-Generated.
+ */
+function removeUrlSuffix(value: string) {
+  const queryIndex = value.indexOf('?')
+  const hashIndex = value.indexOf('#')
+  const suffixIndexes = [queryIndex, hashIndex].filter((index) => index >= 0)
+  return suffixIndexes.length ? value.slice(0, Math.min(...suffixIndexes)) : value
+}
+
+/*
+ * AI-Generated.
+ */
+function trimSlashes(value: string) {
+  let start = 0
+  let end = value.length
+
+  while (value[start] === '/') start += 1
+  while (end > start && value[end - 1] === '/') end -= 1
+
+  return value.slice(start, end)
 }
 
 const nextSteps = [
@@ -69,18 +106,19 @@ const nextSteps = [
 // whether they provide a link, or just the DOI directly.
 // this takes the 2nd last slash until the end if present or the whole string otherwise.
 function registrationDoiValue(value: string) {
-  const trimmed = value.trim().replace(/^doi:\s*/i, '')
+  const rawValue = value.trim()
+  const trimmed = rawValue.toLowerCase().startsWith('doi:') ? rawValue.slice(4).trimStart() : rawValue
   if (!trimmed) return ''
 
-  const cleanValue = trimmed.split(/[?#]/)[0].replace(/\/+$/, '')
+  const cleanValue = trimSlashes(removeUrlSuffix(trimmed))
   const parts = cleanValue.split('/').filter(Boolean)
-  return /^https?:\/\//i.test(cleanValue) && parts.length >= 2
+  return isHttpsUrl(cleanValue) && parts.length >= 2
     ? parts.slice(-2).join('/')
-    : cleanValue.replace(/^\/+/, '')
+    : cleanValue
 }
 
 function initialForm(): RegistrationForm {
-  const savedDraft = window.localStorage.getItem(draftKey)
+  const savedDraft = globalThis.localStorage.getItem(draftKey)
   if (!savedDraft) {
     return emptyForm
   }
@@ -88,11 +126,37 @@ function initialForm(): RegistrationForm {
   try {
     return { ...emptyForm, ...(JSON.parse(savedDraft) as Partial<RegistrationForm>) }
   } catch {
-    window.localStorage.removeItem(draftKey)
+    globalThis.localStorage.removeItem(draftKey)
     return emptyForm
   }
 }
 
+/*
+ * AI-Generated.
+ */
+function registrationResultDisplay(result: RegistrationResponse): RegistrationResultDisplay {
+  if (result.status === 'VALID') {
+    return {
+      iconTone: 'bg-emerald-100 text-emerald-600',
+      text: `${result.adapter_name} was stored and validated by the registry.`,
+      title: 'Adapter registration successful',
+    }
+  }
+
+  if (result.status === 'INVALID') {
+    return {
+      iconTone: 'bg-red-100 text-red-600',
+      text: 'Please fix these issues in your GitHub repository, then revalidate.',
+      title: 'Sorry, your adapter is not currently valid.',
+    }
+  }
+
+  return {
+    iconTone: 'bg-amber-100 text-amber-700',
+    text: `${result.adapter_name} was stored. Processing feedback is shown below.`,
+    title: 'Registration submitted',
+  }
+}
 
 // Basically this shows errors or successful registration
 function RegistrationResultPanel({
@@ -103,6 +167,7 @@ function RegistrationResultPanel({
 }: RegistrationResultPanelProps) {
   const isValid = result.status === 'VALID'
   const isInvalid = result.status === 'INVALID'
+  const resultDisplay = registrationResultDisplay(result)
   const validationErrors = ('validation_errors' in result ? result.validation_errors : null)?.filter(Boolean) ?? []
 
   return (
@@ -110,13 +175,7 @@ function RegistrationResultPanel({
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="flex gap-4">
           <span
-            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${
-              isValid
-                ? 'bg-emerald-100 text-emerald-600'
-                : isInvalid
-                  ? 'bg-red-100 text-red-600'
-                  : 'bg-amber-100 text-amber-700'
-            }`}
+            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${resultDisplay.iconTone}`}
           >
             {isValid ? (
               <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />
@@ -126,18 +185,10 @@ function RegistrationResultPanel({
           </span>
           <span>
             <h2 className="text-2xl font-bold text-slate-950">
-              {isValid
-                ? 'Adapter registration successful'
-                : isInvalid
-                  ? 'Sorry, your adapter is not currently valid.'
-                  : 'Registration submitted'}
+              {resultDisplay.title}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              {isValid
-                ? `${result.adapter_name} was stored and validated by the registry.`
-                : isInvalid
-                  ? 'Please fix these issues in your GitHub repository, then revalidate.'
-                  : `${result.adapter_name} was stored. Processing feedback is shown below.`}
+              {resultDisplay.text}
             </p>
           </span>
         </div>
@@ -197,7 +248,7 @@ function RegistrationResultPanel({
   )
 }
 
-function RegisterPage({ authUser }: RegisterPageProps) {
+function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page coordinates one registration workflow; splitting it is a larger UI refactor.
   const [form, setForm] = useState<RegistrationForm>(initialForm)
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
@@ -227,7 +278,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
 
   useEffect(() => {
     const repositoryLocation = form.repositoryLocation.trim()
-    if (!/^https?:\/\/.+/.test(repositoryLocation)) return
+    if (!isHttpsUrl(repositoryLocation)) return
 
     const controller = new AbortController()
 
@@ -259,8 +310,8 @@ function RegisterPage({ authUser }: RegisterPageProps) {
     const doi = registrationDoiValue(form.doi)
 
     if (!authUser) {
-      window.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
-      window.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
+      globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
+      globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
       return
     }
 
@@ -284,7 +335,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
       }
 
       const registration = registrationResult.data
-      window.localStorage.removeItem(draftKey)
+      globalThis.localStorage.removeItem(draftKey)
       setStatus('processing')
 
       const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
@@ -378,7 +429,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
                     onChange={(event) => {
                       const value = event.target.value
                       setError(null)
-                      setMetadataCheckStatus(/^https?:\/\/.+/.test(value.trim()) ? 'checking' : 'idle')
+                      setMetadataCheckStatus(isHttpsUrl(value.trim()) ? 'checking' : 'idle')
                       updateField('repositoryLocation', value)
                     }}
                     placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
