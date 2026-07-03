@@ -288,7 +288,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
       setStatus('processing')
 
       const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
-        path: { registration_id: registration.registration_id },
+        path: { registration_id: registration.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed processing request.
       })
 
       setStatus('idle')
@@ -313,7 +313,7 @@ function RegisterPage({ authUser }: RegisterPageProps) {
     setError(null)
     try {
       const revalidateResult = await revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost({
-        path: { registration_id: result.registration_id },
+        path: { registration_id: result.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed revalidation request.
       })
 
       setStatus('idle')

@@ -62,7 +62,7 @@ function CitationEndorsement({ doi }: CitationEndorsementProps) {
 }
 
 async function fetchCrossrefWork(doi: string): Promise<CrossrefWork | false> {
-  const response = await fetch(`${crossrefWorksBaseUrl}/${encodeURIComponent(doi)}`)
+  const response = await fetch(`${crossrefWorksBaseUrl}/${encodeURIComponent(doi)}`) // NOSONAR: we ignore this in SONAR because the user provides the DOI, and it goes as part of a already host-specified web request to cross ref. In other words, the user can only negatively impact themself if they provide this content, and only to a not found URL on crossref. So SONARs warning about this data being open is not really valid in this scenario
   if (!response.ok) return false
 
   const payload = (await response.json()) as { message?: Record<string, unknown> }

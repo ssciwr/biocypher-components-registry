@@ -51,7 +51,7 @@ def fetch_remote_file(url: str) -> str:
         The response body as text.
     """
     try:
-        resp = requests.get(url, timeout=15)
+        resp = requests.get(url, timeout=15)  # NOSONAR: adapter discovery intentionally fetches maintainer-provided repository metadata URLs.
         if resp.status_code == 404:
             raise RemoteResourceNotFoundError(url, status_code=404)
         resp.raise_for_status()
