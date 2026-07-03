@@ -3,6 +3,15 @@ import type { ReactNode, SyntheticEvent } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 
+
+/*
+
+This file uses AI-generated changes to satisfy Sonar Qube and collected functionality from main/this branch because merging `adopt_workshop_feedback`
+will supercede and change these files anyway; so this AI-generated code should not stay in main for long as we will replace it with the next PR merge.
+
+Just wanted to qualify why I kept that code in now as is.
+ */
+
 type RegisterPageProps = Readonly<{
   apiBaseUrl: string
   authUser: AuthUser | null
@@ -158,6 +167,23 @@ function metadataStatusForResponse(response: Response): MetadataCheckStatus {
 function isHttpUrl(value: string) {
   const normalizedValue = value.trim().toLowerCase()
   return normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')
+}
+
+/*
+ * AI-Generated.
+ */
+function normalizedRegistrationId(value: string) {
+  const normalizedValue = value.trim().toLowerCase()
+  const segments = normalizedValue.split('-')
+  const segmentLengths = [8, 4, 4, 4, 12]
+  const hexChars = '0123456789abcdef'
+  const isUuid = segments.length === segmentLengths.length
+    && segments.every((segment, index) => (
+      segment.length === segmentLengths[index]
+      && [...segment].every((character) => hexChars.includes(character))
+    ))
+
+  return isUuid ? normalizedValue : null
 }
 
 /*
@@ -363,10 +389,17 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
       }
 
       const registration = (await response.json()) as RegistrationResponse
+      const registrationId = normalizedRegistrationId(registration.registration_id)
+      if (!registrationId) {
+        setStatus('idle')
+        setError('Registration was saved, but the returned registration ID was invalid.')
+        return
+      }
+
       globalThis.localStorage.removeItem(draftKey)
       setStatus('processing')
 
-      const processResponse = await fetch(`${apiBaseUrl}/api/v1/registrations/${registration.registration_id}/process`, {
+      const processResponse = await fetch(`${apiBaseUrl}/api/v1/registrations/${registrationId}/process`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -390,10 +423,16 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
   async function revalidateRegistration() {
     if (!result) return
 
+    const registrationId = normalizedRegistrationId(result.registration_id)
+    if (!registrationId) {
+      setError('Cannot revalidate because the registration ID is invalid.')
+      return
+    }
+
     try {
       setStatus('processing')
       setError(null)
-      const response = await fetch(`${apiBaseUrl}/api/v1/registrations/${result.registration_id}/revalidate`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/registrations/${registrationId}/revalidate`, {
         method: 'POST',
         credentials: 'include',
       })
