@@ -47,8 +47,12 @@ type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 type ActiveMetadataCheckStatus = Exclude<MetadataCheckStatus, 'idle'>
 type RegistrationRequestStatus = 'idle' | 'submitting' | 'processing'
 type RegistrationPayload = RegistrationResponse & { detail?: string }
+type RegistrationId = string & { readonly __registrationId: unique symbol }
 
 const draftKey = 'bcr-register-draft'
+const apiRootSegments = ['api', 'v1'] as const
+const githubPathSegmentPattern = /^[A-Za-z0-9._-]+$/u
+const registrationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 
 const emptyForm: RegistrationForm = {
   adapterName: '',
@@ -137,17 +141,33 @@ function getMetadataUrl(location: string) {
     return null
   }
 
+  if (repositoryUrl.protocol !== 'https:' || repositoryUrl.hostname !== 'github.com') {
+    return null
+  }
+
   const parts = repositoryUrl.pathname.split('/').filter(Boolean)
-  const isGitHub = repositoryUrl.hostname === 'github.com' && parts.length >= 2
-  if (!isGitHub) {
-    return new URL('croissant.jsonld', location + '/').href
+  const [owner, repository] = parts
+  const hasSafeRepositoryPath = parts.length >= 2
+    && githubPathSegmentPattern.test(owner)
+    && githubPathSegmentPattern.test(repository)
+  if (!hasSafeRepositoryPath) {
+    return null
   }
 
   const isBlobUrl = parts[2] === 'blob'
   const branch = isBlobUrl && parts[3] ? parts[3] : 'main'
-  const path = isBlobUrl ? parts.slice(4).join('/') : 'croissant.jsonld'
+  const metadataPath = isBlobUrl ? parts.slice(4) : ['croissant.jsonld']
+  const hasSafeMetadataPath = githubPathSegmentPattern.test(branch)
+    && metadataPath.length > 0
+    && metadataPath.every((segment) => githubPathSegmentPattern.test(segment))
+  if (!hasSafeMetadataPath) {
+    return null
+  }
 
-  return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${branch}/${path}`
+  const rawPath = [owner, repository, branch, ...metadataPath]
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+  return new URL(rawPath, 'https://raw.githubusercontent.com/').href
 }
 
 /*
@@ -174,16 +194,25 @@ function isHttpUrl(value: string) {
  */
 function normalizedRegistrationId(value: string) {
   const normalizedValue = value.trim().toLowerCase()
-  const segments = normalizedValue.split('-')
-  const segmentLengths = [8, 4, 4, 4, 12]
-  const hexChars = '0123456789abcdef'
-  const isUuid = segments.length === segmentLengths.length
-    && segments.every((segment, index) => (
-      segment.length === segmentLengths[index]
-      && [...segment].every((character) => hexChars.includes(character))
-    ))
 
-  return isUuid ? normalizedValue : null
+  return registrationIdPattern.test(normalizedValue) ? normalizedValue as RegistrationId : null
+}
+
+/*
+ * AI-Generated.
+ */
+function getApiUrl(apiBaseUrl: string, pathSegments: readonly string[], query?: Record<string, string>) {
+  const baseUrl = new URL(apiBaseUrl || globalThis.location.origin, globalThis.location.origin)
+  const url = new URL(baseUrl.href)
+  const basePathSegments = baseUrl.pathname.split('/').filter(Boolean)
+  const encodedPathSegments = [...basePathSegments, ...apiRootSegments, ...pathSegments]
+    .map((segment) => encodeURIComponent(segment))
+
+  url.pathname = `/${encodedPathSegments.join('/')}`
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+  return url.href
 }
 
 /*
@@ -363,13 +392,13 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
 
     if (!authUser) {
       globalThis.localStorage.setItem(draftKey, JSON.stringify(form))
-      globalThis.location.href = `${apiBaseUrl}/api/v1/auth/github/start?return_to=${encodeURIComponent('/register')}`
+      globalThis.location.href = getApiUrl(apiBaseUrl, ['auth', 'github', 'start'], { return_to: '/register' })
       return
     }
 
     try {
       setStatus('submitting')
-      const response = await fetch(`${apiBaseUrl}/api/v1/registrations`, {
+      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations']), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -399,7 +428,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
       globalThis.localStorage.removeItem(draftKey)
       setStatus('processing')
 
-      const processResponse = await fetch(`${apiBaseUrl}/api/v1/registrations/${registrationId}/process`, {
+      const processResponse = await fetch(getApiUrl(apiBaseUrl, ['registrations', registrationId, 'process']), {
         method: 'POST',
         credentials: 'include',
       })
@@ -432,7 +461,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
     try {
       setStatus('processing')
       setError(null)
-      const response = await fetch(`${apiBaseUrl}/api/v1/registrations/${registrationId}/revalidate`, {
+      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations', registrationId, 'revalidate']), {
         method: 'POST',
         credentials: 'include',
       })
@@ -500,7 +529,9 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
                     onChange={(event) => {
                       const value = event.target.value
                       setError(null)
-                      setMetadataCheckStatus(isHttpUrl(value) ? 'checking' : 'idle')
+                      setMetadataCheckStatus(
+                        isHttpUrl(value) ? (getMetadataUrl(value) ? 'checking' : 'blocked') : 'idle'
+                      )
                       updateField('repositoryLocation', value)
                     }}
                     placeholder="https://github.com/example/clinical-visit-adapter"

@@ -104,11 +104,11 @@
         }
         
         .btn-secondary {
-            background: #48bb78;
+            background: #2f855a;
         }
         
         .btn-secondary:hover {
-            background: #38a169;
+            background: #276749;
             box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
         }
         
@@ -137,7 +137,7 @@
         
         .footer {
             margin-top: 32px;
-            color: #a0aec0;
+            color: #4a5568;
             font-size: 14px;
         }
     </style>
@@ -195,24 +195,26 @@
         </div>
     </div>
     
-    <script>
-        // Check backend health on load
-        fetch('/api/v1/health')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Backend health:', data);
-                if (data.status === 'ok') {
-                    document.querySelector('.status').innerHTML = '✅ All Tiers Running';
-                    document.querySelector('.status').style.background = '#d1fae5';
-                    document.querySelector('.status').style.color = '#065f46';
-                }
-            })
-            .catch(error => {
-                console.error('Backend unreachable:', error);
-                document.querySelector('.status').innerHTML = '⚠️ Backend Unavailable';
-                document.querySelector('.status').style.background = '#fee2e2';
-                document.querySelector('.status').style.color = '#991b1b';
-            });
+    <script type="module">
+        const statusElement = document.querySelector('.status');
+
+        try {
+            const response = await fetch('/api/v1/health');
+            const data = await response.json();
+            console.log('Backend health:', data);
+            if (data.status === 'ok' && statusElement instanceof HTMLElement) {
+                statusElement.innerHTML = '✅ All Tiers Running';
+                statusElement.style.background = '#d1fae5';
+                statusElement.style.color = '#065f46';
+            }
+        } catch (error) {
+            console.error('Backend unreachable:', error);
+            if (statusElement instanceof HTMLElement) {
+                statusElement.innerHTML = '⚠️ Backend Unavailable';
+                statusElement.style.background = '#fee2e2';
+                statusElement.style.color = '#991b1b';
+            }
+        }
     </script>
 </body>
 </html>

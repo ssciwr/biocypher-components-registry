@@ -17,9 +17,9 @@ RUN pnpm run build
 FROM nginx:1.27-alpine
 
 ENV BACKEND_INTERNAL_URL=http://backend:8000
-COPY --chmod=0444 \
+COPY --chown=root:root --chmod=0444 \
     nginx.conf /etc/nginx/templates/default.conf.template
-COPY --chmod=0555 --from=build \
+COPY --chown=root:root --chmod=0555 --from=build \
     /app/dist /usr/share/nginx/html
 RUN touch /var/run/nginx.pid \
     && chown -R nginx:nginx \

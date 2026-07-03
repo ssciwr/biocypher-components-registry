@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 import hmac
 from secrets import token_urlsafe
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
 import requests
@@ -29,6 +29,18 @@ from src.persistence.auth_store import AuthSessionStore
 
 
 router = APIRouter()
+AuthSessionCookie = Annotated[
+    str | None,
+    Cookie(alias=settings.auth_session_cookie_name),
+]
+AuthSessionStoreDependency = Annotated[
+    AuthSessionStore,
+    Depends(get_auth_session_store),
+]
+CurrentAuthSessionDependency = Annotated[
+    AuthSession,
+    Depends(get_current_auth_session),
+]
 
 
 @router.get("/auth/github/start", include_in_schema=False)
@@ -70,7 +82,7 @@ def finish_github_login(
     code: str,
     state: str,
     request: Request,
-    store: AuthSessionStore = Depends(get_auth_session_store),
+    store: AuthSessionStoreDependency,
 ) -> RedirectResponse:
     """Exchange a GitHub OAuth code for a local browser session."""
     client_id, client_secret, session_secret = _github_oauth_config()
@@ -109,8 +121,8 @@ def finish_github_login(
     return response
 
 
-@router.get("/auth/me", response_model=AuthMeResponse)
-def get_me(session: AuthSession = Depends(get_current_auth_session)) -> AuthMeResponse:
+@router.get("/auth/me")
+def get_me(session: CurrentAuthSessionDependency) -> AuthMeResponse:
     """Return the current signed-in GitHub identity."""
     return AuthMeResponse.from_session(session)
 
@@ -118,11 +130,8 @@ def get_me(session: AuthSession = Depends(get_current_auth_session)) -> AuthMeRe
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
     response: Response,
-    session_token: str | None = Cookie(
-        default=None,
-        alias=settings.auth_session_cookie_name,
-    ),
-    store: AuthSessionStore = Depends(get_auth_session_store),
+    store: AuthSessionStoreDependency,
+    session_token: AuthSessionCookie = None,
 ) -> None:
     """Delete the local browser session cookie."""
     if session_token is not None:
