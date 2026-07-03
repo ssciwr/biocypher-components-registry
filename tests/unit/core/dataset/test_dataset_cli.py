@@ -34,7 +34,7 @@ def test_direct_command_wraps_known_and_passthrough_args(monkeypatch) -> None:
             "--generator",
             "croissant-baker",
             "--input",
-            "/tmp/data",
+            "/data/example",
             "--output",
             "croissant.jsonld",
             "--validate",
@@ -51,7 +51,7 @@ def test_direct_command_wraps_known_and_passthrough_args(monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert captured["generator"] == "croissant-baker"
     assert captured["request"] == DatasetGenerationRequest(
-        input_path="/tmp/data",
+        input_path="/data/example",
         output_path="croissant.jsonld",
         validate=True,
         description="OmniPath dataset",
@@ -80,7 +80,7 @@ def test_direct_command_accepts_auto_generator(monkeypatch) -> None:
             "--generator",
             "auto",
             "--input",
-            "/tmp/data",
+            "/data/example",
         ],
     )
 
@@ -106,7 +106,7 @@ def test_direct_command_validates_by_default(monkeypatch) -> None:
         [
             "direct",
             "--input",
-            "/tmp/data",
+            "/data/example",
         ],
     )
 
@@ -116,7 +116,7 @@ def test_direct_command_validates_by_default(monkeypatch) -> None:
 
 def test_guided_retries_after_backend_failure(monkeypatch) -> None:
     request = DatasetGenerationRequest(
-        input_path="/tmp/data",
+        input_path="/data/example",
         output_path="croissant.jsonld",
         description="initial",
     )

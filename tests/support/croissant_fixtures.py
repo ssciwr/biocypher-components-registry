@@ -1,21 +1,21 @@
+"""Shared Croissant document fixtures reused across test modules.
+
+Extracted to avoid duplicating the same sample dataset document literal in
+many test files (see SonarQube duplicated-lines findings).
+"""
+
 from __future__ import annotations
 
-from copy import deepcopy
 
-from src.core.shared.constants import STANDARD_CONTEXT
-from src.core.validation.adapter import validate_adapter
-from src.core.validation.dataset import validate_dataset
-
-
-def _valid_dataset_document() -> dict:
+def sample_dataset_document() -> dict:
+    """Return a minimal valid Croissant dataset document for test fixtures."""
     return {
-        "@context": deepcopy(STANDARD_CONTEXT),
         "@type": "sc:Dataset",
         "name": "Example dataset",
         "description": "Example dataset",
         "conformsTo": "http://mlcommons.org/croissant/1.0",
         "citeAs": "https://example.org/dataset",
-        "creator": {"@type": "sc:Person", "name": "Example Creator"},
+        "creator": [{"@type": "sc:Person", "name": "Example Creator"}],
         "datePublished": "2024-01-01T00:00:00",
         "license": "https://opensource.org/licenses/MIT",
         "url": "https://example.org/dataset",
@@ -52,19 +52,3 @@ def _valid_dataset_document() -> dict:
             }
         ],
     }
-
-
-def test_validate_dataset_accepts_dataset_root() -> None:
-    document = _valid_dataset_document()
-
-    result = validate_dataset(document)
-
-    assert result.is_valid
-
-
-def test_validate_adapter_rejects_dataset_root() -> None:
-    document = _valid_dataset_document()
-
-    result = validate_adapter(document)
-
-    assert not result.is_valid

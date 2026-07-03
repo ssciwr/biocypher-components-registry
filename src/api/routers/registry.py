@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -25,6 +25,7 @@ from src.core.registration.store import RegistrationStore
 
 
 router = APIRouter()
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
 RegistryLatestEvent = Literal[
     "SUBMITTED",
     "VALID_CREATED",
@@ -46,7 +47,6 @@ RegistryLatestEvent = Literal[
 
 @router.get(
     "/registry/registrations",
-    response_model=RegistryRegistrationListResponse,
     summary="List registry registrations",
     description=(
         "Return maintainer/operator rows for active registrations, including "
@@ -55,18 +55,24 @@ RegistryLatestEvent = Literal[
     ),
 )
 def list_registry_registrations(
-    status: RegistrationStatus | None = Query(
-        default=None,
-        description="Filter registry registrations by public registration status.",
-    ),
-    latest_event: RegistryLatestEvent | None = Query(
-        default=None,
-        description=(
-            "Filter by latest registration event type, such as VALID_CREATED, "
-            "INVALID_SCHEMA, or FETCH_FAILED."
+    store: RegistrationStoreDep,
+    status: Annotated[
+        RegistrationStatus | None,
+        Query(
+            description=(
+                "Filter registry registrations by public registration status."
+            )
         ),
-    ),
-    store: RegistrationStore = Depends(get_registration_store),
+    ] = None,
+    latest_event: Annotated[
+        RegistryLatestEvent | None,
+        Query(
+            description=(
+                "Filter by latest registration event type, such as VALID_CREATED, "
+                "INVALID_SCHEMA, or FETCH_FAILED."
+            )
+        ),
+    ] = None,
 ) -> RegistryRegistrationListResponse:
     """Return registry registration overview rows with latest event information."""
     items: list[RegistryRegistrationResponse] = []
@@ -92,7 +98,6 @@ def list_registry_registrations(
 
 @router.get(
     "/registry/entries",
-    response_model=RegistryEntryListResponse,
     summary="List registry entries",
     description=(
         "Return canonical valid registry entries. This endpoint does not return "
@@ -100,7 +105,7 @@ def list_registry_registrations(
     ),
 )
 def list_registry_entries(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryEntryListResponse:
     """Return canonical valid registry entries."""
     entries = store.list_registry_entries()
@@ -111,7 +116,6 @@ def list_registry_entries(
 
 @router.get(
     "/registry/entries/{entry_id}",
-    response_model=RegistryEntryResponse,
     summary="Get registry entry",
     description=(
         "Return one canonical valid registry entry by registry entry id. The "
@@ -120,7 +124,7 @@ def list_registry_entries(
 )
 def get_registry_entry(
     entry_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryEntryResponse:
     """Return one canonical valid registry entry by identifier."""
     entry = store.get_registry_entry(entry_id)
@@ -132,7 +136,6 @@ def get_registry_entry(
 
 @router.get(
     "/registry/refreshes/latest",
-    response_model=RegistryRefreshLatestResponse,
     summary="Get latest registry refresh",
     description=(
         "Return the latest persisted batch refresh summary. Returns 404 if no "
@@ -140,7 +143,7 @@ def get_registry_entry(
     ),
 )
 def get_latest_registry_refresh(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryRefreshLatestResponse:
     """Return the latest persisted registry refresh summary."""
     refresh = store.get_latest_batch_refresh()
@@ -152,7 +155,6 @@ def get_latest_registry_refresh(
 
 @router.post(
     "/registry/refreshes",
-    response_model=RegistryRefreshResponse,
     summary="Run registry refresh",
     description=(
         "Process every active registration once, continue past per-source "
@@ -161,7 +163,7 @@ def get_latest_registry_refresh(
     ),
 )
 def create_registry_refresh(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistryRefreshResponse:
     """Process all active registration sources once."""
     return _refresh_registry_response(store)

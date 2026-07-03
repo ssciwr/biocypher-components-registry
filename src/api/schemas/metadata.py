@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.core.shared.constants import CROISSANT_CONFORMS_TO_URL, STANDARD_CONTEXT
 from src.core.validation.results import ValidationCheck, ValidationResult
 
 
@@ -14,15 +16,21 @@ from src.core.validation.results import ValidationCheck, ValidationResult
 # ===========================================================
 
 
+DATASET_DEMO_INPUT_PATH = "/srv/biocypher/examples/dataset-demo"
+ADAPTER_DEMO_INPUT_PATH = "/srv/biocypher/examples/adapter-demo"
+PEOPLE_DEMO_URL = "https://example.org/people-demo"
+MIT_LICENSE_URL = "https://opensource.org/licenses/MIT"
+PEOPLE_CSV_FILENAME = "people.csv"
+
 DATASET_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
-    "input_path": "/tmp/biocypher-api-dataset-demo",
+    "input_path": DATASET_DEMO_INPUT_PATH,
     "generator": "native",
     "validate": True,
     "name": "People Demo Dataset",
     "description": "Small CSV dataset used to verify generation.",
-    "url": "https://example.org/people-demo",
-    "license": "https://opensource.org/licenses/MIT",
-    "citation": "https://example.org/people-demo",
+    "url": PEOPLE_DEMO_URL,
+    "license": MIT_LICENSE_URL,
+    "citation": PEOPLE_DEMO_URL,
     "dataset_version": "1.0.0",
     "date_published": "2026-04-17",
     "creators": ["Person|Dataset Creator"],
@@ -33,37 +41,23 @@ DATASET_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
 METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
     "kind": "dataset",
     "metadata": {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "cr": "http://mlcommons.org/croissant/",
-            "sc": "https://schema.org/",
-            "dct": "http://purl.org/dc/terms/",
-            "conformsTo": "dct:conformsTo",
-            "fileObject": "cr:fileObject",
-            "recordSet": "cr:recordSet",
-            "field": "cr:field",
-            "source": "cr:source",
-            "extract": "cr:extract",
-            "column": "cr:column",
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-        },
+        "@context": deepcopy(STANDARD_CONTEXT),
         "@type": "sc:Dataset",
         "name": "People Demo Dataset",
         "description": "Small CSV dataset used to verify validation.",
-        "conformsTo": "http://mlcommons.org/croissant/1.0",
-        "citeAs": "https://example.org/people-demo",
+        "conformsTo": CROISSANT_CONFORMS_TO_URL,
+        "citeAs": PEOPLE_DEMO_URL,
         "creator": {"@type": "sc:Person", "name": "Dataset Creator"},
         "datePublished": "2026-04-17",
-        "license": "https://opensource.org/licenses/MIT",
-        "url": "https://example.org/people-demo",
+        "license": MIT_LICENSE_URL,
+        "url": PEOPLE_DEMO_URL,
         "version": "1.0.0",
         "distribution": [
             {
-                "@id": "people.csv",
+                "@id": PEOPLE_CSV_FILENAME,
                 "@type": "cr:FileObject",
-                "name": "people.csv",
-                "contentUrl": "people.csv",
+                "name": PEOPLE_CSV_FILENAME,
+                "contentUrl": PEOPLE_CSV_FILENAME,
                 "encodingFormat": "text/csv",
                 "sha256": "abc123",
             }
@@ -81,7 +75,7 @@ METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
                         "description": "Identifier column.",
                         "dataType": "sc:Text",
                         "source": {
-                            "fileObject": {"@id": "people.csv"},
+                            "fileObject": {"@id": PEOPLE_CSV_FILENAME},
                             "extract": {"column": "id"},
                         },
                     }
@@ -96,17 +90,17 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
     "name": "People Adapter",
     "description": "Adapter metadata generated through the API.",
     "version": "1.0.0",
-    "license": "https://opensource.org/licenses/MIT",
+    "license": MIT_LICENSE_URL,
     "code_repository": "https://github.com/example/people-adapter",
     "dataset_paths": [],
     "generated_datasets": [
         {
-            "input": "/tmp/biocypher-api-adapter-demo",
+            "input": ADAPTER_DEMO_INPUT_PATH,
             "validate": True,
             "name": "People Dataset",
             "description": "Small people dataset.",
             "url": "https://example.org/people",
-            "license": "https://opensource.org/licenses/MIT",
+            "license": MIT_LICENSE_URL,
             "citation": "https://example.org/people",
             "dataset_version": "1.0.0",
             "date_published": "2026-04-17",

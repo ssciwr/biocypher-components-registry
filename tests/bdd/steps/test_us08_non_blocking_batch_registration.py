@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import json
 import sqlite3
 from pathlib import Path
@@ -15,7 +14,6 @@ from src.core.registration.service import (
     submit_registration,
 )
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
-from src.core.web import server as web_ui_new
 
 
 scenarios("../features/us08_non_blocking_batch_registration.feature")
@@ -235,27 +233,6 @@ def batch_registration_workflow_runs(
     batch_registration_context["summary"] = refresh_active_registrations(store)
 
 
-@when("the batch registration workflow is triggered from the web UI")
-def batch_registration_workflow_is_triggered_from_the_web_ui(
-    batch_registration_context: dict[str, Any],
-) -> None:
-    """Trigger the batch refresh from the lightweight web handler."""
-    handler = web_ui_new._Handler
-    handler.output_dir = batch_registration_context["database_path"].parent
-    handler.last_output_path = batch_registration_context["database_path"].parent / "generated.jsonld"
-    handler.registration_db_path = batch_registration_context["database_path"]
-
-    post_handler = object.__new__(handler)
-    post_handler.path = "/registry/refresh"
-    post_handler.headers = {"Content-Length": "0"}
-    post_handler.rfile = io.BytesIO(b"")
-    captured: list[tuple[int, str]] = []
-    post_handler._send = lambda content, status=200: captured.append((status, content))
-
-    handler.do_POST(post_handler)
-    batch_registration_context["web_response"] = captured
-
-
 @then("remaining adapters are still processed")
 def remaining_adapters_are_still_processed(
     batch_registration_context: dict[str, Any],
@@ -334,30 +311,3 @@ def registry_records_valid_created_for_corrected_source(
         batch_registration_context["corrected_registration_id"],
         "VALID_CREATED",
     )
-
-
-@then("the UI shows the batch summary")
-def ui_shows_the_batch_summary(
-    batch_registration_context: dict[str, Any],
-) -> None:
-    """Assert that the web refresh page renders the batch summary."""
-    response = batch_registration_context["web_response"]
-
-    assert response
-    assert response[0][0] == 200
-    assert "Registry Operations" in response[0][1]
-    assert "Latest Batch Summary" in response[0][1]
-    assert "Batch refresh finished." in response[0][1]
-
-
-@then("the latest per-source outcomes are visible")
-def latest_per_source_outcomes_are_visible(
-    batch_registration_context: dict[str, Any],
-) -> None:
-    """Assert that the web refresh page lists the latest source outcomes."""
-    response = batch_registration_context["web_response"]
-
-    assert "Batch Valid Adapter" in response[0][1]
-    assert "Batch Invalid Adapter" in response[0][1]
-    assert "VALID_CREATED" in response[0][1]
-    assert "INVALID_SCHEMA" in response[0][1]

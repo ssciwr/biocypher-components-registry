@@ -52,6 +52,7 @@ GITHUB_OAUTH_CLIENT_SECRET=
 AUTH_SESSION_SECRET=
 FRONTEND_BASE_URL=http://localhost:5175
 VITE_API_BASE_URL=http://localhost:8000
+BACKEND_BASE_URL=http://localhost:8000
 # When integrating, adjust this
 ```
 

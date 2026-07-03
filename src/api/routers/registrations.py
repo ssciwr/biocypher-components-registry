@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status
 
 from src.api.dependencies import get_optional_auth_session, get_registration_store
@@ -32,6 +34,9 @@ from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
 
+RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth_session)]
+
 
 # ===========================================================
 # Registration Routes
@@ -40,7 +45,6 @@ router = APIRouter()
 
 @router.post(
     "/registrations",
-    response_model=RegistrationCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Submit an adapter registration",
     description=(
@@ -52,8 +56,8 @@ router = APIRouter()
 )
 def create_registration(
     payload: RegistrationCreateRequest,
-    store: RegistrationStore = Depends(get_registration_store),
-    auth_session: AuthSession | None = Depends(get_optional_auth_session),
+    store: RegistrationStoreDep,
+    auth_session: OptionalAuthSessionDep,
 ) -> RegistrationCreateResponse:
     """Create and persist a submitted adapter registration."""
     try:
@@ -61,6 +65,7 @@ def create_registration(
             adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
+            contact_email=payload.contact_email,
             license_value=payload.license_value,
             doi=payload.doi,
             submitted_by_github_login=(
@@ -75,7 +80,6 @@ def create_registration(
 
 @router.get(
     "/registrations",
-    response_model=RegistrationListResponse,
     summary="List registrations",
     description=(
         "Return active registration summary rows. This list is intentionally "
@@ -84,7 +88,7 @@ def create_registration(
     ),
 )
 def list_registrations(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationListResponse:
     """Return active stored adapter registrations."""
     registrations = store.list_active_registrations()
@@ -98,7 +102,6 @@ def list_registrations(
 
 @router.get(
     "/registrations/{registration_id}/events",
-    response_model=RegistrationEventListResponse,
     summary="List registration events",
     description=(
         "Return the event history recorded while submitting, processing, "
@@ -107,7 +110,7 @@ def list_registrations(
 )
 def list_registration_events(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationEventListResponse:
     """Return the event history for one stored adapter registration."""
     registration = store.get_registration(registration_id)
@@ -122,7 +125,6 @@ def list_registration_events(
 
 @router.get(
     "/registrations/{registration_id}",
-    response_model=RegistrationDetailResponse,
     summary="Get registration detail",
     description=(
         "Return one operator-facing registration detail record. This endpoint "
@@ -132,7 +134,7 @@ def list_registration_events(
 )
 def get_registration(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationDetailResponse:
     """Return one stored adapter registration by identifier."""
     registration = store.get_registration(registration_id)
@@ -144,7 +146,6 @@ def get_registration(
 
 @router.post(
     "/registrations/{registration_id}/process",
-    response_model=RegistrationProcessResponse,
     summary="Process one registration",
     description=(
         "Discover the submitted repository metadata, validate the adapter and "
@@ -154,7 +155,7 @@ def get_registration(
 )
 def process_registration(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationProcessResponse:
     """Discover, validate, and persist one stored registration result."""
     try:
@@ -170,7 +171,6 @@ def process_registration(
 
 @router.post(
     "/registrations/{registration_id}/revalidate",
-    response_model=RegistrationRevalidateResponse,
     summary="Revalidate one registration",
     description=(
         "Reprocess one registration whose current status is INVALID or whose "
@@ -179,7 +179,7 @@ def process_registration(
 )
 def revalidate_registration_route(
     registration_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> RegistrationRevalidateResponse:
     """Reprocess one previously invalid or fetch-failed registration."""
     try:

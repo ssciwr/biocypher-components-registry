@@ -72,20 +72,34 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
     let ignore = false
 
     fetch(`${apiBaseUrl}/api/v1/auth/me`, { credentials: 'include' })
-      .then((response) => (response.ok ? response.json() : null))
+      .then((response) => {
+        if (response.status === 401) {
+          return null
+        }
+        if (!response.ok) {
+          throw new Error('Could not check sign-in status.')
+        }
+        return response.json() as Promise<AuthUser>
+      })
       .then((user: AuthUser | null) => {
         if (!ignore) {
           setAuthUser(user)
           cacheAuthUser(user)
+          setAuthError(null)
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!ignore) {
+          setAuthError('Could not check sign-in status.')
+        }
+      })
 
     return () => {
       ignore = true
@@ -100,20 +114,33 @@ function App() {
 
 
   async function logOut() {
-    const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    }).catch(() => null)
+    try {
+      const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
 
-    if (response?.ok) {
+      if (!response.ok) {
+        setAuthError('Sign out failed.')
+        return
+      }
+
       setAuthUser(null)
       cacheAuthUser(null)
+      setAuthError(null)
+    } catch {
+      setAuthError('Sign out failed.')
     }
   }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
+      {authError ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
+          {authError}
+        </div>
+      ) : null}
       {pathname === '/register' ? (
         <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
       ) : (

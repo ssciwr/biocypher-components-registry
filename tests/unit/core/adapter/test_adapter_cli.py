@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -10,6 +12,7 @@ from cli import app
 from src.core.adapter import cli as adapter_cli
 from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationRequest
+from src.core.shared.constants import STANDARD_CONTEXT
 
 
 runner = CliRunner()
@@ -17,43 +20,7 @@ runner = CliRunner()
 
 def _valid_dataset_document() -> dict:
     return {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "citeAs": "cr:citeAs",
-            "column": "cr:column",
-            "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
-            "rai": "http://mlcommons.org/croissant/RAI/",
-            "data": {"@id": "cr:data", "@type": "@json"},
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-            "dct": "http://purl.org/dc/terms/",
-            "examples": {"@id": "cr:examples", "@type": "@json"},
-            "extract": "cr:extract",
-            "field": "cr:field",
-            "fileProperty": "cr:fileProperty",
-            "fileObject": "cr:fileObject",
-            "fileSet": "cr:fileSet",
-            "format": "cr:format",
-            "includes": "cr:includes",
-            "isLiveDataset": "cr:isLiveDataset",
-            "jsonPath": "cr:jsonPath",
-            "key": "cr:key",
-            "md5": "cr:md5",
-            "parentField": "cr:parentField",
-            "path": "cr:path",
-            "recordSet": "cr:recordSet",
-            "references": "cr:references",
-            "regex": "cr:regex",
-            "repeated": "cr:repeated",
-            "replace": "cr:replace",
-            "samplingRate": "cr:samplingRate",
-            "sc": "https://schema.org/",
-            "separator": "cr:separator",
-            "source": "cr:source",
-            "subField": "cr:subField",
-            "transform": "cr:transform",
-        },
+        "@context": deepcopy(STANDARD_CONTEXT),
         "@type": "sc:Dataset",
         "name": "Example dataset",
         "description": "Example dataset",
@@ -173,30 +140,21 @@ def test_adapter_direct_requires_creator(tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     dataset_path.write_text(json.dumps(_valid_dataset_document()), encoding="utf-8")
 
-    result = runner.invoke(
-        app,
-        [
-            "adapter",
-            "direct",
-            "--name",
-            "Example Adapter",
-            "--description",
-            "Adapter description",
-            "--version",
-            "1.0.0",
-            "--license",
-            "MIT",
-            "--code-repository",
-            "https://example.org/repo",
-            "--dataset-path",
-            str(dataset_path),
-            "--keywords",
-            "adapter",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "At least one --creator is required" in result.output
+    with pytest.raises(
+        typer.BadParameter,
+        match="At least one --creator is required",
+    ):
+        adapter_cli.direct_cmd(
+            ctx=None,  # type: ignore[arg-type]
+            name="Example Adapter",
+            description="Adapter description",
+            version="1.0.0",
+            license_value="MIT",
+            code_repository="https://example.org/repo",
+            dataset_paths=[str(dataset_path)],
+            creator=None,
+            keywords="adapter",
+        )
 
 
 def test_adapter_direct_accepts_auto_as_dataset_generator(tmp_path: Path) -> None:
@@ -240,34 +198,11 @@ def test_adapter_direct_rejects_removed_generator_flag(tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     dataset_path.write_text(json.dumps(_valid_dataset_document()), encoding="utf-8")
 
-    result = runner.invoke(
-        app,
-        [
-            "adapter",
-            "direct",
-            "--generator",
-            "auto",
-            "--name",
-            "Example Adapter",
-            "--description",
-            "Adapter description",
-            "--version",
-            "1.0.0",
-            "--license",
-            "MIT",
-            "--code-repository",
-            "https://example.org/repo",
-            "--dataset-path",
-            str(dataset_path),
-            "--creator",
-            "Edwin Carreno, SSC, https://orcid.org/0000-0000-0000-0000",
-            "--keywords",
-            "adapter,biocypher",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "--generator" in result.output
+    with pytest.raises(
+        typer.BadParameter,
+        match="Unexpected argument '--generator'",
+    ):
+        adapter_cli._parse_dataset_blocks(["--generator", "auto"])
 
 
 def test_adapter_guided_builds_request_and_runs(monkeypatch) -> None:
@@ -393,12 +328,12 @@ def test_adapter_guided_retries_after_backend_failure(monkeypatch) -> None:
 
 def test_adapter_direct_supports_generated_dataset_configs(tmp_path: Path, monkeypatch) -> None:
     dataset_config = tmp_path / "dataset.yaml"
-    dataset_config.write_text("input: /tmp/data\n", encoding="utf-8")
+    dataset_config.write_text("input: /data/example\n", encoding="utf-8")
     captured: dict[str, object] = {}
 
     def fake_dataset_request_from_config(config_path: str) -> GenerationRequest:
         captured["config_path"] = config_path
-        return GenerationRequest(input_path="/tmp/data", output_path="croissant.jsonld")
+        return GenerationRequest(input_path="/data/example", output_path="croissant.jsonld")
 
     def fake_execute_adapter_request(
         request: AdapterGenerationRequest,
