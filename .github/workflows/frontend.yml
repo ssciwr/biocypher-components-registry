@@ -40,6 +40,9 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
+      - name: Install Cypress binary
+        run: pnpm exec cypress install
+
       - name: Verify Cypress
         run: pnpm exec cypress verify
 
