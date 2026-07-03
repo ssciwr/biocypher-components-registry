@@ -1,15 +1,15 @@
-import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { ArrowRightStartOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
 
 type AuthUser = {
   github_login: string
 }
 
-type AppHeaderProps = {
+type AppHeaderProps = Readonly<{
   apiBaseUrl: string
   authUser: AuthUser | null
   onLogout: () => Promise<void>
-}
+}>
 
 function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
   return (
@@ -21,12 +21,12 @@ function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
           <span className="text-sm text-slate-500">| Registry</span>
         </a>
         <nav className="hidden items-center gap-16 text-sm text-slate-600 md:flex" aria-label="Main">
-          <a className="hover:text-slate-950" href="#">
+          <span className="text-slate-400">
             Explore
-          </a>
-          <a className="hover:text-slate-950" href="#">
+          </span>
+          <span className="text-slate-400">
             Create
-          </a>
+          </span>
           <a className="hover:text-slate-950" href="/register">
             Register
           </a>
@@ -44,7 +44,7 @@ function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
                 title="Sign out"
                 type="button"
               >
-                <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
+                <ArrowRightStartOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
               </button>
             </span>
           ) : (
@@ -55,13 +55,13 @@ function AppHeader({ apiBaseUrl, authUser, onLogout }: AppHeaderProps) {
               Sign in with GitHub
             </a>
           )}
-          <a
+          <button
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
-            href="#"
+            type="button"
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
             <b>MCP Workspace</b>
-          </a>
+          </button>
         </div>
       </div>
     </header>

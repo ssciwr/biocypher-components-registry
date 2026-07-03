@@ -46,15 +46,15 @@ const authUserKey = 'bcr-auth-user' // does not really matter, just needs to be 
 // each time you edit code (e.g. a small AI agent change), the reloaded codebase means you would get logged out before
 function cacheAuthUser(user: AuthUser | null) {
   if (user) {
-    window.localStorage.setItem(authUserKey, JSON.stringify(user))
+    globalThis.localStorage.setItem(authUserKey, JSON.stringify(user))
     return
   }
-  window.localStorage.removeItem(authUserKey)
+  globalThis.localStorage.removeItem(authUserKey)
 }
 
 
 function readCachedAuthUser(): AuthUser | null {
-  const savedUser = window.localStorage.getItem(authUserKey)
+  const savedUser = globalThis.localStorage.getItem(authUserKey)
   if (!savedUser) {
     return null
   }
@@ -63,7 +63,7 @@ function readCachedAuthUser(): AuthUser | null {
     const user = JSON.parse(savedUser) as Partial<AuthUser>
     return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
   } catch {
-    window.localStorage.removeItem(authUserKey)
+    globalThis.localStorage.removeItem(authUserKey)
     return null
   }
 }
@@ -73,7 +73,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
   const [authError, setAuthError] = useState<string | null>(null)
-  const [pathname, setPathname] = useState(window.location.pathname)
+  const [pathname, setPathname] = useState(globalThis.location.pathname)
 
   useEffect(() => {
     let ignore = false
@@ -107,9 +107,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const updatePathname = () => setPathname(window.location.pathname)
-    window.addEventListener('popstate', updatePathname)
-    return () => window.removeEventListener('popstate', updatePathname)
+    const updatePathname = () => setPathname(globalThis.location.pathname)
+    globalThis.addEventListener('popstate', updatePathname)
+    return () => globalThis.removeEventListener('popstate', updatePathname)
   }, [])
 
 
@@ -158,7 +158,7 @@ function HomePage() {
         <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
             <span className="h-2 w-2 rounded-full bg-lime-500" aria-hidden="true" />
-            Discover adapters, generate metadata, and register components
+            <span>Discover adapters, generate metadata, and register components</span>
           </div>
           <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
             Find BioCypher components<br /> for your research
@@ -180,13 +180,12 @@ function HomePage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
             <span>Popular:</span>
             {popularAdapters.map((adapter) => (
-              <a
+              <span
                 className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
-                href="#"
                 key={adapter}
               >
                 {adapter}
-              </a>
+              </span>
             ))}
           </div>
         </div>
@@ -220,9 +219,9 @@ function HomePage() {
             })}
           </div>
 
-          <a
+          <button
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            href="#"
+            type="button"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />
@@ -240,7 +239,7 @@ function HomePage() {
                 be written more accurately and thoroughly.
               </span>
             </span>
-          </a>
+          </button>
         </div>
       </section>
     </>

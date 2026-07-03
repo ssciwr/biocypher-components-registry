@@ -5,10 +5,10 @@ type ModalElement = ReactElement<{
   onClose?: () => void
 }>
 
-type LinkToModalProps = {
+type LinkToModalProps = Readonly<{
   children: ReactNode
   modal: ModalElement
-}
+}>
 
 /**
  * A helper so you can easily create a modal based around any JSX element.
