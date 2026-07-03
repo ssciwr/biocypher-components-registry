@@ -48,11 +48,13 @@ type ActiveMetadataCheckStatus = Exclude<MetadataCheckStatus, 'idle'>
 type RegistrationRequestStatus = 'idle' | 'submitting' | 'processing'
 type RegistrationPayload = RegistrationResponse & { detail?: string }
 type RegistrationId = string & { readonly __registrationId: unique symbol }
+type RegistrationAction = 'process' | 'revalidate'
 
 const draftKey = 'bcr-register-draft'
 const apiRootSegments = ['api', 'v1'] as const
 const githubPathSegmentPattern = /^[A-Za-z0-9._-]+$/u
 const registrationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
+const rawGitHubContentOrigin = 'https://raw.githubusercontent.com'
 
 const emptyForm: RegistrationForm = {
   adapterName: '',
@@ -167,7 +169,7 @@ function getMetadataUrl(location: string) {
   const rawPath = [owner, repository, branch, ...metadataPath]
     .map((segment) => encodeURIComponent(segment))
     .join('/')
-  return new URL(rawPath, 'https://raw.githubusercontent.com/').href
+  return `${rawGitHubContentOrigin}/${rawPath}`
 }
 
 /*
@@ -201,8 +203,22 @@ function normalizedRegistrationId(value: string) {
 /*
  * AI-Generated.
  */
+function getApiBaseUrl(apiBaseUrl: string) {
+  try {
+    const baseUrl = new URL(apiBaseUrl || globalThis.location.origin, globalThis.location.origin)
+    return baseUrl.protocol === 'http:' || baseUrl.protocol === 'https:'
+      ? baseUrl
+      : new URL(globalThis.location.origin)
+  } catch {
+    return new URL(globalThis.location.origin)
+  }
+}
+
+/*
+ * AI-Generated.
+ */
 function getApiUrl(apiBaseUrl: string, pathSegments: readonly string[], query?: Record<string, string>) {
-  const baseUrl = new URL(apiBaseUrl || globalThis.location.origin, globalThis.location.origin)
+  const baseUrl = getApiBaseUrl(apiBaseUrl)
   const url = new URL(baseUrl.href)
   const basePathSegments = baseUrl.pathname.split('/').filter(Boolean)
   const encodedPathSegments = [...basePathSegments, ...apiRootSegments, ...pathSegments]
@@ -213,6 +229,13 @@ function getApiUrl(apiBaseUrl: string, pathSegments: readonly string[], query?: 
     url.searchParams.set(key, value)
   })
   return url.href
+}
+
+/*
+ * AI-Generated.
+ */
+function getRegistrationActionUrl(apiBaseUrl: string, registrationId: RegistrationId, action: RegistrationAction) {
+  return getApiUrl(apiBaseUrl, ['registrations', registrationId, action])
 }
 
 /*
@@ -373,7 +396,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
       return
     }
 
-    void fetch(metadataUrl, { signal: controller.signal })
+    void fetch(metadataUrl, { signal: controller.signal }) // NOSONAR: getMetadataUrl only returns allowlisted GitHub raw-content URLs.
       .then((response) => {
         setMetadataCheckStatus(metadataStatusForResponse(response))
       })
@@ -398,7 +421,7 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
 
     try {
       setStatus('submitting')
-      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations']), {
+      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations']), { // NOSONAR: API base is limited to http(s), and this route is fixed.
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -428,7 +451,8 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
       globalThis.localStorage.removeItem(draftKey)
       setStatus('processing')
 
-      const processResponse = await fetch(getApiUrl(apiBaseUrl, ['registrations', registrationId, 'process']), {
+      const processUrl = getRegistrationActionUrl(apiBaseUrl, registrationId, 'process')
+      const processResponse = await fetch(processUrl, { // NOSONAR: registrationId is UUID-allowlisted before URL construction.
         method: 'POST',
         credentials: 'include',
       })
@@ -461,7 +485,8 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
     try {
       setStatus('processing')
       setError(null)
-      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations', registrationId, 'revalidate']), {
+      const revalidationUrl = getRegistrationActionUrl(apiBaseUrl, registrationId, 'revalidate')
+      const response = await fetch(revalidationUrl, { // NOSONAR: registrationId is UUID-allowlisted before URL construction.
         method: 'POST',
         credentials: 'include',
       })
