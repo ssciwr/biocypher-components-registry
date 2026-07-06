@@ -44,6 +44,11 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose?.()
       }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        onClose?.()
+      }}
     >
       <section className="w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6">
         <div className="flex items-start justify-between gap-4">
