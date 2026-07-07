@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from urllib.parse import ParseResult, urlparse
+from urllib.parse import ParseResult, quote, urlparse
 
 from pydantic import BaseModel, Field
 
@@ -42,19 +42,14 @@ class AdapterMaintainerResponse(BaseModel):
         repository_url = _repository_url(repository_location)
         if repository_url is None:
             return None
-        owner = _repository_owner(repository_url)
-        if not owner:
+        namespace = _repository_namespace(repository_url)
+        if not namespace:
             return None
         origin = f"{repository_url.scheme}://{repository_url.netloc}"
-        avatar_url = (
-            f"https://github.com/{owner}.png"
-            if repository_url.netloc.lower() == "github.com"
-            else None
-        )
         return cls(
-            username=owner,
-            avatar_url=avatar_url,
-            profile_url=f"{origin}/{owner}",
+            username=namespace,
+            avatar_url=_repository_avatar_url(repository_url, namespace),
+            profile_url=f"{origin}/{namespace}",
         )
 
 
@@ -245,14 +240,40 @@ def _repository_url(repository_location: str | None) -> ParseResult | None:
     return parsed
 
 
-def _repository_owner(repository_url: ParseResult) -> str | None:
+def _repository_namespace(repository_url: ParseResult) -> str | None:
     """
-    Use the first repository path segment as the public owner/user candidate. (consistent between Github/Gitlab)
+    Use the repository namespace as the public maintainer candidate.
     """
     parts = [part for part in repository_url.path.strip("/").split("/") if part]
     if len(parts) < 2:
         return None
+    if _is_gitlab_host(repository_url.netloc):
+        gitlab_route_start = parts.index("-") if "-" in parts else len(parts)
+        repository_parts = parts[:gitlab_route_start]
+        if len(repository_parts) < 2:
+            return None
+        return "/".join(repository_parts[:-1])
     return parts[0]
+
+
+def _repository_avatar_url(repository_url: ParseResult, namespace: str) -> str | None:
+    """
+    Build a provider-specific organization avatar URL without fetching remote APIs.
+    """
+    origin = f"{repository_url.scheme}://{repository_url.netloc}"
+    if repository_url.netloc.lower() == "github.com":
+        return f"https://github.com/{namespace}.png"
+    if _is_gitlab_host(repository_url.netloc):
+        return f"{origin}/api/v4/groups/{quote(namespace, safe='')}/avatar"
+    return None
+
+
+def _is_gitlab_host(host: str) -> bool:
+    """
+    Treat GitLab.com and explicit self-hosted GitLab domains as GitLab providers.
+    """
+    normalized_host = host.lower()
+    return normalized_host == "gitlab.com" or normalized_host.startswith("gitlab.")
 
 
 def data_sources_from_metadata(metadata: dict[str, Any]) -> list[AdapterDataSourceResponse]:

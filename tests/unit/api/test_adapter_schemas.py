@@ -22,11 +22,11 @@ from src.api.schemas.adapters import AdapterMaintainerResponse, _repository_url
         (
             "https://gitlab.com/gitlab-org/gitlab",
             "gitlab-org",
-            None,
+            "https://gitlab.com/api/v4/groups/gitlab-org/avatar",
             "https://gitlab.com/gitlab-org",
         ),
     ],
-) # GitLab example is the second one; we have no real BioCypher GitLab examples for now.
+)
 def test_repository_maintainer_uses_repository_owner(
     repository_location: str,
     expected_username: str,
@@ -46,15 +46,15 @@ def test_repository_maintainer_uses_repository_owner(
     assert maintainer.profile_url == expected_profile
 
 
-def test_repository_maintainer_supports_self_hosted_gitlab_owner() -> None:
+def test_repository_maintainer_ignores_unknown_host_avatar() -> None:
     """
-    Resolve self-hosted GitLab owners without a public avatar lookup.
+    Keep unknown repository hosts as plain owner links.
     """
     maintainer = AdapterMaintainerResponse.from_repository_location(
-        "https://gitlab.example.org/gitlab-org/gitlab"
+        "https://institution.example.org/team/example"
     )
 
     assert maintainer is not None
-    assert maintainer.username == "gitlab-org"
+    assert maintainer.username == "team"
     assert maintainer.avatar_url is None
-    assert maintainer.profile_url == "https://gitlab.example.org/gitlab-org"
+    assert maintainer.profile_url == "https://institution.example.org/team"

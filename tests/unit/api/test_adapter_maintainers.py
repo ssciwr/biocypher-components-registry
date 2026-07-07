@@ -34,7 +34,7 @@ def test_latest_adapter_uses_gitlab_repository_owner(
     tmp_path: Path,
 ) -> None:
     """
-    Use the GitLab repository owner without a public API lookup.
+    Use the GitLab repository owner avatar endpoint for a real public project.
     """
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     create_adapter_entry(
@@ -42,14 +42,14 @@ def test_latest_adapter_uses_gitlab_repository_owner(
         None,
         adapter_id="example-adapter",
         adapter_name="Example Adapter",
-        repository_location="https://gitlab.example.org/alice/example",
+        repository_location="https://gitlab.com/gitlab-org/gitlab",
     )
     payload = create_adapter_client(store).get("/api/v1/adapters/latest").json()
     maintainer = payload["items"][0]["maintainers"][0]
 
-    assert maintainer["username"] == "alice"
-    assert maintainer["avatar_url"] is None
-    assert maintainer["profile_url"] == "https://gitlab.example.org/alice"
+    assert maintainer["username"] == "gitlab-org"
+    assert maintainer["avatar_url"] == "https://gitlab.com/api/v4/groups/gitlab-org/avatar"
+    assert maintainer["profile_url"] == "https://gitlab.com/gitlab-org"
 
 
 def test_latest_adapter_uses_self_hosted_repository_owner(
