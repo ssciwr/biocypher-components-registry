@@ -125,10 +125,9 @@ function AdapterListView() {
               </div>
               <div className="mt-auto flex items-center justify-between gap-2 pt-6">
                 <AvatarGroup maintainers={adapter.maintainers} />
-                <span className="inline-flex items-center gap-1 text-sm text-slate-500">
+                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600">
                   <span aria-hidden="true">👍</span>
                   <span>{adapter.endorsement_count ?? 0}</span>
-              <span>Endorse</span>
                 </span>
               </div>
             </article>
@@ -320,23 +319,22 @@ bc.run()`}
                 <span className="break-all text-slate-500">Repository URL not available</span>
               )}
             </div>
-            <button
-              aria-label={`Endorse ${adapter.adapter_name}`}
-              className={`mt-5 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${adapter.endorsed_by_current_user ? 'cursor-default border-blue-600 bg-blue-600 font-semibold text-white' : 'cursor-pointer border-slate-400 bg-white font-medium text-slate-700 hover:border-slate-500 hover:bg-slate-50'} disabled:cursor-default disabled:opacity-80`}
-              disabled={isEndorsing || adapter.endorsed_by_current_user}
-              onClick={() => void endorseCurrentAdapter()}
-              type="button"
-            >
-              <span aria-hidden="true">👍</span>
-              <span>{adapter.endorsement_count ?? 0}</span>
-              <span>Endorse</span>
-            </button>
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
+              <button
+                aria-label={`Endorse ${adapter.adapter_name}`}
+                className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 ${adapter.endorsed_by_current_user ? 'cursor-default font-semibold' : 'cursor-pointer font-medium hover:border-slate-300 hover:bg-slate-100'} disabled:cursor-default disabled:opacity-80`}
+                disabled={isEndorsing || adapter.endorsed_by_current_user}
+                onClick={() => void endorseCurrentAdapter()}
+                type="button"
+              >
+                <span aria-hidden="true">👍</span>
+                <span>{adapter.endorsement_count ?? 0}</span>
+              </button>
+              {adapter.license_value ? <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">{adapter.license_value}</span> : null}
+            </div>
             {endorsementError ? (
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
             ) : null}
-            <div className="mt-6 flex flex-wrap gap-3 text-xs">
-              {adapter.license_value ? <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">{adapter.license_value}</span> : null}
-            </div>
           </section>
 
 
@@ -396,7 +394,7 @@ function AvatarGroup({ maintainers, showNames = false }: Readonly<{ maintainers?
         return (
           <span className="flex items-center gap-3" key={`${profileUrl ?? displayName}:${maintainer.avatar_url ?? 'fallback'}`}>
             {maintainer.avatar_url ? (
-              <img alt={displayName} className="h-10 w-10 rounded-full border border-slate-200" crossOrigin="anonymous" src={maintainer.avatar_url} />
+              <img alt={displayName} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
             ) : (
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-sm font-semibold text-slate-700" aria-hidden="true">
                 {fallbackLabel}

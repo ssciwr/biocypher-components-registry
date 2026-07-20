@@ -17,6 +17,7 @@ const crossrefWork = {
   },
 }
 
+//
 describe('Crossref citation endorsement test', () => {
   it('shows successful GET made on load and data parsed onto page, crossref citation data for an adapter DOI appears from client-side crossref API request ', () => {
     cy.intercept('GET', '**/api/v1/auth/me', { statusCode: 401, body: { detail: 'GitHub sign-in required.' } })
