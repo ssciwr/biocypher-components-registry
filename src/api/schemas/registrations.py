@@ -22,6 +22,11 @@ REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
 }
 
 
+# ===========================================================
+# =====================  Input Models =======================
+# ===========================================================
+
+
 class RegistrationCreateRequest(BaseModel):
     """Request body for creating an adapter registration."""
 
@@ -87,6 +92,11 @@ class RegistrationCreateRequest(BaseModel):
             return None
         normalized_value = value.strip()
         return normalized_value or None
+
+
+# ===========================================================
+# =====================  Output Models ======================
+# ===========================================================
 
 
 class RegistrationCreateResponse(BaseModel):
