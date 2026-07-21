@@ -38,10 +38,10 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --no-build --locked --group dev
+        run: uv sync --locked --group dev
 
       - name: Run tests
-        run: uv run --locked pytest --cov --cov-branch --cov-report=xml --no-build
+        run: uv run --locked pytest --cov --cov-branch --cov-report=xml
 
       - name: Check coverage report
         run: ls -lh coverage.xml
