@@ -8,7 +8,7 @@ The project currently contains:
 
 - a Python backend with CLI commands and a FastAPI REST API
 - SQLite support for local development and PostgreSQL support for deployment-oriented setups
-- a React/Vite frontend scaffold under `frontend/` (static landing page, not yet wired to the API)
+- a React/Vite frontend  under `frontend/` which is powered by GitHub based authentication and requires a basic GitHub OAuth App key
 - unit and BDD tests for core, API, persistence, and CLI behavior
 
 ## Requirements
@@ -36,6 +36,16 @@ Other optional dependency groups defined in `pyproject.toml`:
 
 - `api-client`: installs `httpie` for ad hoc API calls (`uv sync --group api-client`)
 - `performance`: installs `locust` for load testing against `locustfile.py` (`uv sync --group performance`)
+
+Create a .env file and make sure it is untracked(.gitignore should do this by default). You can then copy the contents of .envsample, and edit it to add a real GitHub OAuthApp ID and Secret, following these steps on GitHub for your user:
+
+Click "Settings", then "Developer Settings" (low on the left), then OAuth Apps and "New OAuth App", then enter these values for local development:
+`GitHub OAuth App form data for local dev:`
+For the Homepage URL: http://127.0.0.1:5173
+For the call back; http://127.0.0.1:5173/api/v1/auth/github/callback
+
+After registering, click `"Generate a new client secret"` on the page and put the value in `.env` under `GITHUB_OAUTH_CLIENT_SECRET`.
+Then look on the page for the ID and set that too: `GITHUB_OAUTH_CLIENT_ID`
 
 Run backend tests:
 
