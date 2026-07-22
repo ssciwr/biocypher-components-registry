@@ -1,6 +1,7 @@
 # BioCypher Components Registry
 
 [![codecov](https://codecov.io/gh/ssciwr/biocypher-components-registry/graph/badge.svg?token=V6MMJ2L1O6)](https://codecov.io/gh/ssciwr/biocypher-components-registry)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ssciwr/biocypher-components-registry/main.svg)](https://results.pre-commit.ci/latest/github/ssciwr/biocypher-components-registry/main)
 
 Registry system for BioCypher adapters with metadata validation, registration workflows, persistence, and API/CLI access.
 
@@ -121,6 +122,17 @@ uv run cli.py adapter direct --name "My Adapter" --description "..." --version "
 ```
 
 Run `uv run cli.py adapter --help` or `uv run cli.py dataset --help` for the full flag list of each mode.
+
+## Agentic workspace
+The agentic workspace can be run through the API or directly through the command-line using
+```bash
+uv run --group workspace python src/core/workspace/client_loop.py
+```
+Be aware that currently you need a Claude API key that is provided as environment variable:
+```bash
+export ANTHROPIC_API_KEY="<your key>"
+```
+For more information on the agentic workspace, consult its [dedicated documentation](docs/agentic_workspace.md).
 
 ## REST API
 
