@@ -214,11 +214,14 @@ name = "biocypher-components-registry"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "croissant-baker" },
     { name = "fastapi" },
     { name = "jsonschema" },
+    { name = "mcp" },
     { name = "mlcroissant" },
     { name = "pandas" },
+    { name = "prompt-toolkit" },
     { name = "psycopg2-binary" },
     { name = "pyarrow" },
     { name = "pyyaml" },
@@ -243,19 +246,17 @@ dev = [
 performance = [
     { name = "locust" },
 ]
-workspace = [
-    { name = "anthropic" },
-    { name = "mcp" },
-    { name = "prompt-toolkit" },
-]
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.69" },
     { name = "croissant-baker" },
     { name = "fastapi" },
     { name = "jsonschema" },
+    { name = "mcp", specifier = ">=1.9" },
     { name = "mlcroissant" },
     { name = "pandas" },
+    { name = "prompt-toolkit" },
     { name = "psycopg2-binary" },
     { name = "pyarrow" },
     { name = "pyyaml" },
@@ -276,11 +277,6 @@ dev = [
     { name = "pytest-cov" },
 ]
 performance = [{ name = "locust" }]
-workspace = [
-    { name = "anthropic", specifier = ">=0.69" },
-    { name = "mcp", specifier = ">=1.9" },
-    { name = "prompt-toolkit" },
-]
 
 [[package]]
 name = "blinker"
