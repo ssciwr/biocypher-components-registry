@@ -83,7 +83,11 @@ def ensure_supported_generator(generator: str) -> str:
 def create_registration_request(
     adapter_name: str,
     repository_location: str,
+    description: str | None = None,
     contact_email: str | None = None,
+    license_value: str | None = None,
+    doi: str | None = None,
+    submitted_by_github_login: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized repository submission request."""
     from src.core.adapter.service import (
@@ -93,7 +97,11 @@ def create_registration_request(
     return _create_registration_request(
         adapter_name=adapter_name,
         repository_location=repository_location,
+        description=description,
         contact_email=contact_email,
+        license_value=license_value,
+        doi=doi,
+        submitted_by_github_login=submitted_by_github_login,
     )
 
 

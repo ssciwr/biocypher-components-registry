@@ -1,4 +1,4 @@
-"""Shared SQLAlchemy table definitions for registration persistence."""
+"""Shared SQLAlchemy table definitions for registration and auth persistence."""
 
 from __future__ import annotations
 
@@ -12,15 +12,27 @@ registration_sources_table = Table(
     metadata,
     Column("id", String, primary_key=True),
     Column("submitted_adapter_name", String, nullable=False),
+    Column("description", String, nullable=True),
     Column("repository_location", String, nullable=False),
     Column("source_kind", String, nullable=False),
     Column("contact_email", String, nullable=True),
+    Column("license_value", String, nullable=True),
+    Column("doi", String, nullable=True),
+    Column("submitted_by_github_login", String, nullable=True),
     Column("is_active", Boolean, nullable=False),
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
     Column("last_checked_at", String, nullable=True),
     Column("last_seen_at", String, nullable=True),
     Column("current_registry_entry_id", String, nullable=True),
+)
+
+auth_sessions_table = Table(
+    "auth_sessions",
+    metadata,
+    Column("id_hash", String, primary_key=True),
+    Column("github_login", String, nullable=False),
+    Column("expires_at", String, nullable=False),
 )
 
 registry_entries_table = Table(

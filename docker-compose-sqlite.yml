@@ -10,9 +10,13 @@ services:
     container_name: biocypher-registry-frontend
     ports:
       - "3000:80"
+    environment:
+      # When integrating, adjust this in .env.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     volumes:
       # Placeholder for future React build output
       - ./frontend-placeholder:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       - backend
     networks:
@@ -22,6 +26,7 @@ services:
   # Tier 2: Backend Container (FastAPI + Uvicorn)
   # ===========================================================
   backend:
+    env_file: .env
     build:
       context: .
       dockerfile: Dockerfile

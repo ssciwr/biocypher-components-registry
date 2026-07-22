@@ -1,12 +1,14 @@
+import { useEffect, useState } from 'react'
 import {
   ArrowRightIcon,
   CloudArrowUpIcon,
   CommandLineIcon,
   DocumentPlusIcon,
   MagnifyingGlassIcon,
-  SparklesIcon,
 } from '@heroicons/react/24/outline'
-import bioCypherLogo from './assets/logo-biocypher.png'
+import AppHeader from './components/AppHeader'
+import type { AuthUser } from './components/AppHeader'
+import RegisterPage from './pages/RegisterPage'
 
 const actionCards = [
   {
@@ -14,6 +16,7 @@ const actionCards = [
     icon: MagnifyingGlassIcon,
     text: 'Search reusable components and inspect adapter metadata like data sources.',
     cta: 'Browse adapters',
+    href: '#',
     tone: 'bg-cyan-100 text-cyan-700',
   },
   {
@@ -21,6 +24,7 @@ const actionCards = [
     icon: DocumentPlusIcon,
     text: 'Create BioCypher adapters and metadata.',
     cta: 'Start creating',
+    href: '#',
     featured: true,
     tone: 'bg-white/20 text-white',
   },
@@ -29,56 +33,132 @@ const actionCards = [
     icon: CloudArrowUpIcon,
     text: 'Submit your adapter repository to our registry, so others can use it.',
     cta: 'Register now',
+    href: '/register',
     tone: 'bg-blue-100 text-blue-700',
   },
 ]
 
 const popularAdapters = ['Open Targets', 'OmniPath', 'Collectri adapter']
 
+const authUserKey = 'bcr-auth-user' // does not really matter, just needs to be hardcoded between hte save/read.
+
+// To persist if they reopen the browser, not really needed but I found it improves developer experience too as otherwise
+// each time you edit code (e.g. a small AI agent change), the reloaded codebase means you would get logged out before
+function cacheAuthUser(user: AuthUser | null) {
+  if (user) {
+    globalThis.localStorage.setItem(authUserKey, JSON.stringify(user))
+    return
+  }
+  globalThis.localStorage.removeItem(authUserKey)
+}
+
+
+function readCachedAuthUser(): AuthUser | null {
+  const savedUser = globalThis.localStorage.getItem(authUserKey)
+  if (!savedUser) {
+    return null
+  }
+
+  try {
+    const user = JSON.parse(savedUser) as Partial<AuthUser>
+    return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
+  } catch {
+    globalThis.localStorage.removeItem(authUserKey)
+    return null
+  }
+}
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+
 function App() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [pathname, setPathname] = useState(globalThis.location.pathname)
+
+  useEffect(() => {
+    let ignore = false
+
+    fetch(`${apiBaseUrl}/api/v1/auth/me`, { credentials: 'include' })
+      .then((response) => {
+        if (response.status === 401) {
+          return null
+        }
+        if (!response.ok) {
+          throw new Error('Could not check sign-in status.')
+        }
+        return response.json() as Promise<AuthUser>
+      })
+      .then((user: AuthUser | null) => {
+        if (!ignore) {
+          setAuthUser(user)
+          cacheAuthUser(user)
+          setAuthError(null)
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAuthError('Could not check sign-in status.')
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const updatePathname = () => setPathname(globalThis.location.pathname)
+    globalThis.addEventListener('popstate', updatePathname)
+    return () => globalThis.removeEventListener('popstate', updatePathname)
+  }, [])
+
+
+  async function logOut() {
+    try {
+      const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        setAuthError('Sign out failed.')
+        return
+      }
+
+      setAuthUser(null)
+      cacheAuthUser(null)
+      setAuthError(null)
+    } catch {
+      setAuthError('Sign out failed.')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-          <a className="flex items-center gap-2" href="#">
-            <img alt="BioCypher" className="h-7 w-7" src={bioCypherLogo} />
-            <span className="text-base font-semibold">BioCypher</span>
-            <span className="text-sm text-slate-500">| Registry</span>
-          </a>
-          <nav className="hidden items-center gap-16 text-sm text-slate-600 md:flex" aria-label="Main">
-            <a className="hover:text-slate-950" href="#">
-              Explore
-            </a>
-            <a className="hover:text-slate-950" href="#">
-              Create
-            </a>
-            <a className="hover:text-slate-950" href="#">
-              Register
-            </a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <a
-              className="hidden rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600 sm:inline-flex"
-              href="#"
-            >
-              Sign in with GitHub
-            </a>
-            <a
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
-              href="#"
-            >
-              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-              <b>Workspace</b>
-            </a>
-          </div>
+      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
+      {authError ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
+          {authError}
         </div>
-      </header>
+      ) : null}
+      {pathname === '/register' ? (
+        <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
+      ) : (
+        <HomePage />
+      )}
+      <Footer />
+    </main>
+  )
+}
 
+function HomePage() {
+  return (
+    <>
       <section className="bg-blue-50">
         <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
             <span className="h-2 w-2 rounded-full bg-lime-500" aria-hidden="true" />
-            Discover adapters, generate metadata, and register components
+            <span>Discover adapters, generate metadata, and register components</span>
           </div>
           <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
             Find BioCypher components<br /> for your research
@@ -100,13 +180,12 @@ function App() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
             <span>Popular:</span>
             {popularAdapters.map((adapter) => (
-              <a
+              <span
                 className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
-                href="#"
                 key={adapter}
               >
                 {adapter}
-              </a>
+              </span>
             ))}
           </div>
         </div>
@@ -121,14 +200,13 @@ function App() {
               return (
                 <a
                   className={`rounded-2xl border p-7 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.featured ? 'border-blue-600 bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700' : 'border-slate-200 bg-white hover:border-blue-200'}`}
-                  href="#"
+                  href={card.href}
                   key={card.label}
                 >
                   <span
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}
                   >
                     <Icon className="h-6 w-6" aria-hidden="true" />
-                    {/* todo: croissant icon/decide on icons */}
                   </span>
                   <h2 className={`mt-4 text-xl font-bold ${card.featured ? 'text-white' : 'text-slate-950'}`}>{card.label}</h2>
                   <p className={`mt-3 min-h-12 text-sm leading-5 ${card.featured ? 'text-blue-50' : 'text-slate-600'}`}>{card.text}</p>
@@ -141,9 +219,9 @@ function App() {
             })}
           </div>
 
-          <a
+          <button
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            href="#"
+            type="button"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />
@@ -161,24 +239,28 @@ function App() {
                 be written more accurately and thoroughly.
               </span>
             </span>
-          </a>
+          </button>
         </div>
       </section>
+    </>
+  )
+}
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7 text-xs text-slate-500">
-          <a
-            className="hover:text-blue-600"
-            href="https://github.com/ssciwr/biocypher-components-registry"
-            rel="noreferrer"
-            target="_blank"
-          >
-            GitHub
-          </a>
-          <span>BioCypher Components Registry</span>
-        </div>
-      </footer>
-    </main>
+function Footer() {
+  return (
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7 text-xs text-slate-500">
+        <a
+          className="hover:text-blue-600"
+          href="https://github.com/ssciwr/biocypher-components-registry"
+          rel="noreferrer"
+          target="_blank"
+        >
+          GitHub
+        </a>
+        <span>BioCypher Components Registry</span>
+      </div>
+    </footer>
   )
 }
 

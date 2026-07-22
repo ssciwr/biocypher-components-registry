@@ -44,14 +44,22 @@ def execute_request(
 def create_registration_request(
     adapter_name: str,
     repository_location: str,
+    description: str | None = None,
     contact_email: str | None = None,
+    license_value: str | None = None,
+    doi: str | None = None,
+    submitted_by_github_login: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized adapter registration request.
 
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or supported repository URL.
+        description: Optional maintainer-facing adapter summary.
         contact_email: Optional maintainer contact email for status follow-up.
+        license_value: Optional submitted adapter license text.
+        doi: Optional submitted DOI text.
+        submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
         A normalized registration request ready for the registry workflow.
@@ -66,11 +74,14 @@ def create_registration_request(
     if not normalized_name:
         raise ValueError("Adapter name is required.")
 
-    normalized_location = repository_location.strip()
+    normalized_location = _normalize_repository_location(repository_location)
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
+    normalized_description = _normalize_optional_text(description)
     normalized_contact_email = _normalize_contact_email(contact_email)
+    normalized_license_value = _normalize_optional_text(license_value)
+    normalized_doi = _normalize_optional_text(doi)
 
     if normalized_location.startswith(("http://", "https://")):
         _validate_remote_repository(normalized_location)
@@ -88,8 +99,27 @@ def create_registration_request(
         repository_location=normalized_repository_location,
         repository_kind=repository_kind,
         source=repository_location,
+        description=normalized_description,
         contact_email=normalized_contact_email,
+        license_value=normalized_license_value,
+        doi=normalized_doi,
+        submitted_by_github_login=submitted_by_github_login,
     )
+
+
+def _normalize_repository_location(repository_location: str) -> str:
+    normalized_location = repository_location.strip()
+    if normalized_location.startswith("github.com/"):
+        return f"https://{normalized_location}"
+    return normalized_location
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Return stripped optional text."""
+    if value is None:
+        return None
+    normalized_value = value.strip()
+    return normalized_value or None
 
 
 def _normalize_contact_email(contact_email: str | None) -> str | None:

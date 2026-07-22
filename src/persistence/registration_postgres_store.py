@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
@@ -31,6 +31,20 @@ class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
     def _initialize_database(self) -> None:
         """Create the schema if it does not exist."""
         metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            for column_name in (
+                "description",
+                "contact_email",
+                "license_value",
+                "doi",
+                "submitted_by_github_login",
+            ):
+                connection.execute(
+                    text(
+                        "ALTER TABLE registration_sources "
+                        f"ADD COLUMN IF NOT EXISTS {column_name} VARCHAR"
+                    )
+                )
 
     def _build_engine(self) -> Engine:
         """Create the SQLAlchemy engine for PostgreSQL with production settings."""

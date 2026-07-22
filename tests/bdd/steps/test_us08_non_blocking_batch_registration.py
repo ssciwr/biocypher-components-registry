@@ -311,4 +311,3 @@ def registry_records_valid_created_for_corrected_source(
         batch_registration_context["corrected_registration_id"],
         "VALID_CREATED",
     )
-

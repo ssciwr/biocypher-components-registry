@@ -3,9 +3,11 @@ from __future__ import annotations
 from src.persistence.tables import (
     registration_events_table,
     registration_sources_table,
+    auth_sessions_table,
     registry_entries_table,
     registry_refreshes_table,
 )
+
 
 def test_registration_sources_table_has_expected_columns() -> None:
     """Expose the expected source columns through SQLAlchemy metadata."""
@@ -13,9 +15,13 @@ def test_registration_sources_table_has_expected_columns() -> None:
     assert set(registration_sources_table.columns.keys()) == {
         "id",
         "submitted_adapter_name",
+        "description",
         "repository_location",
         "source_kind",
         "contact_email",
+        "license_value",
+        "doi",
+        "submitted_by_github_login",
         "is_active",
         "created_at",
         "updated_at",
@@ -79,4 +85,14 @@ def test_registry_refreshes_table_has_expected_columns() -> None:
         "duplicate",
         "rejected_same_version_changed",
         "fetch_failed",
+    }
+
+
+def test_auth_sessions_table_has_expected_columns() -> None:
+    """Expose the expected minimal GitHub session columns."""
+    assert auth_sessions_table.name == "auth_sessions"
+    assert set(auth_sessions_table.columns.keys()) == {
+        "id_hash",
+        "github_login",
+        "expires_at",
     }

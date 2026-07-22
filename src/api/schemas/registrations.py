@@ -13,16 +13,12 @@ from src.core.registration.models import (
     StoredRegistration,
 )
 
-
-# ===========================================================
-# =====================  OpenAPI Examples ===================
-# ===========================================================
-
-
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
-    "adapter_name": "Manual Example Adapter",
-    "repository_location": "https://github.com/example-org/example-adapter",
+    "adapter_name": "CollecTRI Adapter",
+    "repository_location": "github.com/biocypher/collectri",
     "contact_email": "maintainer@example.org",
+    "license_value": "MIT",
+    "doi": "10.5281/zenodo.1234567",
 }
 
 
@@ -53,6 +49,14 @@ class RegistrationCreateRequest(BaseModel):
         default=None,
         description="Optional maintainer contact email for follow-up.",
     )
+    license_value: str | None = Field(
+        default=None,
+        description="Optional submitted adapter license text.",
+    )
+    doi: str | None = Field(
+        default=None,
+        description="Optional submitted DOI text.",
+    )
 
     @field_validator("adapter_name", "repository_location")
     @classmethod
@@ -80,6 +84,15 @@ class RegistrationCreateRequest(BaseModel):
 
         return normalized_value
 
+    @field_validator("license_value", "doi")
+    @classmethod
+    def _strip_optional_text(cls, value: str | None) -> str | None:
+        """Normalize optional text fields."""
+        if value is None:
+            return None
+        normalized_value = value.strip()
+        return normalized_value or None
+
 
 # ===========================================================
 # =====================  Output Models ======================
@@ -97,6 +110,9 @@ class RegistrationCreateResponse(BaseModel):
     status: RegistrationStatus
     created_at: datetime
     contact_email: str | None = None
+    license_value: str | None = None
+    doi: str | None = None
+    submitted_by_github_login: str | None = None
 
     @classmethod
     def from_stored(cls, registration: StoredRegistration) -> "RegistrationCreateResponse":
@@ -110,6 +126,9 @@ class RegistrationCreateResponse(BaseModel):
             status=registration.status,
             created_at=registration.created_at,
             contact_email=registration.contact_email,
+            license_value=registration.license_value,
+            doi=registration.doi,
+            submitted_by_github_login=registration.submitted_by_github_login,
         )
 
 
@@ -135,6 +154,9 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
             status=registration.status,
             created_at=registration.created_at,
             contact_email=registration.contact_email,
+            license_value=registration.license_value,
+            doi=registration.doi,
+            submitted_by_github_login=registration.submitted_by_github_login,
             metadata_path=registration.metadata_path,
             metadata=registration.metadata,
             profile_version=registration.profile_version,
@@ -163,6 +185,9 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
             status=registration.status,
             created_at=registration.created_at,
             contact_email=registration.contact_email,
+            license_value=registration.license_value,
+            doi=registration.doi,
+            submitted_by_github_login=registration.submitted_by_github_login,
             profile_version=registration.profile_version,
             updated_at=registration.updated_at,
             uniqueness_key=registration.uniqueness_key,

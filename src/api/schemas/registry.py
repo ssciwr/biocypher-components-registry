@@ -95,7 +95,6 @@ class RegistryRegistrationResponse(BaseModel):
     latest_event_type: str
     created_at: datetime
     updated_at: datetime | None = None
-    contact_email: str | None = None
     profile_version: str | None = None
     uniqueness_key: str | None = None
 
@@ -117,7 +116,6 @@ class RegistryRegistrationResponse(BaseModel):
             latest_event_type=latest_event_type,
             created_at=registration.created_at,
             updated_at=registration.updated_at,
-            contact_email=registration.contact_email,
             profile_version=registration.profile_version,
             uniqueness_key=registration.uniqueness_key,
         )

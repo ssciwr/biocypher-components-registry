@@ -47,6 +47,8 @@ from src.core.validation.results import ValidationResult
 from src.persistence.factory import build_registration_store
 
 
+_DEFAULT_GITHUB_LOGIN = "sampleGithubLogin"
+
 # ============================================================================
 # Constants
 # ============================================================================
@@ -201,13 +203,12 @@ def _print_discovery_target(
         )
     )
 
-
 def _print_submission_request(
     adapter_name: str,
     adapter_id: str,
     repository_location: str,
     repository_kind: str,
-    contact_email: str | None,
+    github_login: str,
 ) -> None:
     body = Text()
     body.append("Adapter\n", style=STYLE_SECTION_HEADING)
@@ -217,10 +218,9 @@ def _print_submission_request(
     body.append("Repository\n", style="bold")
     body.append(f"{repository_location}\n\n", style="white")
     body.append("Kind\n", style="bold")
-    body.append(repository_kind, style="white")
-    if contact_email:
-        body.append("\n\nContact Email\n", style="bold")
-        body.append(contact_email, style="white")
+    body.append(f"{repository_kind}\n\n", style="white")
+    body.append("GitHub Login\n", style="bold")
+    body.append(github_login, style="white")
     console.print(
         Panel(
             body,
@@ -325,7 +325,7 @@ def _print_stored_registration(
     repository_location: str,
     repository_kind: str,
     status: str,
-    contact_email: str | None,
+    github_login: str,
 ) -> None:
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
@@ -337,10 +337,9 @@ def _print_stored_registration(
     body.append("Kind\n", style="bold")
     body.append(f"{repository_kind}\n\n", style="white")
     body.append("Status\n", style="bold")
-    body.append(status, style="white")
-    if contact_email:
-        body.append("\n\nContact Email\n", style="bold")
-        body.append(contact_email, style="white")
+    body.append(f"{status}\n\n", style="white")
+    body.append("GitHub Login\n", style="bold")
+    body.append(github_login, style="white")
     console.print(
         Panel(
             body,
@@ -421,6 +420,13 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
 # ============================================================================
 
 
+def _resolve_github_login(github_login: str | None) -> str:
+    if github_login is None:
+        return _DEFAULT_GITHUB_LOGIN
+    normalized_login = github_login.strip()
+    return normalized_login or _DEFAULT_GITHUB_LOGIN
+
+
 @app.command(
     "submit",
     help=(
@@ -438,17 +444,18 @@ def submit_cmd(
         ...,
         help="Local repository path or supported repository URL.",
     ),
-    contact_email: str | None = typer.Option(
-        None,
-        "--contact-email",
-        help="Optional maintainer contact email for status follow-up.",
+    github_login: str | None = typer.Option(
+        _DEFAULT_GITHUB_LOGIN,
+        "--github-login",
+        help="GitHub login to attach to this registration.",
     ),
 ) -> None:
+    resolved_github_login = _resolve_github_login(github_login)
     try:
         request = create_registration_request(
             adapter_name=adapter_name,
             repository_location=repository_location,
-            contact_email=contact_email,
+            submitted_by_github_login=resolved_github_login,
         )
     except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
@@ -459,7 +466,7 @@ def submit_cmd(
         adapter_id=request.adapter_id,
         repository_location=request.repository_location,
         repository_kind=request.repository_kind,
-        contact_email=request.contact_email,
+        github_login=request.submitted_by_github_login or _DEFAULT_GITHUB_LOGIN,
     )
     console.print("[green]Registration request created[/green]")
 
@@ -483,19 +490,20 @@ def submit_registration_cmd(
         "--db-path",
         help=_DB_PATH_HELP,
     ),
-    contact_email: str | None = typer.Option(
-        None,
-        "--contact-email",
-        help="Optional maintainer contact email for status follow-up.",
+    github_login: str | None = typer.Option(
+        _DEFAULT_GITHUB_LOGIN,
+        "--github-login",
+        help="GitHub login to attach to this registration.",
     ),
 ) -> None:
+    resolved_github_login = _resolve_github_login(github_login)
     try:
         store = build_registration_store(db_path)
         registration = submit_registration_record(
             adapter_name=adapter_name,
             repository_location=repository_location,
             store=store,
-            contact_email=contact_email,
+            submitted_by_github_login=resolved_github_login,
         )
     except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
@@ -507,7 +515,7 @@ def submit_registration_cmd(
         repository_location=registration.repository_location,
         repository_kind=registration.repository_kind,
         status=registration.status.value,
-        contact_email=registration.contact_email,
+        github_login=registration.submitted_by_github_login or _DEFAULT_GITHUB_LOGIN,
     )
     console.print("[green]Registration stored[/green]")
 

@@ -42,7 +42,17 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
                 text("PRAGMA table_info(registration_sources)")
             ).mappings()
         }
-        if "contact_email" not in columns:
-            connection.execute(
-                text("ALTER TABLE registration_sources ADD COLUMN contact_email VARCHAR")
-            )
+        for column_name in (
+            "description",
+            "contact_email",
+            "license_value",
+            "doi",
+            "submitted_by_github_login",
+        ):
+            if column_name not in columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE registration_sources "
+                        f"ADD COLUMN {column_name} VARCHAR"
+                    )
+                )

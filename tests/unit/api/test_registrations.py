@@ -6,8 +6,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
-from src.api.dependencies import get_registration_store
+from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.schemas.registrations import REGISTRATION_CREATE_EXAMPLE
+from src.core.auth.models import AuthSession
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
 
@@ -128,6 +129,9 @@ def test_create_registration_endpoint_persists_registration(
     store = SQLiteRegistrationStore(database_path)
     app = create_app()
     app.dependency_overrides[get_registration_store] = lambda: store
+    app.dependency_overrides[get_optional_auth_session] = lambda: AuthSession(
+        github_login="edwinc"
+    )
     client = TestClient(app)
 
     response = client.post(
@@ -135,7 +139,8 @@ def test_create_registration_endpoint_persists_registration(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
 
@@ -147,36 +152,15 @@ def test_create_registration_endpoint_persists_registration(
     assert payload["repository_location"] == str(repository.resolve())
     assert payload["repository_kind"] == "local"
     assert payload["status"] == "SUBMITTED"
-    assert payload["contact_email"] == "maintainer@example.org"
+    assert payload["license_value"] == "MIT"
+    assert payload["doi"] == "10.5281/zenodo.1234567"
+    assert payload["submitted_by_github_login"] == "edwinc"
 
     stored = store.get_registration(payload["registration_id"])
     assert stored is not None
-    assert stored.contact_email == "maintainer@example.org"
-
-
-def test_create_registration_endpoint_rejects_invalid_contact_email(
-    tmp_path: Path,
-) -> None:
-    """Reject invalid contact email values through request validation."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    store = SQLiteRegistrationStore(database_path)
-    app = create_app()
-    app.dependency_overrides[get_registration_store] = lambda: store
-    client = TestClient(app)
-
-    response = client.post(
-        "/api/v1/registrations",
-        json={
-            "adapter_name": "Example Adapter",
-            "repository_location": str(repository),
-            "contact_email": "not-an-email",
-        },
-    )
-
-    assert response.status_code == 422
-    assert "Contact email must be a valid email address." in response.text
+    assert stored.license_value == "MIT"
+    assert stored.doi == "10.5281/zenodo.1234567"
+    assert stored.submitted_by_github_login == "edwinc"
 
 
 def test_create_registration_endpoint_maps_missing_repository_to_bad_request(
@@ -219,7 +203,8 @@ def test_get_registration_endpoint_returns_stored_registration(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
     registration_id = create_response.json()["registration_id"]
@@ -234,7 +219,8 @@ def test_get_registration_endpoint_returns_stored_registration(
     assert payload["repository_location"] == str(repository.resolve())
     assert payload["repository_kind"] == "local"
     assert payload["status"] == "SUBMITTED"
-    assert payload["contact_email"] == "maintainer@example.org"
+    assert payload["license_value"] == "MIT"
+    assert payload["doi"] == "10.5281/zenodo.1234567"
     assert payload["metadata_path"] is None
     assert payload["metadata"] is None
     assert payload["profile_version"] is None
@@ -296,7 +282,7 @@ def test_list_registrations_endpoint_returns_active_registrations(
         json={
             "adapter_name": "First Adapter",
             "repository_location": str(first_repository),
-            "contact_email": "first@example.org",
+            "license_value": "MIT",
         },
     )
     second_response = client.post(
@@ -304,7 +290,7 @@ def test_list_registrations_endpoint_returns_active_registrations(
         json={
             "adapter_name": "Second Adapter",
             "repository_location": str(second_repository),
-            "contact_email": "second@example.org",
+            "license_value": "Apache-2.0",
         },
     )
 
@@ -324,9 +310,9 @@ def test_list_registrations_endpoint_returns_active_registrations(
         "SUBMITTED",
         "SUBMITTED",
     ]
-    assert [item["contact_email"] for item in payload["items"]] == [
-        "first@example.org",
-        "second@example.org",
+    assert [item["license_value"] for item in payload["items"]] == [
+        "MIT",
+        "Apache-2.0",
     ]
     assert all("metadata" not in item for item in payload["items"])
     assert all("metadata_path" not in item for item in payload["items"])
@@ -353,7 +339,8 @@ def test_list_registrations_endpoint_omits_processed_metadata(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
     registration_id = create_response.json()["registration_id"]
@@ -394,7 +381,8 @@ def test_process_registration_endpoint_marks_registration_valid(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
     registration_id = create_response.json()["registration_id"]
@@ -408,7 +396,8 @@ def test_process_registration_endpoint_marks_registration_valid(
     assert payload["metadata_path"] == str(repository / "croissant.jsonld")
     assert payload["profile_version"] == "v1"
     assert payload["uniqueness_key"] == "example-adapter::1.0.0"
-    assert payload["contact_email"] == "maintainer@example.org"
+    assert payload["license_value"] == "MIT"
+    assert payload["doi"] == "10.5281/zenodo.1234567"
 
 
 def test_process_registration_endpoint_returns_not_found_for_unknown_registration(
@@ -476,7 +465,8 @@ def test_revalidate_registration_endpoint_reprocesses_corrected_invalid_source(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
     registration_id = create_response.json()["registration_id"]
@@ -499,7 +489,8 @@ def test_revalidate_registration_endpoint_reprocesses_corrected_invalid_source(
     assert payload["profile_version"] == "v1"
     assert payload["uniqueness_key"] == "example-adapter::1.0.0"
     assert payload["validation_errors"] is None
-    assert payload["contact_email"] == "maintainer@example.org"
+    assert payload["license_value"] == "MIT"
+    assert payload["doi"] == "10.5281/zenodo.1234567"
 
 
 def test_revalidate_registration_endpoint_returns_not_found_for_unknown_registration(
@@ -572,7 +563,8 @@ def test_list_registration_events_endpoint_returns_fetch_failed_event(
         json={
             "adapter_name": "Example Adapter",
             "repository_location": str(repository),
-            "contact_email": "maintainer@example.org",
+            "license_value": "MIT",
+            "doi": "10.5281/zenodo.1234567",
         },
     )
     registration_id = create_response.json()["registration_id"]

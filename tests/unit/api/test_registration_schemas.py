@@ -28,23 +28,27 @@ def test_registration_create_request_normalizes_input_fields() -> None:
     request = RegistrationCreateRequest(
         adapter_name="  Example Adapter  ",
         repository_location="  https://github.com/example/example-adapter  ",
-        contact_email="  maintainer@example.org  ",
+        license_value="  MIT  ",
+        doi="  10.5281/zenodo.1234567  ",
     )
 
     assert request.adapter_name == "Example Adapter"
     assert request.repository_location == "https://github.com/example/example-adapter"
-    assert request.contact_email == "maintainer@example.org"
+    assert request.license_value == "MIT"
+    assert request.doi == "10.5281/zenodo.1234567"
 
 
-def test_registration_create_request_treats_blank_contact_email_as_missing() -> None:
-    """Allow omitted maintainer contact by normalizing blank contact email to None."""
+def test_registration_create_request_treats_blank_optional_fields_as_missing() -> None:
+    """Allow omitted optional fields by normalizing blank text to None."""
     request = RegistrationCreateRequest(
         adapter_name="Example Adapter",
         repository_location="https://github.com/example/example-adapter",
-        contact_email="   ",
+        license_value="   ",
+        doi="   ",
     )
 
-    assert request.contact_email is None
+    assert request.license_value is None
+    assert request.doi is None
 
 
 def test_registration_create_request_rejects_blank_required_fields() -> None:
@@ -53,16 +57,6 @@ def test_registration_create_request_rejects_blank_required_fields() -> None:
         RegistrationCreateRequest(
             adapter_name="   ",
             repository_location="https://github.com/example/example-adapter",
-        )
-
-
-def test_registration_create_request_rejects_invalid_contact_email() -> None:
-    """Reject invalid contact email values at the API boundary."""
-    with pytest.raises(ValidationError, match="Contact email must be a valid email address."):
-        RegistrationCreateRequest(
-            adapter_name="Example Adapter",
-            repository_location="https://github.com/example/example-adapter",
-            contact_email="not-an-email",
         )
 
 
@@ -77,7 +71,8 @@ def test_registration_create_response_maps_from_stored_registration() -> None:
         repository_kind="remote",
         status=RegistrationStatus.SUBMITTED,
         created_at=created_at,
-        contact_email="maintainer@example.org",
+        license_value="MIT",
+        doi="10.5281/zenodo.1234567",
     )
 
     response = RegistrationCreateResponse.from_stored(registration)
@@ -86,7 +81,8 @@ def test_registration_create_response_maps_from_stored_registration() -> None:
     assert response.adapter_name == "Example Adapter"
     assert response.status == RegistrationStatus.SUBMITTED
     assert response.created_at == created_at
-    assert response.contact_email == "maintainer@example.org"
+    assert response.license_value == "MIT"
+    assert response.doi == "10.5281/zenodo.1234567"
 
 
 def test_registration_detail_response_maps_optional_registration_fields() -> None:
@@ -101,7 +97,8 @@ def test_registration_detail_response_maps_optional_registration_fields() -> Non
         repository_kind="remote",
         status=RegistrationStatus.VALID,
         created_at=created_at,
-        contact_email="maintainer@example.org",
+        license_value="MIT",
+        doi="10.5281/zenodo.1234567",
         metadata_path="croissant.jsonld",
         metadata={"name": "Example Adapter"},
         profile_version="v1",
