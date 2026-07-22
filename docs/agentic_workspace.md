@@ -1,18 +1,19 @@
 # Agentic workspace
 
-The agentic workspace facilititates adapter creation using AI agents and the [BioCypher MCP](https://github.com/biocypher/biocypher-mcp). Currently only Anthropic (Claude) can be used for this, and it requires the user to have an API key. It is planned to extend this to BYOK, however the best integration of MCP is currently with Claude.
+The agentic workspace facilitates adapter creation using AI agents and the [BioCypher MCP](https://github.com/biocypher/biocypher-mcp). Currently only Anthropic (Claude) can be used for this, and it requires the user to have an API key. It is planned to extend this to BYOK, however the best integration of MCP is currently with Claude.
 
 ## `client_loop.py`
 
 Install the workspace dependencies and run the client from the repository root using
-```bash
-uv sync --group workspace
-uv run python src/core/workspace/client_loop.py
-```
-You need to provide your Anthropic API key as 
-```bash
-export ANTHROPIC_API_KEY="<your key>"
-```
+
+    uv sync
+    uv run python src/core/workspace/client_loop.py
+
+You need to provide your Anthropic API key via one of:
+
+    export ANTHROPIC_API_KEY="<your key>"
+    # or
+    export ANTHROPIC_API_KEY_FILE="secrets/anthropic_api_key"
 You will first need to confirm the Python environment that should be used for the adapter development. This will be a different environment to the registry environment, so you need to set it up first and install BioCypher and cookiecutter. I use my standard BioCypher environment at the moment.
 
 The reason that I have set up the script like this - asking for the environment - is that there are many ways to create and use environments. We want to limit the choices for the registry and use a dedicated environment for the agentic workspace processes. Also it uses additional tokens if you first need to create a new environment which is unnecessary for this use case and can be shipped with the container.

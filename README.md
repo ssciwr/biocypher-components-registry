@@ -125,13 +125,14 @@ Run `uv run cli.py adapter --help` or `uv run cli.py dataset --help` for the ful
 
 ## Agentic workspace
 The agentic workspace can be run through the API or directly through the command-line using
-```bash
-uv run --group workspace python src/core/workspace/client_loop.py
-```
-Be aware that currently you need a Claude API key that is provided as environment variable:
-```bash
-export ANTHROPIC_API_KEY="<your key>"
-```
+
+    uv run python src/core/workspace/client_loop.py
+
+Be aware that currently you need a Claude API key, provided via environment variables:
+
+    export ANTHROPIC_API_KEY="<your key>"
+    # or
+    export ANTHROPIC_API_KEY_FILE="secrets/anthropic_api_key"
 For more information on the agentic workspace, consult its [dedicated documentation](docs/agentic_workspace.md).
 
 ## REST API

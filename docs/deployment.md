@@ -1,6 +1,6 @@
 # Deployment & Security Architecture
 
-Status: findings from the security review of `src/backend/client_loop.py` and
+Status: findings from the security review of `src/core/workspace/client_loop.py` and
 deployment planning for public multi-user operation alongside the
 [biocypher-components-registry](https://github.com/ssciwr/biocypher-components-registry) stack.
 
