@@ -80,3 +80,4 @@ One caveat: `cache_control={"type": "ephemeral"}` as top-level kwarg — that is
 - Creation of croissant files for the adapter. Requires adapting the cookiecutter repo.
 - Multiple MCPs. We also want at least OntoWeaver MCP to run as well.
 - Problem with Anthropic API keys and testing the performance of local models.
+- Integration with GitHub: Creating repos on GitHub with the folders created in a session.
