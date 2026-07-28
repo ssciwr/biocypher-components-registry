@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react'
 import { BookOpenIcon } from '@heroicons/react/24/outline'
+import { fetchCrossrefWork, type CrossrefWork } from '../api/crossref'
 
 type CitationEndorsementProps = Readonly<{
   doi: string | null
 }>
 
-type CrossrefWork = {
-  count: number
-  title: string
-  authors: string[]
-}
-
 type CitationWork = CrossrefWork & {
+  count: number
   doi: string
+  title: string
 }
-
-const crossrefWorksBaseUrl = 'https://api.crossref.org/works' // hardcoded as only used in this one place. invalid DOIs mean the citation information will not be rendered
 
 function CitationEndorsement({ doi }: CitationEndorsementProps) {
   const doiValue = doi?.trim() || ''
@@ -26,9 +21,14 @@ function CitationEndorsement({ doi }: CitationEndorsementProps) {
 
     void fetchCrossrefWork(doiValue)
       .then((work) => {
-        setCitation(work ? { doi: doiValue, ...work } : false)
+        if (!work || typeof work.count !== 'number' || !work.title || work.authors.length === 0) {
+          setCitation(false)
+          return
+        }
+        setCitation({ authors: work.authors, count: work.count, doi: doiValue, title: work.title })
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        console.error('Could not load Crossref citation data.', error)
         setCitation(false) // if invalid or missing parts
       })
   }, [doiValue])
@@ -60,29 +60,5 @@ function CitationEndorsement({ doi }: CitationEndorsementProps) {
     </div>
   )
 }
-
-async function fetchCrossrefWork(doi: string): Promise<CrossrefWork | false> {
-  const response = await fetch(`${crossrefWorksBaseUrl}/${encodeURIComponent(doi)}`) // NOSONAR: we ignore this in SONAR because the user provides the DOI, and it goes as part of a already host-specified web request to cross ref. In other words, the user can only negatively impact themself if they provide this content, and only to a not found URL on crossref. So SONARs warning about this data being open is not really valid in this scenario
-  if (!response.ok) return false
-
-  const payload = (await response.json()) as { message?: Record<string, unknown> }
-  const message = payload.message
-  if (!message) return false
-
-  const count = message['is-referenced-by-count']
-  const title = message.title ? String(message.title).trim() : false
-  const authors = Array.isArray(message.author)
-    ? (message.author as Array<{ given?: string; family?: string; name?: string } | null>)
-        .map((author) => (
-          [author?.given, author?.family].filter(Boolean).join(' ') || String(author?.name || '')
-        ).trim())
-        .filter((name) => name.length > 1)
-    : []
-
-  if (typeof count !== 'number' || !Number.isFinite(count) || !title || authors.length === 0) return false
-
-  return { count, title, authors }
-}
-
 
 export default CitationEndorsement

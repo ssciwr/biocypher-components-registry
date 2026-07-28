@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 import {
@@ -12,6 +11,7 @@ import {
   type RegistrationRevalidateResponse,
 } from '../api/client'
 import { client } from '../api/client/client.gen'
+import { fetchCrossrefWork } from '../api/crossref'
 
 type RegisterPageProps = Readonly<{
   authUser: AuthUser | null
@@ -41,8 +41,10 @@ type RegistrationResultDisplay = Readonly<{
 }>
 
 type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
+type DoiCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'error'
 
 const draftKey = 'bcr-register-draft'
+const httpsUrlPattern = /^https:\/\/.+/i
 
 const emptyForm: RegistrationForm = {
   adapterName: '',
@@ -50,37 +52,6 @@ const emptyForm: RegistrationForm = {
   licenseValue: '',
   doi: '',
   cffUrl: '',
-}
-
-/*
- * AI-Generated.
- */
-function isHttpsUrl(value: string) {
-  const normalized = value.toLowerCase()
-  return normalized.startsWith('https://') && normalized.length > 'https://'.length
-}
-
-/*
- * AI-Generated.
- */
-function removeUrlSuffix(value: string) {
-  const queryIndex = value.indexOf('?')
-  const hashIndex = value.indexOf('#')
-  const suffixIndexes = [queryIndex, hashIndex].filter((index) => index >= 0)
-  return suffixIndexes.length ? value.slice(0, Math.min(...suffixIndexes)) : value
-}
-
-/*
- * AI-Generated.
- */
-function trimSlashes(value: string) {
-  let start = 0
-  let end = value.length
-
-  while (value[start] === '/') start += 1
-  while (end > start && value[end - 1] === '/') end -= 1
-
-  return value.slice(start, end)
 }
 
 const nextSteps = [
@@ -102,19 +73,11 @@ const nextSteps = [
   },
 ]
 
-// parse quickly on the client side to just keep the part we want to consistently look up the DOI record,
-// whether they provide a link, or just the DOI directly.
-// this takes the 2nd last slash until the end if present or the whole string otherwise.
 function registrationDoiValue(value: string) {
-  const rawValue = value.trim()
-  const trimmed = rawValue.toLowerCase().startsWith('doi:') ? rawValue.slice(4).trimStart() : rawValue
-  if (!trimmed) return ''
-
-  const cleanValue = trimSlashes(removeUrlSuffix(trimmed))
-  const parts = cleanValue.split('/').filter(Boolean)
-  return isHttpsUrl(cleanValue) && parts.length >= 2
-    ? parts.slice(-2).join('/')
-    : cleanValue
+  const trimmed = value.trim()
+  return trimmed.toLowerCase().startsWith('doi:')
+    ? trimmed.slice(4).trimStart()
+    : trimmed
 }
 
 function initialForm(): RegistrationForm {
@@ -132,7 +95,7 @@ function initialForm(): RegistrationForm {
 }
 
 /*
- * AI-Generated.
+ * AI-Generated. Based on the Penpot designs.
  */
 function registrationResultDisplay(result: RegistrationResponse): RegistrationResultDisplay {
   if (result.status === 'VALID') {
@@ -254,31 +217,68 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [metadataCheckStatus, setMetadataCheckStatus] = useState<MetadataCheckStatus>('idle')
+  const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  const metadataCheckText =
-    metadataCheckStatus === 'found'
-      ? 'has croissant file'
-      : metadataCheckStatus === 'missing'
-        ? 'missing croissant file'
-        : metadataCheckStatus === 'blocked'
-          ? 'CORS blocked'
-          : 'checking file'
-  const metadataCheckClass =
-    metadataCheckStatus === 'found'
-      ? 'bg-emerald-400 text-white'
-      : metadataCheckStatus === 'missing'
-        ? 'bg-red-500 text-white'
-        : metadataCheckStatus === 'blocked'
-          ? 'bg-amber-400 text-slate-950'
-          : 'bg-blue-100 text-blue-700'
+  let metadataCheckText = 'checking file'
+  let metadataCheckClass = 'bg-blue-100 text-blue-700'
+  if (metadataCheckStatus === 'found') {
+    metadataCheckText = 'has croissant file'
+    metadataCheckClass = 'bg-emerald-400 text-white'
+  } else if (metadataCheckStatus === 'missing') {
+    metadataCheckText = 'missing croissant file'
+    metadataCheckClass = 'bg-red-500 text-white'
+  } else if (metadataCheckStatus === 'blocked') {
+    metadataCheckText = 'CORS blocked'
+    metadataCheckClass = 'bg-amber-400 text-slate-950'
+  }
+  const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle'
+  let doiCheckText = 'checking Crossref'
+  let doiCheckClass = 'text-blue-700'
+  if (doiCheckStatus === 'found') {
+    doiCheckText = 'DOI found in Crossref'
+    doiCheckClass = 'text-emerald-600'
+  } else if (doiCheckStatus === 'missing') {
+    doiCheckText = 'DOI not found in Crossref. Make sure it fits this format: 10.1000/182'
+    doiCheckClass = 'text-red-600'
+  } else if (doiCheckStatus === 'error') {
+    doiCheckText = 'Could not check DOI'
+    doiCheckClass = 'text-red-600'
+  }
+  let submitButtonText = 'Sign in with GitHub'
+  if (status === 'submitting') {
+    submitButtonText = 'Submitting...'
+  } else if (status === 'processing') {
+    submitButtonText = 'Checking adapter'
+  } else if (authUser) {
+    submitButtonText = 'Register adapter'
+  }
+  const SubmitButtonIcon = authUser ? PlusIcon : ArrowRightIcon
+  let metadataCheckIcon = (
+    <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
+  )
+  if (metadataCheckStatus === 'found') {
+    metadataCheckIcon = <CheckIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (metadataCheckStatus === 'missing') {
+    metadataCheckIcon = <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (metadataCheckStatus === 'blocked') {
+    metadataCheckIcon = <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
+  }
+  let doiCheckIcon = <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+  if (doiCheckStatus === 'found') {
+    doiCheckIcon = <CheckIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (doiCheckStatus === 'checking') {
+    doiCheckIcon = (
+      <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
+    )
+  }
 
   useEffect(() => {
     const repositoryLocation = form.repositoryLocation.trim()
-    if (!isHttpsUrl(repositoryLocation)) return
+    if (!httpsUrlPattern.test(repositoryLocation)) return
 
     const controller = new AbortController()
 
@@ -302,7 +302,32 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
     return () => controller.abort()
   }, [form.repositoryLocation])
 
-  async function submitRegistration(event: FormEvent<HTMLFormElement>) {
+
+  /*
+   * AI-Generated.
+   */
+  async function checkDoiOnBlur(value: string) {
+    const doi = registrationDoiValue(value)
+    updateField('doi', doi)
+    setDoiCheck({ status: 'idle', value: doi })
+    if (!doi) return
+
+    setDoiCheck({ status: 'checking', value: doi })
+    try {
+      const work = await fetchCrossrefWork(doi)
+      const status = work ? 'found' : 'missing'
+      setDoiCheck((current) => (
+        current.value === doi ? { status, value: doi } : current
+      ))
+    } catch (error) {
+      console.error('Could not check DOI with Crossref.', error)
+      setDoiCheck((current) => (
+        current.value === doi ? { status: 'error', value: doi } : current
+      ))
+    }
+  }
+
+  async function submitRegistration(event: { preventDefault: () => void }) {
     event.preventDefault()
     setError(null)
     setResult(null)
@@ -410,7 +435,7 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
 
             <div className="mt-8 grid gap-6">
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                Adapter name*
+                <span>Adapter name*</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                   onChange={(event) => updateField('adapterName', event.target.value)}
@@ -422,14 +447,16 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
+                <span>
+                  Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
+                </span>
                 <span className="relative block">
                   <input
                     className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                     onChange={(event) => {
                       const value = event.target.value
                       setError(null)
-                      setMetadataCheckStatus(isHttpsUrl(value.trim()) ? 'checking' : 'idle')
+                      setMetadataCheckStatus(httpsUrlPattern.test(value.trim()) ? 'checking' : 'idle')
                       updateField('repositoryLocation', value)
                     }}
                     placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
@@ -442,15 +469,7 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
                       aria-live="polite"
                       className={`pointer-events-none absolute right-1.5 top-1/2 inline-flex h-12 -translate-y-1/2 items-center gap-2 rounded-2xl px-4 text-sm font-medium ${metadataCheckClass}`}
                     >
-                      {metadataCheckStatus === 'found' ? (
-                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                      ) : metadataCheckStatus === 'missing' ? (
-                        <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-                      ) : metadataCheckStatus === 'blocked' ? (
-                        <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
-                      ) : (
-                        <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
-                      )}
+                      {metadataCheckIcon}
                       {metadataCheckText}
                     </span>
                   ) : null}
@@ -458,7 +477,7 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                License
+                <span>License</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                   onChange={(event) => updateField('licenseValue', event.target.value)}
@@ -469,19 +488,32 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                DOI
+                <span>DOI</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                  onBlur={(event) => updateField('doi', registrationDoiValue(event.target.value))}
-                  onChange={(event) => updateField('doi', event.target.value)}
+                  aria-invalid={doiCheckStatus === 'missing' || doiCheckStatus === 'error'}
+                  onBlur={(event) => void checkDoiOnBlur(event.target.value)}
+                  onChange={(event) => {
+                    setDoiCheck({ status: 'idle', value: '' })
+                    updateField('doi', event.target.value)
+                  }}
                   placeholder="10.1000/182"
                   type="text"
                   value={form.doi}
                 />
+                {doiCheckStatus !== 'idle' ? (
+                  <span
+                    aria-live="polite"
+                    className={`inline-flex items-center gap-2 text-sm font-medium ${doiCheckClass}`}
+                  >
+                    {doiCheckIcon}
+                    {doiCheckText}
+                  </span>
+                ) : null}
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                CFF file link
+                <span>CFF file link</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                   onChange={(event) => updateField('cffUrl', event.target.value)}
@@ -500,18 +532,8 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
                 disabled={status !== 'idle'}
                 type="submit"
               >
-                {status === 'submitting'
-                  ? 'Submitting...'
-                  : status === 'processing'
-                    ? 'Checking adapter'
-                    : authUser
-                      ? 'Register adapter'
-                      : 'Sign in with GitHub'}
-                {authUser ? (
-                  <PlusIcon className="h-5 w-5" aria-hidden="true" />
-                ) : (
-                  <ArrowRightIcon className="h-5 w-5" aria-hidden="true" />
-                )}
+                {submitButtonText}
+                <SubmitButtonIcon className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 
