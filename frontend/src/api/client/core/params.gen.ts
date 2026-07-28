@@ -50,7 +50,8 @@ const extraPrefixesMap: Record<string, Slot> = {
 };
 const extraPrefixes = Object.entries(extraPrefixesMap);
 
-type KeyMapEntry =
+type KeyMap = Map<
+  string,
   | {
       in: Slot;
       map?: string;
@@ -58,12 +59,13 @@ type KeyMapEntry =
   | {
       in?: never;
       map: Slot;
-    };
-
-type KeyMap = Map<string, KeyMapEntry>;
+    }
+>;
 
 function buildKeyMap(fields: FieldsConfig, map?: KeyMap): KeyMap {
-  map ??= new Map();
+  if (!map) {
+    map = new Map();
+  }
 
   for (const config of fields) {
     if ('in' in config) {
@@ -101,146 +103,72 @@ function stripEmptySlots(params: Params): void {
   }
 }
 
-/*
- * AI-Generated.
- */
-function createParams(): Params {
-  return {
+export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsConfig): Params {
+  const params: Params = {
     headers: Object.create(null),
     path: Object.create(null),
     query: Object.create(null),
   };
-}
 
-/*
- * AI-Generated.
- */
-function writeSlot(params: Params, slot: Slot, key: string, value: unknown): void {
-  let record = params[slot] as Record<string, unknown> | undefined;
-  if (record === undefined) {
-    record = Object.create(null) as Record<string, unknown>;
-    params[slot] = record;
-  }
-  record[key] = value;
-}
-
-/*
- * AI-Generated.
- */
-function writeMappedField(
-  params: Params,
-  field: KeyMapEntry,
-  key: string,
-  value: unknown,
-): void {
-  if (field.in) {
-    writeSlot(params, field.in, field.map || key, value);
-    return;
-  }
-  (params as Partial<Record<Slot, unknown>>)[field.map] = value;
-}
-
-/*
- * AI-Generated.
- */
-function writeExtraPrefixedParam(params: Params, key: string, value: unknown): boolean {
-  const extra = extraPrefixes.find(([prefix]) => key.startsWith(prefix));
-  if (!extra) {
-    return false;
-  }
-
-  const [prefix, slot] = extra;
-  writeSlot(params, slot, key.slice(prefix.length), value);
-  return true;
-}
-
-/*
- * AI-Generated.
- */
-function writeAllowedExtraParam(
-  params: Params,
-  config: FieldsConfig[number],
-  key: string,
-  value: unknown,
-): void {
-  if (!('allowExtra' in config) || !config.allowExtra) {
-    return;
-  }
-
-  for (const [slot, allowed] of Object.entries(config.allowExtra)) {
-    if (allowed) {
-      writeSlot(params, slot as Slot, key, value);
-      return;
-    }
-  }
-}
-
-/*
- * AI-Generated.
- */
-function writeObjectParam(
-  params: Params,
-  map: KeyMap,
-  config: FieldsConfig[number],
-  key: string,
-  value: unknown,
-): void {
-  const field = map.get(key);
-  if (field) {
-    writeMappedField(params, field, key, value);
-    return;
-  }
-
-  if (!writeExtraPrefixedParam(params, key, value)) {
-    writeAllowedExtraParam(params, config, key, value);
-  }
-}
-
-/*
- * AI-Generated.
- */
-function writeDirectFieldConfig(
-  params: Params,
-  map: KeyMap,
-  config: Field & { in: Slot },
-  arg: unknown,
-): void {
-  if (!config.key) {
-    params.body = arg;
-    return;
-  }
-
-  writeMappedField(params, map.get(config.key)!, config.key, arg);
-}
-
-/*
- * AI-Generated.
- */
-function writeConfigArg(
-  params: Params,
-  map: KeyMap,
-  config: FieldsConfig[number],
-  arg: unknown,
-): void {
-  if ('in' in config) {
-    writeDirectFieldConfig(params, map, config, arg);
-    return;
-  }
-
-  for (const [key, value] of Object.entries(arg ?? {})) {
-    writeObjectParam(params, map, config, key, value);
-  }
-}
-
-export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsConfig): Params {
-  const params = createParams();
   const map = buildKeyMap(fields);
+
+  function writeSlot(slot: Slot, key: string, value: unknown): void {
+    let record = params[slot] as Record<string, unknown> | undefined;
+    if (record === undefined) {
+      record = Object.create(null) as Record<string, unknown>;
+      params[slot] = record;
+    }
+    record[key] = value;
+  }
+
   let config: FieldsConfig[number] | undefined;
 
   for (const [index, arg] of args.entries()) {
-    config = fields[index] || config;
-    if (config) {
-      writeConfigArg(params, map, config, arg);
+    if (fields[index]) {
+      config = fields[index];
+    }
+
+    if (!config) {
+      continue;
+    }
+
+    if ('in' in config) {
+      if (config.key) {
+        const field = map.get(config.key)!;
+        const name = field.map || config.key;
+        if (field.in) {
+          writeSlot(field.in, name, arg);
+        }
+      } else {
+        params.body = arg;
+      }
+    } else {
+      for (const [key, value] of Object.entries(arg ?? {})) {
+        const field = map.get(key);
+
+        if (field) {
+          if (field.in) {
+            const name = field.map || key;
+            writeSlot(field.in, name, value);
+          } else {
+            params[field.map] = value;
+          }
+        } else {
+          const extra = extraPrefixes.find(([prefix]) => key.startsWith(prefix));
+
+          if (extra) {
+            const [prefix, slot] = extra;
+            writeSlot(slot, key.slice(prefix.length), value);
+          } else if ('allowExtra' in config && config.allowExtra) {
+            for (const [slot, allowed] of Object.entries(config.allowExtra)) {
+              if (allowed) {
+                writeSlot(slot as Slot, key, value);
+                break;
+              }
+            }
+          }
+        }
+      }
     }
   }
 

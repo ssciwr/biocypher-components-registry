@@ -73,7 +73,6 @@ class AdapterRegistrationRequest:
         repository_location: Submitted local path or repository URL.
         repository_kind: Normalized repository location type.
         source: Original user-provided repository input.
-        contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
@@ -86,7 +85,6 @@ class AdapterRegistrationRequest:
     repository_kind: Literal["local", "remote"]
     source: str
     description: str | None = None
-    contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
     cff_url: str | None = None

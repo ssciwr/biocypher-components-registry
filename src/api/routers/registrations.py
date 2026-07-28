@@ -67,7 +67,6 @@ def create_registration(
             adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
-            contact_email=payload.contact_email,
             license_value=payload.license_value,
             doi=payload.doi,
             cff_url=payload.cff_url,

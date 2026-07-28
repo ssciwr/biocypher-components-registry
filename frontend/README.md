@@ -102,6 +102,9 @@ Current assessment: Not needed given our data is minimal. I checked the codebase
 ### Static Verification
 Improved by Linting, SonarQube and our Software Development Life Cycle/Gherkin docs
 
+### Rate-limits decision
+We should analyze the backend to add rate limits to more costly actions to run and prevent users using our API to process data.
+
 ### Security Testing
 Partially tested by SonarQube, we need to look at how we keep the most sensitive data (email for registration / Github information)
 The Github token access should be reviewed

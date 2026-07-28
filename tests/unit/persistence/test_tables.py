@@ -18,7 +18,6 @@ def test_registration_sources_table_has_expected_columns() -> None:
         "description",
         "repository_location",
         "source_kind",
-        "contact_email",
         "license_value",
         "doi",
         "cff_url",

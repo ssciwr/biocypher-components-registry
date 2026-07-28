@@ -629,12 +629,6 @@ export type RegistrationCreateRequest = {
      */
     repository_location: string;
     /**
-     * Contact Email
-     *
-     * Optional maintainer contact email for follow-up.
-     */
-    contact_email?: string | null;
-    /**
      * License Value
      *
      * Optional submitted adapter license text.
@@ -685,10 +679,6 @@ export type RegistrationCreateResponse = {
      * Created At
      */
     created_at: string;
-    /**
-     * Contact Email
-     */
-    contact_email?: string | null;
     /**
      * License Value
      */
@@ -750,10 +740,6 @@ export type RegistrationDetailResponse = {
      * Created At
      */
     created_at: string;
-    /**
-     * Contact Email
-     */
-    contact_email?: string | null;
     /**
      * License Value
      */
@@ -898,10 +884,6 @@ export type RegistrationListItemResponse = {
      */
     created_at: string;
     /**
-     * Contact Email
-     */
-    contact_email?: string | null;
-    /**
      * License Value
      */
     license_value?: string | null;
@@ -974,10 +956,6 @@ export type RegistrationProcessResponse = {
      * Created At
      */
     created_at: string;
-    /**
-     * Contact Email
-     */
-    contact_email?: string | null;
     /**
      * License Value
      */
@@ -1053,10 +1031,6 @@ export type RegistrationRevalidateResponse = {
      * Created At
      */
     created_at: string;
-    /**
-     * Contact Email
-     */
-    contact_email?: string | null;
     /**
      * License Value
      */

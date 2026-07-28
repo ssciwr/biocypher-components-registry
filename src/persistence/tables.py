@@ -15,7 +15,6 @@ registration_sources_table = Table(
     Column("description", String, nullable=True),
     Column("repository_location", String, nullable=False),
     Column("source_kind", String, nullable=False),
-    Column("contact_email", String, nullable=True),
     Column("license_value", String, nullable=True),
     Column("doi", String, nullable=True),
     Column("cff_url", String, nullable=True),

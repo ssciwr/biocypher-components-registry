@@ -7,7 +7,9 @@ export type CrossrefWork = Readonly<{
 const crossrefWorksBaseUrl = 'https://api.crossref.org/works'
 
 /*
- * AI-Generated.
+ * To clarify this is based on the fact that telling the user whether the DOI exists or not is more useful
+ * than if we simply parse it to a valid DOI format and save it. However, we let them register whether it exists or not
+ * (in case of some peculiar case where cross ref API does not have it (yet)).
  */
 export async function fetchCrossrefWork(doi: string): Promise<CrossrefWork | false> {
   const response = await fetch(`${crossrefWorksBaseUrl}/${encodeURIComponent(doi)}`) // NOSONAR: the DOI is encoded and appended to a configured Crossref works endpoint; bad user input can only query Crossref for a missing work.

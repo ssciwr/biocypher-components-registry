@@ -2176,18 +2176,6 @@
             "title": "Repository Location",
             "description": "Local repository path or supported remote repository URL containing a root-level croissant.jsonld file."
           },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email",
-            "description": "Optional maintainer contact email for follow-up."
-          },
           "license_value": {
             "anyOf": [
               {
@@ -2235,7 +2223,6 @@
         "example": {
           "adapter_name": "CollecTRI Adapter",
           "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
-          "contact_email": "maintainer@example.org",
           "doi": "10.5281/zenodo.1234567",
           "license_value": "MIT",
           "repository_location": "https://gitlab.example.org/biocypher/collectri"
@@ -2281,17 +2268,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
-          },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email"
           },
           "license_value": {
             "anyOf": [
@@ -2405,17 +2381,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
-          },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email"
           },
           "license_value": {
             "anyOf": [
@@ -2732,17 +2697,6 @@
             "format": "date-time",
             "title": "Created At"
           },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email"
-          },
           "license_value": {
             "anyOf": [
               {
@@ -2892,17 +2846,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
-          },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email"
           },
           "license_value": {
             "anyOf": [
@@ -3073,17 +3016,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
-          },
-          "contact_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Email"
           },
           "license_value": {
             "anyOf": [

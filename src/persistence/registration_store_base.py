@@ -53,7 +53,6 @@ class SQLAlchemyRegistrationStore:
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
             description=request.description,
-            contact_email=request.contact_email,
             license_value=request.license_value,
             doi=request.doi,
             cff_url=request.cff_url,
@@ -74,7 +73,6 @@ class SQLAlchemyRegistrationStore:
                         description=registration.description,
                         repository_location=registration.repository_location,
                         source_kind=registration.repository_kind,
-                        contact_email=registration.contact_email,
                         license_value=registration.license_value,
                         doi=registration.doi,
                         cff_url=registration.cff_url,
@@ -371,24 +369,20 @@ class SQLAlchemyRegistrationStore:
                         str(existing_entry["metadata_checksum"] or "")
                         == observed_checksum
                     )
-                    event_type = (
-                        "DUPLICATE"
-                        if same_checksum
-                        else "REJECTED_SAME_VERSION_CHANGED"
-                    )
-                    message = (
-                        "Duplicate canonical registry entry rejected."
-                        if same_checksum
-                        else "Changed metadata for the same adapter id and version was rejected."
-                    )
-                    error_message = (
-                        f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
-                        if same_checksum
-                        else (
+                    duplicate_outcomes = {
+                        True: (
+                            "DUPLICATE",
+                            "Duplicate canonical registry entry rejected.",
+                            f"Duplicate registration rejected for uniqueness key: {uniqueness_key}",
+                        ),
+                        False: (
+                            "REJECTED_SAME_VERSION_CHANGED",
+                            "Changed metadata for the same adapter id and version was rejected.",
                             "Registration rejected because metadata changed for an existing "
-                            f"adapter id and version: {uniqueness_key}. Please bump the version."
-                        )
-                    )
+                            f"adapter id and version: {uniqueness_key}. Please bump the version.",
+                        ),
+                    }
+                    event_type, message, error_message = duplicate_outcomes[same_checksum]
                     connection.execute(
                         update(registration_sources_table)
                         .where(registration_sources_table.c.id == registration_id)
@@ -814,7 +808,6 @@ class SQLAlchemyRegistrationStore:
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
             description=source_row.get("description"),
-            contact_email=source_row.get("contact_email"),
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),
             cff_url=source_row.get("cff_url"),

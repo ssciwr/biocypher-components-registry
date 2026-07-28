@@ -33,7 +33,6 @@ class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
         with self.engine.begin() as connection:
             for column_name in (
                 "description",
-                "contact_email",
                 "license_value",
                 "doi",
                 "cff_url",

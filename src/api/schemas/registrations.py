@@ -16,7 +16,6 @@ from src.core.registration.models import (
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "adapter_name": "CollecTRI Adapter",
     "repository_location": "https://gitlab.example.org/biocypher/collectri",
-    "contact_email": "maintainer@example.org",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
     "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
@@ -41,10 +40,6 @@ class RegistrationCreateRequest(BaseModel):
             "a root-level croissant.jsonld file."
         ),
     )
-    contact_email: str | None = Field(
-        default=None,
-        description="Optional maintainer contact email for follow-up.",
-    )
     license_value: str | None = Field(
         default=None,
         description="Optional submitted adapter license text.",
@@ -67,23 +62,6 @@ class RegistrationCreateRequest(BaseModel):
             raise ValueError("Field must not be blank.")
         return normalized_value
 
-    @field_validator("contact_email")
-    @classmethod
-    def _normalize_contact_email(cls, value: str | None) -> str | None:
-        """Normalize an optional contact email for API input."""
-        if value is None:
-            return None
-
-        normalized_value = value.strip()
-        if not normalized_value:
-            return None
-
-        local_part, separator, domain = normalized_value.partition("@")
-        if not separator or not local_part or "." not in domain:
-            raise ValueError("Contact email must be a valid email address.")
-
-        return normalized_value
-
     @field_validator("license_value", "doi", "cff_url")
     @classmethod
     def _strip_optional_text(cls, value: str | None) -> str | None:
@@ -104,7 +82,6 @@ class RegistrationCreateResponse(BaseModel):
     repository_kind: Literal["local", "remote"] | str
     status: RegistrationStatus
     created_at: datetime
-    contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
     cff_url: str | None = None
@@ -121,7 +98,6 @@ class RegistrationCreateResponse(BaseModel):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
@@ -150,7 +126,6 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
@@ -182,7 +157,6 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,

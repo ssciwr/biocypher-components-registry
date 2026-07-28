@@ -46,7 +46,6 @@ def create_registration_request(
     adapter_name: str,
     repository_location: str,
     description: str | None = None,
-    contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
     cff_url: str | None = None,
@@ -58,7 +57,6 @@ def create_registration_request(
         adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or remote repository URL.
         description: Optional maintainer-facing adapter summary.
-        contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
@@ -69,7 +67,6 @@ def create_registration_request(
 
     Raises:
         ValueError: If the adapter name or location is empty.
-        ValueError: If the contact email is provided but invalid.
         FileNotFoundError: If a submitted local repository path does not exist.
         InvalidRepoURLError: If a submitted URL is not a valid remote repository URL.
     """
@@ -82,7 +79,6 @@ def create_registration_request(
         raise ValueError("Repository location is required.")
 
     normalized_description = _normalize_optional_text(description)
-    normalized_contact_email = _normalize_contact_email(contact_email)
     normalized_license_value = _normalize_optional_text(license_value)
     normalized_doi = _normalize_optional_text(doi)
     normalized_cff_url = _normalize_optional_text(cff_url)
@@ -104,7 +100,6 @@ def create_registration_request(
         repository_kind=repository_kind,
         source=repository_location,
         description=normalized_description,
-        contact_email=normalized_contact_email,
         license_value=normalized_license_value,
         doi=normalized_doi,
         cff_url=normalized_cff_url,
@@ -143,22 +138,6 @@ def _normalize_optional_text(value: str | None) -> str | None:
         return None
     normalized_value = value.strip()
     return normalized_value or None
-
-
-def _normalize_contact_email(contact_email: str | None) -> str | None:
-    """Return a normalized optional contact email."""
-    if contact_email is None:
-        return None
-
-    normalized_email = contact_email.strip()
-    if not normalized_email:
-        return None
-
-    local_part, separator, domain = normalized_email.partition("@")
-    if not separator or not local_part or "." not in domain:
-        raise ValueError("Contact email must be a valid email address.")
-
-    return normalized_email
 
 
 def _normalize_local_repository(repository_location: str) -> str:

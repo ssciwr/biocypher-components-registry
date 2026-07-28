@@ -97,7 +97,8 @@ function initialForm(): RegistrationForm {
 /*
  * AI-Generated. Based on the Penpot designs.
  */
-function registrationResultDisplay(result: RegistrationResponse): RegistrationResultDisplay {
+function registrationResultFeedbackDisplay(result: RegistrationResponse): RegistrationResultDisplay {
+  // AI-generated helper which groups semantically the relevant icon tone, title and text for registraiton feedback
   if (result.status === 'VALID') {
     return {
       iconTone: 'bg-emerald-100 text-emerald-600',
@@ -130,7 +131,7 @@ function RegistrationResultPanel({
 }: RegistrationResultPanelProps) {
   const isValid = result.status === 'VALID'
   const isInvalid = result.status === 'INVALID'
-  const resultDisplay = registrationResultDisplay(result)
+  const resultDisplay = registrationResultFeedbackDisplay(result)
   const validationErrors = ('validation_errors' in result ? result.validation_errors : null)?.filter(Boolean) ?? []
 
   return (
@@ -223,19 +224,19 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  let metadataCheckText = 'checking file'
-  let metadataCheckClass = 'bg-blue-100 text-blue-700'
+  let metadataCheckText = 'Checking Croissant file'
+  let metadataCheckClass = 'text-blue-700'
   if (metadataCheckStatus === 'found') {
-    metadataCheckText = 'has croissant file'
-    metadataCheckClass = 'bg-emerald-400 text-white'
+    metadataCheckText = 'Croissant file found at repository root'
+    metadataCheckClass = 'text-emerald-600'
   } else if (metadataCheckStatus === 'missing') {
-    metadataCheckText = 'missing croissant file'
-    metadataCheckClass = 'bg-red-500 text-white'
+    metadataCheckText = "Croissant file not found at this repository link's root"
+    metadataCheckClass = 'text-red-600'
   } else if (metadataCheckStatus === 'blocked') {
-    metadataCheckText = 'CORS blocked'
-    metadataCheckClass = 'bg-amber-400 text-slate-950'
+    metadataCheckText = 'Could not check Croissant file'
+    metadataCheckClass = 'text-red-600'
   }
-  const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle'
+  const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
   let doiCheckText = 'checking Crossref'
   let doiCheckClass = 'text-blue-700'
   if (doiCheckStatus === 'found') {
@@ -303,9 +304,6 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
   }, [form.repositoryLocation])
 
 
-  /*
-   * AI-Generated.
-   */
   async function checkDoiOnBlur(value: string) {
     const doi = registrationDoiValue(value)
     updateField('doi', doi)
@@ -450,30 +448,29 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
                 <span>
                   Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
                 </span>
-                <span className="relative block">
-                  <input
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                    onChange={(event) => {
-                      const value = event.target.value
-                      setError(null)
-                      setMetadataCheckStatus(httpsUrlPattern.test(value.trim()) ? 'checking' : 'idle')
-                      updateField('repositoryLocation', value)
-                    }}
-                    placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
-                    required
-                    type="url"
-                    value={form.repositoryLocation}
-                  />
-                  {metadataCheckStatus !== 'idle' ? (
-                    <span
-                      aria-live="polite"
-                      className={`pointer-events-none absolute right-1.5 top-1/2 inline-flex h-12 -translate-y-1/2 items-center gap-2 rounded-2xl px-4 text-sm font-medium ${metadataCheckClass}`}
-                    >
-                      {metadataCheckIcon}
-                      {metadataCheckText}
-                    </span>
-                  ) : null}
-                </span>
+                <input
+                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                  aria-invalid={metadataCheckStatus === 'missing' || metadataCheckStatus === 'blocked'}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setError(null)
+                    setMetadataCheckStatus(httpsUrlPattern.test(value.trim()) ? 'checking' : 'idle')
+                    updateField('repositoryLocation', value)
+                  }}
+                  placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
+                  required
+                  type="url"
+                  value={form.repositoryLocation}
+                />
+                {metadataCheckStatus !== 'idle' ? (
+                  <span
+                    aria-live="polite"
+                    className={`inline-flex items-center gap-2 text-sm font-medium ${metadataCheckClass}`}
+                  >
+                    {metadataCheckIcon}
+                    {metadataCheckText}
+                  </span>
+                ) : null}
               </label>
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">

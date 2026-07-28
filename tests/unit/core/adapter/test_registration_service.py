@@ -45,53 +45,6 @@ def test_create_registration_request_accepts_supported_remote_repository() -> No
     assert request.repository_path is None
 
 
-def test_create_registration_request_normalizes_contact_email(
-    tmp_path: Path,
-) -> None:
-    """Normalize a provided optional maintainer contact email."""
-    repository = tmp_path / "example-adapter"
-    repository.mkdir()
-
-    request = create_registration_request(
-        adapter_name="Example Adapter",
-        repository_location=str(repository),
-        contact_email="  maintainer@example.org  ",
-    )
-
-    assert request.contact_email == "maintainer@example.org"
-
-
-def test_create_registration_request_treats_blank_contact_email_as_missing(
-    tmp_path: Path,
-) -> None:
-    """Treat a blank optional contact email as omitted."""
-    repository = tmp_path / "example-adapter"
-    repository.mkdir()
-
-    request = create_registration_request(
-        adapter_name="Example Adapter",
-        repository_location=str(repository),
-        contact_email="   ",
-    )
-
-    assert request.contact_email is None
-
-
-def test_create_registration_request_rejects_invalid_contact_email(
-    tmp_path: Path,
-) -> None:
-    """Reject a provided contact email that does not look valid."""
-    repository = tmp_path / "example-adapter"
-    repository.mkdir()
-
-    with pytest.raises(ValueError, match="Contact email must be a valid email address."):
-        create_registration_request(
-            adapter_name="Example Adapter",
-            repository_location=str(repository),
-            contact_email="not-an-email",
-        )
-
-
 def test_create_registration_request_rejects_empty_adapter_name() -> None:
     """Reject a submission when the adapter name is blank."""
     with pytest.raises(ValueError, match="Adapter name is required."):

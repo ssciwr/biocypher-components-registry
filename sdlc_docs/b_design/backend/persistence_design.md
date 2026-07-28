@@ -120,13 +120,11 @@ request:
 submitted_adapter_name
 repository_location
 source_kind
-contact_email
 status timestamps and current entry references
 ```
 
-`contact_email` is nullable because maintainer contact is optional. UI-only
-fields such as a croissant-root confirmation checkbox must not be stored in this
-table.
+UI-only fields such as a croissant-root confirmation checkbox must not be stored
+in this table.
 
 ## Registry Refresh Fields
 

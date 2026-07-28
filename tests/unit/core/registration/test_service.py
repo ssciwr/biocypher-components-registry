@@ -27,7 +27,6 @@ class MemoryRegistrationStore:
             repository_kind=request.repository_kind,
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
-            contact_email=request.contact_email,
         )
         self.saved.append(stored)
         return stored
@@ -59,14 +58,12 @@ def test_submit_registration_persists_created_request(tmp_path: Path) -> None:
         adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
-        contact_email="maintainer@example.org",
     )
 
     assert stored.adapter_name == "Example Adapter"
     assert stored.adapter_id == "example-adapter"
     assert stored.repository_kind == "local"
     assert stored.status == RegistrationStatus.SUBMITTED
-    assert stored.contact_email == "maintainer@example.org"
 
 
 def test_build_uniqueness_key_prefers_metadata_adapter_id_over_submitted_name() -> None:

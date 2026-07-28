@@ -29,11 +29,11 @@ Use GitHub's OAuth web application flow:
 2. Backend creates a random `state`, stores a short-lived signed state cookie, and redirects to `https://github.com/login/oauth/authorize`.
 3. GitHub redirects back to `GET /api/v1/auth/github/callback?code=...&state=...`.
 4. Backend validates `state`, exchanges `code` for an access token at `https://github.com/login/oauth/access_token`, and requests JSON with `Accept: application/json`.
-5. Backend fetches `https://api.github.com/user` and, only if we need email, `https://api.github.com/user/emails`.
+5. Backend fetches `https://api.github.com/user`.
 6. Backend creates a local session and sets an HttpOnly cookie, then redirects to the frontend.
 7. Frontend calls `GET /api/v1/auth/me` with credentials included to render signed-in state.
 
-Scopes: start with `read:user user:email` if we want a verified contact email for registration workflows. If we only need GitHub id/login/avatar, use no extra scope or just `read:user`.
+Scopes: use no extra scope or just `read:user`; the registration workflow uses the GitHub login and does not collect email.
 
 ## Backend Shape
 
@@ -110,4 +110,3 @@ Do not wire access control into the three homepage action cards yet. They can re
 - GitHub OAuth web application flow: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 - GitHub OAuth scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST API authenticated user: https://docs.github.com/en/rest/users/users#get-the-authenticated-user
-- GitHub REST API authenticated user emails: https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user

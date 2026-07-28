@@ -320,19 +320,15 @@ registration contract:
 ```text
 adapter_name: string
 repository_location: string
-contact_email: string | null
 ```
-
-`contact_email` is optional. If present, the backend normalizes surrounding
-whitespace and rejects values that are not valid email-like strings.
 
 Do not include UI-only confirmation fields in the API contract. For example, a
 frontend checkbox confirming that `croissant.jsonld` exists at the repository
 root is a client-side workflow guard, not persisted registry state.
 
 `RegistrationCreateResponse` and `RegistrationDetailResponse` should include
-the normalized `contact_email` value so clients can show the submitted contact
-information back to maintainers.
+the normalized submitted repository details so clients can show them back to
+maintainers.
 
 `GET /api/v1/registrations` must return summary list items only. It should not
 include full Croissant metadata, metadata paths, or validation error details.

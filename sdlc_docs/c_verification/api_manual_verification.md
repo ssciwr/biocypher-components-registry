@@ -262,8 +262,7 @@ Submit the local demo adapter repository:
 ```bash
 http POST :8000/api/v1/registrations \
   adapter_name="Manual Example Adapter" \
-  repository_location=/tmp/biocypher-api-manual-adapter \
-  contact_email=maintainer@example.org
+  repository_location=/tmp/biocypher-api-manual-adapter
 ```
 
 Expected result:

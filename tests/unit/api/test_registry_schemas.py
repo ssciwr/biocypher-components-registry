@@ -82,7 +82,6 @@ def test_registry_source_row_response_maps_from_registration() -> None:
         repository_kind="remote",
         status=RegistrationStatus.VALID,
         created_at=created_at,
-        contact_email="maintainer@example.org",
         profile_version="v1",
         updated_at=updated_at,
         uniqueness_key="example-adapter::1.0.0",
