@@ -109,7 +109,7 @@ def list_registrations(
     description="Return whether a remote repository exposes root-level croissant.jsonld.",
 )
 def check_registration_croissant_file_presence(
-    repository_url: str = Query(..., min_length=1),
+    repository_url: Annotated[str, Query(min_length=1)],
 ) -> RegistrationCroissantFilePresentCheckResponse:
     """Return whether the submitted repository exposes Croissant metadata."""
     try:

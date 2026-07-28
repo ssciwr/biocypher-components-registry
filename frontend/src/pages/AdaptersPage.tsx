@@ -419,7 +419,6 @@ function AvatarGroup({ maintainers, showNames = false }: Readonly<{ maintainers?
 }
 
 function ColumnModal({ source }: Readonly<{ source: DataSource }>) {
-  // todo: show real field/column metadata when backend exposes parsed recordSet fields.
   return (
     <LinkToModal modal={<GenericModal title={`Data Source "${source.name}" - ${source.column_count} Columns`} content={<div className="text-sm text-slate-700">Column metadata is not exposed by the adapter API yet.</div>} />}>
       {source.column_count} Columns
@@ -467,7 +466,11 @@ function repositoryHref(repositoryLocation: string | null | undefined) {
 
   try {
     const url = new URL(normalized)
-    return url.href.replace(/\/+$/, '')
+    let href = url.href
+    while (href.endsWith('/')) {
+      href = href.slice(0, -1)
+    }
+    return href
   } catch {
     return null
   }
