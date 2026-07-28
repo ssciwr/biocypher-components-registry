@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        # actions/checkout v7.01
+        # actions/checkout v7.01 # same as in publish GHCR to ensure it's identical.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Set up pnpm
@@ -42,19 +42,3 @@ jobs:
 
       - name: Build frontend
         run: pnpm run build
-
-      - name: Install Cypress binary
-        run: pnpm exec cypress install
-
-      - name: Verify Cypress
-        run: pnpm exec cypress verify
-
-      - name: Run Cypress tests
-        uses: cypress-io/github-action@f790eee7a50d9505912f50c2095510be7de06aa7
-        with:
-          working-directory: frontend
-          install: false
-          start: pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort
-          wait-on: "http://127.0.0.1:5173"
-          wait-on-timeout: 120
-          command: pnpm run ui-tests

@@ -19,7 +19,7 @@ The project contains:
 
 - a Python backend with CLI commands and a FastAPI REST API
 - SQLite support for local development and PostgreSQL support for deployment-oriented setups
-- a React/Vite frontend under `frontend/` for browsing and registering adapters
+- a React/Vite frontend under `frontend/` for browsing adapters and GitHub-authenticated registration
 - unit and BDD tests for core, API, persistence, and CLI behavior
 
 ## Requirements

@@ -28,6 +28,7 @@ class StoredRegistration:
         repository_kind: Repository location type.
         status: Current tracked status for the submission.
         created_at: Timestamp when the submission was stored.
+        description: Optional maintainer-facing adapter summary.
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
@@ -49,6 +50,7 @@ class StoredRegistration:
     repository_kind: str
     status: RegistrationStatus
     created_at: datetime
+    description: str | None = None
     contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
@@ -99,10 +101,7 @@ class RegistryEntry:
 
     @property
     def adapter_version(self) -> str | None:
-        """AI-Generated.
-
-        Return the adapter version stored in the persisted Croissant metadata.
-        """
+        """Return the adapter version stored in the persisted Croissant metadata."""
         if self.metadata is None:
             return None
         version = self.metadata.get("version")

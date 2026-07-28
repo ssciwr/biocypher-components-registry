@@ -45,6 +45,7 @@ def execute_request(
 def create_registration_request(
     adapter_name: str,
     repository_location: str,
+    description: str | None = None,
     contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
@@ -56,6 +57,7 @@ def create_registration_request(
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or remote repository URL.
+        description: Optional maintainer-facing adapter summary.
         contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
@@ -79,6 +81,7 @@ def create_registration_request(
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
+    normalized_description = _normalize_optional_text(description)
     normalized_contact_email = _normalize_contact_email(contact_email)
     normalized_license_value = _normalize_optional_text(license_value)
     normalized_doi = _normalize_optional_text(doi)
@@ -100,6 +103,7 @@ def create_registration_request(
         repository_location=normalized_repository_location,
         repository_kind=repository_kind,
         source=repository_location,
+        description=normalized_description,
         contact_email=normalized_contact_email,
         license_value=normalized_license_value,
         doi=normalized_doi,

@@ -92,10 +92,7 @@ def search_adapters(
     query: str = Query(min_length=1),
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterLatestListResponse:
-    """AI-Generated.
-
-    Return adapter cards from the PostgreSQL-backed title search.
-    """
+    """Return adapter cards from the PostgreSQL-backed title search."""
     search_entries = getattr(store, "search_registry_entries_by_adapter_name", None)
     if not callable(search_entries):
         return AdapterLatestListResponse(items=[])

@@ -625,9 +625,15 @@ export type RegistrationCreateRequest = {
     /**
      * Repository Location
      *
-     * Local repository path or remote repository URL containing a root-level croissant.jsonld file.
+     * Local repository path or supported remote repository URL containing a root-level croissant.jsonld file.
      */
     repository_location: string;
+    /**
+     * Contact Email
+     *
+     * Optional maintainer contact email for follow-up.
+     */
+    contact_email?: string | null;
     /**
      * License Value
      *
@@ -679,6 +685,10 @@ export type RegistrationCreateResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Contact Email
+     */
+    contact_email?: string | null;
     /**
      * License Value
      */
@@ -740,6 +750,10 @@ export type RegistrationDetailResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Contact Email
+     */
+    contact_email?: string | null;
     /**
      * License Value
      */
@@ -884,6 +898,10 @@ export type RegistrationListItemResponse = {
      */
     created_at: string;
     /**
+     * Contact Email
+     */
+    contact_email?: string | null;
+    /**
      * License Value
      */
     license_value?: string | null;
@@ -956,6 +974,10 @@ export type RegistrationProcessResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Contact Email
+     */
+    contact_email?: string | null;
     /**
      * License Value
      */
@@ -1031,6 +1053,10 @@ export type RegistrationRevalidateResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Contact Email
+     */
+    contact_email?: string | null;
     /**
      * License Value
      */

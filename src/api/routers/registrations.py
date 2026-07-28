@@ -37,6 +37,7 @@ from src.core.shared.files import remote_metadata_exists
 router = APIRouter()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth_session)]
 
 
 # ===========================================================
@@ -58,7 +59,7 @@ RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_sto
 def create_registration(
     payload: RegistrationCreateRequest,
     store: RegistrationStoreDep,
-    auth_session: AuthSession | None = Depends(get_optional_auth_session),
+    auth_session: OptionalAuthSessionDep,
 ) -> RegistrationCreateResponse:
     """Create and persist a submitted adapter registration."""
     try:
@@ -66,6 +67,7 @@ def create_registration(
             adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
+            contact_email=payload.contact_email,
             license_value=payload.license_value,
             doi=payload.doi,
             cff_url=payload.cff_url,
@@ -110,10 +112,7 @@ def list_registrations(
 def check_registration_croissant_file_presence(
     repository_url: str = Query(..., min_length=1),
 ) -> RegistrationCroissantFilePresentCheckResponse:
-    """AI-Generated.
-
-    A quick http call that the frontend can make to check if the users submitted repository has data we can use for registration (the croissant file)
-    """
+    """Return whether the submitted repository exposes Croissant metadata."""
     try:
         has_croissant_file = remote_metadata_exists(repository_url)
     except Exception as exc:

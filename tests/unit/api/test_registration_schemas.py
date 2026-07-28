@@ -18,6 +18,11 @@ from src.core.registration.models import (
 )
 
 
+# ===========================================================
+# Registration Schema Tests
+# ===========================================================
+
+
 def test_registration_create_request_normalizes_input_fields() -> None:
     """Normalize registration create input while keeping the API contract explicit."""
     request = RegistrationCreateRequest(

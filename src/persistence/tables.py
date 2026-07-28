@@ -12,6 +12,7 @@ registration_sources_table = Table(
     metadata,
     Column("id", String, primary_key=True),
     Column("submitted_adapter_name", String, nullable=False),
+    Column("description", String, nullable=True),
     Column("repository_location", String, nullable=False),
     Column("source_kind", String, nullable=False),
     Column("contact_email", String, nullable=True),

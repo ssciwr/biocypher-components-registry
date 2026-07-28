@@ -37,10 +37,7 @@ from src.core.shared.ids import slugify_identifier
 
 
 class SQLAlchemyRegistrationStore:
-    """AI-Generated.
-
-    Shared registration behavior for SQLAlchemy-backed stores.
-    """
+    """Shared registration behavior for SQLAlchemy-backed stores."""
 
     def create_registration(
         self,
@@ -55,6 +52,7 @@ class SQLAlchemyRegistrationStore:
             repository_kind=request.repository_kind,
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
+            description=request.description,
             contact_email=request.contact_email,
             license_value=request.license_value,
             doi=request.doi,
@@ -73,6 +71,7 @@ class SQLAlchemyRegistrationStore:
                     insert(registration_sources_table).values(
                         id=registration.registration_id,
                         submitted_adapter_name=registration.adapter_name,
+                        description=registration.description,
                         repository_location=registration.repository_location,
                         source_kind=registration.repository_kind,
                         contact_email=registration.contact_email,
@@ -182,10 +181,7 @@ class SQLAlchemyRegistrationStore:
         query: str,
         limit: int = 10_000,
     ) -> list[RegistryEntry]:
-        """AI-Generated.
-
-        Return active canonical entries whose adapter title matches the query.
-        """
+        """Return active canonical entries whose adapter title matches the query."""
         search_term = query.strip()
         if not search_term:
             return []
@@ -371,19 +367,23 @@ class SQLAlchemyRegistrationStore:
                     uniqueness_key,
                 )
                 if existing_entry is not None:
+                    same_checksum = (
+                        str(existing_entry["metadata_checksum"] or "")
+                        == observed_checksum
+                    )
                     event_type = (
                         "DUPLICATE"
-                        if str(existing_entry["metadata_checksum"] or "") == observed_checksum
+                        if same_checksum
                         else "REJECTED_SAME_VERSION_CHANGED"
                     )
                     message = (
                         "Duplicate canonical registry entry rejected."
-                        if event_type == "DUPLICATE"
+                        if same_checksum
                         else "Changed metadata for the same adapter id and version was rejected."
                     )
                     error_message = (
                         f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
-                        if event_type == "DUPLICATE"
+                        if same_checksum
                         else (
                             "Registration rejected because metadata changed for an existing "
                             f"adapter id and version: {uniqueness_key}. Please bump the version."
@@ -670,10 +670,7 @@ class SQLAlchemyRegistrationStore:
         connection: Engine | object,
         repository_location: str,
     ) -> RowMapping | None:
-        """AI-Generated.
-
-        Load one registration source for a normalized repository location.
-        """
+        """Load one registration source for a normalized repository location."""
         return connection.execute(
             select(registration_sources_table).where(
                 registration_sources_table.c.repository_location
@@ -687,10 +684,7 @@ class SQLAlchemyRegistrationStore:
         adapter_id: str,
         github_login: str,
     ) -> RowMapping | None:
-        """AI-Generated.
-
-        Load an endorsement row for one adapter/login pair.
-        """
+        """Load an endorsement row for one adapter/login pair."""
         return connection.execute(
             select(adapter_endorsements_table).where(
                 adapter_endorsements_table.c.adapter_id == adapter_id,
@@ -819,6 +813,7 @@ class SQLAlchemyRegistrationStore:
             repository_kind=str(source_row["source_kind"]),
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
+            description=source_row.get("description"),
             contact_email=source_row.get("contact_email"),
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),

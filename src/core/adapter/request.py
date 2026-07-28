@@ -69,6 +69,7 @@ class AdapterRegistrationRequest:
     Args:
         adapter_name: Human-readable adapter name supplied by the maintainer.
         adapter_id: Stable slug identifier derived from the adapter name.
+        description: Optional maintainer-facing adapter summary.
         repository_location: Submitted local path or repository URL.
         repository_kind: Normalized repository location type.
         source: Original user-provided repository input.
@@ -84,6 +85,7 @@ class AdapterRegistrationRequest:
     repository_location: str
     repository_kind: Literal["local", "remote"]
     source: str
+    description: str | None = None
     contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None

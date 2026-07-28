@@ -48,7 +48,13 @@ from src.persistence.factory import build_registration_store
 
 _DEFAULT_GITHUB_LOGIN = "sampleGithubLogin"
 _DEMO_GITHUB_LOGIN = "jmsssc"
+
+# ============================================================================
+# Constants
+# ============================================================================
+
 STYLE_SECTION_HEADING = "bold cyan"
+ADAPTER_LABEL = "Adapter\n"
 REGISTRATION_ID_HELP = "Stored registration identifier."
 HTTPS_SCHEME = "https"
 HTTP_SCHEME = "http"
@@ -267,7 +273,7 @@ def _print_submission_request(
     github_login: str,
 ) -> None:
     body = Text()
-    body.append("Adapter\n", style=STYLE_SECTION_HEADING)
+    body.append(ADAPTER_LABEL, style=STYLE_SECTION_HEADING)
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Adapter ID\n", style="bold")
     body.append(f"{adapter_id}\n\n", style="white")
@@ -298,7 +304,7 @@ def _print_registration_result(
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
-    body.append("Adapter\n", style="bold")
+    body.append(ADAPTER_LABEL, style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Status\n", style="bold")
     body.append(f"{status}\n\n", style="white")
@@ -386,7 +392,7 @@ def _print_stored_registration(
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
-    body.append("Adapter\n", style="bold")
+    body.append(ADAPTER_LABEL, style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Repository\n", style="bold")
     body.append(f"{repository_location}\n\n", style="white")

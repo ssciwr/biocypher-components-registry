@@ -15,6 +15,7 @@ def test_registration_sources_table_has_expected_columns() -> None:
     assert set(registration_sources_table.columns.keys()) == {
         "id",
         "submitted_adapter_name",
+        "description",
         "repository_location",
         "source_kind",
         "contact_email",

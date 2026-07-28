@@ -110,8 +110,9 @@ function App() {
         }
         setAuthError(null)
       })
-      .catch(() => {
-        if (!ignore) setAuthError(null)
+      .catch((error: unknown) => {
+        console.error('Could not check sign-in status.', error)
+        if (!ignore) setAuthError('Could not check sign-in status.')
       })
 
     return () => {
@@ -145,7 +146,8 @@ function App() {
     }
   }
 
-  const adapterId = pathname.match(/^\/adapters\/([^/]+)$/)?.[1]
+  const adapterPathMatch = /^\/adapters\/([^/]+)$/.exec(pathname)
+  const adapterId = adapterPathMatch?.[1]
   let page = <HomePage />
 
   if (pathname === '/register') {
@@ -175,10 +177,11 @@ function HomePage() {
         <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
             <span className="h-2 w-2 rounded-full bg-lime-500" aria-hidden="true" />
-            Discover adapters, generate metadata, and register components
+            <span>Discover adapters, generate metadata, and register components</span>
           </div>
           <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
-            Find BioCypher components<br /> for your research
+            <span className="block">Find BioCypher components</span>
+            <span className="block">for your research</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 md:text-lg">
             Search adapters, create Croissant metadata, and submit your adapter repository to us
