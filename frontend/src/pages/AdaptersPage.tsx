@@ -22,7 +22,6 @@ import {
 } from '../api/client'
 import { client } from '../api/client/client.gen'
 
-type Maintainer = Readonly<Partial<AdapterMaintainerResponse> & { github_login?: string | null }>
 type DataSource = AdapterDataSourceResponse
 type LatestAdapter = AdapterLatestItemResponse
 type AdapterDetail = AdapterDetailResponse
@@ -124,7 +123,7 @@ function AdapterListView() {
                 ))}
               </div>
               <div className="mt-auto flex items-center justify-between gap-2 pt-6">
-                <AvatarGroup maintainers={adapter.maintainers} />
+                <MaintainerAvatar maintainer={adapter.maintainer} />
                 <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600">
                   <span aria-hidden="true">👍</span>
                   <span>{adapter.endorsement_count ?? 0}</span>
@@ -341,7 +340,7 @@ bc.run()`}
           <section>
             <h2 className="text-2xl font-bold text-slate-950">Maintainer</h2>
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-5">
-              <AvatarGroup maintainers={adapter.maintainers} showNames />
+              <MaintainerAvatar maintainer={adapter.maintainer} showName />
             </div>
           </section>
 
@@ -380,41 +379,38 @@ bc.run()`}
   )
 }
 
-// A pure function, render only, no looking up /guessing the profile picture by the url.
-function AvatarGroup({ maintainers, showNames = false }: Readonly<{ maintainers?: Maintainer[] | null; showNames?: boolean }>) {
-  const maintainerList = maintainers ?? []
-  if (!maintainerList.length) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
+/*
+AI-Generated.
+Render one maintainer identity; the backend owns repository URL parsing.
+*/
+function MaintainerAvatar({ maintainer, showName = false }: Readonly<{ maintainer?: AdapterMaintainerResponse | null; showName?: boolean }>) {
+  if (!maintainer) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
+
+  const displayName = maintainer.username.trim() || 'Unknown maintainer'
+  const profileUrl = maintainer.profile_url ?? null
+  const fallbackLabel = displayName.slice(0, 2).toUpperCase()
+
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      {maintainerList.map((maintainer) => {
-        const githubLogin = maintainer.github_login?.trim()
-        const displayName = maintainer.username?.trim() || githubLogin || 'Unknown maintainer'
-        const profileUrl = maintainer.profile_url ?? null
-        const fallbackLabel = displayName.slice(0, 2).toUpperCase()
-        return (
-          <span className="flex items-center gap-3" key={`${profileUrl ?? displayName}:${maintainer.avatar_url ?? 'fallback'}`}>
-            {maintainer.avatar_url ? (
-              <img alt={displayName} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
-            ) : (
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-sm font-semibold text-slate-700" aria-hidden="true">
-                {fallbackLabel}
-              </span>
-            )}
-            {showNames ? (
-              <span>
-                {profileUrl ? (
-                  <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={profileUrl} rel="noreferrer" target="_blank">
-                    {displayName}
-                  </a>
-                ) : (
-                  <span className="block text-sm font-medium text-slate-950">{displayName}</span>
-                )}
-              </span>
-            ) : null}
-          </span>
-        )
-      })}
-    </div>
+    <span className="flex items-center gap-3">
+      {maintainer.avatar_url ? (
+        <img alt={displayName} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
+      ) : (
+        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-sm font-semibold text-slate-700" aria-hidden="true">
+          {fallbackLabel}
+        </span>
+      )}
+      {showName ? (
+        <span>
+          {profileUrl ? (
+            <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={profileUrl} rel="noreferrer" target="_blank">
+              {displayName}
+            </a>
+          ) : (
+            <span className="block text-sm font-medium text-slate-950">{displayName}</span>
+          )}
+        </span>
+      ) : null}
+    </span>
   )
 }
 

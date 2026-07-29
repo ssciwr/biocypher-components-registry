@@ -1,9 +1,8 @@
 """Adapter metadata validator.
 
 Validates a parsed ``croissant.jsonld`` dict against the active adapter
-JSON Schema (Draft 7). Before validation, ``hasPart`` is normalised: if the
-payload stores a single dataset as an object instead of a one-element array,
-it is wrapped automatically so the schema can always expect an array.
+JSON Schema (Draft 7). The schema accepts JSON-LD singleton or list forms
+for fields Croissant commonly serializes either way.
 
 In addition to JSON Schema, this module also performs lightweight
 Croissant-specific semantic checks such as duplicate node ``@id`` values
@@ -26,16 +25,15 @@ from src.core.validation.results import ValidationCheck, ValidationResult
 def validate_adapter(data: dict[str, Any]) -> ValidationResult:
     """Validate adapter metadata against the active adapter schema."""
     schema = load_active_schema()
-    normalised = _normalise_has_part(data)
 
     validator_cls = jsonschema.validators.validator_for(schema)
     validator = validator_cls(schema)
 
-    mlcroissant_errors = validate_with_mlcroissant(normalised)
+    mlcroissant_errors = validate_with_mlcroissant(data)
     schema_errors = [
-        _format_error(err) for err in validator.iter_errors(normalised)
+        _format_error(err) for err in validator.iter_errors(data)
     ]
-    semantic_errors = _semantic_errors(normalised)
+    semantic_errors = _semantic_errors(data)
     checks = [
         ValidationCheck(
             name="Croissant compliance",
@@ -92,13 +90,6 @@ def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationR
         checks=checks,
         profile_version=adapter_result.profile_version,
     )
-
-
-def _normalise_has_part(data: dict[str, Any]) -> dict[str, Any]:
-    has_part = data.get("hasPart")
-    if isinstance(has_part, dict):
-        return {**data, "hasPart": [has_part]}
-    return data
 
 
 def _embedded_dataset_checks(data: dict[str, Any]) -> list[ValidationCheck]:
@@ -185,6 +176,8 @@ def _is_node_definition(node: dict[str, Any]) -> bool:
 
 def _file_object_reference_errors(data: dict[str, Any]) -> list[str]:
     has_part = data.get("hasPart")
+    if isinstance(has_part, dict):
+        has_part = [has_part]
     if not isinstance(has_part, list):
         return []
 

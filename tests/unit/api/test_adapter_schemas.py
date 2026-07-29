@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from src.api.schemas.adapters import (
+    AdapterDetailResponse,
     AdapterLatestItemResponse,
     AdapterMaintainerResponse,
     data_sources_from_metadata,
@@ -79,16 +80,20 @@ def test_repository_maintainer_ignores_incomplete_repository_locations() -> None
     assert AdapterMaintainerResponse.from_repository_location("https://gitlab.com/org") is None
 
 
-def test_latest_adapter_item_normalizes_metadata_keywords() -> None:
+def test_adapter_items_use_singular_maintainer_and_keywords() -> None:
     """
-    Cover latest adapter cards with a string keyword list.
+    Cover adapter display responses with a string keyword list.
     """
     now = datetime.now(timezone.utc)
     entry = RegistryEntry("e1", "r1", "Example", "example::1.0", now, now, {"keywords": "a, b,, "})
     registration = StoredRegistration("r1", "Example", "example", "github.com/org/repo", "remote", RegistrationStatus.VALID, now)
-    item = AdapterLatestItemResponse.from_entry(entry, registration, 2, True)
-    assert item.keywords == ["a", "b"]
-    assert item.maintainers[0].username == "org"
-    assert item.endorsement_count == 2
-    assert item.endorsed_by_current_user is True
+    latest_item = AdapterLatestItemResponse.from_entry(entry, registration, 2, True)
+    detail_item = AdapterDetailResponse.from_entries("example", [entry], registration)
 
+    assert latest_item.maintainer is not None
+    assert latest_item.keywords == ["a", "b"]
+    assert latest_item.maintainer.username == "org"
+    assert latest_item.endorsement_count == 2
+    assert latest_item.endorsed_by_current_user is True
+    assert detail_item.maintainer is not None
+    assert detail_item.maintainer.username == "org"

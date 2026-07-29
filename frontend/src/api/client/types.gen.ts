@@ -114,10 +114,7 @@ export type AdapterDetailResponse = {
      * Keywords
      */
     keywords?: Array<string>;
-    /**
-     * Maintainers
-     */
-    maintainers?: Array<AdapterMaintainerResponse>;
+    maintainer?: AdapterMaintainerResponse | null;
     /**
      * Data Sources
      */
@@ -236,10 +233,7 @@ export type AdapterLatestItemResponse = {
      * Keywords
      */
     keywords?: Array<string>;
-    /**
-     * Maintainers
-     */
-    maintainers?: Array<AdapterMaintainerResponse>;
+    maintainer?: AdapterMaintainerResponse | null;
     /**
      * Endorsement Count
      */

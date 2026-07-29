@@ -14,7 +14,7 @@ Full tool chain example for the adapter list:
 6. The frontend stores those items as `LatestAdapter[]`.
 7. Typing "Ope" in the search box calls `searchAdaptersApiV1AdaptersSearchGet({ query: { query: "Ope" } })`.
 8. FastAPI `search_adapters` asks Postgres for adapter title matches and returns matching `AdapterLatestItemResponse` cards.
-9. `AdapterListView` renders matching adapter cards with name, latest version, description, up to three keywords, maintainers, and endorsement count.
+9. `AdapterListView` renders matching adapter cards with name, latest version, description, up to three keywords, maintainer, and endorsement count.
 
 # Local development advice
 I recommend to run the frontend with `pnpm run dev` and to run the backend using `uv` concurrently for local dev. That will use SQLite for the DB.

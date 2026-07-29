@@ -1189,12 +1189,15 @@
             "type": "array",
             "title": "Keywords"
           },
-          "maintainers": {
-            "items": {
-              "$ref": "#/components/schemas/AdapterMaintainerResponse"
-            },
-            "type": "array",
-            "title": "Maintainers"
+          "maintainer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdapterMaintainerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "data_sources": {
             "items": {
@@ -1408,12 +1411,15 @@
             "type": "array",
             "title": "Keywords"
           },
-          "maintainers": {
-            "items": {
-              "$ref": "#/components/schemas/AdapterMaintainerResponse"
-            },
-            "type": "array",
-            "title": "Maintainers"
+          "maintainer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdapterMaintainerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "endorsement_count": {
             "type": "integer",

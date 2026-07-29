@@ -98,13 +98,7 @@ class AdapterLatestItemResponse(BaseModel):
     description: str | None = None
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
-    maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
-    '''
-    This is nowadays always just a single maintainer - the organization user.
-    That is because on Github, and Gitlab, the organizer ID is always in the URL, which is a lot more reliable than managing
-    bespoke APIs to get each maintainers username/avatar image. (it seems at first glance impossible for us to look up
-    maintainers for some gitlab instances without a custom access API key too).
-    '''
+    maintainer: AdapterMaintainerResponse | None = None
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
     updated_at: datetime
@@ -128,7 +122,7 @@ class AdapterLatestItemResponse(BaseModel):
             description=_metadata_text(metadata, "description"),
             repository_location=repository_location,
             keywords=_metadata_list(metadata, "keywords"),
-            maintainers=[maintainer] if maintainer else [],
+            maintainer=maintainer,
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
             updated_at=entry.updated_at,
@@ -159,7 +153,7 @@ class AdapterDetailResponse(BaseModel):
     doi: str | None = None
     cff_url: str | None = None
     keywords: list[str] = Field(default_factory=list)
-    maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
+    maintainer: AdapterMaintainerResponse | None = None
     data_sources: list[AdapterDataSourceResponse] = Field(default_factory=list)
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
@@ -190,7 +184,7 @@ class AdapterDetailResponse(BaseModel):
             doi=registration.doi if registration else None,
             cff_url=registration.cff_url if registration else None,
             keywords=_metadata_list(metadata, "keywords"),
-            maintainers=[maintainer] if maintainer else [],
+            maintainer=maintainer,
             data_sources=data_sources_from_metadata(metadata),
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
