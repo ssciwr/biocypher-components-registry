@@ -41,16 +41,15 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
         event.preventDefault()
         onClose?.()
       }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose?.()
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return
-        event.preventDefault()
-        onClose?.()
-      }}
     >
-      <section className="w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6">
+      <button
+        aria-label="Close modal"
+        className="absolute inset-0 cursor-default border-0 bg-transparent p-0 focus:outline-none"
+        tabIndex={-1}
+        type="button"
+        onClick={onClose}
+      />
+      <section className="relative z-10 w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <h2
             className="m-0 text-xl font-semibold text-zinc-950 dark:text-zinc-50"

@@ -44,7 +44,8 @@ jobs:
         run: pnpm run build
 
       - name: Install Cypress binary
-        run: pnpm exec cypress install
+        # Cypress binary install is intentional after package lifecycle scripts are blocked above.
+        run: pnpm exec cypress install # NOSONAR
 
       - name: Verify Cypress
         run: pnpm exec cypress verify
