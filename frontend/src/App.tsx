@@ -76,6 +76,7 @@ client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
+  const [authVerified, setAuthVerified] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(globalThis.location.pathname)
 
@@ -99,11 +100,13 @@ function App() {
 
         if (result.data) {
           setAuthUser(result.data)
+          setAuthVerified(true)
           cacheAuthUser(result.data)
           setAuthError(null)
           return
         }
 
+        setAuthVerified(false)
         if (result.response?.status === 401) {
           setAuthUser(null)
           cacheAuthUser(null)
@@ -112,7 +115,10 @@ function App() {
       })
       .catch((error: unknown) => {
         console.error('Could not check sign-in status.', error)
-        if (!ignore) setAuthError('Could not check sign-in status.')
+        if (!ignore) {
+          setAuthVerified(false)
+          setAuthError('Could not check sign-in status.')
+        }
       })
 
     return () => {
@@ -139,6 +145,7 @@ function App() {
       }
 
       setAuthUser(null)
+      setAuthVerified(false)
       cacheAuthUser(null)
       setAuthError(null)
     } catch (error) {
@@ -151,7 +158,7 @@ function App() {
   let page = <HomePage />
 
   if (pathname === '/register') {
-    page = <RegisterPage authUser={authUser} />
+    page = <RegisterPage authUser={authUser} authVerified={authVerified} />
   } else if (pathname === '/adapters' || adapterId) {
     page = <AdaptersPage adapterId={adapterId} />
   }

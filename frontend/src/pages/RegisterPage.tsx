@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 import {
@@ -14,6 +14,7 @@ import { client } from '../api/client/client.gen'
 import { fetchCrossrefWork } from '../api/crossref'
 
 type RegisterPageProps = Readonly<{
+  authVerified: boolean
   authUser: AuthUser | null
 }>
 
@@ -44,6 +45,7 @@ type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 type DoiCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'error'
 
 const draftKey = 'bcr-register-draft'
+const submitAfterAuthKey = 'bcr-register-submit-after-auth'
 const httpsUrlPattern = /^https:\/\/.+/i
 
 const emptyForm: RegistrationForm = {
@@ -88,8 +90,10 @@ function initialForm(): RegistrationForm {
 
   try {
     return { ...emptyForm, ...(JSON.parse(savedDraft) as Partial<RegistrationForm>) }
-  } catch {
+  } catch (error) {
+    console.error('Could not read registration draft.', error)
     globalThis.localStorage.removeItem(draftKey)
+    globalThis.localStorage.removeItem(submitAfterAuthKey)
     return emptyForm
   }
 }
@@ -212,7 +216,8 @@ function RegistrationResultPanel({
   )
 }
 
-function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page coordinates one registration workflow; splitting it is a larger UI refactor.
+function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONAR: this page coordinates one registration workflow; splitting it is a larger UI refactor.
+  const autoSubmitAttemptedRef = useRef(false)
   const [form, setForm] = useState<RegistrationForm>(initialForm)
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
@@ -249,15 +254,16 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
     doiCheckText = 'Could not check DOI'
     doiCheckClass = 'text-red-600'
   }
+  const canSubmitDirectly = Boolean(authUser)
   let submitButtonText = 'Sign in with GitHub'
   if (status === 'submitting') {
     submitButtonText = 'Submitting...'
   } else if (status === 'processing') {
     submitButtonText = 'Checking adapter'
-  } else if (authUser) {
+  } else if (canSubmitDirectly) {
     submitButtonText = 'Register adapter'
   }
-  const SubmitButtonIcon = authUser ? PlusIcon : ArrowRightIcon
+  const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
   let metadataCheckIcon = (
     <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
   )
@@ -325,40 +331,39 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
     }
   }
 
-  async function submitRegistration(event: { preventDefault: () => void }) {
-    event.preventDefault()
+  const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm) => {
     setError(null)
     setResult(null)
 
-    const doi = registrationDoiValue(form.doi)
-
-    if (!authUser) {
-      globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
-      globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
-      return
-    }
+    const doi = registrationDoiValue(registrationForm.doi)
 
     setStatus('submitting')
     try {
       const registrationResult = await createRegistrationApiV1RegistrationsPost({
         body: {
-          adapter_name: form.adapterName,
-          repository_location: form.repositoryLocation,
-          license_value: form.licenseValue.trim() || undefined,
+          adapter_name: registrationForm.adapterName,
+          repository_location: registrationForm.repositoryLocation,
+          license_value: registrationForm.licenseValue.trim() || undefined,
           doi: doi || undefined,
-          cff_url: form.cffUrl.trim() || undefined,
+          cff_url: registrationForm.cffUrl.trim() || undefined,
         },
       })
 
       const registrationError = registrationResult.error as unknown
       if (registrationError || !registrationResult.data) {
+        const details = registrationError as { details?: string; detail?: string } | undefined
         setStatus('idle')
-        setError(typeof registrationError === 'string' && registrationError ? registrationError : (registrationError as { details?: string; detail?: string } | undefined)?.details || (registrationError as { details?: string; detail?: string } | undefined)?.detail || 'Registration failed.')
+        setError(
+          typeof registrationError === 'string' && registrationError
+            ? registrationError
+            : details?.details || details?.detail || 'Registration failed.'
+        )
         return
       }
 
       const registration = registrationResult.data
       globalThis.localStorage.removeItem(draftKey)
+      globalThis.localStorage.removeItem(submitAfterAuthKey)
       setStatus('processing')
 
       const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
@@ -368,16 +373,54 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
       setStatus('idle')
       const processError = processResult.error as unknown
       if (processError || !processResult.data) {
+        const details = processError as { details?: string; detail?: string } | undefined
         setResult(registration)
-        setError(typeof processError === 'string' && processError ? processError : (processError as { details?: string; detail?: string } | undefined)?.details || (processError as { details?: string; detail?: string } | undefined)?.detail || 'Registration was saved, but processing failed.')
+        setError(
+          typeof processError === 'string' && processError
+            ? processError
+            : details?.details || details?.detail || 'Registration was saved, but processing failed.'
+        )
         return
       }
 
       setResult(processResult.data)
     } catch (error) {
+      const details = error as { details?: string; detail?: string } | undefined
       setStatus('idle')
-      setError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Registration failed.')
+      setError(
+        typeof error === 'string' && error
+          ? error
+          : details?.details || details?.detail || 'Registration failed.'
+      )
     }
+  }, [])
+
+  useEffect(() => {
+    if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
+    if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
+
+    const submitTimer = globalThis.setTimeout(() => {
+      if (autoSubmitAttemptedRef.current) return
+      autoSubmitAttemptedRef.current = true
+      globalThis.localStorage.removeItem(submitAfterAuthKey)
+      void submitAuthenticatedRegistration(form)
+    }, 0)
+    return () => globalThis.clearTimeout(submitTimer)
+  }, [authUser, authVerified, form, result, status, submitAuthenticatedRegistration])
+
+  async function submitRegistration(event: { preventDefault: () => void }) {
+    event.preventDefault()
+
+    const doi = registrationDoiValue(form.doi)
+
+    if (!authUser) {
+      globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
+      globalThis.localStorage.setItem(submitAfterAuthKey, '1')
+      globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
+      return
+    }
+
+    await submitAuthenticatedRegistration({ ...form, doi })
   }
 
   async function revalidateRegistration() {
@@ -393,14 +436,24 @@ function RegisterPage({ authUser }: RegisterPageProps) { // NOSONAR: this page c
       setStatus('idle')
       const revalidateError = revalidateResult.error as unknown
       if (revalidateError || !revalidateResult.data) {
-        setError(typeof revalidateError === 'string' && revalidateError ? revalidateError : (revalidateError as { details?: string; detail?: string } | undefined)?.details || (revalidateError as { details?: string; detail?: string } | undefined)?.detail || 'Revalidation failed.')
+        const details = revalidateError as { details?: string; detail?: string } | undefined
+        setError(
+          typeof revalidateError === 'string' && revalidateError
+            ? revalidateError
+            : details?.details || details?.detail || 'Revalidation failed.'
+        )
         return
       }
 
       setResult(revalidateResult.data)
     } catch (error) {
+      const details = error as { details?: string; detail?: string } | undefined
       setStatus('idle')
-      setError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Revalidation failed.')
+      setError(
+        typeof error === 'string' && error
+          ? error
+          : details?.details || details?.detail || 'Revalidation failed.'
+      )
     }
   }
 

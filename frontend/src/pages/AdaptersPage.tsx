@@ -381,7 +381,6 @@ bc.run()`}
 
 /*
 AI-Generated.
-Render one maintainer identity; the backend owns repository URL parsing.
 */
 function MaintainerAvatar({ maintainer, showName = false }: Readonly<{ maintainer?: AdapterMaintainerResponse | null; showName?: boolean }>) {
   if (!maintainer) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
