@@ -218,7 +218,11 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path: Path) -
     )
     store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",
@@ -235,3 +239,19 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path: Path) -
     assert "Example" in result.output
     assert "Adapter" in result.output
     assert "1.0.0" in result.output
+
+
+def test_seed_demo_adapters_command_is_idempotent(tmp_path: Path) -> None:
+    """"// backend change made by jmsssc to adopt workshop feedback hence testing
+    """
+    database_path = tmp_path / "registry.sqlite3"
+
+    first = runner.invoke(app, ["seed-demo-adapters", "--db-path", str(database_path)])
+    second = runner.invoke(app, ["seed-demo-adapters", "--db-path", str(database_path)])
+    entries = SQLiteRegistrationStore(database_path).list_registry_entries()
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    assert "Seeded 3 demo adapters" in first.output
+    assert "skipped 3 existing" in second.output
+    assert len(entries) == 3

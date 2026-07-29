@@ -28,6 +28,7 @@ from src.core.shared.files import (
     fetch_remote_file,
     fetch_remote_metadata,
     parse_json_metadata,
+    remote_metadata_exists,
 )
 from src.core.shared.constants import METADATA_FILENAME
 from src.core.shared.errors import (
@@ -228,6 +229,7 @@ class TestFetchRemoteFile:
         """
         Test fetching a remote file successfully.
         """
+
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(200, "payload")
 
@@ -239,6 +241,7 @@ class TestFetchRemoteFile:
         """
         Test fetching a remote file that returns 404.
         """
+
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(404, "")
 
@@ -250,6 +253,7 @@ class TestFetchRemoteFile:
         """
         Test fetching a remote file that returns an HTTP error.
         """
+
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(500, "")
 
@@ -262,6 +266,7 @@ class TestFetchRemoteFile:
         """
         Test that request exceptions propagate as RequestException.
         """
+
         def fake_get(url: str, timeout: int) -> Any:
             raise RequestException("timeout")
 
@@ -270,12 +275,11 @@ class TestFetchRemoteFile:
             fetch_remote_file("https://example.com/timeout")
 
     # ---- Regression Unit Tests
-    def test_error_message_contains_url(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_error_message_contains_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """
         Test error messages include the URL for debugging.
         """
+
         def fake_get(url: str, timeout: int) -> Any:
             return _make_response(500, "")
 
@@ -295,6 +299,7 @@ class TestFetchRemoteMetadata:
         """
         Test remote discovery when metadata exists.
         """
+
         def fake_fetch(url: str) -> str:
             return '{"name": "remote"}'
 
@@ -322,6 +327,7 @@ class TestFetchRemoteMetadata:
         """
         Test remote discovery when metadata is not found in main/master.
         """
+
         def fake_fetch(url: str) -> str:
             raise RemoteResourceNotFoundError(url)
 
@@ -334,6 +340,7 @@ class TestFetchRemoteMetadata:
         """
         Test remote discovery when the repo URL ends with .git.
         """
+
         def fake_fetch(url: str) -> str:
             return '{"name": "remote"}'
 
@@ -341,13 +348,58 @@ class TestFetchRemoteMetadata:
         metadata = fetch_remote_metadata("https://github.com/org/repo.git")
         assert metadata["name"] == "remote"
 
-    # ---- Regression Unit Tests
-    def test_error_is_specific_type(
-        self, monkeypatch: pytest.MonkeyPatch
+    def test_remote_metadata_branch_urls(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """
+        Increase coverage of added features from workshop feedback - consider different gitlab/github combos
+        """
+        fetched: list[str] = []
+
+        def fake_fetch(url: str) -> str:
+            fetched.append(url)
+            return '{"name": "remote"}'
+
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
+
+        github = fetch_remote_metadata("https://github.com/org/repo/blob/dev/file.json")
+        gitlab = fetch_remote_metadata(
+            "https://gitlab.com/org/repo/-/raw/dev/file.json"
+        )
+        exists = remote_metadata_exists("https://example.org/team/repo")
+
+        assert github["name"] == "remote"
+        assert gitlab["name"] == "remote"
+        assert exists is True
+        assert "https://raw.githubusercontent.com/org/repo/dev/file.json" in fetched
+        assert "https://gitlab.com/org/repo/-/raw/dev/croissant.jsonld" in fetched
+
+    def test_remote_metadata_exists_returns_false_after_missing_candidates(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        """this is used by the frontend purely because we want one source of truth and I put it in the backned
+        in theory the file can be missing or another type of repository other than Github/Gitlab which follows other url conventions so we do not find the file
+        and this test addresses that with a mock to check what the frontend would receive is accurate for user feedback, and what
+        the backend uses to validate the registration is also correct"""
+        fetched: list[str] = []
+
+        def fake_fetch(url: str) -> str:
+            fetched.append(url)
+            raise RemoteResourceNotFoundError(url)
+
+        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
+
+        exists = remote_metadata_exists("https://gitlab.com/org/repo")
+
+        assert exists is False
+        assert fetched[0].endswith("/-/raw/main/croissant.jsonld")
+        assert fetched[1].endswith("/-/raw/master/croissant.jsonld")
+
+    # ---- Regression Unit Tests
+    def test_error_is_specific_type(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """
         Test that missing metadata raises MetadataNotFoundError, not ValueError.
         """
+
         def fake_fetch(url: str) -> str:
             raise RemoteResourceNotFoundError(url)
 
