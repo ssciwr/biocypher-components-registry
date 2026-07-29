@@ -143,7 +143,9 @@ def _latest_adapter_items(
 )
 def get_adapter(
     adapter_id: str,
-    auth_session: AuthSession | None = Depends(get_optional_auth_session),
+    auth_session: Annotated[
+        AuthSession | None, Depends(get_optional_auth_session)
+    ],
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterDetailResponse:
     """Return one public adapter."""
@@ -178,7 +180,7 @@ def endorsed_by_current_user(
 )
 def endorse_adapter(
     adapter_id: str,
-    auth_session: AuthSession = Depends(get_current_auth_session),
+    auth_session: Annotated[AuthSession, Depends(get_current_auth_session)],
     store: RegistrationStore = Depends(get_registration_store),
 ) -> AdapterEndorsementResponse:
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
