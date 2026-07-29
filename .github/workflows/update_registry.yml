@@ -29,10 +29,10 @@ jobs:
       run: uv sync --locked --no-dev # NOSONAR
 
     - name: Fetch adapters metadata
-      run: uv run --locked python scripts/fetch_adapters.py
+      run: .venv/bin/python scripts/fetch_adapters.py
 
     - name: Generate aggregated registry
-      run: uv run --locked python scripts/generate_registry.py
+      run: .venv/bin/python scripts/generate_registry.py
 
     - name: Commit and push changes
       run: |

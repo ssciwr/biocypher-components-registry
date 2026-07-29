@@ -104,7 +104,6 @@ def list_registrations(
 
 @router.get(
     "/registrations/croissant-file-present-check",
-    response_model=RegistrationCroissantFilePresentCheckResponse,
     summary="Check registration Croissant file presence",
     description="Return whether a remote repository exposes root-level croissant.jsonld.",
 )

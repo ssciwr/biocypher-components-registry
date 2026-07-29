@@ -34,6 +34,8 @@ from src.core.registration.store import RegistrationStore
 router = APIRouter()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
+AuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
+OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth_session)]
 
 
 # ===========================================================
@@ -69,12 +71,11 @@ def list_adapters(
 
 @router.get(
     "/adapters/latest",
-    response_model=AdapterLatestListResponse,
     summary="List latest (30) public adapters",
     description="Return the latest valid adapters",
 )
 def list_latest_adapters(
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterLatestListResponse:
     """Return newest unique adapter cards from canonical entries."""
     return AdapterLatestListResponse(
@@ -84,13 +85,12 @@ def list_latest_adapters(
 
 @router.get(
     "/adapters/search",
-    response_model=AdapterLatestListResponse,
     summary="Search public adapters",
     description="Return public adapter cards whose title matches the search term.",
 )
 def search_adapters(
-    query: str = Query(min_length=1),
-    store: RegistrationStore = Depends(get_registration_store),
+    query: Annotated[str, Query(min_length=1)],
+    store: RegistrationStoreDep,
 ) -> AdapterLatestListResponse:
     """Return adapter cards from the PostgreSQL-backed title search."""
     search_entries = getattr(store, "search_registry_entries_by_adapter_name", None)
@@ -143,10 +143,8 @@ def _latest_adapter_items(
 )
 def get_adapter(
     adapter_id: str,
-    auth_session: Annotated[
-        AuthSession | None, Depends(get_optional_auth_session)
-    ],
-    store: RegistrationStore = Depends(get_registration_store),
+    auth_session: OptionalAuthSessionDep,
+    store: RegistrationStoreDep,
 ) -> AdapterDetailResponse:
     """Return one public adapter."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
@@ -174,14 +172,13 @@ def endorsed_by_current_user(
 
 @router.post(
     "/adapters/{adapter_id}/endorse",
-    response_model=AdapterEndorsementResponse,
     summary="Endorse an adapter",
     description="Record that the signed-in user endorses this adapter.",
 )
 def endorse_adapter(
     adapter_id: str,
-    auth_session: Annotated[AuthSession, Depends(get_current_auth_session)],
-    store: RegistrationStore = Depends(get_registration_store),
+    auth_session: AuthSessionDep,
+    store: RegistrationStoreDep,
 ) -> AdapterEndorsementResponse:
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
     if not entries:
@@ -196,13 +193,12 @@ def endorse_adapter(
 
 @router.get(
     "/adapters/{adapter_id}/metadata",
-    response_model=AdapterMetadataResponse,
     summary="Get adapter metadata",
     description="Return the full stored Croissant metadata document for one adapter.",
 )
 def get_adapter_metadata(
     adapter_id: str,
-    store: RegistrationStore = Depends(get_registration_store),
+    store: RegistrationStoreDep,
 ) -> AdapterMetadataResponse:
     """Return full Croissant metadata for one public adapter."""
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
