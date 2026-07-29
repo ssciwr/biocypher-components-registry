@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from tests.unit.api.adapter_test_helpers import (
     create_adapter_client,
@@ -75,6 +77,24 @@ def test_get_adapter_endpoint_returns_adapter_without_metadata(
     assert payload["doi"] == "10.1038/nature11416"
     assert payload["cff_url"] == "https://example.org/CITATION.cff"
     assert "metadata" not in payload
+
+
+def test_search_adapters_endpoint_returns_empty_without_search_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return empty array of items which frontend can show as "No results found for <x>".
+    (Without a search backend)
+    """
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    monkeypatch.setattr(store, "search_registry_entries_by_adapter_name", None)
+    response = create_adapter_client(store).get(
+        "/api/v1/adapters/search",
+        params={"query": "Example"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+    assert "items" in response.json()
 
 
 def test_get_adapter_metadata_endpoint_returns_full_metadata(

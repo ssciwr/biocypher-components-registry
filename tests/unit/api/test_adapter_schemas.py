@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
-from src.api.schemas.adapters import AdapterMaintainerResponse, _repository_url
+from src.api.schemas.adapters import (
+    AdapterLatestItemResponse,
+    AdapterMaintainerResponse,
+    data_sources_from_metadata,
+    _repository_url,
+)
+from src.core.registration.models import RegistryEntry, RegistrationStatus, StoredRegistration
 
 
 # ===========================================================
@@ -58,3 +66,29 @@ def test_repository_maintainer_ignores_unknown_host_avatar() -> None:
     assert maintainer.username == "team"
     assert maintainer.avatar_url is None
     assert maintainer.profile_url == "https://institution.example.org/team"
+
+
+def test_repository_maintainer_ignores_incomplete_repository_locations() -> None:
+    """
+
+    Negative/red testing of invalid submitted information
+    Cover unsupported repository location shapes for maintainer display.
+    """
+    assert AdapterMaintainerResponse.from_repository_location(None) is None
+    assert AdapterMaintainerResponse.from_repository_location("not-a-url") is None
+    assert AdapterMaintainerResponse.from_repository_location("https://gitlab.com/org") is None
+
+
+def test_latest_adapter_item_normalizes_metadata_keywords() -> None:
+    """
+    Cover latest adapter cards with a string keyword list.
+    """
+    now = datetime.now(timezone.utc)
+    entry = RegistryEntry("e1", "r1", "Example", "example::1.0", now, now, {"keywords": "a, b,, "})
+    registration = StoredRegistration("r1", "Example", "example", "github.com/org/repo", "remote", RegistrationStatus.VALID, now)
+    item = AdapterLatestItemResponse.from_entry(entry, registration, 2, True)
+    assert item.keywords == ["a", "b"]
+    assert item.maintainers[0].username == "org"
+    assert item.endorsement_count == 2
+    assert item.endorsed_by_current_user is True
+

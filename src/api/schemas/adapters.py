@@ -99,6 +99,12 @@ class AdapterLatestItemResponse(BaseModel):
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
     maintainers: list[AdapterMaintainerResponse] = Field(default_factory=list)
+    '''
+    This is nowadays always just a single maintainer - the organization user.
+    That is because on Github, and Gitlab, the organizer ID is always in the URL, which is a lot more reliable than managing
+    bespoke APIs to get each maintainers username/avatar image. (it seems at first glance impossible for us to look up
+    maintainers for some gitlab instances without a custom access API key too).
+    '''
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
     updated_at: datetime
