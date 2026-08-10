@@ -40,6 +40,20 @@ from src.api.schemas.registry import (
     RegistryRefreshLatestResponse,
     RegistryRefreshResponse,
 )
+from src.api.schemas.workspace import (
+    FileContentResponse,
+    FileEntryResponse,
+    FileListResponse,
+    FileWriteRequest,
+    FileWriteResponse,
+    InterruptResponse,
+    MessageCreateRequest,
+    MessageCreateResponse,
+    SessionCreateResponse,
+    SessionKeyRequest,
+    SessionStateResponse,
+    ToolDescriptor,
+)
 
 __all__ = [
     "AdapterCatalogItemResponse",
@@ -53,7 +67,15 @@ __all__ = [
     "DATASET_METADATA_GENERATE_EXAMPLE",
     "DatasetMetadataGenerateRequest",
     "DatasetMetadataGenerateResponse",
+    "FileContentResponse",
+    "FileEntryResponse",
+    "FileListResponse",
+    "FileWriteRequest",
+    "FileWriteResponse",
     "HealthResponse",
+    "InterruptResponse",
+    "MessageCreateRequest",
+    "MessageCreateResponse",
     "METADATA_VALIDATE_DATASET_EXAMPLE",
     "MetadataValidationCheckResponse",
     "MetadataValidationRequest",
@@ -74,4 +96,8 @@ __all__ = [
     "RegistryRegistrationResponse",
     "RegistryRefreshLatestResponse",
     "RegistryRefreshResponse",
+    "SessionCreateResponse",
+    "SessionKeyRequest",
+    "SessionStateResponse",
+    "ToolDescriptor",
 ]

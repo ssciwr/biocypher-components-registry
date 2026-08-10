@@ -33,6 +33,9 @@ services:
     container_name: biocypher-registry-backend
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
+      # Agentic workspace API (src/api/routers/workspace.py): per-session
+      # directories live under the same persisted data volume.
+      AGENT_WORKSPACES_ROOT: /app/data/workspaces
     ports:
       - "8000:8000"
     volumes:
