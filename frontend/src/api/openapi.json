@@ -1037,6 +1037,74 @@
         "title": "AdapterCatalogListResponse",
         "description": "Response model for the public adapter catalog."
       },
+      "AdapterCreatorGenerateRequest": {
+        "properties": {
+          "creator_type": {
+            "type": "string",
+            "enum": [
+              "Person",
+              "Organization"
+            ],
+            "title": "Creator Type",
+            "default": "Person"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "affiliation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affiliation"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AdapterCreatorGenerateRequest",
+        "description": "Structured creator input for adapter metadata generation."
+      },
       "AdapterDataSourceResponse": {
         "properties": {
           "name": {
@@ -1547,7 +1615,7 @@
           },
           "creators": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AdapterCreatorGenerateRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -1571,16 +1639,6 @@
               }
             ],
             "title": "Adapter Id"
-          },
-          "programming_language": {
-            "type": "string",
-            "title": "Programming Language",
-            "default": "Python"
-          },
-          "target_product": {
-            "type": "string",
-            "title": "Target Product",
-            "default": "BioCypher"
           },
           "generator": {
             "type": "string",
@@ -1615,7 +1673,14 @@
           "adapter_id": "people-adapter",
           "code_repository": "https://github.com/example/people-adapter",
           "creators": [
-            "Person|Example Creator|Example Lab|||https://orcid.org/0000-0000-0000-0000"
+            {
+              "affiliation": "Example Lab",
+              "creator_type": "Person",
+              "email": "creator@example.org",
+              "identifier": "https://orcid.org/0000-0000-0000-0000",
+              "name": "Example Creator",
+              "url": "https://example.org/creator"
+            }
           ],
           "dataset_generator": "native",
           "dataset_paths": [],
@@ -1644,8 +1709,6 @@
           ],
           "license": "https://opensource.org/licenses/MIT",
           "name": "People Adapter",
-          "programming_language": "Python",
-          "target_product": "BioCypher",
           "validate": true,
           "version": "1.0.0"
         }

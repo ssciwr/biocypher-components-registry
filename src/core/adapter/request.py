@@ -53,11 +53,9 @@ class AdapterGenerationRequest:
     code_repository: str
     dataset_paths: list[str]
     validate: bool = True
-    creators: list[str] = field(default_factory=list)
+    creators: list[str | dict[str, str]] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     adapter_id: str | None = None
-    programming_language: str = "Python"
-    target_product: str = "BioCypher"
     dataset_generator: str = "croissant-baker"
     generated_datasets: list[GenerationRequest] = field(default_factory=list)
 

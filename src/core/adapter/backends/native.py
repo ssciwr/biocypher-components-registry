@@ -21,7 +21,10 @@ from src.core.shared.creators import parse_adapter_creator_string
 from src.core.shared.errors import GeneratorError
 from src.core.shared.ids import slugify_identifier
 from src.core.shared.licenses import normalize_license_url
-from src.core.validation import validate_adapter_with_embedded_datasets, validate_dataset
+from src.core.validation import (
+    validate_adapter_with_embedded_datasets,
+    validate_dataset,
+)
 
 
 class NativeAdapterGenerator(AdapterGenerator):
@@ -33,7 +36,9 @@ class NativeAdapterGenerator(AdapterGenerator):
         """Build, serialize, and optionally validate adapter metadata."""
         datasets = [self._load_dataset(path) for path in request.dataset_paths]
         dataset_reports: list[str] = []
-        for dataset_index, dataset_request in enumerate(request.generated_datasets, start=1):
+        for dataset_index, dataset_request in enumerate(
+            request.generated_datasets, start=1
+        ):
             dataset_document, dataset_stdout, dataset_stderr = self._generate_dataset(
                 request.dataset_generator,
                 dataset_request,
@@ -63,8 +68,6 @@ class NativeAdapterGenerator(AdapterGenerator):
             keywords=request.keywords,
             datasets=datasets,
             adapter_id=request.adapter_id,
-            programming_language=request.programming_language,
-            target_product=request.target_product,
         )
 
         output_path = Path(request.output_path)
@@ -99,7 +102,9 @@ class NativeAdapterGenerator(AdapterGenerator):
             document=document,
         )
 
-    def _generate_dataset(self, generator: str, request) -> tuple[dict[str, Any], str, str]:
+    def _generate_dataset(
+        self, generator: str, request
+    ) -> tuple[dict[str, Any], str, str]:
         """Generate one nested dataset document through the dataset service."""
         with TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "croissant_dataset.jsonld"
@@ -130,7 +135,9 @@ class NativeAdapterGenerator(AdapterGenerator):
         """Load and validate an existing dataset document from disk."""
         dataset_path = Path(path).expanduser()
         if not dataset_path.exists():
-            raise GeneratorError(f"Dataset metadata file does not exist: {dataset_path}")
+            raise GeneratorError(
+                f"Dataset metadata file does not exist: {dataset_path}"
+            )
 
         try:
             document = json.loads(dataset_path.read_text(encoding="utf-8"))
@@ -148,16 +155,36 @@ class NativeAdapterGenerator(AdapterGenerator):
         return _normalise_embedded_dataset(document)
 
 
-def _build_creators(raw_creators: list[str]) -> list[dict[str, Any]]:
-    """Parse serialized creator strings into adapter creator objects."""
+def _build_creators(raw_creators: list[str | dict[str, str]]) -> list[dict[str, Any]]:
+    """Build adapter creator objects from API JSON or legacy strings."""
     creators: list[dict[str, Any]] = []
     for raw in raw_creators:
+        if isinstance(raw, dict):
+            name = raw.get("name", "").strip()
+            if name:
+                identifier = (
+                    raw.get("identifier", "").strip() or raw.get("orcid", "").strip()
+                )
+                creators.append(
+                    build_adapter_creator(
+                        name=name,
+                        affiliation=raw.get("affiliation", "").strip(),
+                        email=raw.get("email", "").strip(),
+                        url=raw.get("url", "").strip(),
+                        identifier=identifier,
+                        creator_type=raw.get("creator_type", "Person").strip(),
+                    )
+                )
+            continue
+
         spec = parse_adapter_creator_string(raw)
         if spec and spec.name:
             creators.append(
                 build_adapter_creator(
                     name=spec.name,
                     affiliation=spec.affiliation,
+                    email=spec.email,
+                    url=spec.url,
                     identifier=spec.identifier,
                     creator_type=spec.creator_type,
                 )

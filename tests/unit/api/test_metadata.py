@@ -142,7 +142,7 @@ def _adapter_generate_payload(**overrides: object) -> dict[str, object]:
         "version": "1.0.0",
         "license": "https://opensource.org/licenses/MIT",
         "code_repository": "https://github.com/example/example-adapter",
-        "creators": ["Example Creator"],
+        "creators": [{"name": "Example Creator"}],
         "keywords": ["adapter"],
     }
     payload.update(overrides)
@@ -408,7 +408,13 @@ def test_generate_adapter_metadata_endpoint_returns_generated_document(
                 }
             ],
             creators=[
-                "Person|Example Creator|Example Lab||https://example.org|https://orcid.org/0000-0000-0000-0000"
+                {
+                    "creator_type": "Person",
+                    "name": "Example Creator",
+                    "affiliation": "Example Lab",
+                    "url": "https://example.org",
+                    "identifier": "https://orcid.org/0000-0000-0000-0000",
+                }
             ],
             keywords=["adapter", "biocypher"],
             dataset_generator="native",
@@ -423,6 +429,8 @@ def test_generate_adapter_metadata_endpoint_returns_generated_document(
     assert request.name == "Example Adapter"
     assert request.dataset_paths == [str(tmp_path / "dataset.jsonld")]
     assert request.dataset_generator == "native"
+    assert request.creators[0]["url"] == "https://example.org"
+    assert request.creators[0]["identifier"] == "https://orcid.org/0000-0000-0000-0000"
     assert request.generated_datasets[0].input_path == str(tmp_path / "data")
     assert request.generated_datasets[0].name == "Generated Dataset"
     assert payload["metadata"]["name"] == "Example Adapter"
@@ -498,7 +506,7 @@ def test_generate_adapter_metadata_endpoint_rejects_blank_required_lists() -> No
     response = client.post(
         ADAPTER_GENERATE_PATH,
         json=_adapter_generate_payload(
-            creators=["   "],
+            creators=[{"name": "   "}],
             keywords=[""],
         ),
     )
@@ -522,7 +530,14 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
             description="Adapter metadata generated through the API.",
             code_repository="https://github.com/example/people-adapter",
             creators=[
-                "Person|Example Creator|Example Lab|||https://orcid.org/0000-0000-0000-0000"
+                {
+                    "creator_type": "Person",
+                    "name": "Example Creator",
+                    "affiliation": "Example Lab",
+                    "email": "creator@example.org",
+                    "url": "https://example.org/creator",
+                    "identifier": "https://orcid.org/0000-0000-0000-0000",
+                }
             ],
             keywords=["adapter", "biocypher"],
             dataset_generator="native",
@@ -548,6 +563,11 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
     metadata = payload["metadata"]
     assert metadata["@type"] == "SoftwareSourceCode"
     assert metadata["name"] == "People Adapter"
+    assert metadata["creator"][0]["email"] == "creator@example.org"
+    assert metadata["creator"][0]["url"] == "https://example.org/creator"
+    assert (
+        metadata["creator"][0]["identifier"] == "https://orcid.org/0000-0000-0000-0000"
+    )
     assert metadata["hasPart"][0]["name"] == "People Dataset"
     assert metadata["hasPart"][0]["distribution"][0]["name"] == "people.csv"
     assert payload["generator"] == "native"

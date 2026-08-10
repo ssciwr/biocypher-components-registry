@@ -22,7 +22,10 @@ from src.core.adapter.request import AdapterGenerationRequest
 from src.core.adapter.service import execute_request as execute_adapter_request
 from src.core.dataset.request import GenerationRequest
 from src.core.dataset.service import execute_request as execute_dataset_request
-from src.core.validation import validate_adapter_with_embedded_datasets, validate_dataset
+from src.core.validation import (
+    validate_adapter_with_embedded_datasets,
+    validate_dataset,
+)
 from src.core.validation.results import ValidationResult
 
 
@@ -239,11 +242,11 @@ def _build_adapter_generation_request(
         code_repository=payload.code_repository,
         dataset_paths=payload.dataset_paths,
         validate=payload.run_validation,
-        creators=payload.creators,
+        creators=[
+            creator.model_dump(exclude_none=True) for creator in payload.creators
+        ],
         keywords=payload.keywords,
         adapter_id=payload.adapter_id,
-        programming_language=payload.programming_language,
-        target_product=payload.target_product,
         dataset_generator=payload.dataset_generator,
         generated_datasets=[
             _build_embedded_dataset_generation_request(dataset)

@@ -110,12 +110,17 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
     ],
     "validate": True,
     "creators": [
-        "Person|Example Creator|Example Lab|||https://orcid.org/0000-0000-0000-0000"
+        {
+            "creator_type": "Person",
+            "name": "Example Creator",
+            "affiliation": "Example Lab",
+            "email": "creator@example.org",
+            "url": "https://example.org/creator",
+            "identifier": "https://orcid.org/0000-0000-0000-0000",
+        }
     ],
     "keywords": ["adapter", "biocypher"],
     "adapter_id": "people-adapter",
-    "programming_language": "Python",
-    "target_product": "BioCypher",
     "generator": "native",
     "dataset_generator": "native",
 }
@@ -231,6 +236,29 @@ class AdapterEmbeddedDatasetGenerateRequest(_GeneratedDatasetFields):
         return _required_text(value, field_name="Input path")
 
 
+class AdapterCreatorGenerateRequest(BaseModel):
+    """Structured creator input for adapter metadata generation."""
+
+    creator_type: Literal["Person", "Organization"] = "Person"
+    name: str = Field(..., min_length=1)
+    affiliation: str | None = None
+    email: str | None = None
+    url: str | None = None
+    identifier: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _require_name(cls, value: str | None) -> str:
+        """Keep adapter creator names explicit."""
+        return _required_text(value, field_name="Creator name")
+
+    @field_validator("affiliation", "email", "url", "identifier")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        """Trim optional creator text fields and collapse blanks to null."""
+        return _optional_text(value)
+
+
 class AdapterMetadataGenerateRequest(BaseModel):
     """Request body for generating adapter metadata without persisting it."""
 
@@ -249,11 +277,9 @@ class AdapterMetadataGenerateRequest(BaseModel):
         default_factory=list
     )
     run_validation: bool = Field(default=True, alias="validate")
-    creators: list[str] = Field(..., min_length=1)
+    creators: list[AdapterCreatorGenerateRequest] = Field(..., min_length=1)
     keywords: list[str] = Field(..., min_length=1)
     adapter_id: str | None = None
-    programming_language: str = "Python"
-    target_product: str = "BioCypher"
     generator: Literal["native"] = "native"
     dataset_generator: Literal["auto", "croissant-baker", "native"] = "croissant-baker"
 
@@ -264,8 +290,6 @@ class AdapterMetadataGenerateRequest(BaseModel):
         "license_value",
         "code_repository",
         "adapter_id",
-        "programming_language",
-        "target_product",
     )
     @classmethod
     def _normalize_text(cls, value: str | None) -> str | None:
@@ -278,8 +302,6 @@ class AdapterMetadataGenerateRequest(BaseModel):
         "version",
         "license_value",
         "code_repository",
-        "programming_language",
-        "target_product",
     )
     @classmethod
     def _require_text(cls, value: str | None) -> str:
@@ -292,7 +314,7 @@ class AdapterMetadataGenerateRequest(BaseModel):
         """Trim list items and remove blank values."""
         return _text_list(value)
 
-    @field_validator("creators", "keywords")
+    @field_validator("keywords")
     @classmethod
     def _normalize_required_text_list(cls, value: list[str]) -> list[str]:
         """Trim required list items and reject blank-only lists."""
