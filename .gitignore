@@ -147,6 +147,7 @@ registry.sqlite3
 
 # Codex file
 .codex
+AGENTS.md
 
 # VS Code settings
 .vscode/settings.json

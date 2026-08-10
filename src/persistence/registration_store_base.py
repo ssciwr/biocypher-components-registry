@@ -1,10 +1,4 @@
-"""Shared SQLAlchemy Core implementation of the registration store port.
-
-Both the PostgreSQL and SQLite adapters share the same persistence logic and
-only differ in engine construction and schema initialization. This base class
-holds that shared logic so each concrete adapter stays limited to its
-engine-specific seams (connection setup and schema/migration handling).
-"""
+"""Shared SQLAlchemy Core behavior for registration persistence."""
 
 from __future__ import annotations
 
@@ -13,13 +7,16 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 
 from src.core.adapter.request import AdapterRegistrationRequest
-from src.core.registration.errors import DuplicateRegistrationError
+from src.core.registration.errors import (
+    DUPLICATE_REPOSITORY_URL_MESSAGE,
+    DuplicateRegistrationError,
+)
 from src.core.registration.models import (
     BatchRefreshRecord,
     BatchRefreshSummary,
@@ -29,6 +26,7 @@ from src.core.registration.models import (
     StoredRegistration,
 )
 from src.persistence.tables import (
+    adapter_endorsements_table,
     registration_events_table,
     registration_sources_table,
     registry_entries_table,
@@ -39,14 +37,7 @@ from src.core.shared.ids import slugify_identifier
 
 
 class SQLAlchemyRegistrationStore:
-    """Persist registration requests through SQLAlchemy Core.
-
-    Concrete engine adapters (PostgreSQL, SQLite) subclass this and only
-    implement ``_build_engine`` and ``_initialize_database``. This class
-    expects ``self.engine: Engine`` to be set by the subclass constructor.
-    """
-
-    engine: Engine
+    """Shared registration behavior for SQLAlchemy-backed stores."""
 
     def create_registration(
         self,
@@ -62,32 +53,42 @@ class SQLAlchemyRegistrationStore:
             status=RegistrationStatus.SUBMITTED,
             created_at=datetime.now(UTC),
             description=request.description,
-            contact_email=request.contact_email,
             license_value=request.license_value,
             doi=request.doi,
+            cff_url=request.cff_url,
             submitted_by_github_login=request.submitted_by_github_login,
         )
 
         with self.engine.begin() as connection:
-            connection.execute(
-                insert(registration_sources_table).values(
-                    id=registration.registration_id,
-                    submitted_adapter_name=registration.adapter_name,
-                    description=registration.description,
-                    repository_location=registration.repository_location,
-                    source_kind=registration.repository_kind,
-                    contact_email=registration.contact_email,
-                    license_value=registration.license_value,
-                    doi=registration.doi,
-                    submitted_by_github_login=registration.submitted_by_github_login,
-                    is_active=True,
-                    created_at=registration.created_at.isoformat(),
-                    updated_at=registration.created_at.isoformat(),
-                    last_checked_at=None,
-                    last_seen_at=None,
-                    current_registry_entry_id=None,
+            if self._registration_source_by_repository_location(
+                connection,
+                registration.repository_location,
+            ):
+                raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
+            try:
+                connection.execute(
+                    insert(registration_sources_table).values(
+                        id=registration.registration_id,
+                        submitted_adapter_name=registration.adapter_name,
+                        description=registration.description,
+                        repository_location=registration.repository_location,
+                        source_kind=registration.repository_kind,
+                        license_value=registration.license_value,
+                        doi=registration.doi,
+                        cff_url=registration.cff_url,
+                        submitted_by_github_login=registration.submitted_by_github_login,
+                        is_active=True,
+                        created_at=registration.created_at.isoformat(),
+                        updated_at=registration.created_at.isoformat(),
+                        last_checked_at=None,
+                        last_seen_at=None,
+                        current_registry_entry_id=None,
+                    )
                 )
-            )
+            except IntegrityError as exc:
+                raise DuplicateRegistrationError(
+                    DUPLICATE_REPOSITORY_URL_MESSAGE
+                ) from exc
             self._insert_registration_event(
                 connection,
                 source_id=registration.registration_id,
@@ -173,6 +174,36 @@ class SQLAlchemyRegistrationStore:
 
         return [self._registry_entry_row_to_entry(row) for row in rows]
 
+    def search_registry_entries_by_adapter_name(
+        self,
+        query: str,
+        limit: int = 10_000,
+    ) -> list[RegistryEntry]:
+        """Return active canonical entries whose adapter title matches the query."""
+        search_term = query.strip()
+        if not search_term:
+            return []
+
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(registry_entries_table)
+                .where(
+                    registry_entries_table.c.is_active.is_(True),
+                    registry_entries_table.c.adapter_name.icontains(
+                        search_term,
+                        autoescape=True,
+                    ),
+                )
+                .order_by(
+                    registry_entries_table.c.updated_at.desc(),
+                    registry_entries_table.c.created_at.desc(),
+                    registry_entries_table.c.id.desc(),
+                )
+                .limit(limit)
+            ).mappings().all()
+
+        return [self._registry_entry_row_to_entry(row) for row in rows]
+
     def get_registry_entry(self, entry_id: str) -> RegistryEntry | None:
         """Return one active canonical registry entry by identifier when it exists."""
         with self.engine.connect() as connection:
@@ -186,6 +217,43 @@ class SQLAlchemyRegistrationStore:
         if row is None:
             return None
         return self._registry_entry_row_to_entry(row)
+
+    def endorse_adapter(self, adapter_id: str, github_login: str) -> None:
+        now = datetime.now(UTC).isoformat()
+        try:
+            with self.engine.begin() as connection:
+                if self._adapter_endorsement_row(connection, adapter_id, github_login):
+                    return
+                connection.execute(
+                    insert(adapter_endorsements_table).values(
+                        id=str(uuid4()),
+                        adapter_id=adapter_id,
+                        github_login=github_login,
+                        created_at=now,
+                    )
+                )
+        except IntegrityError:
+            return
+
+    def count_adapter_endorsements(self, adapter_id: str) -> int:
+        """Count distinct GitHub endorsements for the adapter.
+        """
+        with self.engine.connect() as connection:
+            count = connection.execute(
+                select(func.count())
+                .select_from(adapter_endorsements_table)
+                .where(adapter_endorsements_table.c.adapter_id == adapter_id)
+            ).scalar_one()
+        return int(count)
+
+    def has_adapter_endorsement(self, adapter_id: str, github_login: str) -> bool:
+        """Has this given user (usually the logged in user) already given an endorsement for this adapter?"""
+        with self.engine.connect() as connection:
+            return self._adapter_endorsement_row(
+                connection,
+                adapter_id,
+                github_login,
+            ) is not None
 
     def record_batch_refresh(
         self,
@@ -254,51 +322,130 @@ class SQLAlchemyRegistrationStore:
         updated_at = datetime.now(UTC)
         metadata_payload = json.dumps(metadata, sort_keys=True)
         adapter_name = str(metadata.get("name", "")).strip()
-        adapter_version = str(metadata.get("version", "")).strip()
         pending_duplicate_error: str | None = None
 
         try:
             with self.engine.begin() as connection:
                 current_entry = self._current_registry_entry(connection, registration_id)
-                unchanged_result = self._finalize_unchanged_registration(
-                    connection,
-                    current_entry,
-                    observed_checksum,
-                    registration_id=registration_id,
-                    metadata_path=metadata_path,
-                    profile_version=profile_version,
-                    metadata_payload=metadata_payload,
-                    updated_at=updated_at,
-                )
-                if unchanged_result is not None:
-                    return unchanged_result
+                if (
+                    current_entry is not None
+                    and str(current_entry["metadata_checksum"] or "") == observed_checksum
+                ):
+                    connection.execute(
+                        update(registration_sources_table)
+                        .where(registration_sources_table.c.id == registration_id)
+                        .values(
+                            updated_at=updated_at.isoformat(),
+                            last_checked_at=updated_at.isoformat(),
+                            last_seen_at=updated_at.isoformat(),
+                        )
+                    )
+                    self._insert_registration_event(
+                        connection,
+                        source_id=registration_id,
+                        registry_entry_id=str(current_entry["id"]),
+                        event_type="UNCHANGED",
+                        profile_version=profile_version,
+                        metadata_json=metadata_payload,
+                        error_details=None,
+                        message="Metadata checksum unchanged; canonical entry preserved.",
+                        started_at=updated_at.isoformat(),
+                        finished_at=updated_at.isoformat(),
+                        mlcroissant_valid=True,
+                        schema_valid=True,
+                        observed_checksum=observed_checksum,
+                    )
+                    updated_registration = self.get_registration(registration_id)
+                    if updated_registration is None:
+                        raise ValueError(f"Registration not found: {registration_id}")
+                    return replace(updated_registration, metadata_path=metadata_path)
 
                 existing_entry = self._registry_entry_by_uniqueness_key(
                     connection,
                     uniqueness_key,
                 )
                 if existing_entry is not None:
-                    pending_duplicate_error = self._reject_duplicate_registration(
-                        connection,
-                        existing_entry,
-                        observed_checksum,
-                        registration_id=registration_id,
-                        uniqueness_key=uniqueness_key,
-                        profile_version=profile_version,
-                        metadata_payload=metadata_payload,
-                        updated_at=updated_at,
+                    same_checksum = (
+                        str(existing_entry["metadata_checksum"] or "")
+                        == observed_checksum
                     )
-                else:
-                    self._create_valid_registry_entry(
+                    duplicate_outcomes = {
+                        True: (
+                            "DUPLICATE",
+                            "Duplicate canonical registry entry rejected.",
+                            f"Duplicate registration rejected for uniqueness key: {uniqueness_key}",
+                        ),
+                        False: (
+                            "REJECTED_SAME_VERSION_CHANGED",
+                            "Changed metadata for the same adapter id and version was rejected.",
+                            "Registration rejected because metadata changed for an existing "
+                            f"adapter id and version: {uniqueness_key}. Please bump the version.",
+                        ),
+                    }
+                    event_type, message, error_message = duplicate_outcomes[same_checksum]
+                    connection.execute(
+                        update(registration_sources_table)
+                        .where(registration_sources_table.c.id == registration_id)
+                        .values(
+                            updated_at=updated_at.isoformat(),
+                            last_checked_at=updated_at.isoformat(),
+                            last_seen_at=updated_at.isoformat(),
+                        )
+                    )
+                    self._insert_registration_event(
                         connection,
-                        registration_id=registration_id,
-                        adapter_name=adapter_name,
-                        adapter_version=adapter_version,
+                        source_id=registration_id,
+                        registry_entry_id=str(existing_entry["id"]),
+                        event_type=event_type,
                         profile_version=profile_version,
-                        uniqueness_key=uniqueness_key,
+                        metadata_json=metadata_payload,
+                        error_details=json.dumps([error_message]),
+                        message=message,
+                        started_at=updated_at.isoformat(),
+                        finished_at=updated_at.isoformat(),
                         observed_checksum=observed_checksum,
-                        metadata_payload=metadata_payload,
-                        updated_at=updated_at,
+                    )
+                    pending_duplicate_error = error_message
+                else:
+                    registry_entry_id = str(uuid4())
+                    connection.execute(
+                        insert(registry_entries_table).values(
+                            id=registry_entry_id,
+                            source_id=registration_id,
+                            adapter_name=adapter_name,
+                            profile_version=profile_version,
+                            uniqueness_key=uniqueness_key,
+                            metadata_checksum=observed_checksum,
+                            metadata_json=metadata_payload,
+                            created_at=updated_at.isoformat(),
+                            updated_at=updated_at.isoformat(),
+                            is_active=True,
+                        )
+                    )
+                    connection.execute(
+                        update(registration_sources_table)
+                        .where(registration_sources_table.c.id == registration_id)
+                        .values(
+                            updated_at=updated_at.isoformat(),
+                            last_checked_at=updated_at.isoformat(),
+                            last_seen_at=updated_at.isoformat(),
+                            current_registry_entry_id=registry_entry_id,
+                        )
+                    )
+                    self._insert_registration_event(
+                        connection,
+                        source_id=registration_id,
+                        registry_entry_id=registry_entry_id,
+                        event_type="VALID_CREATED",
+                        profile_version=profile_version,
+                        metadata_json=metadata_payload,
+                        error_details=None,
+                        message="Canonical valid registry entry created.",
+                        started_at=updated_at.isoformat(),
+                        finished_at=updated_at.isoformat(),
+                        mlcroissant_valid=True,
+                        schema_valid=True,
+                        observed_checksum=observed_checksum,
                     )
         except IntegrityError as exc:
             raise DuplicateRegistrationError(
@@ -311,169 +458,6 @@ class SQLAlchemyRegistrationStore:
         if pending_duplicate_error is not None:
             raise DuplicateRegistrationError(pending_duplicate_error)
         return replace(updated_registration, metadata_path=metadata_path)
-
-    def _finalize_unchanged_registration(
-        self,
-        connection: Engine | object,
-        current_entry: RowMapping | None,
-        observed_checksum: str,
-        *,
-        registration_id: str,
-        metadata_path: str | None,
-        profile_version: str,
-        metadata_payload: str,
-        updated_at: datetime,
-    ) -> StoredRegistration | None:
-        """Preserve the canonical entry when the metadata checksum is unchanged.
-
-        Returns the finalized registration when the checksum matched, or
-        ``None`` when the caller should continue with duplicate/creation handling.
-        """
-        if (
-            current_entry is None
-            or str(current_entry["metadata_checksum"] or "") != observed_checksum
-        ):
-            return None
-
-        connection.execute(
-            update(registration_sources_table)
-            .where(registration_sources_table.c.id == registration_id)
-            .values(
-                updated_at=updated_at.isoformat(),
-                last_checked_at=updated_at.isoformat(),
-                last_seen_at=updated_at.isoformat(),
-            )
-        )
-        self._insert_registration_event(
-            connection,
-            source_id=registration_id,
-            registry_entry_id=str(current_entry["id"]),
-            event_type="UNCHANGED",
-            profile_version=profile_version,
-            metadata_json=metadata_payload,
-            error_details=None,
-            message="Metadata checksum unchanged; canonical entry preserved.",
-            started_at=updated_at.isoformat(),
-            finished_at=updated_at.isoformat(),
-            mlcroissant_valid=True,
-            schema_valid=True,
-            observed_checksum=observed_checksum,
-        )
-        updated_registration = self.get_registration(registration_id)
-        if updated_registration is None:
-            raise ValueError(f"Registration not found: {registration_id}")
-        return replace(updated_registration, metadata_path=metadata_path)
-
-    def _reject_duplicate_registration(
-        self,
-        connection: Engine | object,
-        existing_entry: RowMapping,
-        observed_checksum: str,
-        *,
-        registration_id: str,
-        uniqueness_key: str,
-        profile_version: str,
-        metadata_payload: str,
-        updated_at: datetime,
-    ) -> str:
-        """Record a rejected duplicate/changed registration and return the error message."""
-        event_type = (
-            "DUPLICATE"
-            if str(existing_entry["metadata_checksum"] or "") == observed_checksum
-            else "REJECTED_SAME_VERSION_CHANGED"
-        )
-        message = (
-            "Duplicate canonical registry entry rejected."
-            if event_type == "DUPLICATE"
-            else "Changed metadata for the same adapter_id and version was rejected."
-        )
-        error_message = (
-            f"Duplicate registration rejected for uniqueness key: {uniqueness_key}"
-            if event_type == "DUPLICATE"
-            else (
-                "Registration rejected because metadata changed for an existing "
-                f"adapter_id and version: {uniqueness_key}. Please bump the version."
-            )
-        )
-        connection.execute(
-            update(registration_sources_table)
-            .where(registration_sources_table.c.id == registration_id)
-            .values(
-                updated_at=updated_at.isoformat(),
-                last_checked_at=updated_at.isoformat(),
-                last_seen_at=updated_at.isoformat(),
-            )
-        )
-        self._insert_registration_event(
-            connection,
-            source_id=registration_id,
-            registry_entry_id=str(existing_entry["id"]),
-            event_type=event_type,
-            profile_version=profile_version,
-            metadata_json=metadata_payload,
-            error_details=json.dumps([error_message]),
-            message=message,
-            started_at=updated_at.isoformat(),
-            finished_at=updated_at.isoformat(),
-            observed_checksum=observed_checksum,
-        )
-        return error_message
-
-    def _create_valid_registry_entry(
-        self,
-        connection: Engine | object,
-        *,
-        registration_id: str,
-        adapter_name: str,
-        adapter_version: str,
-        profile_version: str,
-        uniqueness_key: str,
-        observed_checksum: str,
-        metadata_payload: str,
-        updated_at: datetime,
-    ) -> None:
-        """Create a new canonical registry entry for a valid registration."""
-        registry_entry_id = str(uuid4())
-        connection.execute(
-            insert(registry_entries_table).values(
-                id=registry_entry_id,
-                source_id=registration_id,
-                adapter_name=adapter_name,
-                adapter_version=adapter_version,
-                profile_version=profile_version,
-                uniqueness_key=uniqueness_key,
-                metadata_checksum=observed_checksum,
-                metadata_json=metadata_payload,
-                created_at=updated_at.isoformat(),
-                updated_at=updated_at.isoformat(),
-                is_active=True,
-            )
-        )
-        connection.execute(
-            update(registration_sources_table)
-            .where(registration_sources_table.c.id == registration_id)
-            .values(
-                updated_at=updated_at.isoformat(),
-                last_checked_at=updated_at.isoformat(),
-                last_seen_at=updated_at.isoformat(),
-                current_registry_entry_id=registry_entry_id,
-            )
-        )
-        self._insert_registration_event(
-            connection,
-            source_id=registration_id,
-            registry_entry_id=registry_entry_id,
-            event_type="VALID_CREATED",
-            profile_version=profile_version,
-            metadata_json=metadata_payload,
-            error_details=None,
-            message="Canonical valid registry entry created.",
-            started_at=updated_at.isoformat(),
-            finished_at=updated_at.isoformat(),
-            mlcroissant_valid=True,
-            schema_valid=True,
-            observed_checksum=observed_checksum,
-        )
 
     def mark_registration_invalid(
         self,
@@ -675,6 +659,33 @@ class SQLAlchemyRegistrationStore:
             )
         ).mappings().first()
 
+    def _registration_source_by_repository_location(
+        self,
+        connection: Engine | object,
+        repository_location: str,
+    ) -> RowMapping | None:
+        """Load one registration source for a normalized repository location."""
+        return connection.execute(
+            select(registration_sources_table).where(
+                registration_sources_table.c.repository_location
+                == repository_location
+            )
+        ).mappings().first()
+
+    def _adapter_endorsement_row(
+        self,
+        connection: Engine | object,
+        adapter_id: str,
+        github_login: str,
+    ) -> RowMapping | None:
+        """Load an endorsement row for one adapter/login pair."""
+        return connection.execute(
+            select(adapter_endorsements_table).where(
+                adapter_endorsements_table.c.adapter_id == adapter_id,
+                adapter_endorsements_table.c.github_login == github_login,
+            )
+        ).mappings().first()
+
     def _event_row_to_event(self, event_row: RowMapping) -> RegistrationEvent:
         """Convert one event row into the public core event model."""
         error_details = (
@@ -717,7 +728,6 @@ class SQLAlchemyRegistrationStore:
             entry_id=str(entry_row["id"]),
             source_id=str(entry_row["source_id"]),
             adapter_name=str(entry_row["adapter_name"]),
-            adapter_version=str(entry_row["adapter_version"]),
             profile_version=(
                 str(entry_row["profile_version"])
                 if entry_row["profile_version"] is not None
@@ -798,9 +808,9 @@ class SQLAlchemyRegistrationStore:
             status=self._derive_status(latest_event_type, current_entry),
             created_at=datetime.fromisoformat(str(source_row["created_at"])),
             description=source_row.get("description"),
-            contact_email=source_row.get("contact_email"),
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),
+            cff_url=source_row.get("cff_url"),
             submitted_by_github_login=source_row.get("submitted_by_github_login"),
             metadata_path=self._resolve_metadata_path(source_row),
             metadata=metadata,

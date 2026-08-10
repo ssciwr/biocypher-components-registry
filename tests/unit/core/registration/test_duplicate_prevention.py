@@ -102,6 +102,40 @@ def _valid_adapter_document(
     }
 
 
+@pytest.mark.parametrize(
+    ("main_url", "master_url", "canonical_url"),
+    [
+        (
+            "https://github.com/biocypher/example-adapter/tree/main",
+            "https://github.com/biocypher/example-adapter/tree/master",
+            "https://github.com/biocypher/example-adapter",
+        ),
+        (
+            "https://gitlab.example.org/group/example-adapter/-/tree/main",
+            "https://gitlab.example.org/group/example-adapter/-/tree/master",
+            "https://gitlab.example.org/group/example-adapter",
+        ),
+    ],
+)
+def test_submit_registration_rejects_main_master_branch_duplicate(
+    tmp_path: Path,
+    main_url: str,
+    master_url: str,
+    canonical_url: str,
+) -> None:
+    """Reject branch-specific URLs that resolve to the same repository root."""
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    first = submit_registration("Example Adapter", main_url, store)
+
+    with pytest.raises(DuplicateRegistrationError):
+        submit_registration("Example Adapter", master_url, store)
+    active_registrations = store.list_active_registrations()
+
+    assert first.repository_location == canonical_url
+    assert active_registrations[0].repository_location == canonical_url
+    assert len(active_registrations) == 1
+
+
 def test_sqlite_store_rejects_duplicate_valid_uniqueness_key(tmp_path: Path) -> None:
     """Reject a second valid registration that reuses the same uniqueness key."""
     database_path = tmp_path / "registry.sqlite3"

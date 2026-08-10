@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioCypher Adapter Registry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 48px;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 64px;
+            margin-bottom: 24px;
+        }
+        
+        h1 {
+            color: #1a202c;
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 18px;
+            margin-bottom: 32px;
+        }
+        
+        .status {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-bottom: 32px;
+        }
+        
+        .info-box {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        
+        .info-box h2 {
+            color: #2d3748;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+        
+        .info-box p {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        
+        .links {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #4f46e5;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #4338ca;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #047857;
+        }
+        
+        .btn-secondary:hover {
+            background: #065f46;
+            box-shadow: 0 4px 12px rgba(4, 120, 87, 0.4);
+        }
+        
+        .architecture {
+            margin-top: 32px;
+            padding: 24px;
+            background: #edf2f7;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: left;
+            overflow-x: auto;
+        }
+        
+        .tier {
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        
+        .tier-1 { border-left-color: #48bb78; }
+        .tier-2 { border-left-color: #667eea; }
+        .tier-3 { border-left-color: #ed8936; }
+        
+        .footer {
+            margin-top: 32px;
+            color: #a0aec0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🧬</div>
+        <h1>BioCypher Components Registry</h1>
+        <p class="subtitle">Adapter Metadata Registry & Discovery Platform</p>
+        
+        <div class="status">
+            🚧 React Frontend Coming Soon
+        </div>
+        
+        <div class="info-box">
+            <h2>Three-Tier Architecture</h2>
+            <p>This application is currently running in development mode with the following architecture:</p>
+            
+            <div class="architecture">
+                <div class="tier tier-1">
+                    <strong>✅ Tier 1: Frontend</strong> (You are here)<br>
+                    → Temporary placeholder (nginx)<br>
+                    → Port: 3000
+                </div>
+                <div class="tier tier-2">
+                    <strong>✅ Tier 2: Backend</strong> (Running)<br>
+                    → FastAPI + Uvicorn<br>
+                    → Port: 8000
+                </div>
+                <div class="tier tier-3">
+                    <strong>✅ Tier 3: Database</strong> (SQLite)<br>
+                    → File-based database<br>
+                    → Persisted in Docker volume
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-box">
+            <h2>Backend status</h2>
+            <p>The frontend checks the backend health endpoint through the configured API proxy.</p>
+        </div>
+        
+        <div class="info-box" style="margin-top: 24px;">
+            <h2>Quick API Examples</h2>
+            <p><strong>GET</strong> <code>/api/v1/health</code> - Health check</p>
+            <p><strong>GET</strong> <code>/api/v1/adapters</code> - List public adapters</p>
+            <p><strong>GET</strong> <code>/api/v1/registrations</code> - List registrations</p>
+            <p><strong>POST</strong> <code>/api/v1/registrations</code> - Submit new adapter</p>
+            <p><strong>POST</strong> <code>/api/v1/metadata/validate</code> - Validate metadata</p>
+        </div>
+        
+        <div class="footer">
+            <p>Once the React frontend is implemented, this placeholder will be replaced.</p>
+            <p style="margin-top: 8px;">The frontend will communicate with the backend via the REST API.</p>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Check backend health on load
+        const statusEl = document.querySelector('.status');
+
+        try {
+            const response = await fetch('/api/v1/health');
+            const data = await response.json();
+
+            console.log('Backend health:', data);
+            if (data.status === 'ok' && statusEl instanceof HTMLElement) {
+                statusEl.innerHTML = '✅ All Tiers Running';
+                statusEl.style.background = '#d1fae5';
+                statusEl.style.color = '#065f46';
+            }
+        } catch (error) {
+            console.error('Backend unreachable:', error);
+            if (statusEl instanceof HTMLElement) {
+                statusEl.innerHTML = '⚠️ Backend Unavailable';
+                statusEl.style.background = '#fee2e2';
+                statusEl.style.color = '#991b1b';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -29,9 +29,9 @@ class StoredRegistration:
         status: Current tracked status for the submission.
         created_at: Timestamp when the submission was stored.
         description: Optional maintainer-facing adapter summary.
-        contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
+        cff_url: Optional submitted Citation File Format URL.
         submitted_by_github_login: GitHub login that submitted the registration.
         metadata_path: Stored croissant metadata file path when available.
         metadata: Persisted adapter metadata for approved registrations.
@@ -50,9 +50,9 @@ class StoredRegistration:
     status: RegistrationStatus
     created_at: datetime
     description: str | None = None
-    contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
+    cff_url: str | None = None
     submitted_by_github_login: str | None = None
     metadata_path: str | None = None
     metadata: dict[str, Any] | None = None
@@ -89,7 +89,6 @@ class RegistryEntry:
     entry_id: str
     source_id: str
     adapter_name: str
-    adapter_version: str
     uniqueness_key: str
     created_at: datetime
     updated_at: datetime
@@ -97,6 +96,16 @@ class RegistryEntry:
     profile_version: str | None = None
     metadata_checksum: str | None = None
     is_active: bool = True
+
+    @property
+    def adapter_version(self) -> str | None:
+        """Return the adapter version stored in the persisted Croissant metadata."""
+        if self.metadata is None:
+            return None
+        version = self.metadata.get("version")
+        if version is None:
+            return None
+        return str(version).strip() or None
 
 
 @dataclass(slots=True, frozen=True)

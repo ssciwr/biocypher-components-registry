@@ -20,9 +20,9 @@ The reason that I have set up the script like this - asking for the environment 
 
 The `client_loop` script starts the middleman process between two independent connections:
 
-you (terminal)->  
-    -> client_loop.py - HTTPS -> Anthropic API (or local endpoint)  [LLM]  
-    -> streamable HTTP - https://mcp.biocypher.org/mcp      [MCP server]  
+you (terminal)->
+    -> client_loop.py - HTTPS -> Anthropic API (or local endpoint)  [LLM]
+    -> streamable HTTP - https://mcp.biocypher.org/mcp      [MCP server]
 
 The LLM never talks directly to the MCP. The MCP never talks directly to the LLM. The process started via `client_loop.py` is only the bridge and constitutes the "client-side tool loop": The Anthropic remote-MCP connector is not used (that would be the LLM directly talking to the MCP and to the client, with no direct connection between client and MCP). The purpose of this separation lies in, that users may have sensitive or proprietary data that should not be shared beyond the local network. At the current stage the data confidentiality is not complete as user messages get appended to the history.
 
@@ -34,8 +34,8 @@ The LLM never talks directly to the MCP. The MCP never talks directly to the LLM
 | File tool content | args + truncated results, yes | no | file bytes on disk |
 
 For full data privacy:
-1. Use a local model. 
-2. Route the data around the model and only provide pointers. This can be achieved by adding a local tool like `profile_data(path)`: reads file locally, computes schema/column names/dtypes/sample stats and returns only that to the context. 
+1. Use a local model.
+2. Route the data around the model and only provide pointers. This can be achieved by adding a local tool like `profile_data(path)`: reads file locally, computes schema/column names/dtypes/sample stats and returns only that to the context.
 
 ## The MCP
 

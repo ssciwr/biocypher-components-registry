@@ -220,7 +220,7 @@ def canonical_valid_record_exists_in_registry_entries(
     with sqlite3.connect(registration_architecture_context["database_path"]) as connection:
         row = connection.execute(
             """
-            SELECT source_id, adapter_name, adapter_version, uniqueness_key
+            SELECT source_id, adapter_name, uniqueness_key
             FROM registry_entries
             WHERE source_id = ?
             """,
@@ -230,7 +230,6 @@ def canonical_valid_record_exists_in_registry_entries(
     assert row == (
         registration_architecture_context["registration_id"],
         "Example Adapter",
-        "1.0.0",
         "example-adapter::1.0.0",
     )
 

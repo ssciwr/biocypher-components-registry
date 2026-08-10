@@ -31,21 +31,21 @@ def submit_registration(
     repository_location: str,
     store: RegistrationStore,
     description: str | None = None,
-    contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
+    cff_url: str | None = None,
     submitted_by_github_login: str | None = None,
 ) -> StoredRegistration:
     """Create and persist a registration submission.
 
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
-        repository_location: Local repository path or supported repository URL.
+        repository_location: Local repository path or remote repository URL.
         store: Persistence backend used to save the submission.
         description: Optional maintainer-facing adapter summary.
-        contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
+        cff_url: Optional submitted Citation File Format URL.
         submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
@@ -55,9 +55,9 @@ def submit_registration(
         adapter_name=adapter_name,
         repository_location=repository_location,
         description=description,
-        contact_email=contact_email,
         license_value=license_value,
         doi=doi,
+        cff_url=cff_url,
         submitted_by_github_login=submitted_by_github_login,
     )
     return store.create_registration(request)
@@ -205,7 +205,7 @@ def revalidate_registration(
         return finish_registration(registration_id, store)
     except DuplicateRegistrationError:
         raise
-    except (FileNotFoundError, OSError, MetadataDiscoveryError) as exc:
+    except (OSError, MetadataDiscoveryError) as exc:
         store.mark_registration_fetch_failed(
             registration_id=registration_id,
             error_message=str(exc),
@@ -248,9 +248,7 @@ def _build_uniqueness_key(
     adapter_id = _resolve_adapter_id(metadata, fallback_adapter_id)
     version = str(metadata.get("version", "")).strip()
     if not adapter_id or not version:
-        raise ValueError(
-            "Registration uniqueness key requires adapter id and version."
-        )
+        raise ValueError("Registration uniqueness key requires adapter id and version.")
     return f"{adapter_id}::{version}"
 
 

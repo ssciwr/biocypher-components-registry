@@ -39,14 +39,12 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
     request = create_registration_request(
         adapter_name="Example Adapter",
         repository_location=str(repository),
-        contact_email="maintainer@example.org",
     )
     store = SQLiteRegistrationStore(database_path)
 
     stored = store.create_registration(request)
 
     assert stored.status == RegistrationStatus.SUBMITTED
-    assert stored.contact_email == "maintainer@example.org"
     with sqlite3.connect(database_path) as connection:
         source_row = connection.execute(
             """
@@ -54,7 +52,6 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
                 submitted_adapter_name,
                 repository_location,
                 source_kind,
-                contact_email,
                 is_active
             FROM registration_sources
             """
@@ -70,7 +67,6 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
         "Example Adapter",
         str(repository.resolve()),
         "local",
-        "maintainer@example.org",
         1,
     )
     assert event_row is not None
@@ -115,7 +111,6 @@ def test_sqlite_store_can_load_registration_by_identifier(tmp_path: Path) -> Non
     request = create_registration_request(
         adapter_name="Example Adapter",
         repository_location=str(repository),
-        contact_email="maintainer@example.org",
     )
     store = SQLiteRegistrationStore(database_path)
     created = store.create_registration(request)
@@ -125,7 +120,6 @@ def test_sqlite_store_can_load_registration_by_identifier(tmp_path: Path) -> Non
     assert loaded is not None
     assert loaded.registration_id == created.registration_id
     assert loaded.status == RegistrationStatus.SUBMITTED
-    assert loaded.contact_email == "maintainer@example.org"
 
 
 def test_sqlite_store_lists_active_registrations_with_check_state(
@@ -195,7 +189,7 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     with sqlite3.connect(database_path) as connection:
         entry_row = connection.execute(
             """
-            SELECT source_id, adapter_name, adapter_version, uniqueness_key, is_active
+            SELECT source_id, adapter_name, uniqueness_key, is_active
             FROM registry_entries
             """
         ).fetchone()
@@ -219,7 +213,6 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     assert entry_row == (
         created.registration_id,
         "Example Adapter",
-        "1.0.0",
         "example-adapter::1.0.0",
         1,
     )

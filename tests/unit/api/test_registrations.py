@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
@@ -359,6 +361,47 @@ def test_list_registrations_endpoint_omits_processed_metadata(
     assert "metadata" not in item
     assert "metadata_path" not in item
     assert "validation_errors" not in item
+
+
+def test_check_croissant_file_presence_endpoint_returns_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AI-Generated to increase test coverage. This one checks that the remote metadata endpoint success path works for a given
+    repository url via monkeypatching..
+
+    Check the backend repository metadata presence endpoint success path.
+    """
+    exists = Mock(return_value=True)
+    monkeypatch.setattr("src.api.routers.registrations.remote_metadata_exists", exists)
+    response = TestClient(create_app()).get(
+        "/api/v1/registrations/croissant-file-present-check",
+        params={"repository_url": "https://github.com/org/repo"},
+    )
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload == {"has_croissant_file": True}
+    assert exists.call_args.args == ("https://github.com/org/repo",)
+
+
+def test_check_croissant_file_presence_endpoint_rejects_uncheckable_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AI-Generated.
+
+    Check the backend repository metadata presence endpoint error path.
+    """
+    monkeypatch.setattr(
+        "src.api.routers.registrations.remote_metadata_exists",
+        Mock(side_effect=ValueError("bad url")),
+    )
+    response = TestClient(create_app()).get(
+        "/api/v1/registrations/croissant-file-present-check",
+        params={"repository_url": "not-a-repository"},
+    )
+    detail = response.json()["detail"]
+    assert response.status_code == 400
+    assert "croissant.jsonld" in detail
+    assert "GitHub or a Gitlab instance" in detail
 
 
 def test_process_registration_endpoint_marks_registration_valid(

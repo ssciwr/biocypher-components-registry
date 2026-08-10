@@ -9,6 +9,9 @@ import {
 import AppHeader from './components/AppHeader'
 import type { AuthUser } from './components/AppHeader'
 import RegisterPage from './pages/RegisterPage'
+import AdaptersPage from './pages/AdaptersPage'
+import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
+import { client } from './api/client/client.gen'
 
 const actionCards = [
   {
@@ -16,7 +19,7 @@ const actionCards = [
     icon: MagnifyingGlassIcon,
     text: 'Search reusable components and inspect adapter metadata like data sources.',
     cta: 'Browse adapters',
-    href: '#',
+    href: '/adapters',
     tone: 'bg-cyan-100 text-cyan-700',
   },
   {
@@ -24,7 +27,7 @@ const actionCards = [
     icon: DocumentPlusIcon,
     text: 'Create BioCypher adapters and metadata.',
     cta: 'Start creating',
-    href: '#',
+    href: '/register',
     featured: true,
     tone: 'bg-white/20 text-white',
   },
@@ -69,34 +72,51 @@ function readCachedAuthUser(): AuthUser | null {
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi-ts
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
+  const [authVerified, setAuthVerified] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(globalThis.location.pathname)
+
+  /*
+   * AI-Generated.
+   */
+  useEffect(() => {
+    const loader = globalThis.document.getElementById('app-loader')
+    if (!loader) return
+
+    loader.classList.add('app-loader--hidden')
+    loader.setAttribute('aria-hidden', 'true')
+  }, [])
 
   useEffect(() => {
     let ignore = false
 
-    fetch(`${apiBaseUrl}/api/v1/auth/me`, { credentials: 'include' })
-      .then((response) => {
-        if (response.status === 401) {
-          return null
-        }
-        if (!response.ok) {
-          throw new Error('Could not check sign-in status.')
-        }
-        return response.json() as Promise<AuthUser>
-      })
-      .then((user: AuthUser | null) => {
-        if (!ignore) {
-          setAuthUser(user)
-          cacheAuthUser(user)
+    void getMeApiV1AuthMeGet()
+      .then((result) => {
+        if (ignore) return
+
+        if (result.data) {
+          setAuthUser(result.data)
+          setAuthVerified(true)
+          cacheAuthUser(result.data)
           setAuthError(null)
+          return
         }
+
+        setAuthVerified(false)
+        if (result.response?.status === 401) {
+          setAuthUser(null)
+          cacheAuthUser(null)
+        }
+        setAuthError(null)
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        console.error('Could not check sign-in status.', error)
         if (!ignore) {
+          setAuthVerified(false)
           setAuthError('Could not check sign-in status.')
         }
       })
@@ -115,37 +135,43 @@ function App() {
 
   async function logOut() {
     try {
-      const response = await fetch(apiBaseUrl + '/api/v1/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      })
+      const result = await logoutApiV1AuthLogoutPost()
+      const logoutError = result.error as unknown
 
-      if (!response.ok) {
-        setAuthError('Sign out failed.')
+      if (logoutError) {
+        const logoutErrorDetails = logoutError as { details?: string; detail?: string }
+        setAuthError(typeof logoutError === 'string' ? logoutError : logoutErrorDetails.details || logoutErrorDetails.detail || 'Sign out failed.')
         return
       }
 
       setAuthUser(null)
+      setAuthVerified(false)
       cacheAuthUser(null)
       setAuthError(null)
-    } catch {
-      setAuthError('Sign out failed.')
+    } catch (error) {
+      setAuthError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Sign out failed.')
     }
+  }
+
+  const adapterPathMatch = /^\/adapters\/([^/]+)$/.exec(pathname)
+  const adapterId = adapterPathMatch?.[1]
+  let page = <HomePage />
+
+  if (pathname === '/register') {
+    page = <RegisterPage authUser={authUser} authVerified={authVerified} />
+  } else if (pathname === '/adapters' || adapterId) {
+    page = <AdaptersPage adapterId={adapterId} />
   }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <AppHeader apiBaseUrl={apiBaseUrl} authUser={authUser} onLogout={logOut} />
+      <AppHeader authUser={authUser} onLogout={logOut} />
       {authError ? (
         <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
           {authError}
         </div>
       ) : null}
-      {pathname === '/register' ? (
-        <RegisterPage apiBaseUrl={apiBaseUrl} authUser={authUser} />
-      ) : (
-        <HomePage />
-      )}
+      {page}
       <Footer />
     </main>
   )
@@ -161,7 +187,8 @@ function HomePage() {
             <span>Discover adapters, generate metadata, and register components</span>
           </div>
           <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
-            Find BioCypher components<br /> for your research
+            <span className="block">Find BioCypher components</span>
+            <span className="block">for your research</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-slate-600 md:text-lg">
             Search adapters, create Croissant metadata, and submit your adapter repository to us
@@ -180,12 +207,13 @@ function HomePage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
             <span>Popular:</span>
             {popularAdapters.map((adapter) => (
-              <span
+              <a
                 className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
+                href={`/adapters?query=${encodeURIComponent(adapter)}`}
                 key={adapter}
               >
                 {adapter}
-              </span>
+              </a>
             ))}
           </div>
         </div>
@@ -219,9 +247,9 @@ function HomePage() {
             })}
           </div>
 
-          <button
+          <a
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            type="button"
+            href="/adapters"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />
@@ -239,7 +267,7 @@ function HomePage() {
                 be written more accurately and thoroughly.
               </span>
             </span>
-          </button>
+          </a>
         </div>
       </section>
     </>

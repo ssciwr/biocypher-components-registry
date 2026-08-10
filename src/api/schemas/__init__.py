@@ -5,7 +5,6 @@ from src.api.schemas.adapters import (
     AdapterCatalogListResponse,
     AdapterDetailResponse,
     AdapterMetadataResponse,
-    AdapterVersionResponse,
 )
 from src.api.schemas.common import HealthResponse
 from src.api.schemas.metadata import (
@@ -51,7 +50,6 @@ __all__ = [
     "AdapterMetadataGenerateRequest",
     "AdapterMetadataGenerateResponse",
     "AdapterMetadataResponse",
-    "AdapterVersionResponse",
     "DATASET_METADATA_GENERATE_EXAMPLE",
     "DatasetMetadataGenerateRequest",
     "DatasetMetadataGenerateResponse",

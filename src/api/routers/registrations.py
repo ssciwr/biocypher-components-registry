@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.errors import (
@@ -15,6 +15,7 @@ from src.api.errors import (
 from src.api.schemas.registrations import (
     RegistrationCreateRequest,
     RegistrationCreateResponse,
+    RegistrationCroissantFilePresentCheckResponse,
     RegistrationDetailResponse,
     RegistrationEventListResponse,
     RegistrationEventResponse,
@@ -30,6 +31,7 @@ from src.core.registration.service import (
     submit_registration,
 )
 from src.core.registration.store import RegistrationStore
+from src.core.shared.files import remote_metadata_exists
 
 
 router = APIRouter()
@@ -49,7 +51,7 @@ OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth
     summary="Submit an adapter registration",
     description=(
         "Store one adapter repository as a tracked registration request. "
-        "The repository may be a local path or supported remote URL and should "
+        "The repository may be a local path or remote URL and should "
         "contain a root-level croissant.jsonld file. Processing happens later "
         "through the process endpoint or a registry refresh."
     ),
@@ -65,9 +67,9 @@ def create_registration(
             adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
-            contact_email=payload.contact_email,
             license_value=payload.license_value,
             doi=payload.doi,
+            cff_url=payload.cff_url,
             submitted_by_github_login=(
                 auth_session.github_login if auth_session is not None else None
             ),
@@ -98,6 +100,29 @@ def list_registrations(
     ]
 
     return RegistrationListResponse(items=items)
+
+
+@router.get(
+    "/registrations/croissant-file-present-check",
+    summary="Check registration Croissant file presence",
+    description="Return whether a remote repository exposes root-level croissant.jsonld.",
+)
+def check_registration_croissant_file_presence(
+    repository_url: Annotated[str, Query(min_length=1)],
+) -> RegistrationCroissantFilePresentCheckResponse:
+    """Return whether the submitted repository exposes Croissant metadata."""
+    try:
+        has_croissant_file = remote_metadata_exists(repository_url)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="We could not check the repository url you provided (we tried to check if a raw croissant.jsonld file could be found by our system) Is your file hosted on GitHub or a Gitlab instance?",
+        ) from exc
+    return RegistrationCroissantFilePresentCheckResponse(
+        has_croissant_file=has_croissant_file
+    )
+# previously this happened on the frontend but with Gitlab + Github support it became quite messy.
+# Adding Gitlab support has added about 30 lines to the project, but we keep it simpler conceptually by only hcecking on the backend.
 
 
 @router.get(

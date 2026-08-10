@@ -5,11 +5,22 @@
 
 Registry system for BioCypher adapters with metadata validation, registration workflows, persistence, and API/CLI access.
 
-The project currently contains:
+Key capabilities:
+
+- **Automated Discovery**: Find and validate `croissant.jsonld` metadata files
+- **Multi-Layer Validation**: MLCroissant + schema validation
+- **Dual Database Support**: SQLite (development) and PostgreSQL (production)
+- **Batch Processing**: Non-blocking registry refresh with isolated error handling
+- **Multiple Interfaces**: CLI, Web UI, and REST API
+- **Event Sourcing**: Complete audit trail of all registration attempts
+- **Duplicate Prevention**: Enforced uniqueness by adapter id and metadata version
+- **On-Demand Revalidation**: Fix and reprocess failed registrations
+
+The project contains:
 
 - a Python backend with CLI commands and a FastAPI REST API
 - SQLite support for local development and PostgreSQL support for deployment-oriented setups
-- a React/Vite frontend  under `frontend/` which is powered by GitHub based authentication and requires a basic GitHub OAuth App key
+- a React/Vite frontend under `frontend/` for browsing adapters and GitHub-authenticated registration
 - unit and BDD tests for core, API, persistence, and CLI behavior
 
 ## Requirements
@@ -37,16 +48,6 @@ Other optional dependency groups defined in `pyproject.toml`:
 
 - `api-client`: installs `httpie` for ad hoc API calls (`uv sync --group api-client`)
 - `performance`: installs `locust` for load testing against `locustfile.py` (`uv sync --group performance`)
-
-Create a .env file and make sure it is untracked(.gitignore should do this by default). You can then copy the contents of .envsample, and edit it to add a real GitHub OAuthApp ID and Secret, following these steps on GitHub for your user:
-
-Click "Settings", then "Developer Settings" (low on the left), then OAuth Apps and "New OAuth App", then enter these values for local development:
-`GitHub OAuth App form data for local dev:`
-For the Homepage URL: http://127.0.0.1:5173
-For the call back; http://127.0.0.1:5173/api/v1/auth/github/callback
-
-After registering, click `"Generate a new client secret"` on the page and put the value in `.env` under `GITHUB_OAUTH_CLIENT_SECRET`.
-Then look on the page for the ID and set that too: `GITHUB_OAUTH_CLIENT_ID`
 
 Run backend tests:
 
@@ -165,9 +166,13 @@ All routes below are served under the `/api/v1` prefix.
 | --- | --- | --- |
 | GET | `/health` | API liveness check |
 | GET | `/adapters` | List public adapters derived from canonical registry entries |
-| GET | `/adapters/{adapter_id}` | Get one public adapter with its registered canonical versions |
-| GET | `/adapters/{adapter_id}/versions/{version}/metadata` | Get full Croissant metadata for one adapter version |
+| GET | `/adapters/latest` | List latest public adapter cards |
+| GET | `/adapters/search` | Search public adapter cards |
+| GET | `/adapters/{adapter_id}` | Get one public adapter |
+| GET | `/adapters/{adapter_id}/metadata` | Get full Croissant metadata for one adapter |
+| POST | `/adapters/{adapter_id}/endorse` | Endorse one adapter as the signed-in GitHub user |
 | POST | `/registrations` | Submit an adapter registration |
+| GET | `/registrations/croissant-file-present-check` | Check whether a remote repository exposes `croissant.jsonld` |
 | GET | `/registrations` | List active registrations |
 | GET | `/registrations/{registration_id}` | Get one registration detail |
 | GET | `/registrations/{registration_id}/events` | List event history for one registration |
@@ -193,7 +198,8 @@ curl -X POST http://localhost:8000/api/v1/registrations \
   -d '{
     "adapter_name": "my-adapter",
     "repository_location": "/path/to/repo",
-    "contact_email": "maintainer@example.org"
+    "license_value": "MIT",
+    "doi": "10.5281/zenodo.1234567"
   }'
 
 curl http://localhost:8000/api/v1/registry/registrations
@@ -223,9 +229,10 @@ Run frontend checks:
 ```bash
 pnpm run lint
 pnpm run build
+pnpm run ui-tests
 ```
 
-The frontend is expected to consume the backend through the `/api/v1` API. See `sdlc_docs/b_design/frontend/frontend_api_contract.md` for the current API contract.
+The frontend consumes the backend through the `/api/v1` API. Set `VITE_API_BASE_URL` when the backend is not served from the local default.
 
 ## Database Configuration
 
@@ -271,7 +278,7 @@ The compose files expose the backend API on http://localhost:8000. The PostgreSQ
 biocypher-components-registry/
 ├── cli.py                         # CLI entry point (registration, validation, metadata generation)
 ├── locustfile.py                  # Optional Locust load-testing scenario
-├── frontend/                      # React/Vite frontend scaffold
+├── frontend/                      # React/Vite frontend
 ├── src/
 │   ├── api/                       # FastAPI REST API layer
 │   │   ├── app.py                 # Application factory
@@ -293,8 +300,15 @@ biocypher-components-registry/
 GitHub Actions workflows are stored in `.github/workflows/`.
 
 - `backend.yml`: installs Python dependencies with uv and runs `uv run pytest` with coverage, uploaded to Codecov. Triggered on pull requests touching `src/`, `tests/`, `cli.py`, or dependency files.
-- `frontend.yml`: installs frontend dependencies with pnpm, then runs `pnpm run lint` and `pnpm run build`. Triggered on pull requests touching `frontend/`.
+- `frontend.yml`: installs frontend dependencies with pnpm, then runs lint, build, and Cypress UI tests. Triggered on pull requests touching `frontend/`.
 - `validate_schema.yml`: validates the sample `data/in/adapter_collectri/collectri.json` Croissant file against the schema using the `ssciwr/validate-croissant-schema` action.
+
+Run Cypress locally from `frontend/` after installing the project-specific Cypress binary:
+
+```bash
+pnpm cypress install
+pnpm run ui-tests
+```
 
 ## Documentation
 

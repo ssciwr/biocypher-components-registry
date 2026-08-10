@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from src.core.adapter.request import (
     AdapterGenerationRequest,
@@ -45,20 +46,20 @@ def create_registration_request(
     adapter_name: str,
     repository_location: str,
     description: str | None = None,
-    contact_email: str | None = None,
     license_value: str | None = None,
     doi: str | None = None,
+    cff_url: str | None = None,
     submitted_by_github_login: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized adapter registration request.
 
     Args:
         adapter_name: Human-readable adapter name provided by the maintainer.
-        repository_location: Local repository path or supported repository URL.
+        repository_location: Local repository path or remote repository URL.
         description: Optional maintainer-facing adapter summary.
-        contact_email: Optional maintainer contact email for status follow-up.
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
+        cff_url: Optional submitted Citation File Format URL.
         submitted_by_github_login: GitHub login for browser submissions.
 
     Returns:
@@ -66,24 +67,23 @@ def create_registration_request(
 
     Raises:
         ValueError: If the adapter name or location is empty.
-        ValueError: If the contact email is provided but invalid.
         FileNotFoundError: If a submitted local repository path does not exist.
-        InvalidRepoURLError: If a submitted URL is not a supported repository URL.
+        InvalidRepoURLError: If a submitted URL is not a valid remote repository URL.
     """
     normalized_name = adapter_name.strip()
     if not normalized_name:
         raise ValueError("Adapter name is required.")
 
-    normalized_location = _normalize_repository_location(repository_location)
+    normalized_location = _normalize_repository_into_pure_branchless_location(repository_location)
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
     normalized_description = _normalize_optional_text(description)
-    normalized_contact_email = _normalize_contact_email(contact_email)
     normalized_license_value = _normalize_optional_text(license_value)
     normalized_doi = _normalize_optional_text(doi)
+    normalized_cff_url = _normalize_optional_text(cff_url)
 
-    if normalized_location.startswith(("http://", "https://")):
+    if urlparse(normalized_location).scheme:
         _validate_remote_repository(normalized_location)
         repository_kind = "remote"
         normalized_repository_location = normalized_location
@@ -100,17 +100,35 @@ def create_registration_request(
         repository_kind=repository_kind,
         source=repository_location,
         description=normalized_description,
-        contact_email=normalized_contact_email,
         license_value=normalized_license_value,
         doi=normalized_doi,
+        cff_url=normalized_cff_url,
         submitted_by_github_login=submitted_by_github_login,
     )
 
 
-def _normalize_repository_location(repository_location: str) -> str:
+def _normalize_repository_into_pure_branchless_location(repository_location: str) -> str:
     normalized_location = repository_location.strip()
-    if normalized_location.startswith("github.com/"):
-        return f"https://{normalized_location}"
+    if normalized_location.startswith(("github.com/", "gitlab.com/")):
+        normalized_location = f"https://{normalized_location}"
+    parsed_location = urlparse(normalized_location)
+    if parsed_location.scheme:
+        path_parts = [part for part in parsed_location.path.split("/") if part]
+        if parsed_location.netloc.lower() == "github.com" and len(path_parts) >= 2:
+            path_parts = path_parts[:2]
+        elif "-" in path_parts:
+            marker_index = path_parts.index("-")
+            if marker_index >= 2:
+                path_parts = path_parts[:marker_index]
+        if path_parts:
+            path_parts[-1] = path_parts[-1].removesuffix(".git")
+        return parsed_location._replace(
+            netloc=parsed_location.netloc.lower(),
+            path=f"/{'/'.join(path_parts)}" if path_parts else "",
+            params="",
+            query="",
+            fragment="",
+        ).geturl().rstrip("/")
     return normalized_location
 
 
@@ -122,22 +140,6 @@ def _normalize_optional_text(value: str | None) -> str | None:
     return normalized_value or None
 
 
-def _normalize_contact_email(contact_email: str | None) -> str | None:
-    """Return a normalized optional contact email."""
-    if contact_email is None:
-        return None
-
-    normalized_email = contact_email.strip()
-    if not normalized_email:
-        return None
-
-    local_part, separator, domain = normalized_email.partition("@")
-    if not separator or not local_part or "." not in domain:
-        raise ValueError("Contact email must be a valid email address.")
-
-    return normalized_email
-
-
 def _normalize_local_repository(repository_location: str) -> str:
     """Return a canonical local repository path."""
     repository_path = Path(repository_location).expanduser().resolve()
@@ -147,6 +149,7 @@ def _normalize_local_repository(repository_location: str) -> str:
 
 
 def _validate_remote_repository(repository_location: str) -> None:
-    """Validate that a remote repository URL is currently supported."""
-    if "github.com" not in repository_location:
+    """Validate that a remote repository URL can be fetched over HTTPS."""
+    parsed = urlparse(repository_location)
+    if parsed.scheme != "https" or not parsed.netloc:
         raise InvalidRepoURLError(repository_location)

@@ -68,3 +68,26 @@ def test_validate_adapter_rejects_dataset_root() -> None:
     result = validate_adapter(document)
 
     assert not result.is_valid
+
+
+def test_validate_adapter_accepts_singleton_creator_and_has_part() -> None:
+    dataset = _valid_dataset_document()
+    dataset.pop("@context")
+    document = {
+        "@context": deepcopy(STANDARD_CONTEXT),
+        "@type": "SoftwareSourceCode",
+        "name": "BioCypher CollecTRI Adapter",
+        "description": "Adapter integrating the CollecTRI resource into BioCypher.",
+        "version": "0.0.1",
+        "license": "https://github.com/biocypher/collectri/blob/main/LICENSE",
+        "codeRepository": "https://github.com/biocypher/collectri",
+        "creator": {"@type": "Person", "name": "Sebastian Lobentanzer"},
+        "keywords": ["gene regulatory network"],
+        "hasPart": dataset,
+    }
+
+    result = validate_adapter(document)
+
+    assert result.is_valid
+    assert result.errors == []
+    assert isinstance(document["creator"], dict)

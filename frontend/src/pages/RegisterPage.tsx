@@ -1,19 +1,20 @@
-import { useEffect, useState } from 'react'
-import type { ReactNode, SyntheticEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
-
-
-/*
-
-This file uses AI-generated changes to satisfy Sonar Qube and collected functionality from main/this branch because merging `adopt_workshop_feedback`
-will supercede and change these files anyway; so this AI-generated code should not stay in main for long as we will replace it with the next PR merge.
-
-Just wanted to qualify why I kept that code in now as is.
- */
+import {
+  checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet,
+  createRegistrationApiV1RegistrationsPost,
+  processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
+  revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
+  type RegistrationCreateResponse,
+  type RegistrationProcessResponse,
+  type RegistrationRevalidateResponse,
+} from '../api/client'
+import { client } from '../api/client/client.gen'
+import { fetchCrossrefWork } from '../api/crossref'
 
 type RegisterPageProps = Readonly<{
-  apiBaseUrl: string
+  authVerified: boolean
   authUser: AuthUser | null
 }>
 
@@ -22,19 +23,10 @@ type RegistrationForm = {
   repositoryLocation: string
   licenseValue: string
   doi: string
+  cffUrl: string
 }
 
-type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID' | (string & {})
-
-type RegistrationResponse = {
-  registration_id: string
-  adapter_name: string
-  adapter_id: string
-  repository_location: string
-  status: RegistrationStatus
-  validation_errors?: string[] | null
-  submitted_by_github_login: string | null
-}
+type RegistrationResponse = RegistrationCreateResponse | RegistrationProcessResponse | RegistrationRevalidateResponse
 
 type RegistrationResultPanelProps = Readonly<{
   error: string | null
@@ -43,24 +35,25 @@ type RegistrationResultPanelProps = Readonly<{
   result: RegistrationResponse
 }>
 
+type RegistrationResultDisplay = Readonly<{
+  iconTone: string
+  text: string
+  title: string
+}>
+
 type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
-type ActiveMetadataCheckStatus = Exclude<MetadataCheckStatus, 'idle'>
-type RegistrationRequestStatus = 'idle' | 'submitting' | 'processing'
-type RegistrationPayload = RegistrationResponse & { detail?: string }
-type RegistrationId = string & { readonly __registrationId: unique symbol }
-type RegistrationAction = 'process' | 'revalidate'
+type DoiCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'error'
 
 const draftKey = 'bcr-register-draft'
-const apiRootSegments = ['api', 'v1'] as const
-const githubPathSegmentPattern = /^[A-Za-z0-9._-]+$/u
-const registrationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
-const rawGitHubContentOrigin = 'https://raw.githubusercontent.com'
+const submitAfterAuthKey = 'bcr-register-submit-after-auth'
+const httpsUrlPattern = /^https:\/\/.+/i
 
 const emptyForm: RegistrationForm = {
   adapterName: '',
   repositoryLocation: '',
   licenseValue: '',
   doi: '',
+  cffUrl: '',
 }
 
 const nextSteps = [
@@ -82,187 +75,11 @@ const nextSteps = [
   },
 ]
 
-const metadataCheckViews: Record<ActiveMetadataCheckStatus, { className: string; icon: ReactNode; text: string }> = {
-  blocked: {
-    className: 'bg-amber-400 text-slate-950',
-    icon: <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />,
-    text: 'CORS blocked',
-  },
-  checking: {
-    className: 'bg-blue-100 text-blue-700',
-    icon: <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />,
-    text: 'checking file',
-  },
-  found: {
-    className: 'bg-emerald-400 text-white',
-    icon: <CheckIcon className="h-5 w-5" aria-hidden="true" />,
-    text: 'has croissant file',
-  },
-  missing: {
-    className: 'bg-red-500 text-white',
-    icon: <XMarkIcon className="h-5 w-5" aria-hidden="true" />,
-    text: 'missing croissant file',
-  },
-}
-
-/*
- * AI-Generated.
- */
-function getRegistrationResultView(result: RegistrationResponse) {
-  if (result.status === 'VALID') {
-    return {
-      iconClassName: 'bg-emerald-100 text-emerald-600',
-      text: `${result.adapter_name} was stored and validated by the registry.`,
-      title: 'Adapter registration successful',
-    }
-  }
-
-  if (result.status === 'INVALID') {
-    return {
-      iconClassName: 'bg-red-100 text-red-600',
-      text: 'Please fix these issues in your GitHub repository, then revalidate.',
-      title: 'Sorry, your adapter is not currently valid.',
-    }
-  }
-
-  return {
-    iconClassName: 'bg-amber-100 text-amber-700',
-    text: `${result.adapter_name} was stored. Processing feedback is shown below.`,
-    title: 'Registration submitted',
-  }
-}
-
-/*
- * AI-Generated.
- */
-function getMetadataUrl(location: string) {
-  let repositoryUrl: URL
-  try {
-    repositoryUrl = new URL(location)
-  } catch {
-    return null
-  }
-
-  if (repositoryUrl.protocol !== 'https:' || repositoryUrl.hostname !== 'github.com') {
-    return null
-  }
-
-  const parts = repositoryUrl.pathname.split('/').filter(Boolean)
-  const [owner, repository] = parts
-  const hasSafeRepositoryPath = parts.length >= 2
-    && githubPathSegmentPattern.test(owner)
-    && githubPathSegmentPattern.test(repository)
-  if (!hasSafeRepositoryPath) {
-    return null
-  }
-
-  const isBlobUrl = parts[2] === 'blob'
-  const branch = isBlobUrl && parts[3] ? parts[3] : 'main'
-  const metadataPath = isBlobUrl ? parts.slice(4) : ['croissant.jsonld']
-  const hasSafeMetadataPath = githubPathSegmentPattern.test(branch)
-    && metadataPath.length > 0
-    && metadataPath.every((segment) => githubPathSegmentPattern.test(segment))
-  if (!hasSafeMetadataPath) {
-    return null
-  }
-
-  const rawPath = [owner, repository, branch, ...metadataPath]
-    .map((segment) => encodeURIComponent(segment))
-    .join('/')
-  return `${rawGitHubContentOrigin}/${rawPath}`
-}
-
-/*
- * AI-Generated.
- */
-function metadataStatusForResponse(response: Response): MetadataCheckStatus {
-  if (response.ok) {
-    return 'found'
-  }
-
-  return response.status === 404 ? 'missing' : 'blocked'
-}
-
-/*
- * AI-Generated.
- */
-function isHttpUrl(value: string) {
-  const normalizedValue = value.trim().toLowerCase()
-  return normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')
-}
-
-/*
- * AI-Generated.
- */
-function normalizedRegistrationId(value: string) {
-  const normalizedValue = value.trim().toLowerCase()
-
-  return registrationIdPattern.test(normalizedValue) ? normalizedValue as RegistrationId : null
-}
-
-/*
- * AI-Generated.
- */
-function getApiBaseUrl(apiBaseUrl: string) {
-  try {
-    const baseUrl = new URL(apiBaseUrl || globalThis.location.origin, globalThis.location.origin)
-    return baseUrl.protocol === 'http:' || baseUrl.protocol === 'https:'
-      ? baseUrl
-      : new URL(globalThis.location.origin)
-  } catch {
-    return new URL(globalThis.location.origin)
-  }
-}
-
-/*
- * AI-Generated.
- */
-function getApiUrl(apiBaseUrl: string, pathSegments: readonly string[], query?: Record<string, string>) {
-  const baseUrl = getApiBaseUrl(apiBaseUrl)
-  const url = new URL(baseUrl.href)
-  const basePathSegments = baseUrl.pathname.split('/').filter(Boolean)
-  const encodedPathSegments = [...basePathSegments, ...apiRootSegments, ...pathSegments]
-    .map((segment) => encodeURIComponent(segment))
-
-  url.pathname = `/${encodedPathSegments.join('/')}`
-  Object.entries(query ?? {}).forEach(([key, value]) => {
-    url.searchParams.set(key, value)
-  })
-  return url.href
-}
-
-/*
- * AI-Generated.
- */
-function getRegistrationActionUrl(apiBaseUrl: string, registrationId: RegistrationId, action: RegistrationAction) {
-  return getApiUrl(apiBaseUrl, ['registrations', registrationId, action])
-}
-
-/*
- * AI-Generated.
- */
-async function readRegistrationPayload(response: Response) {
-  try {
-    return (await response.json()) as RegistrationPayload
-  } catch (error) {
-    console.warn('Could not parse registration response.', error)
-    return null
-  }
-}
-
-/*
- * AI-Generated.
- */
-function submitButtonText(status: RegistrationRequestStatus, authUser: AuthUser | null) {
-  if (status === 'submitting') {
-    return 'Submitting...'
-  }
-
-  if (status === 'processing') {
-    return 'Checking adapter'
-  }
-
-  return authUser ? 'Register adapter' : 'Sign in with GitHub'
+function registrationDoiValue(value: string) {
+  const trimmed = value.trim()
+  return trimmed.toLowerCase().startsWith('doi:')
+    ? trimmed.slice(4).trimStart()
+    : trimmed
 }
 
 function initialForm(): RegistrationForm {
@@ -273,14 +90,43 @@ function initialForm(): RegistrationForm {
 
   try {
     return { ...emptyForm, ...(JSON.parse(savedDraft) as Partial<RegistrationForm>) }
-  } catch {
+  } catch (error) {
+    console.error('Could not read registration draft.', error)
     globalThis.localStorage.removeItem(draftKey)
+    globalThis.localStorage.removeItem(submitAfterAuthKey)
     return emptyForm
   }
 }
 
+/*
+ * AI-Generated. Based on the Penpot designs.
+ */
+function registrationResultFeedbackDisplay(result: RegistrationResponse): RegistrationResultDisplay {
+  // AI-generated helper which groups semantically the relevant icon tone, title and text for registraiton feedback
+  if (result.status === 'VALID') {
+    return {
+      iconTone: 'bg-emerald-100 text-emerald-600',
+      text: `${result.adapter_name} was stored and validated by the registry.`,
+      title: 'Adapter registration successful',
+    }
+  }
 
-// Basically this shows errors or successfull registration
+  if (result.status === 'INVALID') {
+    return {
+      iconTone: 'bg-red-100 text-red-600',
+      text: 'Please fix these issues in your GitHub repository, then revalidate.',
+      title: 'Sorry, your adapter is not currently valid.',
+    }
+  }
+
+  return {
+    iconTone: 'bg-amber-100 text-amber-700',
+    text: `${result.adapter_name} was stored. Processing feedback is shown below.`,
+    title: 'Registration submitted',
+  }
+}
+
+// Basically this shows errors or successful registration
 function RegistrationResultPanel({
   error,
   isProcessing,
@@ -289,15 +135,15 @@ function RegistrationResultPanel({
 }: RegistrationResultPanelProps) {
   const isValid = result.status === 'VALID'
   const isInvalid = result.status === 'INVALID'
-  const resultView = getRegistrationResultView(result)
-  const validationErrors = result.validation_errors?.filter(Boolean) ?? []
+  const resultDisplay = registrationResultFeedbackDisplay(result)
+  const validationErrors = ('validation_errors' in result ? result.validation_errors : null)?.filter(Boolean) ?? []
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="flex gap-4">
           <span
-            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${resultView.iconClassName}`}
+            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${resultDisplay.iconTone}`}
           >
             {isValid ? (
               <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />
@@ -307,10 +153,10 @@ function RegistrationResultPanel({
           </span>
           <span>
             <h2 className="text-2xl font-bold text-slate-950">
-              {resultView.title}
+              {resultDisplay.title}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              {resultView.text}
+              {resultDisplay.text}
             </p>
           </span>
         </div>
@@ -370,35 +216,90 @@ function RegistrationResultPanel({
   )
 }
 
-function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
+function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONAR: this page coordinates one registration workflow; splitting it is a larger UI refactor.
+  const autoSubmitAttemptedRef = useRef(false)
   const [form, setForm] = useState<RegistrationForm>(initialForm)
-  const [status, setStatus] = useState<RegistrationRequestStatus>('idle')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [metadataCheckStatus, setMetadataCheckStatus] = useState<MetadataCheckStatus>('idle')
-  const metadataCheckView =
-    metadataCheckStatus === 'idle' ? null : metadataCheckViews[metadataCheckStatus]
+  const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  let metadataCheckText = 'Checking Croissant file'
+  let metadataCheckClass = 'text-blue-700'
+  if (metadataCheckStatus === 'found') {
+    metadataCheckText = 'Croissant file found at repository root'
+    metadataCheckClass = 'text-emerald-600'
+  } else if (metadataCheckStatus === 'missing') {
+    metadataCheckText = "Croissant file not found at this repository link's root"
+    metadataCheckClass = 'text-red-600'
+  } else if (metadataCheckStatus === 'blocked') {
+    metadataCheckText = 'Could not check Croissant file'
+    metadataCheckClass = 'text-red-600'
+  }
+  const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
+  let doiCheckText = 'checking Crossref'
+  let doiCheckClass = 'text-blue-700'
+  if (doiCheckStatus === 'found') {
+    doiCheckText = 'DOI found in Crossref'
+    doiCheckClass = 'text-emerald-600'
+  } else if (doiCheckStatus === 'missing') {
+    doiCheckText = 'DOI not found in Crossref. Make sure it fits this format: 10.1000/182'
+    doiCheckClass = 'text-red-600'
+  } else if (doiCheckStatus === 'error') {
+    doiCheckText = 'Could not check DOI'
+    doiCheckClass = 'text-red-600'
+  }
+  const canSubmitDirectly = Boolean(authUser)
+  let submitButtonText = 'Sign in with GitHub'
+  if (status === 'submitting') {
+    submitButtonText = 'Submitting...'
+  } else if (status === 'processing') {
+    submitButtonText = 'Checking adapter'
+  } else if (canSubmitDirectly) {
+    submitButtonText = 'Register adapter'
+  }
+  const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
+  let metadataCheckIcon = (
+    <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
+  )
+  if (metadataCheckStatus === 'found') {
+    metadataCheckIcon = <CheckIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (metadataCheckStatus === 'missing') {
+    metadataCheckIcon = <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (metadataCheckStatus === 'blocked') {
+    metadataCheckIcon = <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
+  }
+  let doiCheckIcon = <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+  if (doiCheckStatus === 'found') {
+    doiCheckIcon = <CheckIcon className="h-5 w-5" aria-hidden="true" />
+  } else if (doiCheckStatus === 'checking') {
+    doiCheckIcon = (
+      <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
+    )
+  }
+
   useEffect(() => {
-    let location = form.repositoryLocation.trim()
-    while (location.endsWith('/')) {
-      location = location.slice(0, -1)
-    }
-    if (!isHttpUrl(location)) return
+    const repositoryLocation = form.repositoryLocation.trim()
+    if (!httpsUrlPattern.test(repositoryLocation)) return
 
     const controller = new AbortController()
-    const metadataUrl = getMetadataUrl(location)
-    if (!metadataUrl) {
-      return
-    }
 
-    void fetch(metadataUrl, { signal: controller.signal }) // NOSONAR: getMetadataUrl only returns allowlisted GitHub raw-content URLs.
-      .then((response) => {
-        setMetadataCheckStatus(metadataStatusForResponse(response))
+    void checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet({
+      query: { repository_url: repositoryLocation },
+      signal: controller.signal,
+    })
+      .then((metadataResult) => {
+        if (controller.signal.aborted) return
+        if (metadataResult.error || !metadataResult.data) {
+          setMetadataCheckStatus('blocked')
+          return
+        }
+        setMetadataCheckStatus(metadataResult.data.has_croissant_file ? 'found' : 'missing')
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return
@@ -408,101 +309,151 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
     return () => controller.abort()
   }, [form.repositoryLocation])
 
-  async function submitRegistration(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault()
+
+  async function checkDoiOnBlur(value: string) {
+    const doi = registrationDoiValue(value)
+    updateField('doi', doi)
+    setDoiCheck({ status: 'idle', value: doi })
+    if (!doi) return
+
+    setDoiCheck({ status: 'checking', value: doi })
+    try {
+      const work = await fetchCrossrefWork(doi)
+      const status = work ? 'found' : 'missing'
+      setDoiCheck((current) => (
+        current.value === doi ? { status, value: doi } : current
+      ))
+    } catch (error) {
+      console.error('Could not check DOI with Crossref.', error)
+      setDoiCheck((current) => (
+        current.value === doi ? { status: 'error', value: doi } : current
+      ))
+    }
+  }
+
+  const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm) => {
     setError(null)
     setResult(null)
 
+    const doi = registrationDoiValue(registrationForm.doi)
+
+    setStatus('submitting')
+    try {
+      const registrationResult = await createRegistrationApiV1RegistrationsPost({
+        body: {
+          adapter_name: registrationForm.adapterName,
+          repository_location: registrationForm.repositoryLocation,
+          license_value: registrationForm.licenseValue.trim() || undefined,
+          doi: doi || undefined,
+          cff_url: registrationForm.cffUrl.trim() || undefined,
+        },
+      })
+
+      const registrationError = registrationResult.error as unknown
+      if (registrationError || !registrationResult.data) {
+        const details = registrationError as { details?: string; detail?: string } | undefined
+        setStatus('idle')
+        setError(
+          typeof registrationError === 'string' && registrationError
+            ? registrationError
+            : details?.details || details?.detail || 'Registration failed.'
+        )
+        return
+      }
+
+      const registration = registrationResult.data
+      globalThis.localStorage.removeItem(draftKey)
+      globalThis.localStorage.removeItem(submitAfterAuthKey)
+      setStatus('processing')
+
+      const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
+        path: { registration_id: registration.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed processing request.
+      })
+
+      setStatus('idle')
+      const processError = processResult.error as unknown
+      if (processError || !processResult.data) {
+        const details = processError as { details?: string; detail?: string } | undefined
+        setResult(registration)
+        setError(
+          typeof processError === 'string' && processError
+            ? processError
+            : details?.details || details?.detail || 'Registration was saved, but processing failed.'
+        )
+        return
+      }
+
+      setResult(processResult.data)
+    } catch (error) {
+      const details = error as { details?: string; detail?: string } | undefined
+      setStatus('idle')
+      setError(
+        typeof error === 'string' && error
+          ? error
+          : details?.details || details?.detail || 'Registration failed.'
+      )
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
+    if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
+
+    const submitTimer = globalThis.setTimeout(() => {
+      if (autoSubmitAttemptedRef.current) return
+      autoSubmitAttemptedRef.current = true
+      globalThis.localStorage.removeItem(submitAfterAuthKey)
+      void submitAuthenticatedRegistration(form)
+    }, 0)
+    return () => globalThis.clearTimeout(submitTimer)
+  }, [authUser, authVerified, form, result, status, submitAuthenticatedRegistration])
+
+  async function submitRegistration(event: { preventDefault: () => void }) {
+    event.preventDefault()
+
+    const doi = registrationDoiValue(form.doi)
+
     if (!authUser) {
-      globalThis.localStorage.setItem(draftKey, JSON.stringify(form))
-      globalThis.location.href = getApiUrl(apiBaseUrl, ['auth', 'github', 'start'], { return_to: '/register' })
+      globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
+      globalThis.localStorage.setItem(submitAfterAuthKey, '1')
+      globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
       return
     }
 
-    try {
-      setStatus('submitting')
-      const response = await fetch(getApiUrl(apiBaseUrl, ['registrations']), { // NOSONAR: API base is limited to http(s), and this route is fixed.
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adapter_name: form.adapterName,
-          repository_location: form.repositoryLocation,
-          license_value: form.licenseValue.trim() || undefined,
-          doi: form.doi.trim() || undefined,
-        }),
-      })
-
-      if (!response.ok) {
-        const payload = await readRegistrationPayload(response)
-        setStatus('idle')
-        setError(payload?.detail ?? 'Registration failed.')
-        return
-      }
-
-      const registration = (await response.json()) as RegistrationResponse
-      const registrationId = normalizedRegistrationId(registration.registration_id)
-      if (!registrationId) {
-        setStatus('idle')
-        setError('Registration was saved, but the returned registration ID was invalid.')
-        return
-      }
-
-      globalThis.localStorage.removeItem(draftKey)
-      setStatus('processing')
-
-      const processUrl = getRegistrationActionUrl(apiBaseUrl, registrationId, 'process')
-      const processResponse = await fetch(processUrl, { // NOSONAR: registrationId is UUID-allowlisted before URL construction.
-        method: 'POST',
-        credentials: 'include',
-      })
-      const processPayload = await readRegistrationPayload(processResponse)
-
-      setStatus('idle')
-      if (!processResponse.ok) {
-        setResult(registration)
-        setError(processPayload?.detail ?? 'Registration was saved, but processing failed.')
-        return
-      }
-
-      setResult(processPayload ?? registration)
-    } catch (requestError) {
-      console.error('Could not submit registration.', requestError)
-      setStatus('idle')
-      setError('Registration failed.')
-    }
+    await submitAuthenticatedRegistration({ ...form, doi })
   }
 
   async function revalidateRegistration() {
     if (!result) return
 
-    const registrationId = normalizedRegistrationId(result.registration_id)
-    if (!registrationId) {
-      setError('Cannot revalidate because the registration ID is invalid.')
-      return
-    }
-
+    setStatus('processing')
+    setError(null)
     try {
-      setStatus('processing')
-      setError(null)
-      const revalidationUrl = getRegistrationActionUrl(apiBaseUrl, registrationId, 'revalidate')
-      const response = await fetch(revalidationUrl, { // NOSONAR: registrationId is UUID-allowlisted before URL construction.
-        method: 'POST',
-        credentials: 'include',
+      const revalidateResult = await revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost({
+        path: { registration_id: result.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed revalidation request.
       })
-      const payload = await readRegistrationPayload(response)
 
       setStatus('idle')
-      if (!response.ok) {
-        setError(payload?.detail ?? 'Revalidation failed.')
+      const revalidateError = revalidateResult.error as unknown
+      if (revalidateError || !revalidateResult.data) {
+        const details = revalidateError as { details?: string; detail?: string } | undefined
+        setError(
+          typeof revalidateError === 'string' && revalidateError
+            ? revalidateError
+            : details?.details || details?.detail || 'Revalidation failed.'
+        )
         return
       }
 
-      setResult(payload ?? result)
-    } catch (requestError) {
-      console.error('Could not revalidate registration.', requestError)
+      setResult(revalidateResult.data)
+    } catch (error) {
+      const details = error as { details?: string; detail?: string } | undefined
       setStatus('idle')
-      setError('Revalidation failed.')
+      setError(
+        typeof error === 'string' && error
+          ? error
+          : details?.details || details?.detail || 'Revalidation failed.'
+      )
     }
   }
 
@@ -531,11 +482,11 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
               className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10"
               onSubmit={submitRegistration}
             >
-              <h2 className="text-2xl font-bold text-slate-950">Registration details</h2>
+            <h2 className="text-2xl font-bold text-slate-950">Registration details</h2>
 
-              <div className="mt-8 grid gap-6">
-                <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                  <span>Adapter name*</span>
+            <div className="mt-8 grid gap-6">
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                <span>Adapter name*</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                   onChange={(event) => updateField('adapterName', event.target.value)}
@@ -544,40 +495,39 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
                   type="text"
                   value={form.adapterName}
                 />
-                </label>
+              </label>
 
-                <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                  <span>Repository location*</span>
-                <span className="relative block">
-                  <input
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 pr-48 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                    onChange={(event) => {
-                      const value = event.target.value
-                      setError(null)
-                      setMetadataCheckStatus(
-                        isHttpUrl(value) ? (getMetadataUrl(value) ? 'checking' : 'blocked') : 'idle'
-                      )
-                      updateField('repositoryLocation', value)
-                    }}
-                    placeholder="https://github.com/example/clinical-visit-adapter"
-                    required
-                    type="url"
-                    value={form.repositoryLocation}
-                  />
-                  {metadataCheckView ? (
-                    <span
-                      aria-live="polite"
-                      className={`pointer-events-none absolute right-1.5 top-1/2 inline-flex h-12 -translate-y-1/2 items-center gap-2 rounded-2xl px-4 text-sm font-medium ${metadataCheckView.className}`}
-                    >
-                      {metadataCheckView.icon}
-                      {metadataCheckView.text}
-                    </span>
-                  ) : null}
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                <span>
+                  Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
                 </span>
-                </label>
+                <input
+                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                  aria-invalid={metadataCheckStatus === 'missing' || metadataCheckStatus === 'blocked'}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setError(null)
+                    setMetadataCheckStatus(httpsUrlPattern.test(value.trim()) ? 'checking' : 'idle')
+                    updateField('repositoryLocation', value)
+                  }}
+                  placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
+                  required
+                  type="url"
+                  value={form.repositoryLocation}
+                />
+                {metadataCheckStatus !== 'idle' ? (
+                  <span
+                    aria-live="polite"
+                    className={`inline-flex items-center gap-2 text-sm font-medium ${metadataCheckClass}`}
+                  >
+                    {metadataCheckIcon}
+                    {metadataCheckText}
+                  </span>
+                ) : null}
+              </label>
 
-                <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                  <span>License</span>
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                <span>License</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                   onChange={(event) => updateField('licenseValue', event.target.value)}
@@ -585,60 +535,81 @@ function RegisterPage({ apiBaseUrl, authUser }: RegisterPageProps) {
                   type="text"
                   value={form.licenseValue}
                 />
-                </label>
+              </label>
 
-                <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                  <span>DOI</span>
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                <span>DOI</span>
                 <input
                   className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                  onChange={(event) => updateField('doi', event.target.value)}
-                  placeholder="10.5281/zenodo.1234567"
+                  aria-invalid={doiCheckStatus === 'missing' || doiCheckStatus === 'error'}
+                  onBlur={(event) => void checkDoiOnBlur(event.target.value)}
+                  onChange={(event) => {
+                    setDoiCheck({ status: 'idle', value: '' })
+                    updateField('doi', event.target.value)
+                  }}
+                  placeholder="10.1000/182"
                   type="text"
                   value={form.doi}
                 />
-                </label>
-              </div>
-              <div className="mt-10 flex flex-col gap-4 border-t border-slate-100 pt-8 md:flex-row md:items-center md:justify-end">
+                {doiCheckStatus !== 'idle' ? (
+                  <span
+                    aria-live="polite"
+                    className={`inline-flex items-center gap-2 text-sm font-medium ${doiCheckClass}`}
+                  >
+                    {doiCheckIcon}
+                    {doiCheckText}
+                  </span>
+                ) : null}
+              </label>
+
+              <label className="grid gap-3 text-sm font-semibold text-slate-950">
+                <span>CFF file link</span>
+                <input
+                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                  onChange={(event) => updateField('cffUrl', event.target.value)}
+                  placeholder="https://github.com/example/adapter/blob/main/CITATION.cff"
+                  type="url"
+                  value={form.cffUrl}
+                />
+              </label>
+            </div>
+            <div className="mt-10 flex flex-col gap-4 border-t border-slate-100 pt-8 md:flex-row md:items-center md:justify-end">
               <p className="text-sm leading-6 text-slate-500 md:max-w-sm md:text-right">
-                We use GitHub to attach your login to the registration.
+                Sign in once so we can attach your login to the registration.
               </p>
               <button
                 className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                 disabled={status !== 'idle'}
                 type="submit"
               >
-                {submitButtonText(status, authUser)}
-                {authUser ? (
-                  <PlusIcon className="h-5 w-5" aria-hidden="true" />
-                ) : (
-                  <ArrowRightIcon className="h-5 w-5" aria-hidden="true" />
-                )}
+                {submitButtonText}
+                <SubmitButtonIcon className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 
-              {error ? (
-                <p className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </p>
-              ) : null}
-            </form>
+            {error ? (
+              <p className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </p>
+            ) : null}
+          </form>
 
-            <aside className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
-              <h2 className="text-2xl font-bold text-slate-950">What happens next?</h2>
-              <ol className="mt-8 grid gap-8">
-                {nextSteps.map((step, index) => (
-                  <li className="grid grid-cols-[44px_1fr] gap-5" key={step.title}>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-base font-semibold text-blue-600">
-                      {index + 1}
-                    </span>
-                    <span>
-                      <span className="block text-base font-bold text-slate-950">{step.title}</span>
-                      <span className="mt-1 block text-sm leading-5 text-slate-700">{step.text}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </aside>
+          <aside className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
+            <h2 className="text-2xl font-bold text-slate-950">What happens next?</h2>
+            <ol className="mt-8 grid gap-8">
+              {nextSteps.map((step, index) => (
+                <li className="grid grid-cols-[44px_1fr] gap-5" key={step.title}>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-base font-semibold text-blue-600">
+                    {index + 1}
+                  </span>
+                  <span>
+                    <span className="block text-base font-bold text-slate-950">{step.title}</span>
+                    <span className="mt-1 block text-sm leading-5 text-slate-700">{step.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </aside>
           </div>
         )}
       </div>

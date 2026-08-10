@@ -32,7 +32,7 @@ def discover_local_adapter(repo_path: str | Path) -> AdapterDiscoveryResult:
 
 
 def discover_remote_adapter(repo_url: str) -> AdapterDiscoveryResult:
-    """Discover adapter metadata from a supported remote repository URL."""
+    """Discover adapter metadata from a remote repository URL."""
     metadata = fetch_remote_metadata(repo_url)
     return AdapterDiscoveryResult(
         source=repo_url,

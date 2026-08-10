@@ -1,4 +1,4 @@
-"""SQLAlchemy-backed SQLite storage for adapter registration requests."""
+"""SQLite registration store setup."""
 
 from __future__ import annotations
 
@@ -12,30 +12,33 @@ from src.persistence.tables import metadata
 
 
 class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
-    """Persist registration requests in SQLite through SQLAlchemy Core."""
+    """SQLite engine and migration wrapper for tests and local development."""
 
     def __init__(self, database_path: str | Path) -> None:
-        """Create a store that reads and writes registrations to SQLite."""
         self.database_path = Path(database_path)
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine = self._build_engine()
         self._initialize_database()
 
     def _initialize_database(self) -> None:
-        """Create the schema, apply lightweight migrations, and remove legacy tables."""
         metadata.create_all(self.engine)
         with self.engine.begin() as connection:
             self._ensure_registration_sources_columns(connection)
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_registration_source_repository_location "
+                    "ON registration_sources (repository_location)"
+                )
+            )
             connection.execute(text("DROP INDEX IF EXISTS ix_registrations_uniqueness_key"))
             connection.execute(text("DROP TABLE IF EXISTS registration_failures"))
             connection.execute(text("DROP TABLE IF EXISTS registrations"))
 
     def _build_engine(self) -> Engine:
-        """Create the SQLAlchemy engine for the configured SQLite database."""
         return create_engine(f"sqlite+pysqlite:///{self.database_path}")
 
     def _ensure_registration_sources_columns(self, connection: Engine | object) -> None:
-        """Add missing registration source columns for existing SQLite databases."""
         columns = {
             str(row["name"])
             for row in connection.execute(
@@ -44,9 +47,9 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
         }
         for column_name in (
             "description",
-            "contact_email",
             "license_value",
             "doi",
+            "cff_url",
             "submitted_by_github_login",
         ):
             if column_name not in columns:

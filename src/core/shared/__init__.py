@@ -38,6 +38,7 @@ from src.core.shared.files import (
     fetch_remote_file,
     fetch_remote_metadata,
     parse_json_metadata,
+    remote_metadata_exists,
 )
 
 __all__ = [
@@ -69,5 +70,6 @@ __all__ = [
     "parse_adapter_creator_string",
     "parse_dataset_creator_string",
     "parse_json_metadata",
+    "remote_metadata_exists",
     "slugify_identifier",
 ]

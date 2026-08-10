@@ -15,16 +15,11 @@ from src.core.registration.models import (
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "adapter_name": "CollecTRI Adapter",
-    "repository_location": "github.com/biocypher/collectri",
-    "contact_email": "maintainer@example.org",
+    "repository_location": "https://gitlab.example.org/biocypher/collectri",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
+    "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
 }
-
-
-# ===========================================================
-# =====================  Input Models =======================
-# ===========================================================
 
 
 class RegistrationCreateRequest(BaseModel):
@@ -45,10 +40,6 @@ class RegistrationCreateRequest(BaseModel):
             "a root-level croissant.jsonld file."
         ),
     )
-    contact_email: str | None = Field(
-        default=None,
-        description="Optional maintainer contact email for follow-up.",
-    )
     license_value: str | None = Field(
         default=None,
         description="Optional submitted adapter license text.",
@@ -56,6 +47,10 @@ class RegistrationCreateRequest(BaseModel):
     doi: str | None = Field(
         default=None,
         description="Optional submitted DOI text.",
+    )
+    cff_url: str | None = Field(
+        default=None,
+        description="Optional submitted Citation File Format URL.",
     )
 
     @field_validator("adapter_name", "repository_location")
@@ -67,24 +62,7 @@ class RegistrationCreateRequest(BaseModel):
             raise ValueError("Field must not be blank.")
         return normalized_value
 
-    @field_validator("contact_email")
-    @classmethod
-    def _normalize_contact_email(cls, value: str | None) -> str | None:
-        """Normalize an optional contact email for API input."""
-        if value is None:
-            return None
-
-        normalized_value = value.strip()
-        if not normalized_value:
-            return None
-
-        local_part, separator, domain = normalized_value.partition("@")
-        if not separator or not local_part or "." not in domain:
-            raise ValueError("Contact email must be a valid email address.")
-
-        return normalized_value
-
-    @field_validator("license_value", "doi")
+    @field_validator("license_value", "doi", "cff_url")
     @classmethod
     def _strip_optional_text(cls, value: str | None) -> str | None:
         """Normalize optional text fields."""
@@ -92,11 +70,6 @@ class RegistrationCreateRequest(BaseModel):
             return None
         normalized_value = value.strip()
         return normalized_value or None
-
-
-# ===========================================================
-# =====================  Output Models ======================
-# ===========================================================
 
 
 class RegistrationCreateResponse(BaseModel):
@@ -109,9 +82,9 @@ class RegistrationCreateResponse(BaseModel):
     repository_kind: Literal["local", "remote"] | str
     status: RegistrationStatus
     created_at: datetime
-    contact_email: str | None = None
     license_value: str | None = None
     doi: str | None = None
+    cff_url: str | None = None
     submitted_by_github_login: str | None = None
 
     @classmethod
@@ -125,9 +98,9 @@ class RegistrationCreateResponse(BaseModel):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
         )
 
@@ -153,9 +126,9 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
             metadata_path=registration.metadata_path,
             metadata=registration.metadata,
@@ -184,9 +157,9 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
             repository_kind=registration.repository_kind,
             status=registration.status,
             created_at=registration.created_at,
-            contact_email=registration.contact_email,
             license_value=registration.license_value,
             doi=registration.doi,
+            cff_url=registration.cff_url,
             submitted_by_github_login=registration.submitted_by_github_login,
             profile_version=registration.profile_version,
             updated_at=registration.updated_at,
@@ -198,6 +171,12 @@ class RegistrationListResponse(BaseModel):
     """Response model for a registration list."""
 
     items: list[RegistrationListItemResponse]
+
+
+class RegistrationCroissantFilePresentCheckResponse(BaseModel):
+    """Response model for a remote croissant.jsonld presence check."""
+
+    has_croissant_file: bool
 
 
 class RegistrationEventResponse(BaseModel):

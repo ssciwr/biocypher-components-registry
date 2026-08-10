@@ -15,6 +15,12 @@ from src.core.shared.errors import InvalidRepoURLError
 
 def registration_submission_http_error(exc: Exception) -> HTTPException:
     """Map expected registration submission errors to HTTP responses."""
+    if isinstance(exc, DuplicateRegistrationError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+
     if isinstance(exc, (FileNotFoundError, InvalidRepoURLError, ValueError)):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -83,15 +89,4 @@ def adapter_not_found_http_error(adapter_id: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Adapter not found: {adapter_id}",
-    )
-
-
-def adapter_version_not_found_http_error(
-    adapter_id: str,
-    version: str,
-) -> HTTPException:
-    """Return a 404 response for an unknown public adapter version."""
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Adapter version not found: {adapter_id} {version}",
     )

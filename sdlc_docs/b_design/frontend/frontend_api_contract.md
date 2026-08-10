@@ -191,7 +191,6 @@ Request fields:
 | --- | --- | --- | --- |
 | `adapter_name` | Yes | Text input | Human-readable name. Frontend should trim before submit. |
 | `repository_location` | Yes | Text input | Local server path or supported remote repository URL. |
-| `contact_email` | No | Email input | Optional maintainer email. |
 
 UI-only field:
 
@@ -209,7 +208,6 @@ repository_location
 repository_kind
 status
 created_at
-contact_email
 ```
 
 Success behavior:
@@ -222,8 +220,6 @@ Validation and error states:
 
 - Empty `adapter_name`: show client-side required-field message.
 - Empty `repository_location`: show client-side required-field message.
-- Invalid `contact_email`: show client-side email message and still rely on
-  backend `422` as source of truth.
 - Backend `400`: show operation-level error, such as unsupported repository URL
   or missing local path.
 - Backend `422`: show request validation errors near fields when possible.
@@ -233,8 +229,7 @@ Manual verification reference:
 ```bash
 http POST :8000/api/v1/registrations \
   adapter_name="Manual Example Adapter" \
-  repository_location=/tmp/biocypher-api-manual-adapter \
-  contact_email=maintainer@example.org
+  repository_location=/tmp/biocypher-api-manual-adapter
 ```
 
 ## Registration Detail
@@ -264,7 +259,6 @@ repository_location
 repository_kind
 status
 created_at
-contact_email
 metadata_path
 metadata
 profile_version
@@ -363,7 +357,6 @@ status
 latest_event_type
 created_at
 updated_at
-contact_email
 profile_version
 uniqueness_key
 ```
@@ -488,7 +481,7 @@ Version fields:
 ```text
 adapter_id
 adapter_name
-adapter_version
+adapter_version derived from metadata.version
 registry_entry_id
 profile_version
 metadata_checksum
@@ -500,7 +493,7 @@ Metadata response fields:
 
 ```text
 adapter_id
-adapter_version
+adapter_version derived from metadata.version
 registry_entry_id
 metadata
 ```

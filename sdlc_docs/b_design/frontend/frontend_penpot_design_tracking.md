@@ -159,10 +159,9 @@ The registration form should collect:
 
 - adapter name
 - repository location
-- contact email for status notifications
 - confirmation that a `croissant.jsonld` file exists at the repository root
 
-The contact email is used to notify the submitter about registration processing status, validation outcomes, and follow-up actions when supported by the backend.
+Registration status is tied to the signed-in GitHub login.
 
 Suggested confirmation text:
 

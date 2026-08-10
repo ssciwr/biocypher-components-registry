@@ -133,7 +133,7 @@ class RegistryEntryResponse(BaseModel):
     entry_id: str
     source_id: str
     adapter_name: str
-    adapter_version: str
+    adapter_version: str | None = None
     profile_version: str | None = None
     uniqueness_key: str
     metadata_checksum: str | None = None

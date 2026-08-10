@@ -46,17 +46,19 @@ from src.core.validation import (
 from src.core.validation.results import ValidationResult
 from src.persistence.factory import build_registration_store
 
-
 _DEFAULT_GITHUB_LOGIN = "sampleGithubLogin"
+_DEMO_GITHUB_LOGIN = "jmsssc"
 
 # ============================================================================
 # Constants
 # ============================================================================
 
 STYLE_SECTION_HEADING = "bold cyan"
+ADAPTER_LABEL = "Adapter\n"
 REGISTRATION_ID_HELP = "Stored registration identifier."
 HTTPS_SCHEME = "https"
 HTTP_SCHEME = "http"
+JSONLD_TYPE = "@type"
 
 _DB_PATH_HELP = (
     "SQLite database path for stored registrations. Defaults to "
@@ -64,10 +66,36 @@ _DB_PATH_HELP = (
     f"{core_settings.default_registry_db_path}."
 )
 
-
-# ============================================================================
-# Typer application
-# ============================================================================
+_DEMO_ADAPTERS: list[dict[str, Any]] = [
+    {
+        "adapter_name": "Pathway Signals Adapter",
+        "adapter_id": "pathway-signals-adapter",
+        "version": "0.1.0",
+        "repository_location": "https://github.com/biocypher/pathway-signals-adapter",
+        "description": "Generic pathway and interaction data adapter for registry demos.",
+        "keywords": ["pathways", "interactions", "demo"],
+        "data_source": "Pathway Signals",
+    },
+    {
+        "adapter_name": "Sample Omics Adapter",
+        "adapter_id": "sample-omics-adapter",
+        "version": "0.1.0",
+        "repository_location": "https://github.com/biocypher/sample-omics-adapter",
+        "doi": "10.5555/12345678",
+        "description": "Example adapter describing lightweight multi-omics sample annotations.",
+        "keywords": ["omics", "samples", "demo"],
+        "data_source": "Sample Omics",
+    },
+    {
+        "adapter_name": "Reference Nodes Adapter",
+        "adapter_id": "reference-nodes-adapter",
+        "version": "0.1.0",
+        "repository_location": "https://github.com/biocypher/reference-nodes-adapter",
+        "description": "Small demo adapter for reference node and edge metadata examples.",
+        "keywords": ["reference", "graph", "demo"],
+        "data_source": "Reference Nodes",
+    },
+]
 
 app = typer.Typer(
     name="biocypher-registry",
@@ -79,9 +107,42 @@ app.add_typer(dataset_app, name="dataset")
 app.add_typer(adapter_app, name="adapter")
 
 
-# ============================================================================
-# Metadata and validation helpers
-# ============================================================================
+def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
+    adapter_id = str(spec["adapter_id"])
+    data_source = str(spec["data_source"])
+    return {
+        JSONLD_TYPE: "SoftwareSourceCode",
+        "@id": adapter_id,
+        "name": spec["adapter_name"],
+        "description": spec["description"],
+        "version": spec["version"],
+        "license": "MIT",
+        "codeRepository": spec["repository_location"],
+        "programmingLanguage": "Python",
+        "targetProduct": "BioCypher",
+        "creator": [{JSONLD_TYPE: "Person", "name": _DEMO_GITHUB_LOGIN}],
+        "keywords": spec["keywords"],
+        "hasPart": [
+            {
+                JSONLD_TYPE: "sc:Dataset",
+                "name": data_source,
+                "description": f"Vague demo dataset backing the {spec['adapter_name']}.",
+                "version": "2026.1",
+                "license": "MIT",
+                "url": f"https://example.org/{adapter_id}",
+                "recordSet": [
+                    {
+                        "name": f"{adapter_id}-records",
+                        "field": [
+                            {"name": "source", "description": "Source identifier"},
+                            {"name": "target", "description": "Target identifier"},
+                            {"name": "score", "description": "Demo confidence score"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
 
 
 def _load_metadata(path: Path) -> dict[str, Any]:
@@ -97,7 +158,7 @@ def _load_metadata(path: Path) -> dict[str, Any]:
 
 
 def _detect_metadata_kind(metadata: dict[str, Any]) -> str:
-    root_type = metadata.get("@type")
+    root_type = metadata.get(JSONLD_TYPE)
     if root_type in {"Dataset", "sc:Dataset"}:
         return "dataset"
     if root_type in {"SoftwareSourceCode", "sc:SoftwareSourceCode"}:
@@ -203,6 +264,7 @@ def _print_discovery_target(
         )
     )
 
+
 def _print_submission_request(
     adapter_name: str,
     adapter_id: str,
@@ -211,7 +273,7 @@ def _print_submission_request(
     github_login: str,
 ) -> None:
     body = Text()
-    body.append("Adapter\n", style=STYLE_SECTION_HEADING)
+    body.append(ADAPTER_LABEL, style=STYLE_SECTION_HEADING)
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Adapter ID\n", style="bold")
     body.append(f"{adapter_id}\n\n", style="white")
@@ -242,7 +304,7 @@ def _print_registration_result(
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
-    body.append("Adapter\n", style="bold")
+    body.append(ADAPTER_LABEL, style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Status\n", style="bold")
     body.append(f"{status}\n\n", style="white")
@@ -330,7 +392,7 @@ def _print_stored_registration(
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
     body.append(f"{registration_id}\n\n", style="white")
-    body.append("Adapter\n", style="bold")
+    body.append(ADAPTER_LABEL, style="bold")
     body.append(f"{adapter_name}\n\n", style="white")
     body.append("Repository\n", style="bold")
     body.append(f"{repository_location}\n\n", style="white")
@@ -407,7 +469,7 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
         table.add_row(
             entry.entry_id,
             entry.adapter_name,
-            entry.adapter_version,
+            entry.adapter_version or "n/a",
             entry.uniqueness_key,
             entry.profile_version or "n/a",
             entry.updated_at.isoformat(),
@@ -680,6 +742,56 @@ def show_registration_events_cmd(
         raise typer.Exit(code=1) from exc
 
     _print_registration_events(events)
+
+
+@app.command(
+    "seed-demo-adapters",
+    help="Insert three fake valid adapters for local catalog development.",
+)
+def seed_demo_adapters_cmd(
+    db_path: str | None = typer.Option(
+        None,
+        "--db-path",
+        help=_DB_PATH_HELP,
+    ),
+) -> None:
+    try:
+        store = build_registration_store(db_path)
+        existing_keys = {
+            entry.uniqueness_key for entry in store.list_registry_entries()
+        }
+        seeded = 0
+        skipped = 0
+        for spec in _DEMO_ADAPTERS:
+            uniqueness_key = f"{spec['adapter_id']}::{spec['version']}"
+            if uniqueness_key in existing_keys:
+                skipped += 1
+                continue
+            registration = submit_registration_record(
+                adapter_name=str(spec["adapter_name"]),
+                repository_location=str(spec["repository_location"]),
+                store=store,
+                doi=spec.get("doi"),
+                submitted_by_github_login=_DEMO_GITHUB_LOGIN,
+            )
+            store.mark_registration_valid(
+                registration_id=registration.registration_id,
+                metadata=_demo_adapter_metadata(spec),
+                metadata_path=METADATA_FILENAME,
+                profile_version="demo-v1",
+                uniqueness_key=uniqueness_key,
+                observed_checksum=f"demo-{uniqueness_key}",
+            )
+            existing_keys.add(uniqueness_key)
+            seeded += 1
+    except (ValueError, OSError, typer.BadParameter) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(
+        f"[green]Seeded {seeded} demo adapters[/green] "
+        f"([yellow]skipped {skipped} existing[/yellow])"
+    )
 
 
 @app.command(

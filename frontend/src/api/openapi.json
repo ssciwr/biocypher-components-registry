@@ -1,0 +1,3518 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BioCypher Components Registry API",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Me",
+        "description": "Return the current signed-in GitHub identity.",
+        "operationId": "get_me_api_v1_auth_me_get",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "description": "Delete the local browser session cookie.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Check API health",
+        "description": "Return a lightweight liveness response for the API process.",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "List public adapters",
+        "description": "Return the public adapter catalog derived from canonical valid registry entries. Registrations that are SUBMITTED, INVALID, or FETCH_FAILED do not appear here.",
+        "operationId": "list_adapters_api_v1_adapters_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterCatalogListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/latest": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "List latest (30) public adapters",
+        "description": "Return the latest valid adapters",
+        "operationId": "list_latest_adapters_api_v1_adapters_latest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterLatestListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/search": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Search public adapters",
+        "description": "Return public adapter cards whose title matches the search term.",
+        "operationId": "search_adapters_api_v1_adapters_search_get",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterLatestListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/{adapter_id}": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Get adapter catalog detail",
+        "description": "Return one public adapter. The response is metadata-light; fetch full Croissant metadata through the adapter metadata endpoint.",
+        "operationId": "get_adapter_api_v1_adapters__adapter_id__get",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/{adapter_id}/endorse": {
+      "post": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Endorse an adapter",
+        "description": "Record that the signed-in user endorses this adapter.",
+        "operationId": "endorse_adapter_api_v1_adapters__adapter_id__endorse_post",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterEndorsementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/{adapter_id}/metadata": {
+      "get": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Get adapter metadata",
+        "description": "Return the full stored Croissant metadata document for one adapter.",
+        "operationId": "get_adapter_metadata_api_v1_adapters__adapter_id__metadata_get",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/validate": {
+      "post": {
+        "tags": [
+          "metadata"
+        ],
+        "summary": "Validate metadata",
+        "description": "Validate an inline Croissant adapter or dataset document without persisting it. Adapter validation includes the adapter document and each embedded dataset fragment. Validation failures return 200 with is_valid=false; malformed requests return 422.",
+        "operationId": "validate_metadata_api_v1_metadata_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataValidationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/datasets/generate": {
+      "post": {
+        "tags": [
+          "metadata"
+        ],
+        "summary": "Generate dataset metadata",
+        "description": "Generate dataset Croissant metadata from a server-side input path. The backend writes to a temporary file, returns the generated metadata in the response, and validates by default.",
+        "operationId": "generate_dataset_metadata_api_v1_metadata_datasets_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetMetadataGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetMetadataGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/adapters/generate": {
+      "post": {
+        "tags": [
+          "metadata"
+        ],
+        "summary": "Generate adapter metadata",
+        "description": "Generate adapter Croissant metadata from existing dataset metadata files and/or generated embedded datasets. Paths are server-side paths visible to the backend process. The endpoint returns metadata without creating a registration.",
+        "operationId": "generate_adapter_metadata_api_v1_metadata_adapters_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdapterMetadataGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterMetadataGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations": {
+      "post": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Submit an adapter registration",
+        "description": "Store one adapter repository as a tracked registration request. The repository may be a local path or remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.",
+        "operationId": "create_registration_api_v1_registrations_post",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "List registrations",
+        "description": "Return active registration summary rows. This list is intentionally metadata-light; use the registration detail endpoint for processing details and metadata payloads.",
+        "operationId": "list_registrations_api_v1_registrations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/croissant-file-present-check": {
+      "get": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Check registration Croissant file presence",
+        "description": "Return whether a remote repository exposes root-level croissant.jsonld.",
+        "operationId": "check_registration_croissant_file_presence_api_v1_registrations_croissant_file_present_check_get",
+        "parameters": [
+          {
+            "name": "repository_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Repository Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationCroissantFilePresentCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/{registration_id}/events": {
+      "get": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "List registration events",
+        "description": "Return the event history recorded while submitting, processing, refreshing, or revalidating one registration.",
+        "operationId": "list_registration_events_api_v1_registrations__registration_id__events_get",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationEventListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/{registration_id}": {
+      "get": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Get registration detail",
+        "description": "Return one operator-facing registration detail record. This endpoint may include discovered metadata, metadata path, validation errors, and canonical uniqueness details.",
+        "operationId": "get_registration_api_v1_registrations__registration_id__get",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/{registration_id}/process": {
+      "post": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Process one registration",
+        "description": "Discover the submitted repository metadata, validate the adapter and embedded datasets, update registration status, and create or reuse a canonical registry entry when valid.",
+        "operationId": "process_registration_api_v1_registrations__registration_id__process_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationProcessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/{registration_id}/revalidate": {
+      "post": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Revalidate one registration",
+        "description": "Reprocess one registration whose current status is INVALID or whose latest event is FETCH_FAILED.",
+        "operationId": "revalidate_registration_route_api_v1_registrations__registration_id__revalidate_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRevalidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registry/registrations": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "List registry registrations",
+        "description": "Return maintainer/operator rows for active registrations, including public status and latest event type. The optional filters are strict; unsupported values return 422.",
+        "operationId": "list_registry_registrations_api_v1_registry_registrations_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RegistrationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter registry registrations by public registration status.",
+              "title": "Status"
+            },
+            "description": "Filter registry registrations by public registration status."
+          },
+          {
+            "name": "latest_event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "SUBMITTED",
+                    "VALID_CREATED",
+                    "UNCHANGED",
+                    "DUPLICATE",
+                    "REJECTED_SAME_VERSION_CHANGED",
+                    "INVALID_SCHEMA",
+                    "INVALID_MLCROISSANT",
+                    "INVALID_BOTH",
+                    "FETCH_FAILED",
+                    "REVALIDATED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by latest registration event type, such as VALID_CREATED, INVALID_SCHEMA, or FETCH_FAILED.",
+              "title": "Latest Event"
+            },
+            "description": "Filter by latest registration event type, such as VALID_CREATED, INVALID_SCHEMA, or FETCH_FAILED."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryRegistrationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registry/entries": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "List registry entries",
+        "description": "Return canonical valid registry entries. This endpoint does not return full Croissant metadata; use the adapter metadata endpoint for that.",
+        "operationId": "list_registry_entries_api_v1_registry_entries_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryEntryListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registry/entries/{entry_id}": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get registry entry",
+        "description": "Return one canonical valid registry entry by registry entry id. The response is metadata-light and suitable for registry tables.",
+        "operationId": "get_registry_entry_api_v1_registry_entries__entry_id__get",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryEntryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registry/refreshes/latest": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get latest registry refresh",
+        "description": "Return the latest persisted batch refresh summary. Returns 404 if no refresh has been recorded yet.",
+        "operationId": "get_latest_registry_refresh_api_v1_registry_refreshes_latest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryRefreshLatestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registry/refreshes": {
+      "post": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Run registry refresh",
+        "description": "Process every active registration once, continue past per-source failures, persist the refresh summary, and return aggregate outcome counts.",
+        "operationId": "create_registry_refresh_api_v1_registry_refreshes_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryRefreshResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdapterCatalogItemResponse": {
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "endorsement_count": {
+            "type": "integer",
+            "title": "Endorsement Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "adapter_name"
+        ],
+        "title": "AdapterCatalogItemResponse",
+        "description": "Response model for one adapter catalog item."
+      },
+      "AdapterCatalogListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterCatalogItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AdapterCatalogListResponse",
+        "description": "Response model for the public adapter catalog."
+      },
+      "AdapterDataSourceResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "column_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AdapterDataSourceResponse",
+        "description": "Metadata-light dataset summary embedded in adapter Croissant metadata."
+      },
+      "AdapterDetailResponse": {
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "repository_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Location"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "maintainer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdapterMaintainerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_sources": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterDataSourceResponse"
+            },
+            "type": "array",
+            "title": "Data Sources"
+          },
+          "endorsement_count": {
+            "type": "integer",
+            "title": "Endorsement Count",
+            "default": 0
+          },
+          "endorsed_by_current_user": {
+            "type": "boolean",
+            "title": "Endorsed By Current User",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "adapter_name"
+        ],
+        "title": "AdapterDetailResponse",
+        "description": "Response model for one adapter."
+      },
+      "AdapterEmbeddedDatasetGenerateRequest": {
+        "properties": {
+          "validate": {
+            "type": "boolean",
+            "title": "Validate",
+            "default": true
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation"
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version"
+          },
+          "date_published": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Published"
+          },
+          "creators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Creators"
+          },
+          "extra_args": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Extra Args"
+          },
+          "input": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Input",
+            "description": "Server-side file or directory path used to generate this embedded dataset."
+          }
+        },
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "AdapterEmbeddedDatasetGenerateRequest",
+        "description": "Generated dataset input embedded in an adapter metadata request."
+      },
+      "AdapterEndorsementResponse": {
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "endorsement_count": {
+            "type": "integer",
+            "title": "Endorsement Count"
+          },
+          "endorsed_by_current_user": {
+            "type": "boolean",
+            "title": "Endorsed By Current User",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "endorsement_count"
+        ],
+        "title": "AdapterEndorsementResponse",
+        "description": "Current endorsement state for one adapter."
+      },
+      "AdapterLatestItemResponse": {
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "repository_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Location"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "maintainer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdapterMaintainerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endorsement_count": {
+            "type": "integer",
+            "title": "Endorsement Count",
+            "default": 0
+          },
+          "endorsed_by_current_user": {
+            "type": "boolean",
+            "title": "Endorsed By Current User",
+            "default": false
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "adapter_name",
+          "updated_at"
+        ],
+        "title": "AdapterLatestItemResponse",
+        "description": "Response model for one latest-adapters card."
+      },
+      "AdapterLatestListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterLatestItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AdapterLatestListResponse",
+        "description": "Response model for newest adapter cards."
+      },
+      "AdapterMaintainerResponse": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "profile_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "title": "AdapterMaintainerResponse",
+        "description": "Repository maintainer identity for adapter catalog display."
+      },
+      "AdapterMetadataGenerateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Version"
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1,
+            "title": "License"
+          },
+          "code_repository": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Code Repository"
+          },
+          "dataset_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dataset Paths"
+          },
+          "generated_datasets": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterEmbeddedDatasetGenerateRequest"
+            },
+            "type": "array",
+            "title": "Generated Datasets"
+          },
+          "validate": {
+            "type": "boolean",
+            "title": "Validate",
+            "default": true
+          },
+          "creators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Creators"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Keywords"
+          },
+          "adapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Id"
+          },
+          "programming_language": {
+            "type": "string",
+            "title": "Programming Language",
+            "default": "Python"
+          },
+          "target_product": {
+            "type": "string",
+            "title": "Target Product",
+            "default": "BioCypher"
+          },
+          "generator": {
+            "type": "string",
+            "const": "native",
+            "title": "Generator",
+            "default": "native"
+          },
+          "dataset_generator": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "croissant-baker",
+              "native"
+            ],
+            "title": "Dataset Generator",
+            "default": "croissant-baker"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "version",
+          "license",
+          "code_repository",
+          "creators",
+          "keywords"
+        ],
+        "title": "AdapterMetadataGenerateRequest",
+        "description": "Request body for generating adapter metadata without persisting it.",
+        "example": {
+          "adapter_id": "people-adapter",
+          "code_repository": "https://github.com/example/people-adapter",
+          "creators": [
+            "Person|Example Creator|Example Lab|||https://orcid.org/0000-0000-0000-0000"
+          ],
+          "dataset_generator": "native",
+          "dataset_paths": [],
+          "description": "Adapter metadata generated through the API.",
+          "generated_datasets": [
+            {
+              "citation": "https://example.org/people",
+              "creators": [
+                "Person|Dataset Creator"
+              ],
+              "dataset_version": "1.0.0",
+              "date_published": "2026-04-17",
+              "description": "Small people dataset.",
+              "extra_args": [],
+              "input": "/srv/biocypher/examples/adapter-demo",
+              "license": "https://opensource.org/licenses/MIT",
+              "name": "People Dataset",
+              "url": "https://example.org/people",
+              "validate": true
+            }
+          ],
+          "generator": "native",
+          "keywords": [
+            "adapter",
+            "biocypher"
+          ],
+          "license": "https://opensource.org/licenses/MIT",
+          "name": "People Adapter",
+          "programming_language": "Python",
+          "target_product": "BioCypher",
+          "validate": true,
+          "version": "1.0.0"
+        }
+      },
+      "AdapterMetadataGenerateResponse": {
+        "properties": {
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "generator": {
+            "type": "string",
+            "const": "native",
+            "title": "Generator"
+          },
+          "dataset_generator": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "croissant-baker",
+              "native"
+            ],
+            "title": "Dataset Generator"
+          },
+          "stdout": {
+            "type": "string",
+            "title": "Stdout",
+            "default": ""
+          },
+          "stderr": {
+            "type": "string",
+            "title": "Stderr",
+            "default": ""
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataValidationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata",
+          "generator",
+          "dataset_generator"
+        ],
+        "title": "AdapterMetadataGenerateResponse",
+        "description": "Response returned after generating adapter metadata."
+      },
+      "AdapterMetadataResponse": {
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "registry_entry_id": {
+            "type": "string",
+            "title": "Registry Entry Id"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "registry_entry_id",
+          "metadata"
+        ],
+        "title": "AdapterMetadataResponse",
+        "description": "Response model for one adapter's full Croissant metadata."
+      },
+      "AuthMeResponse": {
+        "properties": {
+          "github_login": {
+            "type": "string",
+            "title": "Github Login"
+          }
+        },
+        "type": "object",
+        "required": [
+          "github_login"
+        ],
+        "title": "AuthMeResponse",
+        "description": "Signed-in GitHub identity shown in the frontend header."
+      },
+      "DatasetMetadataGenerateRequest": {
+        "properties": {
+          "validate": {
+            "type": "boolean",
+            "title": "Validate",
+            "default": true
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation"
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version"
+          },
+          "date_published": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Published"
+          },
+          "creators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Creators"
+          },
+          "extra_args": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Extra Args"
+          },
+          "input_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Input Path",
+            "description": "Server-side file or directory path visible to the backend process."
+          },
+          "generator": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "croissant-baker",
+              "native"
+            ],
+            "title": "Generator",
+            "description": "Dataset metadata generator backend.",
+            "default": "auto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_path"
+        ],
+        "title": "DatasetMetadataGenerateRequest",
+        "description": "Request body for generating dataset metadata from server-side files.",
+        "example": {
+          "citation": "https://example.org/people-demo",
+          "creators": [
+            "Person|Dataset Creator"
+          ],
+          "dataset_version": "1.0.0",
+          "date_published": "2026-04-17",
+          "description": "Small CSV dataset used to verify generation.",
+          "extra_args": [],
+          "generator": "native",
+          "input_path": "/srv/biocypher/examples/dataset-demo",
+          "license": "https://opensource.org/licenses/MIT",
+          "name": "People Demo Dataset",
+          "url": "https://example.org/people-demo",
+          "validate": true
+        }
+      },
+      "DatasetMetadataGenerateResponse": {
+        "properties": {
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "generator": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "croissant-baker",
+              "native"
+            ],
+            "title": "Generator"
+          },
+          "stdout": {
+            "type": "string",
+            "title": "Stdout",
+            "default": ""
+          },
+          "stderr": {
+            "type": "string",
+            "title": "Stderr",
+            "default": ""
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataValidationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata",
+          "generator"
+        ],
+        "title": "DatasetMetadataGenerateResponse",
+        "description": "Response returned after generating dataset metadata."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service"
+        ],
+        "title": "HealthResponse",
+        "description": "Health-check response returned by the API."
+      },
+      "MetadataValidationCheckResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "is_valid",
+          "errors"
+        ],
+        "title": "MetadataValidationCheckResponse",
+        "description": "Response model for one validation layer result."
+      },
+      "MetadataValidationRequest": {
+        "properties": {
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "minProperties": 1,
+            "title": "Metadata",
+            "description": "Inline Croissant adapter or dataset metadata document."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "adapter",
+              "dataset"
+            ],
+            "title": "Kind",
+            "description": "Metadata type to validate. Use auto to infer from the root @type.",
+            "default": "auto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "MetadataValidationRequest",
+        "description": "Request body for validating metadata without persisting it.",
+        "example": {
+          "kind": "dataset",
+          "metadata": {
+            "@context": {
+              "@language": "en",
+              "@vocab": "https://schema.org/",
+              "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
+              "citeAs": "cr:citeAs",
+              "column": "cr:column",
+              "conformsTo": "dct:conformsTo",
+              "cr": "http://mlcommons.org/croissant/",
+              "data": {
+                "@id": "cr:data",
+                "@type": "@json"
+              },
+              "dataType": {
+                "@id": "cr:dataType",
+                "@type": "@vocab"
+              },
+              "dct": "http://purl.org/dc/terms/",
+              "examples": {
+                "@id": "cr:examples",
+                "@type": "@json"
+              },
+              "extract": "cr:extract",
+              "field": "cr:field",
+              "fileObject": "cr:fileObject",
+              "fileProperty": "cr:fileProperty",
+              "fileSet": "cr:fileSet",
+              "format": "cr:format",
+              "includes": "cr:includes",
+              "isLiveDataset": "cr:isLiveDataset",
+              "jsonPath": "cr:jsonPath",
+              "key": "cr:key",
+              "md5": "cr:md5",
+              "parentField": "cr:parentField",
+              "path": "cr:path",
+              "rai": "http://mlcommons.org/croissant/RAI/",
+              "recordSet": "cr:recordSet",
+              "references": "cr:references",
+              "regex": "cr:regex",
+              "repeated": "cr:repeated",
+              "replace": "cr:replace",
+              "samplingRate": "cr:samplingRate",
+              "sc": "https://schema.org/",
+              "separator": "cr:separator",
+              "source": "cr:source",
+              "subField": "cr:subField",
+              "transform": "cr:transform"
+            },
+            "@type": "sc:Dataset",
+            "citeAs": "https://example.org/people-demo",
+            "conformsTo": "http://mlcommons.org/croissant/1.0",
+            "creator": {
+              "@type": "sc:Person",
+              "name": "Dataset Creator"
+            },
+            "datePublished": "2026-04-17",
+            "description": "Small CSV dataset used to verify validation.",
+            "distribution": [
+              {
+                "@id": "people.csv",
+                "@type": "cr:FileObject",
+                "contentUrl": "people.csv",
+                "encodingFormat": "text/csv",
+                "name": "people.csv",
+                "sha256": "abc123"
+              }
+            ],
+            "license": "https://opensource.org/licenses/MIT",
+            "name": "People Demo Dataset",
+            "recordSet": [
+              {
+                "@id": "people-records",
+                "@type": "cr:RecordSet",
+                "field": [
+                  {
+                    "@id": "people-records/id",
+                    "@type": "cr:Field",
+                    "dataType": "sc:Text",
+                    "description": "Identifier column.",
+                    "name": "id",
+                    "source": {
+                      "extract": {
+                        "column": "id"
+                      },
+                      "fileObject": {
+                        "@id": "people.csv"
+                      }
+                    }
+                  }
+                ],
+                "name": "records"
+              }
+            ],
+            "url": "https://example.org/people-demo",
+            "version": "1.0.0"
+          }
+        }
+      },
+      "MetadataValidationResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "adapter",
+              "dataset"
+            ],
+            "title": "Kind"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "profile_version": {
+            "type": "string",
+            "title": "Profile Version"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/MetadataValidationCheckResponse"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "is_valid",
+          "profile_version",
+          "errors",
+          "checks"
+        ],
+        "title": "MetadataValidationResponse",
+        "description": "Response model for one metadata validation run."
+      },
+      "RegistrationCreateRequest": {
+        "properties": {
+          "adapter_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Adapter Name",
+            "description": "Human-readable adapter name supplied by the maintainer."
+          },
+          "repository_location": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Repository Location",
+            "description": "Local repository path or supported remote repository URL containing a root-level croissant.jsonld file."
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value",
+            "description": "Optional submitted adapter license text."
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi",
+            "description": "Optional submitted DOI text."
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url",
+            "description": "Optional submitted Citation File Format URL."
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter_name",
+          "repository_location"
+        ],
+        "title": "RegistrationCreateRequest",
+        "description": "Request body for creating an adapter registration.",
+        "example": {
+          "adapter_name": "CollecTRI Adapter",
+          "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
+          "doi": "10.5281/zenodo.1234567",
+          "license_value": "MIT",
+          "repository_location": "https://gitlab.example.org/biocypher/collectri"
+        }
+      },
+      "RegistrationCreateResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "repository_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Repository Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "submitted_by_github_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By Github Login"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_location",
+          "repository_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "RegistrationCreateResponse",
+        "description": "Response returned after creating an adapter registration."
+      },
+      "RegistrationCroissantFilePresentCheckResponse": {
+        "properties": {
+          "has_croissant_file": {
+            "type": "boolean",
+            "title": "Has Croissant File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_croissant_file"
+        ],
+        "title": "RegistrationCroissantFilePresentCheckResponse",
+        "description": "Response model for a remote croissant.jsonld presence check."
+      },
+      "RegistrationDetailResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "repository_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Repository Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "submitted_by_github_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By Github Login"
+          },
+          "metadata_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Path"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "uniqueness_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uniqueness Key"
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_location",
+          "repository_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "RegistrationDetailResponse",
+        "description": "Detailed response for one stored registration."
+      },
+      "RegistrationEventListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationEventResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RegistrationEventListResponse",
+        "description": "Response model for a registration event history list."
+      },
+      "RegistrationEventResponse": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "registry_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Entry Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "error_details": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Details"
+          },
+          "observed_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Checksum"
+          },
+          "mlcroissant_valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mlcroissant Valid"
+          },
+          "schema_valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Valid"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "source_id",
+          "event_type"
+        ],
+        "title": "RegistrationEventResponse",
+        "description": "Response model for one registration event."
+      },
+      "RegistrationListItemResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "repository_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Repository Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "submitted_by_github_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By Github Login"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "uniqueness_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uniqueness Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_location",
+          "repository_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "RegistrationListItemResponse",
+        "description": "Summary response model for one registration in a list."
+      },
+      "RegistrationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationListItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RegistrationListResponse",
+        "description": "Response model for a registration list."
+      },
+      "RegistrationProcessResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "repository_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Repository Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "submitted_by_github_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By Github Login"
+          },
+          "metadata_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Path"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "uniqueness_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uniqueness Key"
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_location",
+          "repository_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "RegistrationProcessResponse",
+        "description": "Response returned after processing one registration."
+      },
+      "RegistrationRevalidateResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "repository_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Repository Kind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "license_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Value"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "cff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cff Url"
+          },
+          "submitted_by_github_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By Github Login"
+          },
+          "metadata_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Path"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "uniqueness_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uniqueness Key"
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_location",
+          "repository_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "RegistrationRevalidateResponse",
+        "description": "Response returned after revalidating one registration."
+      },
+      "RegistrationStatus": {
+        "type": "string",
+        "enum": [
+          "SUBMITTED",
+          "VALID",
+          "INVALID"
+        ],
+        "title": "RegistrationStatus",
+        "description": "Tracked states for a stored registration request."
+      },
+      "RegistryEntryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistryEntryResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RegistryEntryListResponse",
+        "description": "Response model for canonical registry entries."
+      },
+      "RegistryEntryResponse": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Version"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "uniqueness_key": {
+            "type": "string",
+            "title": "Uniqueness Key"
+          },
+          "metadata_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Checksum"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "source_id",
+          "adapter_name",
+          "uniqueness_key",
+          "created_at",
+          "updated_at",
+          "is_active"
+        ],
+        "title": "RegistryEntryResponse",
+        "description": "Response model for one canonical registry entry."
+      },
+      "RegistryRefreshLatestResponse": {
+        "properties": {
+          "refresh_id": {
+            "type": "string",
+            "title": "Refresh Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Finished At"
+          },
+          "active_sources": {
+            "type": "integer",
+            "title": "Active Sources"
+          },
+          "processed": {
+            "type": "integer",
+            "title": "Processed"
+          },
+          "valid_created": {
+            "type": "integer",
+            "title": "Valid Created"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "invalid": {
+            "type": "integer",
+            "title": "Invalid"
+          },
+          "duplicate": {
+            "type": "integer",
+            "title": "Duplicate"
+          },
+          "rejected_same_version_changed": {
+            "type": "integer",
+            "title": "Rejected Same Version Changed"
+          },
+          "fetch_failed": {
+            "type": "integer",
+            "title": "Fetch Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_id",
+          "started_at",
+          "finished_at",
+          "active_sources",
+          "processed",
+          "valid_created",
+          "unchanged",
+          "invalid",
+          "duplicate",
+          "rejected_same_version_changed",
+          "fetch_failed"
+        ],
+        "title": "RegistryRefreshLatestResponse",
+        "description": "Response model for the latest persisted registry refresh."
+      },
+      "RegistryRefreshResponse": {
+        "properties": {
+          "active_sources": {
+            "type": "integer",
+            "title": "Active Sources"
+          },
+          "processed": {
+            "type": "integer",
+            "title": "Processed"
+          },
+          "valid_created": {
+            "type": "integer",
+            "title": "Valid Created"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "invalid": {
+            "type": "integer",
+            "title": "Invalid"
+          },
+          "duplicate": {
+            "type": "integer",
+            "title": "Duplicate"
+          },
+          "rejected_same_version_changed": {
+            "type": "integer",
+            "title": "Rejected Same Version Changed"
+          },
+          "fetch_failed": {
+            "type": "integer",
+            "title": "Fetch Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_sources",
+          "processed",
+          "valid_created",
+          "unchanged",
+          "invalid",
+          "duplicate",
+          "rejected_same_version_changed",
+          "fetch_failed"
+        ],
+        "title": "RegistryRefreshResponse",
+        "description": "Response returned after refreshing active registration sources."
+      },
+      "RegistryRegistrationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistryRegistrationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RegistryRegistrationListResponse",
+        "description": "Response model for registry registration overview rows."
+      },
+      "RegistryRegistrationResponse": {
+        "properties": {
+          "registration_id": {
+            "type": "string",
+            "title": "Registration Id"
+          },
+          "adapter_name": {
+            "type": "string",
+            "title": "Adapter Name"
+          },
+          "adapter_id": {
+            "type": "string",
+            "title": "Adapter Id"
+          },
+          "repository_kind": {
+            "type": "string",
+            "title": "Repository Kind"
+          },
+          "repository_location": {
+            "type": "string",
+            "title": "Repository Location"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "latest_event_type": {
+            "type": "string",
+            "title": "Latest Event Type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "uniqueness_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uniqueness Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registration_id",
+          "adapter_name",
+          "adapter_id",
+          "repository_kind",
+          "repository_location",
+          "status",
+          "latest_event_type",
+          "created_at"
+        ],
+        "title": "RegistryRegistrationResponse",
+        "description": "Response model for one registry registration overview row."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

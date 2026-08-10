@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table
+from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table, UniqueConstraint
 
 
 metadata = MetaData()
@@ -15,9 +15,9 @@ registration_sources_table = Table(
     Column("description", String, nullable=True),
     Column("repository_location", String, nullable=False),
     Column("source_kind", String, nullable=False),
-    Column("contact_email", String, nullable=True),
     Column("license_value", String, nullable=True),
     Column("doi", String, nullable=True),
+    Column("cff_url", String, nullable=True),
     Column("submitted_by_github_login", String, nullable=True),
     Column("is_active", Boolean, nullable=False),
     Column("created_at", String, nullable=False),
@@ -25,6 +25,10 @@ registration_sources_table = Table(
     Column("last_checked_at", String, nullable=True),
     Column("last_seen_at", String, nullable=True),
     Column("current_registry_entry_id", String, nullable=True),
+    UniqueConstraint(
+        "repository_location",
+        name="uq_registration_source_repository_location",
+    ),
 )
 
 auth_sessions_table = Table(
@@ -41,7 +45,6 @@ registry_entries_table = Table(
     Column("id", String, primary_key=True),
     Column("source_id", String, nullable=False),
     Column("adapter_name", String, nullable=False),
-    Column("adapter_version", String, nullable=False),
     Column("profile_version", String, nullable=True),
     Column("uniqueness_key", String, nullable=False, unique=True),
     Column("metadata_checksum", String, nullable=True),
@@ -49,6 +52,20 @@ registry_entries_table = Table(
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
     Column("is_active", Boolean, nullable=False),
+)
+
+adapter_endorsements_table = Table(
+    "adapter_endorsements",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("adapter_id", String, nullable=False),
+    Column("github_login", String, nullable=False),
+    Column("created_at", String, nullable=False),
+    UniqueConstraint(
+        "adapter_id",
+        "github_login",
+        name="uq_adapter_endorsement_user",
+    ),
 )
 
 registration_events_table = Table(

@@ -21,10 +21,9 @@
       <section class="form-layout">
         <div class="card form-card">
           <h2 class="card-title">Registration details</h2>
-          <p class="card-copy">Provide the adapter name, repository location, and a contact email for status notifications.</p>
-          <div class="field"><label>Adapter name</label><div class="input">OmniPath Secondary Adapter</div></div>
-          <div class="field"><label>Repository location</label><div class="input" style="border-color: var(--red);">https://github.com/biocypher/omnipath-secondary-adapter</div><div class="error-text">Repository could not be reached. Check the URL or try again later.</div></div>
-          <div class="field"><label>Contact email</label><div class="input" style="border-color: var(--red);">maintainerexample.org</div><div class="error-text">Enter a valid contact email address.</div></div>
+          <p class="card-copy">Provide the adapter name and repository location so the registry can check the source.</p>
+          <div class="field"><label for="adapter-name">Adapter name</label><input id="adapter-name" class="input" type="text" value="OmniPath Secondary Adapter" readonly></div>
+          <div class="field"><label for="repository-location">Repository location</label><input id="repository-location" class="input" style="border-color: var(--red);" type="url" value="https://github.com/biocypher/omnipath-secondary-adapter" aria-invalid="true" aria-describedby="repository-location-error" readonly><div id="repository-location-error" class="error-text">Repository could not be reached. Check the URL or try again later.</div></div>
           <div class="checkbox-warning"><div class="checkbox"></div><div><strong>I confirm that a croissant.jsonld file exists at the root of this repository.</strong><br><span class="helper">This checkbox is required before submitting.</span></div></div>
           <div class="actions"><a class="button primary" href="#">Create registration</a><a class="button" href="#">Cancel</a></div>
         </div>

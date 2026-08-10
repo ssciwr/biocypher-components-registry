@@ -49,7 +49,7 @@ import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools import beta_async_tool
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
@@ -544,7 +544,7 @@ async def main() -> None:
             "your Anthropic key, or to any non-empty value together with "
             "ANTHROPIC_BASE_URL for a local model."
         )
-    async with streamablehttp_client(MCP_URL, headers=mcp_headers()) as (
+    async with streamable_http_client(MCP_URL, headers=mcp_headers()) as (
         read,
         write,
         _,
