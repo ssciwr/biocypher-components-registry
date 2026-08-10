@@ -18,20 +18,20 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
         <a className="flex items-center gap-2" href="/">
           <img alt="BioCypher" className="h-7 w-7" src={bioCypherLogo} />
           <span className="text-base font-semibold">BioCypher</span>
-          <span className="text-sm text-slate-500">| Registry</span>
+          <span className="hidden text-sm text-slate-500 sm:inline">| Registry</span>
         </a>
         <nav className="hidden items-center gap-16 text-sm text-slate-600 md:flex" aria-label="Main">
           <a className="hover:text-slate-950" href="/adapters">
             Explore
           </a>
-          <a className="hover:text-slate-950" href="/register">
+          <a className="hover:text-slate-950" href="/create">
             Create
           </a>
           <a className="hover:text-slate-950" href="/register">
             Register
           </a>
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-3 md:flex">
           {authUser ? (
             <span className="hidden items-center gap-2 sm:inline-flex">
               <span className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700">

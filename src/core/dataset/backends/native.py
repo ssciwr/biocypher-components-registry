@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from croissant_baker.files import discover_files as discover_baker_files
 from croissant_baker.handlers.utils import (
@@ -182,10 +183,29 @@ class NativeDatasetGenerator(DatasetGenerator):
             return str(path)
 
 
-def _build_creators(raw_creators: list[str]) -> list[dict]:
-    """Parse serialized creator strings into dataset creator objects."""
+def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:
+    """Build dataset creator objects from API JSON or legacy strings."""
     creators = []
     for raw in raw_creators:
+        if isinstance(raw, dict):
+            name = str(raw.get("name") or "").strip()
+            if name:
+                identifier = (
+                    str(raw.get("identifier") or "").strip()
+                    or str(raw.get("orcid") or "").strip()
+                )
+                creators.append(
+                    build_creator(
+                        name=name,
+                        email=str(raw.get("email") or "").strip(),
+                        url=str(raw.get("url") or "").strip(),
+                        affiliation=str(raw.get("affiliation") or "").strip(),
+                        identifier=identifier,
+                        creator_type=str(raw.get("creator_type") or "Person").strip(),
+                    )
+                )
+            continue
+
         spec = parse_dataset_creator_string(raw)
         if spec and spec.name:
             creators.append(
@@ -194,6 +214,7 @@ def _build_creators(raw_creators: list[str]) -> list[dict]:
                     email=spec.email,
                     url=spec.url,
                     affiliation=spec.affiliation,
+                    identifier=spec.identifier,
                     creator_type=spec.creator_type,
                 )
             )

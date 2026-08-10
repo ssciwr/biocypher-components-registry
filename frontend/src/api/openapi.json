@@ -417,13 +417,13 @@
           "metadata"
         ],
         "summary": "Generate dataset metadata",
-        "description": "Generate dataset Croissant metadata from a server-side input path. The backend writes to a temporary file, returns the generated metadata in the response, and validates by default.",
+        "description": "Generate dataset Croissant metadata from an uploaded source data file. The backend stores the upload temporarily, runs the selected generator, returns the generated metadata, and validates by default.",
         "operationId": "generate_dataset_metadata_api_v1_metadata_datasets_generate_post",
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/DatasetMetadataGenerateRequest"
+                "$ref": "#/components/schemas/Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post"
               }
             }
           },
@@ -459,7 +459,7 @@
           "metadata"
         ],
         "summary": "Generate adapter metadata",
-        "description": "Generate adapter Croissant metadata from existing dataset metadata files and/or generated embedded datasets. Paths are server-side paths visible to the backend process. The endpoint returns metadata without creating a registration.",
+        "description": "Generate adapter Croissant metadata from inline dataset documents, existing server-side dataset metadata files, and/or generated embedded datasets. The endpoint returns metadata without creating a registration.",
         "operationId": "generate_adapter_metadata_api_v1_metadata_adapters_generate_post",
         "requestBody": {
           "content": {
@@ -1379,7 +1379,7 @@
           },
           "creators": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AdapterCreatorGenerateRequest"
             },
             "type": "array",
             "title": "Creators"
@@ -1601,6 +1601,14 @@
             "type": "array",
             "title": "Dataset Paths"
           },
+          "dataset_documents": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Dataset Documents"
+          },
           "generated_datasets": {
             "items": {
               "$ref": "#/components/schemas/AdapterEmbeddedDatasetGenerateRequest"
@@ -1682,6 +1690,7 @@
               "url": "https://example.org/creator"
             }
           ],
+          "dataset_documents": [],
           "dataset_generator": "native",
           "dataset_paths": [],
           "description": "Adapter metadata generated through the API.",
@@ -1689,7 +1698,14 @@
             {
               "citation": "https://example.org/people",
               "creators": [
-                "Person|Dataset Creator"
+                {
+                  "affiliation": "Example Lab",
+                  "creator_type": "Person",
+                  "email": "dataset.creator@example.org",
+                  "identifier": "https://orcid.org/0000-0000-0000-0001",
+                  "name": "Dataset Creator",
+                  "url": "https://example.org/dataset-creator"
+                }
               ],
               "dataset_version": "1.0.0",
               "date_published": "2026-04-17",
@@ -1810,8 +1826,23 @@
         "title": "AuthMeResponse",
         "description": "Signed-in GitHub identity shown in the frontend header."
       },
-      "DatasetMetadataGenerateRequest": {
+      "Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post": {
         "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "generator": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "croissant-baker",
+              "native"
+            ],
+            "title": "Generator",
+            "default": "auto"
+          },
           "validate": {
             "type": "boolean",
             "title": "Validate",
@@ -1894,60 +1925,17 @@
             ],
             "title": "Date Published"
           },
-          "creators": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Creators"
-          },
-          "extra_args": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Extra Args"
-          },
-          "input_path": {
+          "creators_json": {
             "type": "string",
-            "minLength": 1,
-            "title": "Input Path",
-            "description": "Server-side file or directory path visible to the backend process."
-          },
-          "generator": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "croissant-baker",
-              "native"
-            ],
-            "title": "Generator",
-            "description": "Dataset metadata generator backend.",
-            "default": "auto"
+            "title": "Creators Json",
+            "default": "[]"
           }
         },
         "type": "object",
         "required": [
-          "input_path"
+          "file"
         ],
-        "title": "DatasetMetadataGenerateRequest",
-        "description": "Request body for generating dataset metadata from server-side files.",
-        "example": {
-          "citation": "https://example.org/people-demo",
-          "creators": [
-            "Person|Dataset Creator"
-          ],
-          "dataset_version": "1.0.0",
-          "date_published": "2026-04-17",
-          "description": "Small CSV dataset used to verify generation.",
-          "extra_args": [],
-          "generator": "native",
-          "input_path": "/srv/biocypher/examples/dataset-demo",
-          "license": "https://opensource.org/licenses/MIT",
-          "name": "People Demo Dataset",
-          "url": "https://example.org/people-demo",
-          "validate": true
-        }
+        "title": "Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post"
       },
       "DatasetMetadataGenerateResponse": {
         "properties": {

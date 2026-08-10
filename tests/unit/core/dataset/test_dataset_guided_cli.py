@@ -20,6 +20,11 @@ def test_build_croissant_baker_command_includes_known_flags() -> None:
         creators=[
             "Denes Turei,denes@gmail.com",
             "Saezlab,saezlab@gmail.com,https://www.saezlab.org",
+            {
+                "creator_type": "Person",
+                "name": "Dataset Creator",
+                "email": "dataset.creator@example.org",
+            },
         ],
         extra_args=["--custom-flag", "value"],
     )
@@ -45,6 +50,8 @@ def test_build_croissant_baker_command_includes_known_flags() -> None:
         "Denes Turei,denes@gmail.com",
         "--creator",
         "Saezlab,saezlab@gmail.com,https://www.saezlab.org",
+        "--creator",
+        "Person|Dataset Creator||dataset.creator@example.org||",
         "--custom-flag",
         "value",
     ]

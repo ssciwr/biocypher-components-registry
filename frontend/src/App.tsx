@@ -8,6 +8,8 @@ import {
 } from '@heroicons/react/24/outline'
 import AppHeader from './components/AppHeader'
 import type { AuthUser } from './components/AppHeader'
+import CreatePage from './pages/CreatePage'
+import CreateAdapterMetadataPage from './pages/CreateAdapterMetadataPage'
 import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
 import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
@@ -27,7 +29,7 @@ const actionCards = [
     icon: DocumentPlusIcon,
     text: 'Create BioCypher adapters and metadata.',
     cta: 'Start creating',
-    href: '/register',
+    href: '/create',
     featured: true,
     tone: 'bg-white/20 text-white',
   },
@@ -157,7 +159,11 @@ function App() {
   const adapterId = adapterPathMatch?.[1]
   let page = <HomePage />
 
-  if (pathname === '/register') {
+  if (pathname === '/create') {
+    page = <CreatePage />
+  } else if (pathname === '/create/adapter-metadata') {
+    page = <CreateAdapterMetadataPage />
+  } else if (pathname === '/register') {
     page = <RegisterPage authUser={authUser} authVerified={authVerified} />
   } else if (pathname === '/adapters' || adapterId) {
     page = <AdaptersPage adapterId={adapterId} />

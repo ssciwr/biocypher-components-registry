@@ -1,134 +1,185 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import {
-  ArrowDownTrayIcon,
-  TrashIcon,
-} from '@heroicons/react/24/outline'
-import { generateAdapterMetadataApiV1MetadataAdaptersGeneratePost } from '../api/client'
+  generateAdapterMetadataApiV1MetadataAdaptersGeneratePost,
+  generateDatasetMetadataApiV1MetadataDatasetsGeneratePost,
+} from '../api/client'
 import {
-  CreatorEditor,
-  DatasetEditor,
-  SelectInput,
-  TextArea,
-  TextInput,
-} from './createMetadata/MetadataGeneratorFields'
-import {
-  emptyCreator,
-  emptyDataset,
-  emptyForm,
-  licenseOptions,
-} from './createMetadata/options'
-import type { CreatorDraft, DatasetDraft, MetadataGeneratorForm } from './createMetadata/types'
+  AdapterDetailsStep,
+  DatasetBasicsStep,
+  DatasetDetailsStep,
+} from './createMetadata/MetadataGeneratorSteps'
+import { emptyCreator, emptyDataset, emptyForm } from './createMetadata/options'
+import type {
+  CreatorDraft,
+  DatasetDraft,
+  DatasetDatasetManualField,
+  DatasetMode,
+  MetadataGeneratorForm,
+  MetadataStep,
+} from './createMetadata/types'
 import {
   creatorToApiValue,
-  datasetPathsToApiValues,
+  datasetUIStateDraftFromCroissantFile,
+  datasetDraftToDocument,
+  datasetDraftToCroissantGenerateUploadForm,
   downloadMetadata,
+  emptyDatasetManualField,
   errorText,
-  generatedDatasetsToApiValues,
   keywordsToApiValues,
   nextDraftId,
   optionalValue,
 } from './createMetadata/utils'
+import { metadataDraftStorageKey } from './createMetadata/storage'
 
-type MetadataSectionProps = Readonly<{
-  children: ReactNode
-  description: string
-  step: number
-  title: string
-}>
+const steps: ReadonlyArray<{ label: string; step: MetadataStep }> = [
+  { label: 'Basic info adapter', step: 1 },
+  { label: 'Basic info datasets', step: 2 },
+  { label: 'Dataset(s) details', step: 3 },
+  { label: 'Validate & Download', step: 4 },
+]
 
-type RemoveItemButtonProps = Readonly<{
-  label: string
-  onClick: () => void
-}>
-
-type SelectedItemListProps<TItem extends { id: string }> = Readonly<{
-  emptyMessage: string
-  getLabel: (item: TItem) => string
-  getSubtitle: (item: TItem) => string
-  items: TItem[]
-  onRemove: (id: string) => void
-}>
-
-// for input reuse
-function MetadataSection({ children, description, step, title }: MetadataSectionProps) {
+// Steps UI like in the adapter registration page vertical format, on the right
+function Stepper({ currentStep }: Readonly<{ currentStep: MetadataStep }>) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:p-8">
-      <div className="flex items-start gap-4">
-        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-          {step}
-        </span>
-        <span>
-          <h2 className="text-2xl font-bold text-slate-950">{title}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {description}
-          </p>
-        </span>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-// this is used in multiple places so this just saves CSS
-function RemoveItemButton({ label, onClick }: RemoveItemButtonProps) {
-  return (
-    <button
-      aria-label={`Remove ${label}`}
-      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600"
-      onClick={onClick}
-      type="button"
+    <nav
+      aria-label="Metadata generator progress"
+      className="hidden rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-md lg:sticky lg:top-24 lg:block"
     >
-      <TrashIcon className="h-4 w-4" aria-hidden="true" />
-    </button>
+      <ol className="grid gap-0">
+        {steps.map((item, index) => {
+          const isComplete = item.step < currentStep
+          const isCurrent = item.step === currentStep
+          const hasNextStep = index < steps.length - 1
+          let markerClass = 'border-slate-300 bg-white text-slate-500'
+          let labelClass = 'text-slate-500'
+          let lineClass = 'bg-slate-300'
+          let statusText = 'Not started'
+
+          if (isComplete) {
+            markerClass = 'border-slate-950 bg-slate-950 text-white'
+            labelClass = 'text-slate-950'
+            statusText = 'Complete'
+          }
+          if (isCurrent) {
+            markerClass = 'border-slate-950 bg-slate-950 text-white'
+            labelClass = 'text-slate-950'
+            lineClass = 'bg-slate-950'
+            statusText = 'Current step'
+          }
+
+          return (
+            <li className="relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3 pb-6 last:pb-0" key={item.step}>
+              {hasNextStep ? (
+                <span className={`absolute left-5 top-10 h-[calc(100%-2.5rem)] w-0.5 ${lineClass}`} aria-hidden="true" />
+              ) : null}
+              <span
+                aria-current={isCurrent ? 'step' : undefined}
+                className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-bold ${markerClass}`}
+              >
+                {item.step}
+              </span>
+              <span className="pt-0.5">
+                <span className={`block text-sm font-semibold leading-5 ${labelClass}`}>
+                  {item.label}
+                </span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  {statusText}
+                </span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
   )
 }
 
-// resuable UI component again, possibly refactor this and the above out together into a "reusable UI" file.
-function SelectedItemList<TItem extends { id: string }>({
-  emptyMessage,
-  getLabel,
-  getSubtitle,
-  items,
-  onRemove,
-}: SelectedItemListProps<TItem>) {
-  if (!items.length) {
-    return (
-      <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        {emptyMessage}
-      </p>
-    )
+// Use local storage for the latest draft (we only ever keep one draft)
+function restoreStoredDataset(dataset: Partial<DatasetDraft>): DatasetDraft {
+  let mode: DatasetMode = 'generate'
+  if (dataset.mode === 'upload') {
+    mode = 'upload'
   }
 
-  return (
-    <ul className="grid gap-3">
-      {items.map((item) => {
-        const label = getLabel(item)
-
-        return (
-          <li
-            className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
-            key={item.id}
-          >
-            <span>
-              <span className="block font-semibold text-slate-950">{label}</span>
-              <span className="mt-1 block text-slate-500">{getSubtitle(item)}</span>
-            </span>
-            <RemoveItemButton label={label} onClick={() => onRemove(item.id)} />
-          </li>
-        )
-      })}
-    </ul>
-  )
+  return {
+    ...emptyDataset,
+    ...dataset,
+    creators: Array.isArray(dataset.creators) ? dataset.creators : [], // is Array usei s for safety overwriting to avoid errors where e.g. we could use an array function on a non-array variable
+    fields: Array.isArray(dataset.fields) ? dataset.fields : [],
+    manualFields: Array.isArray(dataset.manualFields) ? dataset.manualFields : [],
+    mode,
+    sourceFile: undefined,
+  }
 }
 
+
+// Empty form, restore if set in GET param as resume=1
+function initialForm() {
+  const params = new URLSearchParams(globalThis.location.search)
+  if (params.get('resume') !== '1') {
+    return emptyForm
+  }
+
+  try {
+    const saved = globalThis.localStorage.getItem(metadataDraftStorageKey)
+    if (!saved) {
+      return emptyForm
+    }
+    const parsed = JSON.parse(saved) as Partial<MetadataGeneratorForm>
+    return {
+      ...emptyForm,
+      ...parsed,
+      creators: Array.isArray(parsed.creators) ? parsed.creators : [],
+      datasets: Array.isArray(parsed.datasets)
+        ? parsed.datasets.map(restoreStoredDataset)
+        : [],
+    }
+  } catch (storageError) {
+    console.warn('Could not load metadata draft from localStorage.', storageError)
+    return emptyForm
+  }
+}
+
+/* The page breaks down this way:
+1 - The main form elements
+2 - Belonging to the main form really, the creators of the Adapter "creatorDraft".
+3 - per dataset drafts
+4 - Belonging to each datset draft, the dataset creator drafts
+
+Important notes:
+datasetManualField, formerly fieldDraft: Only for when the user drafts/wants to add a custom field to a dataset! Not the fields for the adapter itself.
+selectedDatasetId: Solely for editing the details of datasets(and their creators)
+
+ */
 function CreateAdapterMetadataPage() {
-  const [form, setForm] = useState<MetadataGeneratorForm>(emptyForm)
+  const [form, setForm] = useState<MetadataGeneratorForm>(initialForm)
   const [creatorDraft, setCreatorDraft] = useState<CreatorDraft>(emptyCreator)
   const [datasetDraft, setDatasetDraft] = useState<DatasetDraft>(emptyDataset)
+  const [datasetCreatorDraft, setDatasetCreatorDraft] = useState<CreatorDraft>(emptyCreator)
+  const [datasetManualField, setDatasetManualField] = useState<DatasetDatasetManualField>(emptyDatasetManualField)
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null)
+  const [step, setStep] = useState<MetadataStep>(1)
   const [error, setError] = useState<string | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false) // flow controlling to avoid issues
+  const [isPreparingDatasets, setIsPreparingDatasets] = useState(false)
 
-// Creators. this interface will be extracted out to also work with dataset creators.
+  useEffect(() => {
+    try {
+      globalThis.localStorage.setItem(
+        metadataDraftStorageKey,
+        JSON.stringify(form, (_key, value) => {
+          if (typeof File !== 'undefined' && value instanceof File) {
+            return undefined
+          }
+          return value
+        }),
+      )
+    } catch (storageError) {
+      console.warn('Could not save metadata draft to localStorage.', storageError)
+    }
+  }, [form])
+
   function addCreator() {
     if (!creatorDraft.name.trim()) {
       setError('Add a creator name first.')
@@ -143,7 +194,6 @@ function CreateAdapterMetadataPage() {
     setError(null)
   }
 
-
   function removeCreator(id: string) {
     setForm((current) => ({
       ...current,
@@ -151,24 +201,93 @@ function CreateAdapterMetadataPage() {
     }))
   }
 
+  function addDatasetCreator() {
+    if (!datasetCreatorDraft.name.trim()) {
+      setError('Add a dataset creator name first.')
+      return
+    }
+
+    setDatasetDraft((current) => ({
+      ...current,
+      creators: [
+        ...current.creators,
+        { ...datasetCreatorDraft, id: nextDraftId('dataset-creator') },
+      ],
+    }))
+    setDatasetCreatorDraft(emptyCreator)
+    setError(null)
+  }
+
+  function removeDatasetCreator(id: string) {
+    setDatasetDraft((current) => ({
+      ...current,
+      creators: current.creators.filter((creator) => creator.id !== id),
+    }))
+  }
+
+  async function handleDatasetUpload(file: File | null) {
+    if (!file) {
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        setError('Upload a JSON object Croissant file.')
+        return
+      }
+      setDatasetDraft((current) => (
+        datasetUIStateDraftFromCroissantFile(
+          parsed as Record<string, unknown>,
+          { ...current, mode: 'upload' },
+          file.name,
+        )
+      ))
+      setError(null)
+    } catch (uploadError) {
+      setError(errorText(uploadError, 'Could not read the Croissant file.'))
+    }
+  }
+
+  function handleDatasetSourceUpload(file: File | null) {
+    if (!file) {
+      return
+    }
+
+    setDatasetDraft((current) => ({
+      ...current,
+      input: file.name,
+      sourceFile: file,
+      sourceFileName: file.name,
+    }))
+    setError(null)
+  }
+
+  function setDatasetMode(mode: DatasetMode) {
+    setDatasetDraft({ ...emptyDataset, mode })
+    setDatasetCreatorDraft(emptyCreator)
+    setError(null)
+  }
 
   function addDataset() {
-    // prevent rows that cannot become a valid API dataset payload.
-    if (datasetDraft.mode === 'croissant' && !datasetDraft.path.trim()) {
-      setError('Add a Croissant file path first.')
+    if (datasetDraft.mode === 'generate' && !datasetDraft.sourceFile) {
+      setError('Upload a source dataset file first.')
       return
     }
 
-    if (datasetDraft.mode === 'manual' && !datasetDraft.input.trim()) {
-      setError('Add an input path first.')
+    if (datasetDraft.mode === 'upload' && !datasetDraft.uploadedDocument) {
+      setError('Upload an existing dataset Croissant file first.')
       return
     }
 
+    const dataset = { ...datasetDraft, id: nextDraftId('dataset') }
     setForm((current) => ({
       ...current,
-      datasets: [...current.datasets, { ...datasetDraft, id: nextDraftId('dataset') }],
+      datasets: [...current.datasets, dataset],
     }))
+    setSelectedDatasetId((current) => current ?? dataset.id)
     setDatasetDraft(emptyDataset)
+    setDatasetCreatorDraft(emptyCreator)
     setError(null)
   }
 
@@ -177,18 +296,36 @@ function CreateAdapterMetadataPage() {
       ...current,
       datasets: current.datasets.filter((dataset) => dataset.id !== id),
     }))
+    setSelectedDatasetId((current) => {
+      if (current !== id) {
+        return current
+      }
+      const remaining = form.datasets.filter((dataset) => dataset.id !== id)
+      return remaining[0]?.id ?? null
+    })
   }
 
- // the main/core function. flow will change slightly soon with step 2/3/4 full implementation
-  async function generateMetadata(event: { preventDefault: () => void }) {
-    event.preventDefault()
-
-    const creators = form.creators.map(creatorToApiValue)
+  function continueToDatasets() {
     const keywords = keywordsToApiValues(form.keywords)
-    // below here is based on temporary code we will replace shortly with true/full impelmentation and GUI design,
-    // currently this just passes attributes through without exposing on the frontend.
-    const datasetPaths = datasetPathsToApiValues(form.datasets)
-    const generatedDatasets = generatedDatasetsToApiValues(form.datasets)
+    let creators = form.creators
+    if (!creators.length && creatorDraft.name.trim()) {
+      creators = [{ ...creatorDraft, id: nextDraftId('creator') }]
+    }
+
+    if (!form.name.trim() || !form.description.trim() || !form.version.trim()) {
+      setError('Complete the required adapter details first.')
+      return
+    }
+
+    if (!form.license.trim()) {
+      setError('Choose an adapter license.')
+      return
+    }
+
+    if (!form.codeRepository.trim()) {
+      setError('Add a repository URL.')
+      return
+    }
 
     if (!creators.length) {
       setError('Add at least one adapter creator.')
@@ -200,12 +337,148 @@ function CreateAdapterMetadataPage() {
       return
     }
 
-    if (!datasetPaths.length && !generatedDatasets.length) {
-      setError('Add at least one Croissant file path or manual dataset.')
+    if (!form.creators.length) {
+      setForm((current) => ({ ...current, creators }))
+      setCreatorDraft(emptyCreator)
+    }
+
+    setError(null)
+    setStep(2)
+  }
+
+  async function prepareDatasetsForDetails() {
+    let datasetsToPrepare = form.datasets
+    if (!datasetsToPrepare.length && datasetDraft.mode === 'generate' && datasetDraft.sourceFile) {
+      datasetsToPrepare = [{ ...datasetDraft, id: nextDraftId('dataset') }]
+    }
+    if (!datasetsToPrepare.length && datasetDraft.mode === 'upload' && datasetDraft.uploadedDocument) {
+      datasetsToPrepare = [{ ...datasetDraft, id: nextDraftId('dataset') }]
+    }
+
+    if (!datasetsToPrepare.length) {
+      setError('Add at least one dataset.')
       return
     }
 
     setError(null)
+    setIsPreparingDatasets(true)
+    try {
+      const datasets: DatasetDraft[] = []
+      for (const dataset of datasetsToPrepare) {
+        if (dataset.uploadedDocument) {
+          datasets.push(dataset)
+          continue
+        }
+
+        if (!dataset.sourceFile) {
+          throw new Error('Upload a source dataset file first.')
+        }
+
+        const result = await generateDatasetMetadataApiV1MetadataDatasetsGeneratePost({
+          body: datasetDraftToCroissantGenerateUploadForm(dataset),
+        })
+        if (result.error !== undefined) {
+          throw new Error(errorText(result.error, 'Dataset generation failed.'))
+        }
+        if (!result.data) {
+          throw new Error('Dataset generation did not return metadata.')
+        }
+        datasets.push(datasetUIStateDraftFromCroissantFile(result.data.metadata, dataset))
+      }
+
+      setForm((current) => ({ ...current, datasets }))
+      setDatasetDraft(emptyDataset)
+      setDatasetCreatorDraft(emptyCreator)
+      setSelectedDatasetId((current) => current ?? datasets[0]?.id ?? null)
+      setStep(3)
+    } catch (prepareError) {
+      setError(errorText(prepareError, 'Dataset generation failed.'))
+    } finally {
+      setIsPreparingDatasets(false)
+    }
+  }
+
+
+  function updateSelectedDatasetDraft(
+    updateDataset: (dataset: DatasetDraft) => DatasetDraft,
+  ) {
+    if (!selectedDatasetId) {
+      return
+    }
+
+    setForm((current) => ({
+      ...current,
+      datasets: current.datasets.map((dataset) => {
+        if (dataset.id !== selectedDatasetId) {
+          return dataset
+        }
+        return updateDataset(dataset)
+      }),
+    }))
+  }
+
+  function updateSelectedDataset(field: keyof DatasetDraft, value: string) {
+    updateSelectedDatasetDraft((dataset) => ({ ...dataset, [field]: value }))
+  }
+
+  function updateSelectedField(
+    fieldId: string,
+    fieldName: keyof DatasetDatasetManualField,
+    value: string,
+  ) {
+    updateSelectedDatasetDraft((dataset) => ({
+      ...dataset,
+      fields: updateFieldList(dataset.fields, fieldId, fieldName, value),
+      manualFields: updateFieldList(dataset.manualFields, fieldId, fieldName, value),
+    }))
+  }
+
+  function addManualField() {
+    if (!selectedDatasetId) {
+      return
+    }
+
+    if (!datasetManualField.name.trim() || !datasetManualField.dataType.trim()) {
+      setError('Add a field name and datatype first.')
+      return
+    }
+
+    updateSelectedDatasetDraft((dataset) => ({
+      ...dataset,
+      manualFields: [
+        ...dataset.manualFields,
+        { ...datasetManualField, id: nextDraftId('manual-field') },
+      ],
+    }))
+    setDatasetManualField(emptyDatasetManualField())
+    setError(null)
+  }
+
+  function removeSelectedField(fieldId: string) {
+    updateSelectedDatasetDraft((dataset) => ({
+      ...dataset,
+      fields: dataset.fields.filter((field) => field.id !== fieldId),
+      manualFields: dataset.manualFields.filter((field) => field.id !== fieldId),
+    }))
+  }
+
+  async function generateMetadata() {
+    const creators = form.creators.map(creatorToApiValue)
+    const keywords = keywordsToApiValues(form.keywords)
+    const datasetDocuments = form.datasets.map(datasetDraftToDocument)
+
+    if (!form.license.trim()) {
+      setError('Choose an adapter license.')
+      return
+    }
+
+    if (!datasetDocuments.length) {
+      setError('Add at least one dataset.')
+      return
+    }
+
+    setError(null)
+    setStep(4)
     setIsGenerating(true)
     try {
       const result = await generateAdapterMetadataApiV1MetadataAdaptersGeneratePost({
@@ -213,8 +486,9 @@ function CreateAdapterMetadataPage() {
           adapter_id: optionalValue(form.adapterId),
           code_repository: form.codeRepository,
           creators,
-          dataset_paths: datasetPaths,
-          generated_datasets: generatedDatasets,
+          dataset_documents: datasetDocuments,
+          dataset_paths: [],
+          generated_datasets: [],
           generator: 'native',
           keywords,
           license: form.license,
@@ -229,165 +503,170 @@ function CreateAdapterMetadataPage() {
         return
       }
 
+      if (!result.data) {
+        setError('Metadata generation did not return a Croissant document.')
+        return
+      }
+
       downloadMetadata(result.data.metadata, form.name)
       setError(null)
-    } catch (error) {
-      setError(errorText(error, 'Metadata generation failed.'))
+    } catch (metadataError) {
+      setError(errorText(metadataError, 'Metadata generation failed.'))
     } finally {
       setIsGenerating(false)
     }
   }
 
+  function handleMetadataSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (step === 1) {
+      continueToDatasets()
+      return
+    }
+    if (step === 2) {
+      void prepareDatasetsForDetails()
+      return
+    }
+    void generateMetadata()
+  }
+
+  const selectedDataset = form.datasets.find((dataset) => dataset.id === selectedDatasetId)
+
   return (
     <section className="bg-slate-100">
       <div className="mx-auto max-w-7xl px-6 py-14 md:py-18">
         <div className="mb-10">
-          <a className="text-sm font-semibold text-blue-600 hover:text-blue-700" href="/create">
-            Create
-          </a>
-          <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-normal text-slate-950 md:text-5xl">
+          <h1 className="max-w-4xl text-4xl font-bold tracking-normal text-slate-950 md:text-5xl">
             Create a Metadata File for an Adapter
           </h1>
         </div>
 
-        <form className="grid gap-8" onSubmit={generateMetadata}>
-          <div className="grid gap-8">
-            <MetadataSection
-              description="Describe the adapter and where its source code lives."
-              step={1}
-              title="Adapter details"
-            >
-              <div className="mt-7 grid gap-5 md:grid-cols-2">
-                <TextInput
-                  label="Adapter name"
-                  maxLength={100}
-                  onChange={(name) => setForm((current) => ({ ...current, name }))}
-                  placeholder="Example: My Awesome BioCypher Adapter"
-                  required
-                  value={form.name}
-                />
-                <TextInput
-                  label="Adapter ID"
-                  maxLength={100}
-                  onChange={(adapterId) => setForm((current) => ({ ...current, adapterId }))}
-                  placeholder="my-awesome-biocypher-adapter"
-                  value={form.adapterId}
-                />
-                <TextInput
-                  label="Version"
-                  maxLength={50}
-                  onChange={(version) => setForm((current) => ({ ...current, version }))}
-                  placeholder="Example: 0.0.1 (semantic version)"
-                  required
-                  value={form.version}
-                />
-                <TextInput
-                  label="Repository URL"
-                  maxLength={200}
-                  onChange={(codeRepository) => setForm((current) => ({ ...current, codeRepository }))}
-                  placeholder="Example: https://github.com/biocypher/my-awesome-adapter"
-                  required
-                  value={form.codeRepository}
-                />
-                <SelectInput
-                  label="License"
-                  onChange={(license) => setForm((current) => ({ ...current, license }))}
-                  options={licenseOptions}
-                  required
-                  value={form.license}
-                />
-                <TextInput
-                  label="Keywords"
-                  maxLength={200}
-                  onChange={(keywords) => setForm((current) => ({ ...current, keywords }))}
-                  placeholder="adapter, biocypher"
-                  required
-                  value={form.keywords}
-                />
-              </div>
-              <div className="mt-5">
-                <TextArea
-                  label="Description"
-                  maxLength={800}
-                  onChange={(description) => setForm((current) => ({ ...current, description }))}
-                  placeholder="Describe what your BioCypher adapter does..."
-                  required
-                  value={form.description}
-                />
-              </div>
-            </MetadataSection>
-
-            <MetadataSection
-              description="Add the people or organizations responsible for this adapter."
-              step={2}
-              title="Adapter creators"
-            >
-              <div className="mt-7 grid gap-4">
-                <SelectedItemList
-                  emptyMessage="No creators yet"
-                  getLabel={(creator) => creator.name}
-                  getSubtitle={(creator) => creator.creatorType}
-                  items={form.creators}
-                  onRemove={removeCreator}
-                />
-                <CreatorEditor
-                  draft={creatorDraft}
-                  onAdd={addCreator}
-                  onChange={(field, value) => {
-                    setCreatorDraft((current) => ({ ...current, [field]: value }))
-                  }}
-                />
-              </div>
-            </MetadataSection>
-
-            <MetadataSection
-              description="Add existing dataset Croissant files or generate embedded dataset metadata."
-              step={3}
-              title="Datasets"
-            >
-              <div className="mt-7 grid gap-4">
-                <SelectedItemList
-                  emptyMessage="No datasets yet"
-                  getLabel={(dataset) => (
-                    dataset.mode === 'croissant' ? dataset.path : dataset.name || dataset.input
-                  )}
-                  getSubtitle={(dataset) => (
-                    dataset.mode === 'croissant' ? 'Croissant file path' : 'Manual dataset information'
-                  )}
-                  items={form.datasets}
-                  onRemove={removeDataset}
-                />
-                <DatasetEditor
-                  draft={datasetDraft}
-                  licenseOptions={licenseOptions}
-                  onAdd={addDataset}
-                  onChange={(field, value) => {
-                    setDatasetDraft((current) => ({ ...current, [field]: value }))
-                  }}
-                />
-              </div>
-            </MetadataSection>
-          </div>
-
-          <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:items-end">
-            {error ? (
-              <p className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </p>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          <form className="grid gap-8" onSubmit={handleMetadataSubmit}>
+            {step === 1 ? (
+              <AdapterDetailsStep
+                creatorDraft={creatorDraft}
+                form={form}
+                onAddCreator={addCreator}
+                onCreatorDraftChange={(field, value) => {
+                  setCreatorDraft((current) => ({ ...current, [field]: value }))
+                }}
+                onFormChange={(field, value) => {
+                  setForm((current) => ({ ...current, [field]: value }))
+                }}
+                onRemoveCreator={removeCreator}
+              />
             ) : null}
-            <button
-              className="inline-flex h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-fit"
-              disabled={isGenerating}
-              type="submit"
-            >
-              {isGenerating ? 'Generating...' : 'Export croissant file'}
-              <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
-        </form>
+
+            {step === 2 ? (
+              <DatasetBasicsStep
+                datasetCreatorDraft={datasetCreatorDraft}
+                datasetDraft={datasetDraft}
+                datasets={form.datasets}
+                onAddDataset={addDataset}
+                onAddDatasetCreator={addDatasetCreator}
+                onDatasetCreatorDraftChange={(field, value) => {
+                  setDatasetCreatorDraft((current) => ({ ...current, [field]: value }))
+                }}
+                onDatasetDraftChange={(field, value) => {
+                  setDatasetDraft((current) => ({ ...current, [field]: value }))
+                }}
+                onDatasetModeChange={setDatasetMode}
+                onDatasetUpload={handleDatasetUpload}
+                onDatasetSourceUpload={handleDatasetSourceUpload}
+                onRemoveDataset={removeDataset}
+                onRemoveDatasetCreator={removeDatasetCreator}
+              />
+            ) : null}
+
+            {step >= 3 ? (
+              <DatasetDetailsStep
+                datasets={form.datasets}
+                datasetManualField={datasetManualField}
+                onAddManualField={addManualField}
+                onDatasetChange={updateSelectedDataset}
+                onFieldChange={updateSelectedField}
+                onManualFieldChange={(field, value) => {
+                  setDatasetManualField((current) => ({ ...current, [field]: value }))
+                }}
+                onRemoveDataset={removeDataset}
+                onRemoveField={removeSelectedField}
+                onSelectDataset={setSelectedDatasetId}
+                selectedDataset={selectedDataset}
+                selectedDatasetId={selectedDatasetId}
+              />
+            ) : null}
+
+            <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between">
+              <div className="flex gap-3">
+                {step > 1 && step < 4 ? (
+                  <button
+                    className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
+                    onClick={() => setStep((current) => (current - 1) as MetadataStep)}
+                    type="button"
+                  >
+                    Back
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-4 md:items-end">
+                {error ? (
+                  <p className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:min-w-96">
+                    {error}
+                  </p>
+                ) : null}
+                {step === 1 ? (
+                  <button
+                    className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+                    type="submit"
+                  >
+                    Continue
+                  </button>
+                ) : null}
+                {step === 2 ? (
+                  <button
+                    className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    disabled={isPreparingDatasets}
+                    type="submit"
+                  >
+                    {isPreparingDatasets ? 'Preparing datasets...' : 'Continue to dataset details'}
+                  </button>
+                ) : null}
+                {step >= 3 ? (
+                  <button
+                    className="inline-flex h-14 cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    disabled={isGenerating}
+                    type="submit"
+                  >
+                    {isGenerating ? 'Generating...' : 'Finish this stage'}
+                    <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </form>
+
+          <Stepper currentStep={step} />
+        </div>
       </div>
     </section>
   )
+}
+
+
+function updateFieldList(
+  fields: DatasetDatasetManualField[],
+  fieldId: string,
+  fieldName: keyof DatasetDatasetManualField,
+  value: string,
+) {
+  return fields.map((field) => {
+    if (field.id !== fieldId) {
+      return field
+    }
+    return { ...field, [fieldName]: value }
+  })
 }
 
 export default CreateAdapterMetadataPage

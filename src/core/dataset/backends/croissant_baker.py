@@ -74,7 +74,25 @@ def build_croissant_baker_command(
             command.extend([flag, value])
 
     for creator in request.creators:
-        if creator:
+        if isinstance(creator, dict):
+            name = str(creator.get("name") or "").strip()
+            if name:
+                command.extend(
+                    [
+                        "--creator",
+                        "|".join(
+                            [
+                                str(creator.get("creator_type") or "Person").strip(),
+                                name,
+                                str(creator.get("affiliation") or "").strip(),
+                                str(creator.get("email") or "").strip(),
+                                str(creator.get("url") or "").strip(),
+                                str(creator.get("identifier") or "").strip(),
+                            ]
+                        ),
+                    ]
+                )
+        elif creator:
             command.extend(["--creator", creator])
 
     command.extend(request.extra_args)

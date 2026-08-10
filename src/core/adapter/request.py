@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from src.core.dataset.request import GenerationRequest
 
@@ -52,6 +52,7 @@ class AdapterGenerationRequest:
     license_value: str
     code_repository: str
     dataset_paths: list[str]
+    dataset_documents: list[dict[str, Any]] = field(default_factory=list)
     validate: bool = True
     creators: list[str | dict[str, str]] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)

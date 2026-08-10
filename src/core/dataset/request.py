@@ -21,7 +21,7 @@ class GenerationRequest:
     citation: str | None = None
     dataset_version: str | None = None
     date_published: str | None = None
-    creators: list[str] = field(default_factory=list)
+    creators: list[str | dict[str, Any]] = field(default_factory=list)
     extra_args: list[str] = field(default_factory=list)
 
 

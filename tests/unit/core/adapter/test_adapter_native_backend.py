@@ -85,6 +85,29 @@ def test_native_adapter_generator_embeds_valid_dataset(tmp_path: Path) -> None:
     assert "Validation completed!" in result.stdout
 
 
+def test_native_adapter_generator_embeds_inline_dataset_document(tmp_path: Path) -> None:
+    output_path = tmp_path / "adapter.jsonld"
+    request = AdapterGenerationRequest(
+        output_path=str(output_path),
+        name="Example Adapter",
+        description="Adapter description",
+        version="1.0.0",
+        license_value="MIT",
+        code_repository="https://example.org/repo",
+        dataset_paths=[],
+        dataset_documents=[_valid_dataset_document()],
+        validate=True,
+        creators=["Person|Edwin Carreno"],
+        keywords=["adapter", "biocypher"],
+    )
+
+    result = NativeAdapterGenerator().generate(request)
+
+    assert result.document is not None
+    assert result.document["hasPart"][0]["name"] == "Example dataset"
+    assert output_path.exists()
+
+
 def test_native_adapter_generator_normalizes_known_license_keyword(tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     output_path = tmp_path / "adapter.jsonld"

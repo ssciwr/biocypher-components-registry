@@ -10,8 +10,9 @@ import {
 } from './canonicalLicenses'
 
 export const licenseOptions: LicenseOption[] = [
-  { label: 'Example: MIT', value: '' },
+  { disabled: true, label: '(None)', value: '' },
   repositoryFileLicenseOption,
+  { label: 'No license', value: 'No license' },
   ...backendCanonicalLicenseOptions,
 ]
 
@@ -28,14 +29,24 @@ export const emptyCreator: CreatorDraft = {
 export const emptyDataset: DatasetDraft = {
   id: 'new-dataset',
   citation: '',
+  contentUrl: '',
+  creators: [],
   datePublished: '',
   datasetVersion: '',
   description: '',
+  encodingFormat: '',
+  fields: [],
+  filename: '',
   input: '',
   license: '',
-  mode: 'croissant',
+  manualFields: [],
+  mode: 'generate',
   name: '',
   path: '',
+  recordSetName: '',
+  sha256: '',
+  sourceFileName: '',
+  uploadedFileName: '',
   url: '',
 }
 

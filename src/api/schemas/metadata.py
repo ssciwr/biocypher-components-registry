@@ -16,27 +16,10 @@ from src.core.validation.results import ValidationCheck, ValidationResult
 # ===========================================================
 
 
-DATASET_DEMO_INPUT_PATH = "/srv/biocypher/examples/dataset-demo"
 ADAPTER_DEMO_INPUT_PATH = "/srv/biocypher/examples/adapter-demo"
 PEOPLE_DEMO_URL = "https://example.org/people-demo"
 MIT_LICENSE_URL = "https://opensource.org/licenses/MIT"
 PEOPLE_CSV_FILENAME = "people.csv"
-
-DATASET_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
-    "input_path": DATASET_DEMO_INPUT_PATH,
-    "generator": "native",
-    "validate": True,
-    "name": "People Demo Dataset",
-    "description": "Small CSV dataset used to verify generation.",
-    "url": PEOPLE_DEMO_URL,
-    "license": MIT_LICENSE_URL,
-    "citation": PEOPLE_DEMO_URL,
-    "dataset_version": "1.0.0",
-    "date_published": "2026-04-17",
-    "creators": ["Person|Dataset Creator"],
-    "extra_args": [],
-}
-
 
 METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
     "kind": "dataset",
@@ -93,6 +76,7 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
     "license": MIT_LICENSE_URL,
     "code_repository": "https://github.com/example/people-adapter",
     "dataset_paths": [],
+    "dataset_documents": [],
     "generated_datasets": [
         {
             "input": ADAPTER_DEMO_INPUT_PATH,
@@ -104,7 +88,16 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
             "citation": "https://example.org/people",
             "dataset_version": "1.0.0",
             "date_published": "2026-04-17",
-            "creators": ["Person|Dataset Creator"],
+            "creators": [
+                {
+                    "creator_type": "Person",
+                    "name": "Dataset Creator",
+                    "affiliation": "Example Lab",
+                    "email": "dataset.creator@example.org",
+                    "url": "https://example.org/dataset-creator",
+                    "identifier": "https://orcid.org/0000-0000-0000-0001",
+                }
+            ],
             "extra_args": [],
         }
     ],
@@ -131,6 +124,29 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
 # ===========================================================
 
 
+class AdapterCreatorGenerateRequest(BaseModel):
+    """Structured creator input for adapter metadata generation."""
+
+    creator_type: Literal["Person", "Organization"] = "Person"
+    name: str = Field(..., min_length=1)
+    affiliation: str | None = None
+    email: str | None = None
+    url: str | None = None
+    identifier: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _require_name(cls, value: str | None) -> str:
+        """Keep adapter creator names explicit."""
+        return _required_text(value, field_name="Creator name")
+
+    @field_validator("affiliation", "email", "url", "identifier")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        """Trim optional creator text fields and collapse blanks to null."""
+        return _optional_text(value)
+
+
 class _GeneratedDatasetFields(BaseModel):
     """Shared API fields for standalone and embedded dataset generation."""
 
@@ -144,7 +160,7 @@ class _GeneratedDatasetFields(BaseModel):
     citation: str | None = None
     dataset_version: str | None = None
     date_published: str | None = None
-    creators: list[str] = Field(default_factory=list)
+    creators: list[AdapterCreatorGenerateRequest] = Field(default_factory=list)
     extra_args: list[str] = Field(default_factory=list)
 
     @field_validator(
@@ -161,7 +177,7 @@ class _GeneratedDatasetFields(BaseModel):
         """Trim optional text fields and collapse blanks to null."""
         return _optional_text(value)
 
-    @field_validator("creators", "extra_args")
+    @field_validator("extra_args")
     @classmethod
     def _normalize_text_list(cls, value: list[str]) -> list[str]:
         """Trim list items and remove blank values."""
@@ -188,19 +204,16 @@ class MetadataValidationRequest(BaseModel):
     )
 
 
-class DatasetMetadataGenerateRequest(_GeneratedDatasetFields):
-    """Request body for generating dataset metadata from server-side files."""
+class DatasetMetadataGeneratePayload(_GeneratedDatasetFields):
+    """Internal values for generating dataset metadata from a staged source file."""
 
-    model_config = ConfigDict(
-        populate_by_name=True,
-        json_schema_extra={"example": DATASET_METADATA_GENERATE_EXAMPLE},
-    )
+    model_config = ConfigDict(populate_by_name=True)
 
     input_path: str = Field(
         ...,
         min_length=1,
         description=(
-            "Server-side file or directory path visible to the backend process."
+            "Temporary file or directory path visible to the backend process."
         ),
     )
     generator: Literal["auto", "croissant-baker", "native"] = Field(
@@ -211,7 +224,7 @@ class DatasetMetadataGenerateRequest(_GeneratedDatasetFields):
     @field_validator("input_path")
     @classmethod
     def _require_input_path(cls, value: str | None) -> str:
-        """Keep the server-side input path explicit."""
+        """Keep the temporary input path explicit."""
         return _required_text(value, field_name="Input path")
 
 
@@ -236,29 +249,6 @@ class AdapterEmbeddedDatasetGenerateRequest(_GeneratedDatasetFields):
         return _required_text(value, field_name="Input path")
 
 
-class AdapterCreatorGenerateRequest(BaseModel):
-    """Structured creator input for adapter metadata generation."""
-
-    creator_type: Literal["Person", "Organization"] = "Person"
-    name: str = Field(..., min_length=1)
-    affiliation: str | None = None
-    email: str | None = None
-    url: str | None = None
-    identifier: str | None = None
-
-    @field_validator("name")
-    @classmethod
-    def _require_name(cls, value: str | None) -> str:
-        """Keep adapter creator names explicit."""
-        return _required_text(value, field_name="Creator name")
-
-    @field_validator("affiliation", "email", "url", "identifier")
-    @classmethod
-    def _normalize_optional_text(cls, value: str | None) -> str | None:
-        """Trim optional creator text fields and collapse blanks to null."""
-        return _optional_text(value)
-
-
 class AdapterMetadataGenerateRequest(BaseModel):
     """Request body for generating adapter metadata without persisting it."""
 
@@ -273,6 +263,7 @@ class AdapterMetadataGenerateRequest(BaseModel):
     license_value: str = Field(..., alias="license", min_length=1)
     code_repository: str = Field(..., min_length=1)
     dataset_paths: list[str] = Field(default_factory=list)
+    dataset_documents: list[dict[str, Any]] = Field(default_factory=list)
     generated_datasets: list[AdapterEmbeddedDatasetGenerateRequest] = Field(
         default_factory=list
     )

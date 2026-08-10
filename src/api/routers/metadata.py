@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 from tempfile import TemporaryDirectory
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from src.api.schemas.metadata import (
+    AdapterCreatorGenerateRequest,
     AdapterEmbeddedDatasetGenerateRequest,
     AdapterMetadataGenerateRequest,
     AdapterMetadataGenerateResponse,
-    DatasetMetadataGenerateRequest,
+    DatasetMetadataGeneratePayload,
     DatasetMetadataGenerateResponse,
     MetadataValidationRequest,
     MetadataValidationResponse,
@@ -60,50 +62,49 @@ def validate_metadata(
     "/metadata/datasets/generate",
     summary="Generate dataset metadata",
     description=(
-        "Generate dataset Croissant metadata from a server-side input path. "
-        "The backend writes to a temporary file, returns the generated metadata "
-        "in the response, and validates by default."
+        "Generate dataset Croissant metadata from an uploaded source data file. "
+        "The backend stores the upload temporarily, runs the selected generator, "
+        "returns the generated metadata, and validates by default."
     ),
 )
+# modified lightly using AI to support data flow
 def generate_dataset_metadata(
-    payload: DatasetMetadataGenerateRequest,
+    file: Annotated[UploadFile, File(...)],
+    generator: Annotated[Literal["auto", "croissant-baker", "native"], Form()] = "auto",
+    run_validation: Annotated[bool, Form(alias="validate")] = True,
+    name: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    url: Annotated[str | None, Form()] = None,
+    license_value: Annotated[str | None, Form(alias="license")] = None,
+    citation: Annotated[str | None, Form()] = None,
+    dataset_version: Annotated[str | None, Form()] = None,
+    date_published: Annotated[str | None, Form()] = None,
+    creators_json: Annotated[str, Form()] = "[]",
 ) -> DatasetMetadataGenerateResponse:
-    """Generate dataset metadata from server-side files without persisting it."""
+    """Generate dataset metadata from an uploaded source file."""
     with TemporaryDirectory() as temporary_directory:
-        output_path = Path(temporary_directory) / "dataset.jsonld"
-        request = _build_dataset_generation_request(
+        temporary_path = Path(temporary_directory)
+        input_path = temporary_path / Path(file.filename or "dataset-upload").name
+        with input_path.open("wb") as handle:
+            shutil.copyfileobj(file.file, handle)
+
+        payload = DatasetMetadataGeneratePayload(
+            input_path=str(input_path),
+            generator=generator,
+            validate=run_validation,
+            name=name,
+            description=description,
+            url=url,
+            license_value=license_value,
+            citation=citation,
+            dataset_version=dataset_version,
+            date_published=date_published,
+            creators=_parse_creators_json(creators_json),
+            extra_args=[],
+        )
+        return _execute_dataset_metadata_generation(
             payload=payload,
-            output_path=output_path,
-        )
-
-        try:
-            result = execute_dataset_request(
-                request=request,
-                generator=payload.generator,
-            )
-            metadata = _load_generated_metadata(
-                document=result.document,
-                output_path=output_path,
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-
-        validation = _optional_validation_response(
-            should_validate=payload.run_validation,
-            kind="dataset",
-            metadata=metadata,
-        )
-
-        return DatasetMetadataGenerateResponse(
-            metadata=metadata,
-            generator=payload.generator,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            warnings=result.warnings,
-            validation=validation,
+            output_path=temporary_path / "dataset.jsonld",
         )
 
 
@@ -111,16 +112,15 @@ def generate_dataset_metadata(
     "/metadata/adapters/generate",
     summary="Generate adapter metadata",
     description=(
-        "Generate adapter Croissant metadata from existing dataset metadata "
-        "files and/or generated embedded datasets. Paths are server-side paths "
-        "visible to the backend process. The endpoint returns metadata without "
-        "creating a registration."
+        "Generate adapter Croissant metadata from inline dataset documents, "
+        "existing server-side dataset metadata files, and/or generated embedded "
+        "datasets. The endpoint returns metadata without creating a registration."
     ),
 )
 def generate_adapter_metadata(
     payload: AdapterMetadataGenerateRequest,
 ) -> AdapterMetadataGenerateResponse:
-    """Generate adapter metadata from existing or generated datasets."""
+    """Generate adapter metadata from inline, existing, or generated datasets."""
     with TemporaryDirectory() as temporary_directory:
         output_path = Path(temporary_directory) / "adapter.jsonld"
         request = _build_adapter_generation_request(
@@ -214,17 +214,68 @@ def _optional_validation_response(
         result=validation_result,
     )
 
-
-def _build_dataset_generation_request(
+# renamed only because it was converted into a shared helper for both dataset generation routes
+def _execute_dataset_metadata_generation(
     *,
-    payload: DatasetMetadataGenerateRequest,
+    payload: DatasetMetadataGeneratePayload,
     output_path: Path,
-) -> GenerationRequest:
-    """Translate the API request into the core dataset generation contract."""
-    return _build_core_dataset_generation_request(
+) -> DatasetMetadataGenerateResponse:
+    """Generate dataset metadata for JSON and upload request variants."""
+    request = _build_core_dataset_generation_request(
         payload=payload,
         output_path=str(output_path),
     )
+
+    try:
+        result = execute_dataset_request(
+            request=request,
+            generator=payload.generator,
+        )
+        metadata = _load_generated_metadata(
+            document=result.document,
+            output_path=output_path,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    validation = _optional_validation_response(
+        should_validate=payload.run_validation,
+        kind="dataset",
+        metadata=metadata,
+    )
+
+    return DatasetMetadataGenerateResponse(
+        metadata=metadata,
+        generator=payload.generator,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        warnings=result.warnings,
+        validation=validation,
+    )
+
+
+# Works for Adapter or Dataset creators equally well
+def _parse_creators_json(creators_json: str) -> list[AdapterCreatorGenerateRequest]:
+    """Parse structured creator form data from a multipart request."""
+    if not creators_json.strip():
+        return []
+
+    try:
+        raw_creators = json.loads(creators_json)
+        if not isinstance(raw_creators, list):
+            raise ValueError("creators_json must be a JSON array.")
+        return [
+            AdapterCreatorGenerateRequest.model_validate(creator)
+            for creator in raw_creators
+        ]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
 
 def _build_adapter_generation_request(
@@ -241,6 +292,7 @@ def _build_adapter_generation_request(
         license_value=payload.license_value,
         code_repository=payload.code_repository,
         dataset_paths=payload.dataset_paths,
+        dataset_documents=payload.dataset_documents,
         validate=payload.run_validation,
         creators=[
             creator.model_dump(exclude_none=True) for creator in payload.creators
@@ -267,7 +319,7 @@ def _build_embedded_dataset_generation_request(
 
 def _build_core_dataset_generation_request(
     *,
-    payload: DatasetMetadataGenerateRequest | AdapterEmbeddedDatasetGenerateRequest,
+    payload: DatasetMetadataGeneratePayload | AdapterEmbeddedDatasetGenerateRequest,
     output_path: str,
 ) -> GenerationRequest:
     """Translate shared dataset generation API fields into the core contract."""
@@ -282,7 +334,9 @@ def _build_core_dataset_generation_request(
         citation=payload.citation,
         dataset_version=payload.dataset_version,
         date_published=payload.date_published,
-        creators=payload.creators,
+        creators=[
+            creator.model_dump(exclude_none=True) for creator in payload.creators
+        ],
         extra_args=payload.extra_args,
     )
 

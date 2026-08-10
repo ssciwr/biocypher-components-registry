@@ -34,7 +34,11 @@ class NativeAdapterGenerator(AdapterGenerator):
 
     def generate(self, request: AdapterGenerationRequest) -> GenerationResult:
         """Build, serialize, and optionally validate adapter metadata."""
-        datasets = [self._load_dataset(path) for path in request.dataset_paths]
+        datasets = [
+            self._load_dataset_document(document)
+            for document in request.dataset_documents
+        ]
+        datasets.extend(self._load_dataset(path) for path in request.dataset_paths)
         dataset_reports: list[str] = []
         for dataset_index, dataset_request in enumerate(
             request.generated_datasets, start=1
@@ -146,10 +150,19 @@ class NativeAdapterGenerator(AdapterGenerator):
                 f"Dataset metadata file is not valid JSON: {dataset_path}"
             ) from exc
 
+        return self._load_dataset_document(document, source=str(dataset_path))
+
+    def _load_dataset_document(
+        self,
+        document: dict[str, Any],
+        *,
+        source: str = "uploaded dataset metadata",
+    ) -> dict[str, Any]:
+        """Validate and normalize one inline dataset document."""
         result = validate_dataset(document)
         if not result.is_valid:
             raise GeneratorError(
-                f"Dataset metadata file is not a valid Croissant dataset: {dataset_path}. "
+                f"Dataset metadata is not a valid Croissant dataset: {source}. "
                 + "; ".join(result.errors)
             )
         return _normalise_embedded_dataset(document)

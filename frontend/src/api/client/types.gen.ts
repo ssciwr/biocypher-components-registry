@@ -41,6 +41,38 @@ export type AdapterCatalogListResponse = {
 };
 
 /**
+ * AdapterCreatorGenerateRequest
+ *
+ * Structured creator input for adapter metadata generation.
+ */
+export type AdapterCreatorGenerateRequest = {
+    /**
+     * Creator Type
+     */
+    creator_type?: 'Person' | 'Organization';
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Affiliation
+     */
+    affiliation?: string | null;
+    /**
+     * Email
+     */
+    email?: string | null;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * Identifier
+     */
+    identifier?: string | null;
+};
+
+/**
  * AdapterDataSourceResponse
  *
  * Metadata-light dataset summary embedded in adapter Croissant metadata.
@@ -170,7 +202,7 @@ export type AdapterEmbeddedDatasetGenerateRequest = {
     /**
      * Creators
      */
-    creators?: Array<string>;
+    creators?: Array<AdapterCreatorGenerateRequest>;
     /**
      * Extra Args
      */
@@ -311,6 +343,12 @@ export type AdapterMetadataGenerateRequest = {
      */
     dataset_paths?: Array<string>;
     /**
+     * Dataset Documents
+     */
+    dataset_documents?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
      * Generated Datasets
      */
     generated_datasets?: Array<AdapterEmbeddedDatasetGenerateRequest>;
@@ -321,7 +359,7 @@ export type AdapterMetadataGenerateRequest = {
     /**
      * Creators
      */
-    creators: Array<string>;
+    creators: Array<AdapterCreatorGenerateRequest>;
     /**
      * Keywords
      */
@@ -330,14 +368,6 @@ export type AdapterMetadataGenerateRequest = {
      * Adapter Id
      */
     adapter_id?: string | null;
-    /**
-     * Programming Language
-     */
-    programming_language?: string;
-    /**
-     * Target Product
-     */
-    target_product?: string;
     /**
      * Generator
      */
@@ -418,11 +448,17 @@ export type AuthMeResponse = {
 };
 
 /**
- * DatasetMetadataGenerateRequest
- *
- * Request body for generating dataset metadata from server-side files.
+ * Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post
  */
-export type DatasetMetadataGenerateRequest = {
+export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
+    /**
+     * File
+     */
+    file: Blob | File;
+    /**
+     * Generator
+     */
+    generator?: 'auto' | 'croissant-baker' | 'native';
     /**
      * Validate
      */
@@ -456,25 +492,9 @@ export type DatasetMetadataGenerateRequest = {
      */
     date_published?: string | null;
     /**
-     * Creators
+     * Creators Json
      */
-    creators?: Array<string>;
-    /**
-     * Extra Args
-     */
-    extra_args?: Array<string>;
-    /**
-     * Input Path
-     *
-     * Server-side file or directory path visible to the backend process.
-     */
-    input_path: string;
-    /**
-     * Generator
-     *
-     * Dataset metadata generator backend.
-     */
-    generator?: 'auto' | 'croissant-baker' | 'native';
+    creators_json?: string;
 };
 
 /**
@@ -1561,7 +1581,7 @@ export type ValidateMetadataApiV1MetadataValidatePostResponses = {
 export type ValidateMetadataApiV1MetadataValidatePostResponse = ValidateMetadataApiV1MetadataValidatePostResponses[keyof ValidateMetadataApiV1MetadataValidatePostResponses];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData = {
-    body: DatasetMetadataGenerateRequest;
+    body: BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost;
     path?: never;
     query?: never;
     url: '/api/v1/metadata/datasets/generate';
