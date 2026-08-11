@@ -65,5 +65,3 @@ export type MetadataGeneratorForm = {
   name: string
   version: string
 }
-
-export type LicenseOption = SelectOption

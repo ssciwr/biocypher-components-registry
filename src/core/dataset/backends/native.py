@@ -188,22 +188,9 @@ def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:
     creators = []
     for raw in raw_creators:
         if isinstance(raw, dict):
-            name = str(raw.get("name") or "").strip()
-            if name:
-                identifier = (
-                    str(raw.get("identifier") or "").strip()
-                    or str(raw.get("orcid") or "").strip()
-                )
-                creators.append(
-                    build_creator(
-                        name=name,
-                        email=str(raw.get("email") or "").strip(),
-                        url=str(raw.get("url") or "").strip(),
-                        affiliation=str(raw.get("affiliation") or "").strip(),
-                        identifier=identifier,
-                        creator_type=str(raw.get("creator_type") or "Person").strip(),
-                    )
-                )
+            creator = _build_creator_from_mapping(raw)
+            if creator:
+                creators.append(creator)
             continue
 
         spec = parse_dataset_creator_string(raw)
@@ -219,6 +206,27 @@ def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:
                 )
             )
     return creators
+
+
+# Keeps  API JSON creator support separate from legacy string parsing which CLI/others still use (for creators input)
+# In turn this makes the frontend much cleaner/more typed.
+def _build_creator_from_mapping(raw: dict[str, Any]) -> dict[str, Any] | None:
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+
+    identifier = (
+        str(raw.get("identifier") or "").strip()
+        or str(raw.get("orcid") or "").strip()
+    )
+    return build_creator(
+        name=name,
+        email=str(raw.get("email") or "").strip(),
+        url=str(raw.get("url") or "").strip(),
+        affiliation=str(raw.get("affiliation") or "").strip(),
+        identifier=identifier,
+        creator_type=str(raw.get("creator_type") or "Person").strip(),
+    )
 
 
 def _infer_date_published(inspections: list[FileInspection]) -> str:

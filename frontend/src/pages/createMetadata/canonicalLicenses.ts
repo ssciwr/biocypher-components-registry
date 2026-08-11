@@ -1,11 +1,11 @@
-import type { LicenseOption } from './types'
+import type { SelectOption } from './types'
 
-export const repositoryFileLicenseOption: LicenseOption = {
+export const repositoryFileLicenseOption: SelectOption = {
   label: 'In repository as file/Custom',
   value: 'In repository as file/Custom',
 }
 
-export const backendCanonicalLicenseOptions: LicenseOption[] = [
+export const backendCanonicalLicenseOptions: SelectOption[] = [
   { label: 'Creative Commons Attribution 4.0', value: 'CC-BY-4.0' },
   { label: 'Creative Commons Attribution-ShareAlike 4.0', value: 'CC-BY-SA-4.0' },
   { label: 'Creative Commons Attribution-NonCommercial 4.0', value: 'CC-BY-NC-4.0' },

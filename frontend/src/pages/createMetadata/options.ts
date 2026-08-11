@@ -1,15 +1,15 @@
 import type {
   CreatorDraft,
   DatasetDraft,
-  LicenseOption,
   MetadataGeneratorForm,
+  SelectOption,
 } from './types'
 import {
   backendCanonicalLicenseOptions,
   repositoryFileLicenseOption,
 } from './canonicalLicenses'
 
-export const licenseOptions: LicenseOption[] = [
+export const licenseOptions: SelectOption[] = [
   { disabled: true, label: '(None)', value: '' },
   repositoryFileLicenseOption,
   { label: 'No license', value: 'No license' },

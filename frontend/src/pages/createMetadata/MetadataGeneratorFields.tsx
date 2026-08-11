@@ -4,7 +4,6 @@ import type {
   CreatorType,
   DatasetDatasetManualField,
   DatasetDraft,
-  LicenseOption,
   SelectOption,
 } from './types'
 import { normaliseOrcid } from './utils'
@@ -44,7 +43,7 @@ type CreatorEditorProps = Readonly<{
 
 type DatasetGenerateEditorProps = Readonly<{
   draft: DatasetDraft
-  licenseOptions: LicenseOption[]
+  licenseOptions: SelectOption[]
   onChange: (field: keyof DatasetDraft, value: string) => void
   onSourceFileChange: (file: File | null) => void
   sourceRequired?: boolean
@@ -53,7 +52,7 @@ type DatasetGenerateEditorProps = Readonly<{
 type DatasetDetailsEditorProps = Readonly<{
   dataset: DatasetDraft
   datasetManualField: DatasetDatasetManualField
-  licenseOptions: LicenseOption[]
+  licenseOptions: SelectOption[]
   onAddManualField: () => void
   onChange: (field: keyof DatasetDraft, value: string) => void
   onFieldChange: (fieldId: string, field: keyof DatasetDatasetManualField, value: string) => void

@@ -300,8 +300,7 @@ function CreateAdapterMetadataPage() {
       if (current !== id) {
         return current
       }
-      const remaining = form.datasets.filter((dataset) => dataset.id !== id)
-      return remaining[0]?.id ?? null
+      return form.datasets.find((dataset) => dataset.id !== id)?.id ?? null
     })
   }
 
