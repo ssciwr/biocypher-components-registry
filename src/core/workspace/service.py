@@ -61,7 +61,6 @@ async def connect_mcp(url: str, headers: dict[str, str]):
         async with streamable_http_client(url, http_client=http_client) as (
             read,
             write,
-            _,
         ):
             async with ClientSession(read, write) as mcp:
                 await mcp.initialize()
