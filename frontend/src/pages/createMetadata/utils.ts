@@ -56,18 +56,7 @@ export function optionalValue(value: string) {
  */
 export function datasetDraftToCroissantGenerateUploadForm(
   dataset: DatasetDraft,
-): {
-  citation: string;
-  creators_json: string;
-  date_published: string;
-  dataset_version: string;
-  description: string;
-  file: any;
-  generator: string;
-  license: string;
-  name: string;
-  url: string
-} {
+): BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost {
   if (!dataset.sourceFile) {
     throw new Error('Upload a source dataset file first.')
   }
