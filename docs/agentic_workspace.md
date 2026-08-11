@@ -74,7 +74,11 @@ Four numbers are printed per LLM round-trip: `input_tokens`, `cache_read_input_t
 One caveat: `cache_control={"type": "ephemeral"}` as top-level kwarg — that is the SDK's auto-prefix-caching convenience on the tool runner. Works with real Anthropic; local endpoints (LiteLLM/llama.cpp) may ignore or reject it, same class of issue as thinking param but no env toggle guards it here.
 
 # Still missing at this point
-- Frontend integration. Will happen after deployment integration and then lead to iterations over backend, API, and deployment. The API side is done: `src/api/routers/workspace.py` (routes) + `src/core/workspace/service.py` (per-session actors), merged from the [agentic-workspace](https://github.com/iulusoy/agentic-workspace) repo and mounted on the main app under `/agent/api/v1` — see [API.md](./API.md) for the full route/event contract and [plan.md 3.7](./plan.md) for what the merge did and didn't cover.
+- Frontend integration. Will happen after deployment integration and then lead to iterations over backend, API, and deployment. The API side is done: `src/api/routers/workspace.py` (routes) + `src/core/workspace/service.py` (per-session actors), merged from the [agentic-workspace](https://github.com/iulusoy/agentic-workspace) repo and mounted on the main app under `/agent/api/v1` — see [API.md](./API.md) for the full route/event contract.
+    - done: route prefix convention, the API side of the compose merge (`AGENT_WORKSPACES_ROOT` env + volume added to `docker-compose-sqlite.yml`/`docker-compose-postgresql.yml`
+    - no separate agent/orchestrator containers exist yet
+    - "one bundle, one deploy" in the sense that there is now only one FastAPI app (`src/api/app.py`) serving both `/api/v1` and `/agent/api/v1`
+    - **Not done:** the React three-pane UI itself, the nginx same-origin routing (no custom `nginx.conf` exists yet — the compose frontend tier still serves the `frontend-placeholder` volume), the `vite dev`  proxy entry, and the auth handoff
 - Deployment integration. This can be run via a container, and then spawn its own per-session containers (see [deployment](./deployment.md)).
 - Integration of neo4j graphs into the registry, to show the built graph or at least metagraph for the adapter. Requires the metagraph backend of BioCypher.
 - Creation of croissant files for the adapter. Requires adapting the cookiecutter repo.

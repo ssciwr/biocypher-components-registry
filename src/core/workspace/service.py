@@ -32,7 +32,7 @@ from pathlib import Path
 import anthropic
 from anthropic import AsyncAnthropic
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
 from src.core.workspace import client_loop as cl
 
@@ -50,11 +50,22 @@ class SessionStartupError(Exception):
 
 @asynccontextmanager
 async def connect_mcp(url: str, headers: dict[str, str]):
-    """Default MCP connector; tests inject a fake with the same shape."""
-    async with streamablehttp_client(url, headers=headers) as (read, write, _):
-        async with ClientSession(read, write) as mcp:
-            await mcp.initialize()
-            yield mcp
+    """Default MCP connector; tests inject a fake with the same shape.
+
+    Headers go through an explicit http_client rather than a headers= kwarg
+    on streamable_http_client (mcp>=2.0 dropped that kwarg along with the
+    deprecated streamablehttp_client name); we own that client's lifecycle
+    since streamable_http_client won't enter/exit a client we pass in.
+    """
+    async with create_mcp_http_client(headers=headers) as http_client:
+        async with streamable_http_client(url, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as mcp:
+                await mcp.initialize()
+                yield mcp
 
 
 def _first_line(description: str | None) -> str:

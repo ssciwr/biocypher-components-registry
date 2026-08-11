@@ -49,7 +49,7 @@ import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools import beta_async_tool
 from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
@@ -544,24 +544,30 @@ async def main() -> None:
             "your Anthropic key, or to any non-empty value together with "
             "ANTHROPIC_BASE_URL for a local model."
         )
-    async with streamable_http_client(MCP_URL, headers=mcp_headers()) as (
-        read,
-        write,
-        _,
-    ):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools_result = await session.list_tools()
-            tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
+    # headers no longer go through streamable_http_client directly (mcp>=2.0
+    # dropped that kwarg with the streamablehttp_client rename); build the
+    # http client ourselves so BIOCYPHER_MCP_AUTH_HEADER still reaches the
+    # server, and own its lifecycle since passing http_client= means
+    # streamable_http_client won't enter/exit it for us.
+    async with create_mcp_http_client(headers=mcp_headers()) as http_client:
+        async with streamable_http_client(MCP_URL, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools_result = await session.list_tools()
+                tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
 
-            if "--list-tools" in sys.argv:
-                for t in tools_result.tools:
-                    print(
-                        f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
-                    )
-                return
+                if "--list-tools" in sys.argv:
+                    for t in tools_result.tools:
+                        print(
+                            f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
+                        )
+                    return
 
-            await chat(tools, api_key, auth_token)
+                await chat(tools, api_key, auth_token)
 
 
 if __name__ == "__main__":
