@@ -60,9 +60,11 @@ def test_create_session_returns_tools_and_token(client):
     response = client.post(f"{PREFIX}/sessions")
     assert response.status_code == 201
     body = response.json()
-    assert body["session_id"] and body["session_token"]
+    assert body["session_id"]
+    assert body["session_token"]
     names = [t["name"] for t in body["tools"]]
-    assert "get_phase_guidance" in names and "write_file" in names
+    assert "get_phase_guidance" in names 
+    assert "write_file" in names
 
 
 def test_auth_required_and_checked(client, session):
