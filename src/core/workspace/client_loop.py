@@ -43,6 +43,7 @@ import asyncio
 import json
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import anthropic
@@ -145,6 +146,27 @@ def read_secret(name: str) -> str | None:
 def mcp_headers() -> dict[str, str]:
     auth = read_secret("BIOCYPHER_MCP_AUTH_HEADER")
     return {"Authorization": auth} if auth else {}
+
+
+@asynccontextmanager
+async def open_mcp_session(url: str, headers: dict[str, str]):
+    """Open an initialized MCP session over streamable HTTP.
+
+    Headers go through an explicit http_client rather than a headers= kwarg
+    on streamable_http_client (mcp>=2.0 dropped that kwarg along with the
+    deprecated streamablehttp_client name); we own that client's lifecycle
+    since streamable_http_client won't enter/exit a client we pass in.
+
+    Shared by this CLI's main() and the API's SessionManager (as the default
+    ``connect_mcp``) so the mcp>=2.0 bootstrap only lives in one place.
+    """
+    async with (
+        create_mcp_http_client(headers=headers) as http_client,
+        streamable_http_client(url, http_client=http_client) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        yield session
 
 
 def render_tool_result(result) -> str:
@@ -544,17 +566,7 @@ async def main() -> None:
             "your Anthropic key, or to any non-empty value together with "
             "ANTHROPIC_BASE_URL for a local model."
         )
-    # headers no longer go through streamable_http_client directly (mcp>=2.0
-    # dropped that kwarg with the streamablehttp_client rename); build the
-    # http client ourselves so BIOCYPHER_MCP_AUTH_HEADER still reaches the
-    # server, and own its lifecycle since passing http_client= means
-    # streamable_http_client won't enter/exit it for us.
-    async with (
-        create_mcp_http_client(headers=mcp_headers()) as http_client,
-        streamable_http_client(MCP_URL, http_client=http_client) as (read, write),
-        ClientSession(read, write) as session,
-    ):
-        await session.initialize()
+    async with open_mcp_session(MCP_URL, mcp_headers()) as session:
         tools_result = await session.list_tools()
         tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
 

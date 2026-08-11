@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from src.core.workspace import client_loop, service
 from src.core.workspace.service import SessionManager, SessionStartupError
 from tests.support.workspace_fakes import (
     FakeRunner,
@@ -39,6 +40,12 @@ async def run_turn(session, content):
     events = await collect_until_done(queue)
     session.unsubscribe(queue)
     return events
+
+
+def test_default_connect_mcp_reuses_client_loop_bootstrap():
+    """Guards against the mcp>=2.0 bootstrap being copy-pasted back into
+    service.py instead of shared via client_loop.open_mcp_session."""
+    assert service.connect_mcp is client_loop.open_mcp_session
 
 
 def test_create_and_delete_session(tmp_path):
