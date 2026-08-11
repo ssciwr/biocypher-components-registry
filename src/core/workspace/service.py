@@ -336,10 +336,13 @@ class SessionManager:
         self.sessions: dict[str, Session] = {}
 
     async def create(self) -> Session:
-        self.workspaces_root.mkdir(parents=True, exist_ok=True)
+        # mkdir is a blocking syscall; off-thread so one session's filesystem
+        # latency (or a slow/networked workspaces_root) can't stall every
+        # other session's SSE heartbeats and message dispatch on this loop.
+        await asyncio.to_thread(self.workspaces_root.mkdir, parents=True, exist_ok=True)
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
-        workspace.mkdir()
+        await asyncio.to_thread(workspace.mkdir)
         session = Session(session_id, workspace, self.mcp_url, self.mcp_headers)
         if self.mcp_connect is not None:
             session.mcp_connect = self.mcp_connect
@@ -380,9 +383,14 @@ class SessionManager:
         # instead of heartbeating a dead session forever.
         session.publish("session_closed")
         session.subscribers.clear()
-        shutil.rmtree(session.workspace, ignore_errors=True)
+        # Recursive delete is a blocking syscall storm on a large/full
+        # workspace; off-thread for the same reason as create()'s mkdir.
+        await asyncio.to_thread(shutil.rmtree, session.workspace, ignore_errors=True)
 
     async def shutdown(self) -> None:
-        # delete() mutates self.sessions, so don't iterate it directly.
-        while self.sessions:
-            await self.delete(next(iter(self.sessions)))
+        # delete() pops from self.sessions synchronously before its first
+        # await, so concurrent delete()s racing over the same dict is safe.
+        await asyncio.gather(
+            *(self.delete(session_id) for session_id in list(self.sessions)),
+            return_exceptions=True,
+        )
