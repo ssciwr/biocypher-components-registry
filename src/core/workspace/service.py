@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import secrets
 import shutil
@@ -32,6 +33,8 @@ import anthropic
 from anthropic import AsyncAnthropic
 
 from src.core.workspace import client_loop as cl
+
+logger = logging.getLogger(__name__)
 
 # Seconds to wait for the MCP connection when creating a session.
 READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
@@ -342,7 +345,15 @@ class SessionManager:
         await asyncio.to_thread(self.workspaces_root.mkdir, parents=True, exist_ok=True)
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
-        await asyncio.to_thread(workspace.mkdir)
+        try:
+            await asyncio.to_thread(workspace.mkdir)
+        except BaseException:
+            # to_thread's worker thread runs mkdir to completion even if this
+            # await is cancelled (e.g. task killed on shutdown), so the dir
+            # can land on disk with nothing left to track/clean it. Nothing
+            # references `session` yet, so clean up here before propagating.
+            await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+            raise
         session = Session(session_id, workspace, self.mcp_url, self.mcp_headers)
         if self.mcp_connect is not None:
             session.mcp_connect = self.mcp_connect
@@ -351,6 +362,11 @@ class SessionManager:
             await asyncio.wait_for(session.ready.wait(), timeout=READY_TIMEOUT)
         except TimeoutError:
             session.error = f"MCP connection timed out after {READY_TIMEOUT}s"
+        except BaseException:
+            # Same hazard: cancelled here and the session isn't registered in
+            # self.sessions yet, so it's on us to tear down the actor/dir.
+            await self._teardown(session)
+            raise
         if session.error:
             await self._teardown(session)
             raise SessionStartupError(session.error)
@@ -390,7 +406,15 @@ class SessionManager:
     async def shutdown(self) -> None:
         # delete() pops from self.sessions synchronously before its first
         # await, so concurrent delete()s racing over the same dict is safe.
-        await asyncio.gather(
-            *(self.delete(session_id) for session_id in list(self.sessions)),
+        session_ids = list(self.sessions)
+        results = await asyncio.gather(
+            *(self.delete(session_id) for session_id in session_ids),
             return_exceptions=True,
         )
+        for session_id, result in zip(session_ids, results):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "session teardown failed during shutdown: session_id=%s",
+                    session_id,
+                    exc_info=result,
+                )
