@@ -86,8 +86,12 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
             "url": "https://example.org/people",
             "license": MIT_LICENSE_URL,
             "citation": "https://example.org/people",
+            "content_url": "https://example.org/people.csv",
             "dataset_version": "1.0.0",
             "date_published": "2026-04-17",
+            "encoding_format": "text/csv",
+            "filename": "people.csv",
+            "sha256": "abc123",
             "creators": [
                 {
                     "creator_type": "Person",
@@ -158,8 +162,12 @@ class _GeneratedDatasetFields(BaseModel):
     url: str | None = None
     license_value: str | None = Field(default=None, alias="license")
     citation: str | None = None
+    content_url: str | None = None
     dataset_version: str | None = None
     date_published: str | None = None
+    encoding_format: str | None = None
+    filename: str | None = None
+    sha256: str | None = None
     creators: list[AdapterCreatorGenerateRequest] = Field(default_factory=list)
     extra_args: list[str] = Field(default_factory=list)
 
@@ -169,8 +177,12 @@ class _GeneratedDatasetFields(BaseModel):
         "url",
         "license_value",
         "citation",
+        "content_url",
         "dataset_version",
         "date_published",
+        "encoding_format",
+        "filename",
+        "sha256",
     )
     @classmethod
     def _normalize_optional_text(cls, value: str | None) -> str | None:

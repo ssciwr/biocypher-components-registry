@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { DocumentArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { DocumentArrowUpIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import {
   CreatorEditor,
   DatasetDetailsEditor,
@@ -39,13 +39,13 @@ type DatasetBasicsStepProps = Readonly<{
   datasetCreatorDraft: CreatorDraft
   datasetDraft: DatasetDraft
   datasets: DatasetDraft[]
-  onAddDataset: () => void
   onAddDatasetCreator: () => void
   onDatasetCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
   onDatasetDraftChange: (field: keyof DatasetDraft, value: string) => void
   onDatasetModeChange: (mode: DatasetMode) => void
   onDatasetSourceUpload: (file: File | null) => void
   onDatasetUpload: (file: File | null) => void
+  onEditDataset: (id: string) => void
   onRemoveDataset: (id: string) => void
   onRemoveDatasetCreator: (id: string) => void
 }>
@@ -182,13 +182,13 @@ export function DatasetBasicsStep({
   datasetCreatorDraft,
   datasetDraft,
   datasets,
-  onAddDataset,
   onAddDatasetCreator,
   onDatasetCreatorDraftChange,
   onDatasetDraftChange,
   onDatasetModeChange,
   onDatasetSourceUpload,
   onDatasetUpload,
+  onEditDataset,
   onRemoveDataset,
   onRemoveDatasetCreator,
 }: DatasetBasicsStepProps) {
@@ -209,11 +209,10 @@ export function DatasetBasicsStep({
       title="Basic dataset info"
     >
       <div className="mt-7 grid gap-4">
-        <SelectedItemList
-          emptyMessage="No datasets yet"
-          getLabel={datasetLabel}
-          getSubtitle={datasetSubtitle}
-          items={datasets}
+        <DatasetOverviewTable
+          datasets={datasets}
+          emptyMessage="No datasets added yet"
+          onEdit={onEditDataset}
           onRemove={onRemoveDataset}
         />
 
@@ -283,15 +282,6 @@ export function DatasetBasicsStep({
             ) : null}
           </div>
         )}
-
-        <button
-          className="inline-flex h-11 w-fit cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-          onClick={onAddDataset}
-          type="button"
-        >
-          <PlusIcon className="h-4 w-4" aria-hidden="true" />
-          Add dataset
-        </button>
       </div>
     </MetadataSection>
   )
@@ -320,8 +310,8 @@ export function DatasetDetailsStep({
       <div className="mt-7 grid gap-6">
         <DatasetOverviewTable
           datasets={datasets}
+          onEdit={onSelectDataset}
           onRemove={onRemoveDataset}
-          onSelect={onSelectDataset}
           selectedDatasetId={selectedDatasetId}
         />
         {selectedDataset ? (
@@ -403,23 +393,33 @@ function SelectedItemList<TItem extends { id: string }>({
 
 function DatasetOverviewTable({
   datasets,
+  emptyMessage,
+  onEdit,
   onRemove,
-  onSelect,
   selectedDatasetId,
 }: Readonly<{
   datasets: DatasetDraft[]
+  emptyMessage?: string
+  onEdit?: (id: string) => void
   onRemove: (id: string) => void
-  onSelect: (id: string) => void
-  selectedDatasetId: string | null
+  selectedDatasetId?: string | null
 }>) {
+  if (!datasets.length) {
+    return (
+      <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        {emptyMessage ?? 'No datasets yet'}
+      </p>
+    )
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
           <tr>
-            <th className="px-4 py-3">Dataset name</th>
-            <th className="px-4 py-3">Fields</th>
-            <th className="px-4 py-3">Mode</th>
+            <th className="px-4 py-3">Dataset</th>
+            <th className="px-4 py-3">Description</th>
+            <th className="px-4 py-3">Source</th>
             <th className="px-4 py-3">Actions</th>
           </tr>
         </thead>
@@ -429,26 +429,40 @@ function DatasetOverviewTable({
             if (dataset.id === selectedDatasetId) {
               rowClass = 'bg-blue-50'
             }
+            let sourceDetail = dataset.input ? `Source: ${dataset.input}` : 'Generate dataset Croissant'
+            if (dataset.mode === 'upload') {
+              sourceDetail = dataset.uploadedFileName
+                ? `Croissant file: ${dataset.uploadedFileName}`
+                : 'Croissant file upload'
+            }
 
             return (
               <tr className={rowClass} key={dataset.id}>
                 <td className="px-4 py-3 font-semibold text-slate-950">
                   {datasetLabel(dataset)}
                 </td>
-                <td className="px-4 py-3 text-slate-700">
-                  {dataset.fields.length + dataset.manualFields.length}
+                <td className="max-w-md px-4 py-3 text-slate-700">
+                  {dataset.description || 'No description yet'}
                 </td>
                 <td className="px-4 py-3 text-slate-700">
-                  {dataset.mode === 'upload' ? 'from croissant' : 'generated'}
+                  <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {dataset.mode === 'upload' ? 'Croissant file' : 'Sample file'}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {sourceDetail}
+                  </span>
                 </td>
                 <td className="flex gap-2 px-4 py-3">
-                  <button
-                    className="h-9 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-                    onClick={() => onSelect(dataset.id)}
-                    type="button"
-                  >
-                    Edit
-                  </button>
+                  {onEdit ? (
+                    <button
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                      onClick={() => onEdit(dataset.id)}
+                      type="button"
+                    >
+                      <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
+                      Edit
+                    </button>
+                  ) : null}
                   <RemoveItemButton
                     label={datasetLabel(dataset)}
                     onClick={() => onRemove(dataset.id)}
@@ -478,13 +492,4 @@ function RemoveItemButton({ label, onClick }: RemoveItemButtonProps) {
 
 function datasetLabel(dataset: DatasetDraft) {
   return dataset.name || dataset.uploadedFileName || dataset.input || 'Untitled dataset'
-}
-
-function datasetSubtitle(dataset: DatasetDraft) {
-  if (dataset.mode === 'upload') {
-    return dataset.uploadedFileName
-      ? `Croissant file: ${dataset.uploadedFileName}`
-      : 'Croissant file upload'
-  }
-  return dataset.input ? `Source: ${dataset.input}` : 'Generate dataset Croissant'
 }

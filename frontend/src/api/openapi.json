@@ -1355,6 +1355,17 @@
             ],
             "title": "Citation"
           },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          },
           "dataset_version": {
             "anyOf": [
               {
@@ -1376,6 +1387,39 @@
               }
             ],
             "title": "Date Published"
+          },
+          "encoding_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding Format"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
           },
           "creators": {
             "items": {
@@ -1697,6 +1741,7 @@
           "generated_datasets": [
             {
               "citation": "https://example.org/people",
+              "content_url": "https://example.org/people.csv",
               "creators": [
                 {
                   "affiliation": "Example Lab",
@@ -1710,10 +1755,13 @@
               "dataset_version": "1.0.0",
               "date_published": "2026-04-17",
               "description": "Small people dataset.",
+              "encoding_format": "text/csv",
               "extra_args": [],
+              "filename": "people.csv",
               "input": "/srv/biocypher/examples/adapter-demo",
               "license": "https://opensource.org/licenses/MIT",
               "name": "People Dataset",
+              "sha256": "abc123",
               "url": "https://example.org/people",
               "validate": true
             }
@@ -1903,6 +1951,17 @@
             ],
             "title": "Citation"
           },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          },
           "dataset_version": {
             "anyOf": [
               {
@@ -1924,6 +1983,39 @@
               }
             ],
             "title": "Date Published"
+          },
+          "encoding_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding Format"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
           },
           "creators_json": {
             "type": "string",

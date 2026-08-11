@@ -77,8 +77,12 @@ def generate_dataset_metadata(
     url: Annotated[str | None, Form()] = None,
     license_value: Annotated[str | None, Form(alias="license")] = None,
     citation: Annotated[str | None, Form()] = None,
+    content_url: Annotated[str | None, Form()] = None,
     dataset_version: Annotated[str | None, Form()] = None,
     date_published: Annotated[str | None, Form()] = None,
+    encoding_format: Annotated[str | None, Form()] = None,
+    filename: Annotated[str | None, Form()] = None,
+    sha256: Annotated[str | None, Form()] = None,
     creators_json: Annotated[str, Form()] = "[]",
 ) -> DatasetMetadataGenerateResponse:
     """Generate dataset metadata from an uploaded source file."""
@@ -97,8 +101,12 @@ def generate_dataset_metadata(
             url=url,
             license_value=license_value,
             citation=citation,
+            content_url=content_url,
             dataset_version=dataset_version,
             date_published=date_published,
+            encoding_format=encoding_format,
+            filename=filename,
+            sha256=sha256,
             creators=_parse_creators_json(creators_json),
             extra_args=[],
         )
@@ -332,8 +340,12 @@ def _build_core_dataset_generation_request(
         url=payload.url,
         license_value=payload.license_value,
         citation=payload.citation,
+        content_url=payload.content_url,
         dataset_version=payload.dataset_version,
         date_published=payload.date_published,
+        encoding_format=payload.encoding_format,
+        filename=payload.filename,
+        sha256=payload.sha256,
         creators=[
             creator.model_dump(exclude_none=True) for creator in payload.creators
         ],

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
+import json
+from pathlib import Path
+from typing import Any
+
 import typer
 
 from src.core.dataset.request import GenerationRequest
@@ -43,6 +49,106 @@ def execute_request(
         resolved = resolve_generator(generator)
         if getattr(resolved, "name", "") == "croissant-baker" and hasattr(resolved, "executable"):
             resolved.executable = executable
-        return resolved.generate(request=request)
+        return _with_distribution_metadata(
+            result=resolved.generate(request=request),
+            request=request,
+        )
     except GeneratorError as exc:
         raise RuntimeError(str(exc)) from exc
+
+
+# AI-Generated.
+# Applies explicit user-edited distribution fields after any dataset backend runs.
+def _with_distribution_metadata(
+    *,
+    result: GenerationResult,
+    request: GenerationRequest,
+) -> GenerationResult:
+    if not _has_distribution_metadata(request):
+        return result
+
+    document = _result_document(result)
+    if document is None:
+        return result
+
+    updated_document = deepcopy(document)
+    distribution = _first_distribution(updated_document)
+    _set_optional(distribution, "contentUrl", request.content_url)
+    _set_optional(distribution, "encodingFormat", request.encoding_format)
+    _set_optional(distribution, "name", request.filename)
+    _set_optional(distribution, "sha256", request.sha256)
+    _write_result_document(result.output_path, updated_document)
+    return replace(result, document=updated_document)
+
+
+# AI-Generated.
+# Keeps the post-generation override path inactive for untouched requests.
+def _has_distribution_metadata(request: GenerationRequest) -> bool:
+    return any(
+        value
+        for value in (
+            request.content_url,
+            request.encoding_format,
+            request.filename,
+            request.sha256,
+        )
+    )
+
+
+# AI-Generated.
+# Loads a generated document from memory first, then from the backend output file.
+def _result_document(result: GenerationResult) -> dict[str, Any] | None:
+    if result.document is not None:
+        return result.document
+
+    output_path = Path(result.output_path) if result.output_path else None
+    if output_path is None or not output_path.exists():
+        return None
+    return json.loads(output_path.read_text(encoding="utf-8"))
+
+
+# AI-Generated.
+# Returns the editable FileObject, creating one only if the generator omitted it.
+def _first_distribution(document: dict[str, Any]) -> dict[str, Any]:
+    distribution = document.get("distribution")
+    if isinstance(distribution, list):
+        for item in distribution:
+            if isinstance(item, dict):
+                return item
+        file_object: dict[str, Any] = {"@type": "cr:FileObject"}
+        distribution.insert(0, file_object)
+        return file_object
+
+    if isinstance(distribution, dict):
+        return distribution
+
+    file_object = {"@type": "cr:FileObject"}
+    document["distribution"] = [file_object]
+    return file_object
+
+
+# AI-Generated.
+# Stores non-blank form overrides using Croissant's JSON-LD property names.
+def _set_optional(
+    document: dict[str, Any],
+    key: str,
+    value: str | None,
+) -> None:
+    normalized_value = value.strip() if value else ""
+    if normalized_value:
+        document[key] = normalized_value
+
+
+# AI-Generated.
+# Keeps file-backed generators and in-memory generators returning the same document.
+def _write_result_document(
+    output_path: str,
+    document: dict[str, Any],
+) -> None:
+    if not output_path:
+        return
+
+    Path(output_path).write_text(
+        json.dumps(document, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )

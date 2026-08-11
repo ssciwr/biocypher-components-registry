@@ -64,13 +64,17 @@ export function datasetDraftToCroissantGenerateUploadForm(
   return {
     citation: optionalValue(dataset.citation),
     creators_json: JSON.stringify(dataset.creators.map(creatorToApiValue)),
+    content_url: optionalValue(dataset.contentUrl),
     date_published: optionalValue(dataset.datePublished),
     dataset_version: optionalValue(dataset.datasetVersion),
     description: optionalValue(dataset.description),
+    encoding_format: optionalValue(dataset.encodingFormat),
     file: dataset.sourceFile,
+    filename: optionalValue(dataset.filename),
     generator: 'auto',
     license: optionalValue(dataset.license),
     name: optionalValue(dataset.name),
+    sha256: optionalValue(dataset.sha256),
     url: optionalValue(dataset.url),
   }
 }
@@ -163,8 +167,32 @@ export function errorText(error: unknown, fallback: string) {
     return error.message
   }
 
-  const details = error as { detail?: string; details?: string } | undefined
-  return details?.details || details?.detail || fallback
+  const details = error as { detail?: unknown; details?: unknown } | undefined
+  const detail = details?.details ?? details?.detail
+  if (typeof detail === 'string' && detail) {
+    return detail
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item
+        }
+        if (typeof item === 'object' && item !== null && 'msg' in item) {
+          return String(item.msg)
+        }
+        return ''
+      })
+      .filter(Boolean)
+    if (messages.some((message) => message.includes('valid dictionary'))) {
+      return 'The backend is still using the old JSON dataset route. Restart the backend so it accepts dataset file uploads.'
+    }
+    return messages.join(' ') || fallback
+  }
+  if (typeof detail === 'object' && detail !== null) {
+    return JSON.stringify(detail)
+  }
+  return fallback
 }
 
 
@@ -194,6 +222,7 @@ function buildDistribution(dataset: DatasetDraft, existing?: Record<string, unkn
     ...(existing ?? {}),
     '@type': existing?.['@type'] ?? 'cr:FileObject',
   }
+  setOptional(distribution, '@id', textValue(existing?.['@id']) || name)
   setOptional(distribution, 'contentUrl', contentUrl)
   setOptional(distribution, 'name', name)
   setOptional(distribution, 'encodingFormat', encodingFormat)
@@ -217,18 +246,36 @@ function datasetManualFieldToCroissantField(
   }
   if (field.source !== undefined) {
     fieldDocument.source = field.source
-  } else if (dataset.filename.trim()) {
+  } else {
+    const fileObjectId = datasetFileObjectId(dataset)
+    if (!fileObjectId) {
+      return fieldDocument
+    }
     fieldDocument.source = {
       extract: { column: field.name.trim() },
-      fileObject: { '@id': dataset.filename.trim() },
+      fileObject: { '@id': fileObjectId },
     }
   }
   return fieldDocument
 }
 
+function datasetFileObjectId(dataset: DatasetDraft) {
+  // to get a source field which croissant requires.
+  const distribution = firstRecord(dataset.uploadedDocument?.distribution)
+  return textValue(distribution?.['@id']) || dataset.filename.trim()
+}
+
 function fieldsFromRecordSet(recordSet?: Record<string, unknown>) {
+  const rawFields = recordSet?.field
+  let fields: Record<string, unknown>[] = []
+  if (Array.isArray(rawFields)) {
+    fields = rawFields.filter(isRecord)
+  } else if (isRecord(rawFields)) {
+    fields = [rawFields]
+  }
+
   // Keep Croissant IDs/source mappings so edit -> export does not drop links we do not edit in the UI.
-  return recordArray(recordSet?.field).map((field) => ({
+  return fields.map((field) => ({
     id: nextDraftId('field'),
     dataType: textValue(field.dataType),
     description: textValue(field.description),
@@ -247,13 +294,6 @@ function firstRecord(value: unknown): Record<string, unknown> | undefined {
     return value
   }
   return undefined
-}
-
-function recordArray(value: unknown): Record<string, unknown>[] {
-  if (Array.isArray(value)) {
-    return value.filter(isRecord)
-  }
-  return isRecord(value) ? [value] : []
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -192,6 +192,10 @@ export type AdapterEmbeddedDatasetGenerateRequest = {
      */
     citation?: string | null;
     /**
+     * Content Url
+     */
+    content_url?: string | null;
+    /**
      * Dataset Version
      */
     dataset_version?: string | null;
@@ -199,6 +203,18 @@ export type AdapterEmbeddedDatasetGenerateRequest = {
      * Date Published
      */
     date_published?: string | null;
+    /**
+     * Encoding Format
+     */
+    encoding_format?: string | null;
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Sha256
+     */
+    sha256?: string | null;
     /**
      * Creators
      */
@@ -484,6 +500,10 @@ export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
      */
     citation?: string | null;
     /**
+     * Content Url
+     */
+    content_url?: string | null;
+    /**
      * Dataset Version
      */
     dataset_version?: string | null;
@@ -491,6 +511,18 @@ export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
      * Date Published
      */
     date_published?: string | null;
+    /**
+     * Encoding Format
+     */
+    encoding_format?: string | null;
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Sha256
+     */
+    sha256?: string | null;
     /**
      * Creators Json
      */

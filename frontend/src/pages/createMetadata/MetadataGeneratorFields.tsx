@@ -14,6 +14,7 @@ type TextInputProps = Readonly<{
   onChange: (value: string) => void
   placeholder?: string
   required?: boolean
+  surface?: 'muted' | 'plain'
   value: string
 }>
 
@@ -90,13 +91,19 @@ export function TextInput({
   onChange,
   placeholder,
   required = false,
+  surface = 'muted',
   value,
 }: TextInputProps) {
+  let backgroundClass = 'bg-slate-50 focus:bg-white'
+  if (surface === 'plain') {
+    backgroundClass = 'bg-white'
+  }
+
   return (
     <label className="grid gap-2 text-sm font-semibold text-slate-950">
       <span>{label}{required ? ' *' : ''}</span>
       <input
-        className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+        className={`h-12 rounded-xl border border-slate-200 px-4 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -117,13 +124,19 @@ export function TextArea({
   onChange,
   placeholder,
   required = false,
+  surface = 'muted',
   value,
 }: TextAreaProps) {
+  let backgroundClass = 'bg-slate-50 focus:bg-white'
+  if (surface === 'plain') {
+    backgroundClass = 'bg-white'
+  }
+
   return (
     <label className="grid gap-2 text-sm font-semibold text-slate-950">
       <span>{label}{required ? ' *' : ''}</span>
       <textarea
-        className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+        className={`min-h-28 rounded-xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -202,45 +215,54 @@ export function CreatorEditor({
 }: CreatorEditorProps) {
   return (
     <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
-      <TextInput
-        label="Name"
-        maxLength={100}
-        onChange={(value) => onChange('name', value)}
-        placeholder="Example: Robert Koch"
-        value={draft.name}
-      />
-      <SelectInput
-        label="Creator type"
-        onChange={(value) => onChange('creatorType', value)}
-        options={creatorTypeOptions}
-        surface="plain"
-        value={draft.creatorType}
-      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextInput
+          label="Name"
+          maxLength={100}
+          onChange={(value) => onChange('name', value)}
+          placeholder="Example: Robert Koch"
+          surface="plain"
+          value={draft.name}
+        />
+        <SelectInput
+          label="Creator type"
+          onChange={(value) => onChange('creatorType', value)}
+          options={creatorTypeOptions}
+          surface="plain"
+          value={draft.creatorType}
+        />
+      </div>
       <TextInput
         label="Affiliation(s) (comma-separated)"
         maxLength={100}
         onChange={(value) => onChange('affiliation', value)}
         placeholder="Example: Robert Koch Institute, University of Goettingen"
+        surface="plain"
         value={draft.affiliation}
       />
-      <TextInput
-        label="ORCID ID"
-        onChange={(value) => onChange('orcid', normaliseOrcid(value))}
-        placeholder="Example: https://orcid.org/1234-5678-9101-1121"
-        value={draft.orcid}
-      />
-      <TextInput
-        label="Email"
-        maxLength={100}
-        onChange={(value) => onChange('email', value)}
-        placeholder="Example: robert.koch@rki.de-mail.de"
-        value={draft.email}
-      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextInput
+          label="ORCID ID"
+          onChange={(value) => onChange('orcid', normaliseOrcid(value))}
+          placeholder="Example: https://orcid.org/1234-5678-9101-1121"
+          surface="plain"
+          value={draft.orcid}
+        />
+        <TextInput
+          label="Email"
+          maxLength={100}
+          onChange={(value) => onChange('email', value)}
+          placeholder="Example: robert.koch@rki.de-mail.de"
+          surface="plain"
+          value={draft.email}
+        />
+      </div>
       <TextInput
         label="URL"
         maxLength={200}
         onChange={(value) => onChange('url', value)}
         placeholder="Example: www.rki.de"
+        surface="plain"
         value={draft.url}
       />
       <button
@@ -413,6 +435,9 @@ export function DatasetDetailsEditor({
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-5 py-4">
           <h3 className="text-xl font-bold text-slate-950">Distribution metadata</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            These values describe the selected source file and will be included in the generated Croissant metadata.
+          </p>
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-2">
           <TextInput
@@ -526,6 +551,7 @@ export function DatasetDetailsEditor({
                 label="Field name"
                 maxLength={120}
                 onChange={(value) => onManualFieldChange('name', value)}
+                surface="plain"
                 value={datasetManualField.name}
               />
               <SelectInput
@@ -540,12 +566,14 @@ export function DatasetDetailsEditor({
               label="Description"
               maxLength={240}
               onChange={(value) => onManualFieldChange('description', value)}
+              surface="plain"
               value={datasetManualField.description}
             />
             <TextInput
               label="Example"
               maxLength={200}
               onChange={(value) => onManualFieldChange('example', value)}
+              surface="plain"
               value={datasetManualField.example}
             />
             <button

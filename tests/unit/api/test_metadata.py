@@ -273,9 +273,13 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
                     }
                 ]
             ),
+            "content_url": "https://example.org/files/people.csv",
+            "encoding_format": "text/csv",
+            "filename": "people.csv",
             "generator": "native",
             "name": " Example dataset ",
             "license": " https://opensource.org/licenses/MIT ",
+            "sha256": "abc123",
             "validate": "true",
         },
         files={"file": ("people.csv", b"id,name\n1,Alice\n", "text/csv")},
@@ -289,6 +293,10 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
     assert Path(request.input_path).name == "people.csv"
     assert request.name == "Example dataset"
     assert request.license_value == "https://opensource.org/licenses/MIT"
+    assert request.content_url == "https://example.org/files/people.csv"
+    assert request.encoding_format == "text/csv"
+    assert request.filename == "people.csv"
+    assert request.sha256 == "abc123"
     assert request.creators[0]["email"] == "dataset.creator@example.org"
     assert payload["metadata"]["name"] == "Example dataset"
     assert payload["generator"] == "native"
@@ -561,8 +569,12 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
                     "url": "https://example.org/people",
                     "license": "https://opensource.org/licenses/MIT",
                     "citation": "https://example.org/people",
+                    "content_url": "https://example.org/files/people.csv",
                     "dataset_version": "1.0.0",
                     "date_published": "2026-04-17",
+                    "encoding_format": "text/csv",
+                    "filename": "people-source.csv",
+                    "sha256": "abc123",
                     "creators": [
                         {
                             "creator_type": "Person",
@@ -593,7 +605,11 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
         metadata["hasPart"][0]["creator"][0]["identifier"]
         == "https://orcid.org/0000-0000-0000-0001"
     )
-    assert metadata["hasPart"][0]["distribution"][0]["name"] == "people.csv"
+    distribution = metadata["hasPart"][0]["distribution"][0]
+    assert distribution["contentUrl"] == "https://example.org/files/people.csv"
+    assert distribution["encodingFormat"] == "text/csv"
+    assert distribution["name"] == "people-source.csv"
+    assert distribution["sha256"] == "abc123"
     assert payload["generator"] == "native"
     assert payload["dataset_generator"] == "native"
     assert payload["validation"]["kind"] == "adapter"

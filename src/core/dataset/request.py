@@ -19,8 +19,12 @@ class GenerationRequest:
     url: str | None = None
     license_value: str | None = None
     citation: str | None = None
+    content_url: str | None = None
     dataset_version: str | None = None
     date_published: str | None = None
+    encoding_format: str | None = None
+    filename: str | None = None
+    sha256: str | None = None
     creators: list[str | dict[str, Any]] = field(default_factory=list)
     extra_args: list[str] = field(default_factory=list)
 

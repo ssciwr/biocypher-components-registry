@@ -161,6 +161,7 @@ function CreateAdapterMetadataPage() {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null)
   const [step, setStep] = useState<MetadataStep>(1)
   const [error, setError] = useState<string | null>(null)
+  const [generatedMetadata, setGeneratedMetadata] = useState<Record<string, unknown> | null>(null)
   const [isGenerating, setIsGenerating] = useState(false) // flow controlling to avoid issues
   const [isPreparingDatasets, setIsPreparingDatasets] = useState(false)
 
@@ -179,6 +180,10 @@ function CreateAdapterMetadataPage() {
       console.warn('Could not save metadata draft to localStorage.', storageError)
     }
   }, [form])
+
+  useEffect(() => {
+    globalThis.scrollTo({ left: 0, top: 0 })
+  }, [step, generatedMetadata])
 
   function addCreator() {
     if (!creatorDraft.name.trim()) {
@@ -269,28 +274,6 @@ function CreateAdapterMetadataPage() {
     setError(null)
   }
 
-  function addDataset() {
-    if (datasetDraft.mode === 'generate' && !datasetDraft.sourceFile) {
-      setError('Upload a source dataset file first.')
-      return
-    }
-
-    if (datasetDraft.mode === 'upload' && !datasetDraft.uploadedDocument) {
-      setError('Upload an existing dataset Croissant file first.')
-      return
-    }
-
-    const dataset = { ...datasetDraft, id: nextDraftId('dataset') }
-    setForm((current) => ({
-      ...current,
-      datasets: [...current.datasets, dataset],
-    }))
-    setSelectedDatasetId((current) => current ?? dataset.id)
-    setDatasetDraft(emptyDataset)
-    setDatasetCreatorDraft(emptyCreator)
-    setError(null)
-  }
-
   function removeDataset(id: string) {
     setForm((current) => ({
       ...current,
@@ -302,6 +285,22 @@ function CreateAdapterMetadataPage() {
       }
       return form.datasets.find((dataset) => dataset.id !== id)?.id ?? null
     })
+  }
+
+  function editDataset(id: string) {
+    const datasetToEdit = form.datasets.find((dataset) => dataset.id === id)
+    if (!datasetToEdit) {
+      return
+    }
+
+    setDatasetDraft(datasetToEdit)
+    setDatasetCreatorDraft(emptyCreator)
+    setForm((current) => ({
+      ...current,
+      datasets: current.datasets.filter((dataset) => dataset.id !== id),
+    }))
+    setSelectedDatasetId((current) => (current === id ? null : current))
+    setError(null)
   }
 
   function continueToDatasets() {
@@ -346,12 +345,11 @@ function CreateAdapterMetadataPage() {
   }
 
   async function prepareDatasetsForDetails() {
-    let datasetsToPrepare = form.datasets
-    if (!datasetsToPrepare.length && datasetDraft.mode === 'generate' && datasetDraft.sourceFile) {
-      datasetsToPrepare = [{ ...datasetDraft, id: nextDraftId('dataset') }]
-    }
-    if (!datasetsToPrepare.length && datasetDraft.mode === 'upload' && datasetDraft.uploadedDocument) {
-      datasetsToPrepare = [{ ...datasetDraft, id: nextDraftId('dataset') }]
+    const datasetsToPrepare = [...form.datasets]
+    const hasPendingSourceFile = datasetDraft.mode === 'generate' && datasetDraft.sourceFile
+    const hasPendingCroissantFile = datasetDraft.mode === 'upload' && datasetDraft.uploadedDocument
+    if (hasPendingSourceFile || hasPendingCroissantFile) {
+      datasetsToPrepare.push({ ...datasetDraft, id: nextDraftId('dataset') })
     }
 
     if (!datasetsToPrepare.length) {
@@ -507,7 +505,7 @@ function CreateAdapterMetadataPage() {
         return
       }
 
-      downloadMetadata(result.data.metadata, form.name)
+      setGeneratedMetadata(result.data.metadata)
       setError(null)
     } catch (metadataError) {
       setError(errorText(metadataError, 'Metadata generation failed.'))
@@ -530,6 +528,9 @@ function CreateAdapterMetadataPage() {
   }
 
   const selectedDataset = form.datasets.find((dataset) => dataset.id === selectedDatasetId)
+  const generatedMetadataJson = generatedMetadata
+    ? JSON.stringify(generatedMetadata, undefined, 2)
+    : ''
 
   return (
     <section className="bg-slate-100">
@@ -541,6 +542,17 @@ function CreateAdapterMetadataPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          {generatedMetadata ? (
+            <MetadataReadyPanel
+              adapterName={form.name}
+              metadata={generatedMetadata}
+              metadataJson={generatedMetadataJson}
+              onBack={() => {
+                setGeneratedMetadata(null)
+                setStep(3)
+              }}
+            />
+          ) : (
           <form className="grid gap-8" onSubmit={handleMetadataSubmit}>
             {step === 1 ? (
               <AdapterDetailsStep
@@ -562,7 +574,6 @@ function CreateAdapterMetadataPage() {
                 datasetCreatorDraft={datasetCreatorDraft}
                 datasetDraft={datasetDraft}
                 datasets={form.datasets}
-                onAddDataset={addDataset}
                 onAddDatasetCreator={addDatasetCreator}
                 onDatasetCreatorDraftChange={(field, value) => {
                   setDatasetCreatorDraft((current) => ({ ...current, [field]: value }))
@@ -573,6 +584,7 @@ function CreateAdapterMetadataPage() {
                 onDatasetModeChange={setDatasetMode}
                 onDatasetUpload={handleDatasetUpload}
                 onDatasetSourceUpload={handleDatasetSourceUpload}
+                onEditDataset={editDataset}
                 onRemoveDataset={removeDataset}
                 onRemoveDatasetCreator={removeDatasetCreator}
               />
@@ -629,7 +641,7 @@ function CreateAdapterMetadataPage() {
                     disabled={isPreparingDatasets}
                     type="submit"
                   >
-                    {isPreparingDatasets ? 'Preparing datasets...' : 'Continue to dataset details'}
+                    {isPreparingDatasets ? 'Adding dataset...' : 'Add dataset'}
                   </button>
                 ) : null}
                 {step >= 3 ? (
@@ -645,8 +657,76 @@ function CreateAdapterMetadataPage() {
               </div>
             </div>
           </form>
+          )}
 
           <Stepper currentStep={step} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Final results panel, for croissant file export
+function MetadataReadyPanel({
+  adapterName,
+  metadata,
+  metadataJson,
+  onBack,
+}: Readonly<{
+  adapterName: string
+  metadata: Record<string, unknown>
+  metadataJson: string
+  onBack: () => void
+}>) {
+  const datasetCount = Array.isArray(metadata.hasPart) ? metadata.hasPart.length : 0
+
+  return (
+    <section className="grid gap-6">
+      <div>
+        <h2 className="text-3xl font-bold text-slate-950">Adapter ready</h2>
+        <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+          Your adapter metadata was generated successfully. Review the JSON-LD preview and download the final Croissant file.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <dl className="grid gap-4 text-sm md:grid-cols-3">
+          <div>
+            <dt className="font-semibold text-slate-500">Adapter</dt>
+            <dd className="mt-1 font-bold text-slate-950">{adapterName || 'Untitled adapter'}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-500">Datasets</dt>
+            <dd className="mt-1 font-bold text-slate-950">{datasetCount}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-500">Format</dt>
+            <dd className="mt-1 font-bold text-slate-950">JSON-LD</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="text-xl font-bold text-slate-950">JSON-LD preview</h3>
+        <pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-slate-100 p-5 text-xs leading-5 text-slate-950">
+          {metadataJson}
+        </pre>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 hover:border-blue-300"
+            onClick={onBack}
+            type="button"
+          >
+            Back to form
+          </button>
+          <button
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+            onClick={() => downloadMetadata(metadata, adapterName)}
+            type="button"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+            Download finished Croissant file
+          </button>
         </div>
       </div>
     </section>
