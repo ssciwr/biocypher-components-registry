@@ -4,23 +4,23 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 ACTIVE_PROFILE_VERSION: str = "v1"
 
-_SCHEMA_FILE_MAP: Dict[str, str] = {
+_SCHEMA_FILE_MAP: dict[str, str] = {
     "v1": "croissant_v1.json",
 }
 
 _SCHEMA_DIR = Path(__file__).parent
 
 
-def load_active_schema() -> Dict[str, Any]:
+def load_active_schema() -> dict[str, Any]:
     """Load the schema for the currently active profile version."""
     return load_schema(ACTIVE_PROFILE_VERSION)
 
 
-def load_schema(version: str) -> Dict[str, Any]:
+def load_schema(version: str) -> dict[str, Any]:
     """Load a schema by registered profile version.
 
     Args:
@@ -33,8 +33,7 @@ def load_schema(version: str) -> Dict[str, Any]:
     if filename is None:
         registered = ", ".join(sorted(_SCHEMA_FILE_MAP))
         raise ValueError(
-            f"Unknown schema version {version!r}. "
-            f"Registered versions: {registered}"
+            f"Unknown schema version {version!r}. Registered versions: {registered}"
         )
 
     schema_path = _SCHEMA_DIR / filename

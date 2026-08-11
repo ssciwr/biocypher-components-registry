@@ -383,7 +383,7 @@ def make_file_tools(
                 out, _ = await asyncio.wait_for(
                     proc.communicate(), timeout=timeout_seconds
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 await proc.wait()
                 return f"[tool error] command timed out after {timeout_seconds}s"
@@ -549,24 +549,23 @@ async def main() -> None:
     # http client ourselves so BIOCYPHER_MCP_AUTH_HEADER still reaches the
     # server, and own its lifecycle since passing http_client= means
     # streamable_http_client won't enter/exit it for us.
-    async with create_mcp_http_client(headers=mcp_headers()) as http_client:
-        async with streamable_http_client(MCP_URL, http_client=http_client) as (
-            read,
-            write,
-        ):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools_result = await session.list_tools()
-                tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
+    async with (
+        create_mcp_http_client(headers=mcp_headers()) as http_client,
+        streamable_http_client(MCP_URL, http_client=http_client) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        tools_result = await session.list_tools()
+        tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
 
-                if "--list-tools" in sys.argv:
-                    for t in tools_result.tools:
-                        print(
-                            f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
-                        )
-                    return
+        if "--list-tools" in sys.argv:
+            for t in tools_result.tools:
+                print(
+                    f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
+                )
+            return
 
-                await chat(tools, api_key, auth_token)
+        await chat(tools, api_key, auth_token)
 
 
 if __name__ == "__main__":

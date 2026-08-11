@@ -13,7 +13,7 @@ class AuthMeResponse(BaseModel):
     github_login: str
 
     @classmethod
-    def from_session(cls, session: AuthSession) -> "AuthMeResponse":
+    def from_session(cls, session: AuthSession) -> AuthMeResponse:
         """Build the browser-safe auth response."""
         return cls(
             github_login=session.github_login,

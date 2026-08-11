@@ -10,7 +10,6 @@ from src.api.dependencies import get_registration_store
 from src.core.registration.service import submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 # ===========================================================
 # Registry Endpoint Tests
 # ===========================================================

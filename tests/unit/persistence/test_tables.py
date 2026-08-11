@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from src.persistence.tables import (
+    auth_sessions_table,
     registration_events_table,
     registration_sources_table,
-    auth_sessions_table,
     registry_entries_table,
     registry_refreshes_table,
 )

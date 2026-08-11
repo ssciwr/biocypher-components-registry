@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.core.dataset.formats.base import PARQUET_MIME, FormatHandler, TEXT_TYPE
+from src.core.dataset.formats.base import PARQUET_MIME, TEXT_TYPE, FormatHandler
 from src.core.dataset.request import FileInspection, InferredField
 from src.core.shared.errors import UnsupportedFormatError
 

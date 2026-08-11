@@ -11,7 +11,6 @@ from src.core.registration.models import RegistrationStatus, StoredRegistration
 from src.core.registration.service import finish_registration, submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 scenarios("../features/us07_persist_invalid_status_and_errors.feature")
 
 

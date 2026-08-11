@@ -9,7 +9,6 @@ from pathlib import Path
 
 from src.core.dataset.request import FileInspection, InferredField
 
-
 TEXT_TYPE = "sc:Text"
 INTEGER_TYPE = "sc:Integer"
 FLOAT_TYPE = "sc:Float"

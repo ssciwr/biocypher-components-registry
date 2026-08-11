@@ -33,11 +33,12 @@ from src.core.registration.service import (
 from src.core.registration.store import RegistrationStore
 from src.core.shared.files import remote_metadata_exists
 
-
 router = APIRouter()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
-OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth_session)]
+OptionalAuthSessionDep = Annotated[
+    AuthSession | None, Depends(get_optional_auth_session)
+]
 
 
 # ===========================================================
@@ -74,7 +75,7 @@ def create_registration(
                 auth_session.github_login if auth_session is not None else None
             ),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise registration_submission_http_error(exc) from exc
 
     return RegistrationCreateResponse.from_stored(registration)
@@ -121,6 +122,8 @@ def check_registration_croissant_file_presence(
     return RegistrationCroissantFilePresentCheckResponse(
         has_croissant_file=has_croissant_file
     )
+
+
 # previously this happened on the frontend but with Gitlab + Github support it became quite messy.
 # Adding Gitlab support has added about 30 lines to the project, but we keep it simpler conceptually by only hcecking on the backend.
 
@@ -188,7 +191,7 @@ def process_registration(
             registration_id=registration_id,
             store=store,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise registration_processing_http_error(registration_id, exc) from exc
 
     return RegistrationProcessResponse.from_stored(registration)
@@ -212,7 +215,7 @@ def revalidate_registration_route(
             registration_id=registration_id,
             store=store,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise registration_processing_http_error(registration_id, exc) from exc
 
     return RegistrationRevalidateResponse.from_stored(registration)

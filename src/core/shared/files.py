@@ -38,7 +38,7 @@ def fetch_local_file(path: Path) -> str:
             return fh.read()
     except OSError as exc:
         msg = f"Failed to read local file {path}: {exc}"
-        raise IOError(msg) from exc
+        raise OSError(msg) from exc
 
 
 def fetch_remote_file(url: str) -> str:
@@ -189,12 +189,10 @@ def _github_metadata_urls(parsed: ParseResult) -> list[str]:
         return []
 
     owner, repo = parts[0], parts[1]
-    if repo.endswith(".git"):
-        repo = repo[:-4]
+    repo = repo.removesuffix(".git")
     if len(parts) >= 5 and parts[2] == "blob":
         return [
-            "https://raw.githubusercontent.com/"
-            f"{owner}/{repo}/{parts[3]}/{'/'.join(parts[4:])}"
+            f"https://raw.githubusercontent.com/{owner}/{repo}/{parts[3]}/{'/'.join(parts[4:])}"
         ]
     return [
         f"https://raw.githubusercontent.com/{owner}/{repo}/main/{METADATA_FILENAME}",
@@ -211,17 +209,18 @@ def _gitlab_metadata_urls(parsed: ParseResult) -> list[str]:
     base_url = f"{parsed.scheme}://{parsed.netloc}"
     if "-" in parts:
         marker = parts.index("-")
-        if marker >= 2 and marker + 2 < len(parts) and parts[marker + 1] in {"blob", "raw"}:
+        if (
+            marker >= 2
+            and marker + 2 < len(parts)
+            and parts[marker + 1] in {"blob", "raw"}
+        ):
             project_path = "/".join(parts[:marker])
             branch = parts[marker + 2]
-            return [
-                f"{base_url}/{project_path}/-/raw/{branch}/{METADATA_FILENAME}"
-            ]
+            return [f"{base_url}/{project_path}/-/raw/{branch}/{METADATA_FILENAME}"]
         return []
 
     owner, repo = parts[0], parts[1]
-    if repo.endswith(".git"):
-        repo = repo[:-4]
+    repo = repo.removesuffix(".git")
     project_path = f"{owner}/{repo}"
     return [
         f"{base_url}/{project_path}/-/raw/main/{METADATA_FILENAME}",

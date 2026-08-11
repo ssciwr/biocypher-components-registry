@@ -10,7 +10,6 @@ from typer.testing import CliRunner
 
 from cli import app
 
-
 scenarios("../features/us04a_registration_ui_and_submission_persistence.feature")
 
 

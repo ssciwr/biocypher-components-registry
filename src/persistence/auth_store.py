@@ -83,11 +83,15 @@ class AuthSessionStore:
     def get_session(self, token: str) -> AuthSession | None:
         """Return a valid session for the raw cookie token."""
         with self.engine.connect() as connection:
-            row = connection.execute(
-                select(auth_sessions_table).where(
-                    auth_sessions_table.c.id_hash == _session_hash(token)
+            row = (
+                connection.execute(
+                    select(auth_sessions_table).where(
+                        auth_sessions_table.c.id_hash == _session_hash(token)
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
 
         if row is None:
             return None

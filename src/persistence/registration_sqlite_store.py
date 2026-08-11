@@ -31,7 +31,9 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
                     "ON registration_sources (repository_location)"
                 )
             )
-            connection.execute(text("DROP INDEX IF EXISTS ix_registrations_uniqueness_key"))
+            connection.execute(
+                text("DROP INDEX IF EXISTS ix_registrations_uniqueness_key")
+            )
             connection.execute(text("DROP TABLE IF EXISTS registration_failures"))
             connection.execute(text("DROP TABLE IF EXISTS registrations"))
 

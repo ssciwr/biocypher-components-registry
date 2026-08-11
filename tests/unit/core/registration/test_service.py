@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from src.core.adapter.request import AdapterRegistrationRequest
 from src.core.registration.models import RegistrationStatus, StoredRegistration
 from src.core.registration.service import _build_uniqueness_key, submit_registration
 from src.core.registration.store import RegistrationStore
-from src.core.adapter.request import AdapterRegistrationRequest
 
 
 class MemoryRegistrationStore:
@@ -37,7 +37,9 @@ class MemoryRegistrationStore:
                 return registration
         return None
 
-    def mark_registration_valid(self, *args: object, **kwargs: object) -> StoredRegistration:
+    def mark_registration_valid(
+        self, *args: object, **kwargs: object
+    ) -> StoredRegistration:
         raise NotImplementedError
 
     def mark_registration_invalid(

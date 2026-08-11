@@ -57,14 +57,13 @@ async def connect_mcp(url: str, headers: dict[str, str]):
     deprecated streamablehttp_client name); we own that client's lifecycle
     since streamable_http_client won't enter/exit a client we pass in.
     """
-    async with create_mcp_http_client(headers=headers) as http_client:
-        async with streamable_http_client(url, http_client=http_client) as (
-            read,
-            write,
-        ):
-            async with ClientSession(read, write) as mcp:
-                await mcp.initialize()
-                yield mcp
+    async with (
+        create_mcp_http_client(headers=headers) as http_client,
+        streamable_http_client(url, http_client=http_client) as (read, write),
+        ClientSession(read, write) as mcp,
+    ):
+        await mcp.initialize()
+        yield mcp
 
 
 def _first_line(description: str | None) -> str:
@@ -362,7 +361,7 @@ class SessionManager:
         session.actor = asyncio.create_task(session.run_actor())
         try:
             await asyncio.wait_for(session.ready.wait(), timeout=READY_TIMEOUT)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             session.error = f"MCP connection timed out after {READY_TIMEOUT}s"
         if session.error:
             await self._teardown(session)
@@ -387,7 +386,8 @@ class SessionManager:
             session.inbox.put_nowait(None)
             try:
                 await asyncio.wait_for(session.actor, timeout=10)
-            except Exception:
+            except Exception:  # noqa: BLE001 - best-effort teardown; any actor
+                # failure (timeout or otherwise) still needs the cancel below
                 session.actor.cancel()
                 with contextlib.suppress(Exception, asyncio.CancelledError):
                     await session.actor

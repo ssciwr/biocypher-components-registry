@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 DATASET_CONTEXT: dict[str, Any] = {
     "@language": "en",
     "@vocab": "https://schema.org/",
@@ -52,7 +51,11 @@ def build_creator(
     creator_type: str = "Person",
 ) -> dict[str, Any]:
     """Build a creator node for dataset metadata."""
-    normalized_type = "Organization" if str(creator_type).strip().lower() == "organization" else "Person"
+    normalized_type = (
+        "Organization"
+        if str(creator_type).strip().lower() == "organization"
+        else "Person"
+    )
     creator: dict[str, Any] = {"@type": f"sc:{normalized_type}", "name": name}
     if affiliation:
         creator["affiliation"] = affiliation

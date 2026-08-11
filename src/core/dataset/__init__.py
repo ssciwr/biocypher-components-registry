@@ -19,6 +19,8 @@ __all__ = [
     "execute_request",
     "request_from_config",
 ]
+
+
 def request_from_config(
     config_path: str,
     output_override: str | None = None,
@@ -26,7 +28,9 @@ def request_from_config(
     """Load a dataset generation request from a YAML config file."""
     from src.core.dataset.config import request_from_config as _request_from_config
 
-    return _request_from_config(config_path=config_path, output_override=output_override)
+    return _request_from_config(
+        config_path=config_path, output_override=output_override
+    )
 
 
 def ensure_supported_generator(generator: str) -> str:

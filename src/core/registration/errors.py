@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 DUPLICATE_REPOSITORY_URL_MESSAGE = "This repository url already exists in the system"
 
 

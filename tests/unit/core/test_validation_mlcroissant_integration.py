@@ -12,7 +12,9 @@ def test_validate_dataset_uses_mlcroissant_rules() -> None:
     result = validate_dataset(document)
 
     assert not result.is_valid
-    assert any("doesn't extend https://schema.org/Dataset" in err for err in result.errors)
+    assert any(
+        "doesn't extend https://schema.org/Dataset" in err for err in result.errors
+    )
 
 
 def test_validate_adapter_combines_mlcroissant_and_schema_checks(monkeypatch) -> None:

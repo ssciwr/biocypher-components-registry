@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table, UniqueConstraint
-
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    UniqueConstraint,
+)
 
 metadata = MetaData()
 

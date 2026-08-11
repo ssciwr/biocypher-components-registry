@@ -13,7 +13,6 @@ from src.api.schemas.registrations import REGISTRATION_CREATE_EXAMPLE
 from src.core.auth.models import AuthSession
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 # ===========================================================
 # Registration Endpoint Tests
 # ===========================================================

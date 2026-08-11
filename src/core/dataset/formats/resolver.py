@@ -12,7 +12,6 @@ from src.core.dataset.formats.tsv import TsvFormatHandler
 from src.core.dataset.formats.tsv_gz import TsvGzFormatHandler
 from src.core.shared.errors import UnsupportedFormatError
 
-
 FORMAT_HANDLERS: list[FormatHandler] = [
     CsvGzFormatHandler(),
     TsvGzFormatHandler(),

@@ -20,8 +20,8 @@ from src.api.schemas.adapters import (
     AdapterCatalogListResponse,
     AdapterDetailResponse,
     AdapterEndorsementResponse,
-    AdapterLatestListResponse,
     AdapterLatestItemResponse,
+    AdapterLatestListResponse,
     AdapterMetadataResponse,
     adapter_id_from_uniqueness_key,
     latest_registry_entry,
@@ -30,12 +30,13 @@ from src.core.auth.models import AuthSession
 from src.core.registration.models import RegistryEntry
 from src.core.registration.store import RegistrationStore
 
-
 router = APIRouter()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
 AuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
-OptionalAuthSessionDep = Annotated[AuthSession | None, Depends(get_optional_auth_session)]
+OptionalAuthSessionDep = Annotated[
+    AuthSession | None, Depends(get_optional_auth_session)
+]
 
 
 # ===========================================================
@@ -79,7 +80,7 @@ def list_latest_adapters(
 ) -> AdapterLatestListResponse:
     """Return newest unique adapter cards from canonical entries."""
     return AdapterLatestListResponse(
-        items=_latest_adapter_items(store.list_registry_entries(), store) # latest 30
+        items=_latest_adapter_items(store.list_registry_entries(), store)  # latest 30
     )
 
 
@@ -98,7 +99,9 @@ def search_adapters(
         return AdapterLatestListResponse(items=[])
 
     return AdapterLatestListResponse(
-        items=_latest_adapter_items(search_entries(query, 120), store) # for search results have a safer default max amount
+        items=_latest_adapter_items(
+            search_entries(query, 120), store
+        )  # for search results have a safer default max amount
     )
 
 
@@ -128,7 +131,7 @@ def _latest_adapter_items(
                 endorsement_count=store.count_adapter_endorsements(adapter_id),
             )
         )
-        if len(items) >= 30: # show the last 30 by default(3-wide columns x 10).
+        if len(items) >= 30:  # show the last 30 by default(3-wide columns x 10).
             break
     return items
 
@@ -155,10 +158,14 @@ def get_adapter(
     return AdapterDetailResponse.from_entries(
         adapter_id,
         entries,
-        store.get_registration(latest.source_id), # this is a bit messy to have/store multiple registrations
+        store.get_registration(
+            latest.source_id
+        ),  # this is a bit messy to have/store multiple registrations
         # creates a lot of extra code to iterate entries/get latest one . not sure we even need that info.
         endorsement_count=store.count_adapter_endorsements(adapter_id),
-        endorsed_by_current_user=endorsed_by_current_user(auth_session, store, adapter_id),
+        endorsed_by_current_user=endorsed_by_current_user(
+            auth_session, store, adapter_id
+        ),
     )
 
 
@@ -167,7 +174,9 @@ def endorsed_by_current_user(
     store: RegistrationStore,
     adapter_id,
 ) -> bool:
-    return  auth_session is not None and store.has_adapter_endorsement(adapter_id, auth_session.github_login)
+    return auth_session is not None and store.has_adapter_endorsement(
+        adapter_id, auth_session.github_login
+    )
 
 
 @router.post(
@@ -187,7 +196,9 @@ def endorse_adapter(
     return AdapterEndorsementResponse(
         adapter_id=adapter_id,
         endorsement_count=store.count_adapter_endorsements(adapter_id),
-        endorsed_by_current_user=endorsed_by_current_user(auth_session, store, adapter_id),
+        endorsed_by_current_user=endorsed_by_current_user(
+            auth_session, store, adapter_id
+        ),
     )
 
 

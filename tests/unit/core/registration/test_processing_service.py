@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core.registration.models import RegistrationStatus
 from src.core.registration.errors import DuplicateRegistrationError
+from src.core.registration.models import RegistrationStatus
 from src.core.registration.service import (
     finish_registration,
     refresh_active_registrations,
@@ -273,7 +273,11 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
     (unchanged_repo / "croissant.jsonld").write_text(
         json.dumps(
             _valid_adapter_document()
-            | {"@id": "unchanged-adapter", "name": "Unchanged Adapter", "version": "1.0.0"}
+            | {
+                "@id": "unchanged-adapter",
+                "name": "Unchanged Adapter",
+                "version": "1.0.0",
+            }
         ),
         encoding="utf-8",
     )
@@ -285,7 +289,11 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
     (valid_repo / "croissant.jsonld").write_text(
         json.dumps(
             _valid_adapter_document()
-            | {"@id": "new-valid-adapter", "name": "New Valid Adapter", "version": "2.0.0"}
+            | {
+                "@id": "new-valid-adapter",
+                "name": "New Valid Adapter",
+                "version": "2.0.0",
+            }
         ),
         encoding="utf-8",
     )
@@ -367,7 +375,7 @@ def test_refresh_active_registrations_counts_duplicate_outcomes(
     (repo_b / "croissant.jsonld").write_text(json.dumps(metadata), encoding="utf-8")
 
     first = submit_registration("Duplicate Adapter", str(repo_a), store)
-    second = submit_registration("Duplicate Adapter Copy", str(repo_b), store)
+    submit_registration("Duplicate Adapter Copy", str(repo_b), store)
     finish_registration(first.registration_id, store)
 
     summary = refresh_active_registrations(store)

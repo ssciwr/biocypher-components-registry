@@ -9,7 +9,6 @@ from src.core.schema.profile import ACTIVE_PROFILE_VERSION, load_active_schema
 from src.core.validation.adapter import validate_adapter
 from src.core.validation.results import ValidationResult
 
-
 scenarios("../features/us03_versioned_validation_profile.feature")
 
 
@@ -121,7 +120,9 @@ def valid_adapter_metadata_for_validation(
         call_log.append(ACTIVE_PROFILE_VERSION)
         return original_loader()
 
-    monkeypatch.setattr("src.core.validation.adapter.load_active_schema", tracked_loader)
+    monkeypatch.setattr(
+        "src.core.validation.adapter.load_active_schema", tracked_loader
+    )
     validation_context["metadata"] = _valid_adapter_document()
     validation_context["call_log"] = call_log
 

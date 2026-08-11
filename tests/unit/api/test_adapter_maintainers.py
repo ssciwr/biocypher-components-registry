@@ -52,7 +52,9 @@ def test_latest_adapter_uses_gitlab_repository_owner(
 
     assert "maintainers" not in item
     assert maintainer["username"] == "gitlab-org"
-    assert maintainer["avatar_url"] == "https://gitlab.com/api/v4/groups/gitlab-org/avatar"
+    assert (
+        maintainer["avatar_url"] == "https://gitlab.com/api/v4/groups/gitlab-org/avatar"
+    )
     assert maintainer["profile_url"] == "https://gitlab.com/gitlab-org"
 
 

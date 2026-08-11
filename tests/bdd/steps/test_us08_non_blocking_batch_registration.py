@@ -15,7 +15,6 @@ from src.core.registration.service import (
 )
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 scenarios("../features/us08_non_blocking_batch_registration.feature")
 
 
@@ -204,7 +203,9 @@ def an_active_source_previously_failed_validation(
 
     store = SQLiteRegistrationStore(batch_registration_context["database_path"])
     registration = submit_registration("Corrected Adapter", str(repository), store)
-    batch_registration_context["corrected_registration_id"] = registration.registration_id
+    batch_registration_context["corrected_registration_id"] = (
+        registration.registration_id
+    )
     finish_registration(registration.registration_id, store)
 
 

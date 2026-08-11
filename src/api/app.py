@@ -17,7 +17,6 @@ from src.api.routers import (
 from src.api.settings import settings
 from src.core.workspace.service import SessionManager
 
-
 # ===========================================================
 # Application Factory
 # ===========================================================

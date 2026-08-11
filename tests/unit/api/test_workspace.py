@@ -63,7 +63,7 @@ def test_create_session_returns_tools_and_token(client):
     assert body["session_id"]
     assert body["session_token"]
     names = [t["name"] for t in body["tools"]]
-    assert "get_phase_guidance" in names 
+    assert "get_phase_guidance" in names
     assert "write_file" in names
 
 

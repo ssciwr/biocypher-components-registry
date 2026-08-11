@@ -14,6 +14,7 @@ from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 This file is fully AI-generated to save time and made tests easier to read/manage
 """
 
+
 def create_adapter_entry(
     store: SQLiteRegistrationStore,
     repository: Path | None,

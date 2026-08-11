@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.core.dataset.formats.base import TSV_MIME, FormatHandler, inspect_delimited_file
+from src.core.dataset.formats.base import (
+    TSV_MIME,
+    FormatHandler,
+    inspect_delimited_file,
+)
 from src.core.dataset.request import FileInspection
 
 

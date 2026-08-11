@@ -10,14 +10,20 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from src.core.adapter.cli import app as adapter_app
 from src.core.adapter.discovery import (
     discover_local_adapter,
     discover_remote_adapter,
     validate_discovered_adapter,
 )
-from src.core.adapter.cli import app as adapter_app
 from src.core.adapter.service import create_registration_request
 from src.core.dataset.cli import app as dataset_app
+from src.core.registration.models import (
+    BatchRefreshRecord,
+    RegistrationEvent,
+    RegistryEntry,
+    StoredRegistration,
+)
 from src.core.registration.service import (
     finish_registration as finish_registration_record,
 )
@@ -30,15 +36,9 @@ from src.core.registration.service import (
 from src.core.registration.service import (
     submit_registration as submit_registration_record,
 )
-from src.core.registration.models import (
-    BatchRefreshRecord,
-    RegistrationEvent,
-    RegistryEntry,
-    StoredRegistration,
-)
+from src.core.settings import settings as core_settings
 from src.core.shared.constants import METADATA_FILENAME
 from src.core.shared.files import fetch_local_metadata, parse_json_metadata
-from src.core.settings import settings as core_settings
 from src.core.validation import (
     validate_adapter_with_embedded_datasets,
     validate_dataset,

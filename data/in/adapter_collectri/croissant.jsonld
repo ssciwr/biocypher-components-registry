@@ -46,8 +46,7 @@
     "transform": "cr:transform",
     "wd": "https://www.wikidata.org/wiki/"
   },
-  "@type": "ComputationalWorkflow",
-  "@type": "sc:Dataset",
+  "@type": ["ComputationalWorkflow", "sc:Dataset"],
   "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "CollecTRI",
   "description": "CollecTRI dataset containing transcription factor regulatory interactions, integrating multi-omics and regulatory interaction data for standardized graph-based analysis.",

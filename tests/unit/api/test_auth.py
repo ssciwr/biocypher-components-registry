@@ -126,9 +126,7 @@ def test_github_payload_failures_raise_auth_error(
 
     Reject GitHub token and user payloads that omit the required fields.
     """
-    monkeypatch.setattr(
-        auth.requests, "post", Mock(return_value=_github_response({}))
-    )
+    monkeypatch.setattr(auth.requests, "post", Mock(return_value=_github_response({})))
     monkeypatch.setattr(auth.requests, "get", Mock(return_value=_github_response({})))
     with pytest.raises(HTTPException) as token_error:
         auth._github_access_token("client-id", "client-secret", "code")

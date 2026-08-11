@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import typer
 from rich.console import Console
@@ -19,7 +19,6 @@ from src.core.dataset.service import (
     ensure_supported_generator as ensure_supported_dataset_backend,
 )
 from src.core.shared.ids import slugify_identifier
-
 
 console = Console()
 _ADAPTER_GENERATOR = "native"
@@ -105,14 +104,18 @@ def _run_request(request: AdapterGenerationRequest, generator: str) -> None:
     )
 
 
-def _run_request_with_recovery(request: AdapterGenerationRequest, generator: str) -> None:
+def _run_request_with_recovery(
+    request: AdapterGenerationRequest, generator: str
+) -> None:
     """Execute a guided request and allow iterative fixes after failures."""
     while True:
         try:
             result = execute_adapter_request(request=request, generator=generator)
         except (RuntimeError, ValueError) as exc:
             console.print(f"[red]{exc}[/red]")
-            if not typer.confirm("Continue editing the adapter input data?", default=True):
+            if not typer.confirm(
+                "Continue editing the adapter input data?", default=True
+            ):
                 raise typer.Exit(code=1) from exc
             review_adapter_request(request)
             continue
@@ -161,12 +164,12 @@ def direct_cmd(
         "--code-repository",
         help="Adapter source code repository URL.",
     ),
-    dataset_paths: list[str] = typer.Option(
+    dataset_paths: list[str] = typer.Option(  # noqa: B008
         [],
         "--dataset-path",
         help="Path to an existing dataset Croissant JSON-LD file. Repeat for multiple datasets.",
     ),
-    dataset_configs: list[str] = typer.Option(
+    dataset_configs: list[str] = typer.Option(  # noqa: B008
         [],
         "--dataset-config",
         help=(
@@ -174,7 +177,7 @@ def direct_cmd(
             "All generated datasets use the same --dataset-generator."
         ),
     ),
-    creator: Optional[list[str]] = typer.Option(
+    creator: list[str] | None = typer.Option(  # noqa: B008
         None,
         "--creator",
         help=(
@@ -188,7 +191,7 @@ def direct_cmd(
         "--keywords",
         help="Comma-separated adapter keywords.",
     ),
-    adapter_id: Optional[str] = typer.Option(
+    adapter_id: str | None = typer.Option(
         None,
         "--adapter-id",
         help="Optional explicit adapter @id.",
@@ -282,7 +285,7 @@ def config_cmd(
         "--dataset-generator",
         help=_DATASET_GENERATOR_HELP,
     ),
-    output: Optional[str] = typer.Option(
+    output: str | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -393,7 +396,9 @@ def _build_dataset_request_from_block(payload: dict[str, object]) -> GenerationR
     """Build one nested dataset request from a parsed CLI block."""
     input_path = str(payload.get("input_path", "")).strip()
     if not input_path:
-        raise typer.BadParameter("Each --dataset block must define --input or --dataset-input.")
+        raise typer.BadParameter(
+            "Each --dataset block must define --input or --dataset-input."
+        )
 
     creators = payload.get("creators", [])
     if not isinstance(creators, list):
@@ -479,7 +484,9 @@ def _edit_name(request: AdapterGenerationRequest) -> None:
 
 
 def _edit_description(request: AdapterGenerationRequest) -> None:
-    request.description = typer.prompt("Description [required]", default=request.description)
+    request.description = typer.prompt(
+        "Description [required]", default=request.description
+    )
 
 
 def _edit_version(request: AdapterGenerationRequest) -> None:
@@ -501,11 +508,15 @@ def _edit_code_repository(request: AdapterGenerationRequest) -> None:
 
 
 def _edit_output(request: AdapterGenerationRequest) -> None:
-    request.output_path = typer.prompt("Output JSON-LD file", default=request.output_path)
+    request.output_path = typer.prompt(
+        "Output JSON-LD file", default=request.output_path
+    )
 
 
 def _edit_validate(request: AdapterGenerationRequest) -> None:
-    request.validate = typer.confirm("Validate generated metadata?", default=request.validate)
+    request.validate = typer.confirm(
+        "Validate generated metadata?", default=request.validate
+    )
 
 
 def _edit_dataset_generator(request: AdapterGenerationRequest) -> None:
@@ -517,7 +528,9 @@ def _edit_dataset_generator(request: AdapterGenerationRequest) -> None:
 
 
 def _edit_keywords(request: AdapterGenerationRequest) -> None:
-    request.keywords = _prompt_required_keywords("Keywords (comma-separated) [required]")
+    request.keywords = _prompt_required_keywords(
+        "Keywords (comma-separated) [required]"
+    )
 
 
 def _edit_creators(request: AdapterGenerationRequest) -> None:
@@ -529,7 +542,9 @@ def _edit_datasets(request: AdapterGenerationRequest) -> None:
 
 
 def _edit_adapter_id(request: AdapterGenerationRequest) -> None:
-    request.adapter_id = _prompt_optional("Adapter @id", default=request.adapter_id or "")
+    request.adapter_id = _prompt_optional(
+        "Adapter @id", default=request.adapter_id or ""
+    )
 
 
 _REQUEST_EDIT_HANDLERS: dict[str, Callable[[AdapterGenerationRequest], None]] = {
@@ -555,7 +570,9 @@ def review_adapter_request(request: AdapterGenerationRequest) -> None:
         if typer.confirm("Proceed with these values?", default=True):
             return
 
-        choice = _prompt_choice("What do you want to edit?", set(_REQUEST_EDIT_HANDLERS))
+        choice = _prompt_choice(
+            "What do you want to edit?", set(_REQUEST_EDIT_HANDLERS)
+        )
         _REQUEST_EDIT_HANDLERS[choice](request)
 
 
@@ -570,7 +587,9 @@ def _print_request_summary(request: AdapterGenerationRequest) -> None:
     console.print(f"  output: {request.output_path}")
     console.print(f"  validate: {request.validate}")
     console.print(f"  dataset-generator: {request.dataset_generator}")
-    console.print(f"  keywords: {', '.join(request.keywords) if request.keywords else '-'}")
+    console.print(
+        f"  keywords: {', '.join(request.keywords) if request.keywords else '-'}"
+    )
     console.print(f"  adapter-id: {request.adapter_id or '-'}")
     for index, creator in enumerate(request.creators, start=1):
         console.print(f"  creator[{index}]: {creator}")
@@ -637,7 +656,9 @@ def _prompt_creators() -> list[str]:
 
 def _prompt_dataset_inputs() -> tuple[list[str], list[GenerationRequest]]:
     """Collect embedded dataset inputs for the adapter request."""
-    console.print(Panel.fit("[bold]Embedded Dataset Metadata[/bold]", border_style="magenta"))
+    console.print(
+        Panel.fit("[bold]Embedded Dataset Metadata[/bold]", border_style="magenta")
+    )
     console.print(
         "Each embedded dataset can come from an existing Croissant file, a shared dataset "
         "generator run.\n"

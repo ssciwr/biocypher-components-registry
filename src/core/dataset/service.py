@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import typer
 
-from src.core.dataset.request import GenerationRequest
 from src.core.dataset.backends import list_generators, resolve_generator
 from src.core.dataset.backends.croissant_baker import (
     build_croissant_baker_command as _build_croissant_baker_command,
 )
-from src.core.dataset.request import GenerationResult
+from src.core.dataset.request import GenerationRequest, GenerationResult
 from src.core.shared.errors import GeneratorError
 
 
@@ -41,7 +40,9 @@ def execute_request(
     ensure_supported_generator(generator)
     try:
         resolved = resolve_generator(generator)
-        if getattr(resolved, "name", "") == "croissant-baker" and hasattr(resolved, "executable"):
+        if getattr(resolved, "name", "") == "croissant-baker" and hasattr(
+            resolved, "executable"
+        ):
             resolved.executable = executable
         return resolved.generate(request=request)
     except GeneratorError as exc:

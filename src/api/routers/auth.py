@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import hmac
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-import hmac
 from secrets import token_urlsafe
 from typing import Annotated, Any
 from urllib.parse import urlencode
@@ -26,7 +26,6 @@ from src.api.schemas.auth import AuthMeResponse
 from src.api.settings import settings
 from src.core.auth.models import AuthSession
 from src.persistence.auth_store import AuthSessionStore
-
 
 router = APIRouter()
 AuthSessionCookie = Annotated[

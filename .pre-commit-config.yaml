@@ -10,7 +10,7 @@ exclude: |
   (?x)^(
     \.venv/|
     frontend/dist/|
-    frontend/node_modules/|
+    frontend/node_modules/
   )
 
 repos:
@@ -26,6 +26,7 @@ repos:
       - id: check-ast
       - id: check-case-conflict
       - id: check-json
+        exclude: (^|/)tsconfig.*\.json$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml

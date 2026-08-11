@@ -111,7 +111,9 @@ async def get_session(session: WorkspaceSessionDep) -> SessionStateResponse:
     ),
     responses=workspace_error_responses(401),
 )
-async def delete_session(session: WorkspaceSessionDep, manager: SessionManagerDep) -> None:
+async def delete_session(
+    session: WorkspaceSessionDep, manager: SessionManagerDep
+) -> None:
     """Delete one workspace session and everything it owns."""
     await manager.delete(session.id)
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import typer
 from rich.console import Console
@@ -13,6 +13,8 @@ from rich.text import Text
 from src.core.dataset.config import request_from_config
 from src.core.dataset.request import (
     GenerationRequest as DatasetGenerationRequest,
+)
+from src.core.dataset.request import (
     GenerationResult,
 )
 from src.core.dataset.service import (
@@ -20,7 +22,6 @@ from src.core.dataset.service import (
     ensure_supported_generator,
     execute_request,
 )
-
 
 console = Console()
 _GENERATOR_HELP = "Dataset generator implementation."
@@ -55,7 +56,9 @@ def _run_request(
     )
 
 
-def _run_request_with_recovery(request: DatasetGenerationRequest, generator: str) -> None:
+def _run_request_with_recovery(
+    request: DatasetGenerationRequest, generator: str
+) -> None:
     """Execute a guided dataset request and allow edits after failures."""
     mode = "guided"
     while True:
@@ -178,7 +181,7 @@ def guided_cmd(
         "--generator",
         help=_GENERATOR_HELP,
     ),
-    input_path: Optional[str] = typer.Option(
+    input_path: str | None = typer.Option(
         None,
         "--input",
         help="Dataset directory passed to the selected generator.",
@@ -216,7 +219,7 @@ def config_cmd(
         "--generator",
         help=_GENERATOR_HELP,
     ),
-    output: Optional[str] = typer.Option(
+    output: str | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -257,24 +260,22 @@ def direct_cmd(
         "--validate/--no-validate",
         help="Run generator validation when supported.",
     ),
-    name: Optional[str] = typer.Option(None, "--name", help="Dataset name."),
-    description: Optional[str] = typer.Option(
+    name: str | None = typer.Option(None, "--name", help="Dataset name."),
+    description: str | None = typer.Option(
         None, "--description", help="Dataset description."
     ),
-    url: Optional[str] = typer.Option(None, "--url", help="Dataset URL."),
-    license_value: Optional[str] = typer.Option(
+    url: str | None = typer.Option(None, "--url", help="Dataset URL."),
+    license_value: str | None = typer.Option(
         None, "--license", help="Dataset license."
     ),
-    citation: Optional[str] = typer.Option(
-        None, "--citation", help="Dataset citation."
-    ),
-    dataset_version: Optional[str] = typer.Option(
+    citation: str | None = typer.Option(None, "--citation", help="Dataset citation."),
+    dataset_version: str | None = typer.Option(
         None, "--dataset-version", help="Dataset version."
     ),
-    date_published: Optional[str] = typer.Option(
+    date_published: str | None = typer.Option(
         None, "--date-published", help="Dataset publication date."
     ),
-    creators: list[str] = typer.Option(
+    creators: list[str] = typer.Option(  # noqa: B008
         None,
         "--creator",
         help="Creator as 'name[,email[,url]]'. Repeat to add more.",
@@ -306,7 +307,9 @@ def prompt_for_request(
 ) -> DatasetGenerationRequest:
     """Interactively collect dataset metadata for one generation run."""
     console.print("\n[bold cyan]Dataset Generator[/bold cyan]")
-    console.print("This guided mode collects metadata and then runs the selected generator.\n")
+    console.print(
+        "This guided mode collects metadata and then runs the selected generator.\n"
+    )
 
     selected_input = input_path or typer.prompt("Dataset input directory [required]")
     selected_output = typer.prompt("Output JSON-LD file", default=output_path)
@@ -383,7 +386,9 @@ def _edit_name(request: DatasetGenerationRequest) -> None:
 
 
 def _edit_description(request: DatasetGenerationRequest) -> None:
-    request.description = _prompt_optional("Description", default=request.description or "")
+    request.description = _prompt_optional(
+        "Description", default=request.description or ""
+    )
 
 
 def _edit_url(request: DatasetGenerationRequest) -> None:
@@ -391,7 +396,9 @@ def _edit_url(request: DatasetGenerationRequest) -> None:
 
 
 def _edit_license(request: DatasetGenerationRequest) -> None:
-    request.license_value = _prompt_optional("License", default=request.license_value or "")
+    request.license_value = _prompt_optional(
+        "License", default=request.license_value or ""
+    )
 
 
 def _edit_citation(request: DatasetGenerationRequest) -> None:
@@ -437,7 +444,9 @@ def review_request(request: DatasetGenerationRequest) -> None:
         if typer.confirm("Proceed with these values?", default=True):
             return
 
-        choice = _prompt_choice("What do you want to edit?", set(_REQUEST_EDIT_HANDLERS))
+        choice = _prompt_choice(
+            "What do you want to edit?", set(_REQUEST_EDIT_HANDLERS)
+        )
         _REQUEST_EDIT_HANDLERS[choice](request)
 
 
@@ -558,9 +567,9 @@ def _format_command_preview(command: list[str]) -> str:
     index = 1
     while index < len(command):
         current = shlex.quote(command[index])
-        next_token_is_value = (
-            index + 1 < len(command) and not command[index + 1].startswith("--")
-        )
+        next_token_is_value = index + 1 < len(command) and not command[
+            index + 1
+        ].startswith("--")
         if next_token_is_value:
             current = f"{current} {shlex.quote(command[index + 1])}"
             index += 1

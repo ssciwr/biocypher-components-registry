@@ -8,8 +8,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import func, insert, select, update
-from sqlalchemy.engine import Engine
-from sqlalchemy.engine import RowMapping
+from sqlalchemy.engine import Engine, RowMapping
 from sqlalchemy.exc import IntegrityError
 
 from src.core.adapter.request import AdapterRegistrationRequest
@@ -21,10 +20,12 @@ from src.core.registration.models import (
     BatchRefreshRecord,
     BatchRefreshSummary,
     RegistrationEvent,
-    RegistryEntry,
     RegistrationStatus,
+    RegistryEntry,
     StoredRegistration,
 )
+from src.core.shared.files import fetch_local_metadata
+from src.core.shared.ids import slugify_identifier
 from src.persistence.tables import (
     adapter_endorsements_table,
     registration_events_table,
@@ -32,8 +33,6 @@ from src.persistence.tables import (
     registry_entries_table,
     registry_refreshes_table,
 )
-from src.core.shared.files import fetch_local_metadata
-from src.core.shared.ids import slugify_identifier
 
 
 class SQLAlchemyRegistrationStore:
@@ -148,29 +147,37 @@ class SQLAlchemyRegistrationStore:
     def list_registration_events(self, registration_id: str) -> list[RegistrationEvent]:
         """Return event history for one registration in chronological order."""
         with self.engine.connect() as connection:
-            rows = connection.execute(
-                select(registration_events_table)
-                .where(registration_events_table.c.source_id == registration_id)
-                .order_by(
-                    registration_events_table.c.started_at,
-                    registration_events_table.c.finished_at,
-                    registration_events_table.c.id,
+            rows = (
+                connection.execute(
+                    select(registration_events_table)
+                    .where(registration_events_table.c.source_id == registration_id)
+                    .order_by(
+                        registration_events_table.c.started_at,
+                        registration_events_table.c.finished_at,
+                        registration_events_table.c.id,
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
 
         return [self._event_row_to_event(row) for row in rows]
 
     def list_registry_entries(self) -> list[RegistryEntry]:
         """Return active canonical registry entries in stable creation order."""
         with self.engine.connect() as connection:
-            rows = connection.execute(
-                select(registry_entries_table)
-                .where(registry_entries_table.c.is_active.is_(True))
-                .order_by(
-                    registry_entries_table.c.created_at,
-                    registry_entries_table.c.id,
+            rows = (
+                connection.execute(
+                    select(registry_entries_table)
+                    .where(registry_entries_table.c.is_active.is_(True))
+                    .order_by(
+                        registry_entries_table.c.created_at,
+                        registry_entries_table.c.id,
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
 
         return [self._registry_entry_row_to_entry(row) for row in rows]
 
@@ -185,34 +192,42 @@ class SQLAlchemyRegistrationStore:
             return []
 
         with self.engine.connect() as connection:
-            rows = connection.execute(
-                select(registry_entries_table)
-                .where(
-                    registry_entries_table.c.is_active.is_(True),
-                    registry_entries_table.c.adapter_name.icontains(
-                        search_term,
-                        autoescape=True,
-                    ),
+            rows = (
+                connection.execute(
+                    select(registry_entries_table)
+                    .where(
+                        registry_entries_table.c.is_active.is_(True),
+                        registry_entries_table.c.adapter_name.icontains(
+                            search_term,
+                            autoescape=True,
+                        ),
+                    )
+                    .order_by(
+                        registry_entries_table.c.updated_at.desc(),
+                        registry_entries_table.c.created_at.desc(),
+                        registry_entries_table.c.id.desc(),
+                    )
+                    .limit(limit)
                 )
-                .order_by(
-                    registry_entries_table.c.updated_at.desc(),
-                    registry_entries_table.c.created_at.desc(),
-                    registry_entries_table.c.id.desc(),
-                )
-                .limit(limit)
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
 
         return [self._registry_entry_row_to_entry(row) for row in rows]
 
     def get_registry_entry(self, entry_id: str) -> RegistryEntry | None:
         """Return one active canonical registry entry by identifier when it exists."""
         with self.engine.connect() as connection:
-            row = connection.execute(
-                select(registry_entries_table).where(
-                    registry_entries_table.c.id == entry_id,
-                    registry_entries_table.c.is_active.is_(True),
+            row = (
+                connection.execute(
+                    select(registry_entries_table).where(
+                        registry_entries_table.c.id == entry_id,
+                        registry_entries_table.c.is_active.is_(True),
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
 
         if row is None:
             return None
@@ -236,8 +251,7 @@ class SQLAlchemyRegistrationStore:
             return
 
     def count_adapter_endorsements(self, adapter_id: str) -> int:
-        """Count distinct GitHub endorsements for the adapter.
-        """
+        """Count distinct GitHub endorsements for the adapter."""
         with self.engine.connect() as connection:
             count = connection.execute(
                 select(func.count())
@@ -249,11 +263,14 @@ class SQLAlchemyRegistrationStore:
     def has_adapter_endorsement(self, adapter_id: str, github_login: str) -> bool:
         """Has this given user (usually the logged in user) already given an endorsement for this adapter?"""
         with self.engine.connect() as connection:
-            return self._adapter_endorsement_row(
-                connection,
-                adapter_id,
-                github_login,
-            ) is not None
+            return (
+                self._adapter_endorsement_row(
+                    connection,
+                    adapter_id,
+                    github_login,
+                )
+                is not None
+            )
 
     def record_batch_refresh(
         self,
@@ -297,13 +314,17 @@ class SQLAlchemyRegistrationStore:
     def get_latest_batch_refresh(self) -> BatchRefreshRecord | None:
         """Return the most recent batch refresh summary when one exists."""
         with self.engine.connect() as connection:
-            row = connection.execute(
-                select(registry_refreshes_table).order_by(
-                    registry_refreshes_table.c.finished_at.desc(),
-                    registry_refreshes_table.c.started_at.desc(),
-                    registry_refreshes_table.c.id.desc(),
+            row = (
+                connection.execute(
+                    select(registry_refreshes_table).order_by(
+                        registry_refreshes_table.c.finished_at.desc(),
+                        registry_refreshes_table.c.started_at.desc(),
+                        registry_refreshes_table.c.id.desc(),
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
 
         if row is None:
             return None
@@ -326,10 +347,13 @@ class SQLAlchemyRegistrationStore:
 
         try:
             with self.engine.begin() as connection:
-                current_entry = self._current_registry_entry(connection, registration_id)
+                current_entry = self._current_registry_entry(
+                    connection, registration_id
+                )
                 if (
                     current_entry is not None
-                    and str(current_entry["metadata_checksum"] or "") == observed_checksum
+                    and str(current_entry["metadata_checksum"] or "")
+                    == observed_checksum
                 ):
                     connection.execute(
                         update(registration_sources_table)
@@ -378,11 +402,15 @@ class SQLAlchemyRegistrationStore:
                         False: (
                             "REJECTED_SAME_VERSION_CHANGED",
                             "Changed metadata for the same adapter id and version was rejected.",
-                            "Registration rejected because metadata changed for an existing "
-                            f"adapter id and version: {uniqueness_key}. Please bump the version.",
+                            (
+                                "Registration rejected because metadata changed for an existing "
+                                f"adapter id and version: {uniqueness_key}. Please bump the version."
+                            ),
                         ),
                     }
-                    event_type, message, error_message = duplicate_outcomes[same_checksum]
+                    event_type, message, error_message = duplicate_outcomes[
+                        same_checksum
+                    ]
                     connection.execute(
                         update(registration_sources_table)
                         .where(registration_sources_table.c.id == registration_id)
@@ -610,11 +638,15 @@ class SQLAlchemyRegistrationStore:
         registration_id: str,
     ) -> RowMapping | None:
         """Load one source row when it exists."""
-        return connection.execute(
-            select(registration_sources_table).where(
-                registration_sources_table.c.id == registration_id
+        return (
+            connection.execute(
+                select(registration_sources_table).where(
+                    registration_sources_table.c.id == registration_id
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _current_registry_entry(
         self,
@@ -625,11 +657,16 @@ class SQLAlchemyRegistrationStore:
         source_row = self._source_row(connection, source_id)
         if source_row is None or source_row["current_registry_entry_id"] is None:
             return None
-        return connection.execute(
-            select(registry_entries_table).where(
-                registry_entries_table.c.id == source_row["current_registry_entry_id"]
+        return (
+            connection.execute(
+                select(registry_entries_table).where(
+                    registry_entries_table.c.id
+                    == source_row["current_registry_entry_id"]
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _latest_event_for_source(
         self,
@@ -637,15 +674,19 @@ class SQLAlchemyRegistrationStore:
         source_id: str,
     ) -> RowMapping | None:
         """Load the latest event row for one source when it exists."""
-        return connection.execute(
-            select(registration_events_table)
-            .where(registration_events_table.c.source_id == source_id)
-            .order_by(
-                registration_events_table.c.finished_at.desc(),
-                registration_events_table.c.started_at.desc(),
-                registration_events_table.c.id.desc(),
+        return (
+            connection.execute(
+                select(registration_events_table)
+                .where(registration_events_table.c.source_id == source_id)
+                .order_by(
+                    registration_events_table.c.finished_at.desc(),
+                    registration_events_table.c.started_at.desc(),
+                    registration_events_table.c.id.desc(),
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _registry_entry_by_uniqueness_key(
         self,
@@ -653,11 +694,15 @@ class SQLAlchemyRegistrationStore:
         uniqueness_key: str,
     ) -> RowMapping | None:
         """Load one canonical registry entry by uniqueness key when it exists."""
-        return connection.execute(
-            select(registry_entries_table).where(
-                registry_entries_table.c.uniqueness_key == uniqueness_key
+        return (
+            connection.execute(
+                select(registry_entries_table).where(
+                    registry_entries_table.c.uniqueness_key == uniqueness_key
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _registration_source_by_repository_location(
         self,
@@ -665,12 +710,16 @@ class SQLAlchemyRegistrationStore:
         repository_location: str,
     ) -> RowMapping | None:
         """Load one registration source for a normalized repository location."""
-        return connection.execute(
-            select(registration_sources_table).where(
-                registration_sources_table.c.repository_location
-                == repository_location
+        return (
+            connection.execute(
+                select(registration_sources_table).where(
+                    registration_sources_table.c.repository_location
+                    == repository_location
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _adapter_endorsement_row(
         self,
@@ -679,12 +728,16 @@ class SQLAlchemyRegistrationStore:
         github_login: str,
     ) -> RowMapping | None:
         """Load an endorsement row for one adapter/login pair."""
-        return connection.execute(
-            select(adapter_endorsements_table).where(
-                adapter_endorsements_table.c.adapter_id == adapter_id,
-                adapter_endorsements_table.c.github_login == github_login,
+        return (
+            connection.execute(
+                select(adapter_endorsements_table).where(
+                    adapter_endorsements_table.c.adapter_id == adapter_id,
+                    adapter_endorsements_table.c.github_login == github_login,
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     def _event_row_to_event(self, event_row: RowMapping) -> RegistrationEvent:
         """Convert one event row into the public core event model."""
@@ -773,7 +826,9 @@ class SQLAlchemyRegistrationStore:
         latest_event_type = (
             str(latest_event["event_type"]) if latest_event is not None else "SUBMITTED"
         )
-        current_metadata = self._parse_json(current_entry["metadata_json"]) if current_entry else None
+        current_metadata = (
+            self._parse_json(current_entry["metadata_json"]) if current_entry else None
+        )
         latest_event_metadata = (
             self._parse_json(latest_event["metadata_json"])
             if latest_event is not None and latest_event["metadata_json"]
@@ -791,7 +846,9 @@ class SQLAlchemyRegistrationStore:
         uniqueness_key = (
             str(current_entry["uniqueness_key"])
             if current_entry is not None and current_entry["uniqueness_key"] is not None
-            else self._best_effort_uniqueness_key(metadata, str(source_row["submitted_adapter_name"]))
+            else self._best_effort_uniqueness_key(
+                metadata, str(source_row["submitted_adapter_name"])
+            )
         )
         validation_errors = (
             self._parse_error_details(str(latest_event["error_details"]))
@@ -899,7 +956,11 @@ class SQLAlchemyRegistrationStore:
         """Choose which metadata payload best represents the registration state."""
         if latest_event_type.startswith("INVALID_"):
             return latest_event_metadata
-        if latest_event_type in {"DUPLICATE", "REJECTED_SAME_VERSION_CHANGED", "FETCH_FAILED"}:
+        if latest_event_type in {
+            "DUPLICATE",
+            "REJECTED_SAME_VERSION_CHANGED",
+            "FETCH_FAILED",
+        }:
             return latest_event_metadata
         if current_metadata is not None:
             return current_metadata
@@ -910,7 +971,9 @@ class SQLAlchemyRegistrationStore:
         if str(source_row["source_kind"]) != "local":
             return None
         try:
-            metadata_path, _ = fetch_local_metadata(str(source_row["repository_location"]))
+            metadata_path, _ = fetch_local_metadata(
+                str(source_row["repository_location"])
+            )
         except Exception:  # noqa: BLE001
             return None
         return str(metadata_path)

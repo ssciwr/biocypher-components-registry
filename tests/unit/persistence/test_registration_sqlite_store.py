@@ -138,7 +138,11 @@ def test_sqlite_store_lists_active_registrations_with_check_state(
 
     store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",
@@ -168,7 +172,11 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
 
     updated = store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",
@@ -346,7 +354,11 @@ def test_sqlite_store_lists_active_registry_entries(tmp_path: Path) -> None:
     created = store.create_registration(request)
     store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",
@@ -383,7 +395,11 @@ def test_sqlite_store_loads_registry_entry_by_identifier(tmp_path: Path) -> None
     created = store.create_registration(request)
     store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",
@@ -465,7 +481,11 @@ def test_sqlite_store_get_registration_reconstructs_status_from_three_tables(
 
     store.mark_registration_valid(
         registration_id=created.registration_id,
-        metadata={"@id": "example-adapter", "name": "Example Adapter", "version": "1.0.0"},
+        metadata={
+            "@id": "example-adapter",
+            "name": "Example Adapter",
+            "version": "1.0.0",
+        },
         metadata_path=str(repository / "croissant.jsonld"),
         profile_version="v1",
         uniqueness_key="example-adapter::1.0.0",

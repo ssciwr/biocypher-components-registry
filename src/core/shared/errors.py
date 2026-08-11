@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class GeneratorError(RuntimeError):
     """Base error for generation failures."""
 
@@ -68,6 +69,7 @@ class MetadataNotFoundError(RemoteResourceNotFoundError):
             status_code=404,
             message="Metadata file not found for repository URL.",
         )
+
 
 __all__ = [
     "AmbiguousMetadataFileError",

@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from src.core.registration.models import RegistryEntry, StoredRegistration
 
-
 # ===========================================================
 # =====================  Output Models ======================
 # ===========================================================
@@ -35,7 +34,7 @@ class AdapterMaintainerResponse(BaseModel):
     def from_repository_location(
         cls,
         repository_location: str | None,
-    ) -> "AdapterMaintainerResponse | None":
+    ) -> AdapterMaintainerResponse | None:
         """
         Build public maintainer display data from the repository URL owner.
         """
@@ -78,7 +77,7 @@ class AdapterCatalogItemResponse(BaseModel):
         adapter_id: str,
         entries: list[RegistryEntry],
         endorsement_count: int = 0,
-    ) -> "AdapterCatalogItemResponse":
+    ) -> AdapterCatalogItemResponse:
         """Build one catalog item from the canonical entries for an adapter."""
         latest = latest_registry_entry(entries)
         return cls(
@@ -110,11 +109,13 @@ class AdapterLatestItemResponse(BaseModel):
         registration: StoredRegistration | None,
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
-    ) -> "AdapterLatestItemResponse":
+    ) -> AdapterLatestItemResponse:
         """Build a compact catalog card from entry and source data."""
         metadata = entry.metadata or {}
         repository_location = registration.repository_location
-        maintainer = AdapterMaintainerResponse.from_repository_location(repository_location)
+        maintainer = AdapterMaintainerResponse.from_repository_location(
+            repository_location
+        )
         return cls(
             adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
             adapter_name=entry.adapter_name,
@@ -166,12 +167,14 @@ class AdapterDetailResponse(BaseModel):
         registration: StoredRegistration | None = None,
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
-    ) -> "AdapterDetailResponse":
+    ) -> AdapterDetailResponse:
         """Build adapter detail from canonical entry and source data."""
         latest = latest_registry_entry(entries)
         metadata = latest.metadata or {}
         repository_location = registration.repository_location
-        maintainer = AdapterMaintainerResponse.from_repository_location(repository_location)
+        maintainer = AdapterMaintainerResponse.from_repository_location(
+            repository_location
+        )
         return cls(
             adapter_id=adapter_id,
             adapter_name=latest.adapter_name,
@@ -179,7 +182,9 @@ class AdapterDetailResponse(BaseModel):
             description=_metadata_text(metadata, "description"),
             repository_location=repository_location,
             license_value=(
-                registration.license_value if registration and registration.license_value else _metadata_text(metadata, "license")
+                registration.license_value
+                if registration and registration.license_value
+                else _metadata_text(metadata, "license")
             ),
             doi=registration.doi if registration else None,
             cff_url=registration.cff_url if registration else None,
@@ -199,7 +204,7 @@ class AdapterMetadataResponse(BaseModel):
     metadata: dict[str, Any]
 
     @classmethod
-    def from_entry(cls, entry: RegistryEntry) -> "AdapterMetadataResponse":
+    def from_entry(cls, entry: RegistryEntry) -> AdapterMetadataResponse:
         """Build a metadata response from a canonical registry entry."""
         return cls(
             adapter_id=adapter_id_from_uniqueness_key(entry.uniqueness_key),
@@ -233,7 +238,7 @@ def _repository_url(repository_location: str | None) -> ParseResult | None:
         f"https://{repository_location}"
         if repository_location.startswith(("github.com/", "gitlab.com/"))
         else repository_location
-    ) # we assume institution hosting Gitlab etc has https.
+    )  # we assume institution hosting Gitlab etc has https.
     parsed = urlparse(normalized)
     if parsed.scheme != "https" or not parsed.netloc:
         return None
@@ -276,7 +281,9 @@ def _is_gitlab_host(host: str) -> bool:
     return normalized_host == "gitlab.com" or normalized_host.startswith("gitlab.")
 
 
-def data_sources_from_metadata(metadata: dict[str, Any]) -> list[AdapterDataSourceResponse]:
+def data_sources_from_metadata(
+    metadata: dict[str, Any],
+) -> list[AdapterDataSourceResponse]:
     """Extract embedded Croissant dataset summaries for detail pages."""
     has_part = metadata.get("hasPart")
     raw_sources = has_part if isinstance(has_part, list) else [has_part]

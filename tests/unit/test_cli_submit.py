@@ -10,7 +10,6 @@ from src.core.adapter.service import create_registration_request
 from src.core.settings import settings as core_settings
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 runner = CliRunner()
 
 
@@ -242,8 +241,7 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path: Path) -
 
 
 def test_seed_demo_adapters_command_is_idempotent(tmp_path: Path) -> None:
-    """"// backend change made by jmsssc to adopt workshop feedback hence testing
-    """
+    """ "// backend change made by jmsssc to adopt workshop feedback hence testing"""
     database_path = tmp_path / "registry.sqlite3"
 
     first = runner.invoke(app, ["seed-demo-adapters", "--db-path", str(database_path)])

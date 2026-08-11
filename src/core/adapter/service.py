@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlparse
 
-from src.core.adapter.request import (
-    AdapterGenerationRequest,
-    AdapterRegistrationRequest,
-)
 from src.core.adapter.backends import (
     list_adapter_generators,
     resolve_adapter_generator,
+)
+from src.core.adapter.request import (
+    AdapterGenerationRequest,
+    AdapterRegistrationRequest,
 )
 from src.core.dataset.request import GenerationResult
 from src.core.shared.errors import GeneratorError, InvalidRepoURLError
@@ -74,7 +74,9 @@ def create_registration_request(
     if not normalized_name:
         raise ValueError("Adapter name is required.")
 
-    normalized_location = _normalize_repository_into_pure_branchless_location(repository_location)
+    normalized_location = _normalize_repository_into_pure_branchless_location(
+        repository_location
+    )
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
@@ -107,7 +109,9 @@ def create_registration_request(
     )
 
 
-def _normalize_repository_into_pure_branchless_location(repository_location: str) -> str:
+def _normalize_repository_into_pure_branchless_location(
+    repository_location: str,
+) -> str:
     normalized_location = repository_location.strip()
     if normalized_location.startswith(("github.com/", "gitlab.com/")):
         normalized_location = f"https://{normalized_location}"
@@ -122,13 +126,17 @@ def _normalize_repository_into_pure_branchless_location(repository_location: str
                 path_parts = path_parts[:marker_index]
         if path_parts:
             path_parts[-1] = path_parts[-1].removesuffix(".git")
-        return parsed_location._replace(
-            netloc=parsed_location.netloc.lower(),
-            path=f"/{'/'.join(path_parts)}" if path_parts else "",
-            params="",
-            query="",
-            fragment="",
-        ).geturl().rstrip("/")
+        return (
+            parsed_location._replace(
+                netloc=parsed_location.netloc.lower(),
+                path=f"/{'/'.join(path_parts)}" if path_parts else "",
+                params="",
+                query="",
+                fragment="",
+            )
+            .geturl()
+            .rstrip("/")
+        )
     return normalized_location
 
 

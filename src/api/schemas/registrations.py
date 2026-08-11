@@ -25,7 +25,9 @@ REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
 class RegistrationCreateRequest(BaseModel):
     """Request body for creating an adapter registration."""
 
-    model_config = ConfigDict(json_schema_extra={"example": REGISTRATION_CREATE_EXAMPLE})
+    model_config = ConfigDict(
+        json_schema_extra={"example": REGISTRATION_CREATE_EXAMPLE}
+    )
 
     adapter_name: str = Field(
         ...,
@@ -88,7 +90,9 @@ class RegistrationCreateResponse(BaseModel):
     submitted_by_github_login: str | None = None
 
     @classmethod
-    def from_stored(cls, registration: StoredRegistration) -> "RegistrationCreateResponse":
+    def from_stored(
+        cls, registration: StoredRegistration
+    ) -> RegistrationCreateResponse:
         """Build an API response from a stored core registration model."""
         return cls(
             registration_id=registration.registration_id,
@@ -116,7 +120,9 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
     validation_errors: list[str] | None = None
 
     @classmethod
-    def from_stored(cls, registration: StoredRegistration) -> "RegistrationDetailResponse":
+    def from_stored(
+        cls, registration: StoredRegistration
+    ) -> RegistrationDetailResponse:
         """Build a detailed API response from a stored core registration model."""
         return cls(
             registration_id=registration.registration_id,
@@ -147,7 +153,9 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
     uniqueness_key: str | None = None
 
     @classmethod
-    def from_stored(cls, registration: StoredRegistration) -> "RegistrationListItemResponse":
+    def from_stored(
+        cls, registration: StoredRegistration
+    ) -> RegistrationListItemResponse:
         """Build a list item response from a stored core registration model."""
         return cls(
             registration_id=registration.registration_id,
@@ -196,7 +204,7 @@ class RegistrationEventResponse(BaseModel):
     finished_at: datetime | None = None
 
     @classmethod
-    def from_event(cls, event: RegistrationEvent) -> "RegistrationEventResponse":
+    def from_event(cls, event: RegistrationEvent) -> RegistrationEventResponse:
         """Build an API response from a core registration event model."""
         return cls(
             event_id=event.event_id,

@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from src.core.workspace import client_loop as cl
 from src.core.workspace.service import Session
 
-
 # ===========================================================
 # =====================  Input Models =======================
 # ===========================================================
@@ -55,7 +54,7 @@ class SessionCreateResponse(BaseModel):
     tools: list[ToolDescriptor]
 
     @classmethod
-    def from_session(cls, session: Session) -> "SessionCreateResponse":
+    def from_session(cls, session: Session) -> SessionCreateResponse:
         """Build the create-session response from a live session."""
         return cls(
             session_id=session.id,
@@ -76,7 +75,7 @@ class SessionStateResponse(BaseModel):
     tools: list[ToolDescriptor]
 
     @classmethod
-    def from_session(cls, session: Session) -> "SessionStateResponse":
+    def from_session(cls, session: Session) -> SessionStateResponse:
         """Build the session-state response from a live session."""
         return cls(
             session_id=session.id,

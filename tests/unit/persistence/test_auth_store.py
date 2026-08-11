@@ -36,7 +36,9 @@ def test_auth_session_store_creates_reads_and_deletes_session(tmp_path: Path) ->
     assert store.get_session(token) is None
 
 
-def test_auth_session_store_ignores_missing_and_expired_sessions(tmp_path: Path) -> None:
+def test_auth_session_store_ignores_missing_and_expired_sessions(
+    tmp_path: Path,
+) -> None:
     """AI-Generated.
 
     Treat unknown and expired browser session tokens as anonymous users.

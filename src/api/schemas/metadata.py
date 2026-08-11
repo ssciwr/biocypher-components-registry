@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.core.shared.constants import CROISSANT_CONFORMS_TO_URL, STANDARD_CONTEXT
 from src.core.validation.results import ValidationCheck, ValidationResult
 
-
 # ===========================================================
 # =====================  OpenAPI Examples ===================
 # ===========================================================
@@ -315,7 +314,7 @@ class MetadataValidationCheckResponse(BaseModel):
     def from_check(
         cls,
         check: ValidationCheck,
-    ) -> "MetadataValidationCheckResponse":
+    ) -> MetadataValidationCheckResponse:
         """Build an API response from a core validation check."""
         return cls(
             name=check.name,
@@ -339,7 +338,7 @@ class MetadataValidationResponse(BaseModel):
         *,
         kind: Literal["adapter", "dataset"],
         result: ValidationResult,
-    ) -> "MetadataValidationResponse":
+    ) -> MetadataValidationResponse:
         """Build an API response from a core validation result."""
         return cls(
             kind=kind,

@@ -13,7 +13,6 @@ from src.core.adapter.service import execute_request as execute_adapter_request
 from src.core.shared.constants import METADATA_FILENAME, STANDARD_CONTEXT
 from src.core.validation import validate_adapter, validate_embedded_dataset
 
-
 scenarios("../features/us02_guided_metadata.feature")
 
 
@@ -77,7 +76,9 @@ def _valid_dataset_document() -> dict[str, Any]:
 def _write_dataset_fixture(work_dir: Path) -> Path:
     work_dir.mkdir(parents=True, exist_ok=True)
     dataset_path = work_dir / "dataset.jsonld"
-    dataset_path.write_text(json.dumps(_valid_dataset_document(), indent=2), encoding="utf-8")
+    dataset_path.write_text(
+        json.dumps(_valid_dataset_document(), indent=2), encoding="utf-8"
+    )
     return dataset_path
 
 
@@ -188,7 +189,9 @@ def passes_validation(guidance_context: dict[str, Any]) -> None:
 
 
 @given("mandatory inputs missing a required field")
-def mandatory_inputs_missing_field(guidance_context: dict[str, Any], work_dir: Path) -> None:
+def mandatory_inputs_missing_field(
+    guidance_context: dict[str, Any], work_dir: Path
+) -> None:
     dataset_path = _write_dataset_fixture(work_dir)
     guidance_context["inputs"] = {
         "adapter": {

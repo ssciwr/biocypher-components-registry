@@ -55,7 +55,13 @@ def build_croissant_baker_command(
     executable: str = "croissant-baker",
 ) -> list[str]:
     """Translate a dataset request into ``croissant-baker`` CLI arguments."""
-    command = [executable, "--input", request.input_path, "--output", request.output_path]
+    command = [
+        executable,
+        "--input",
+        request.input_path,
+        "--output",
+        request.output_path,
+    ]
 
     if request.validate:
         command.append("--validate")

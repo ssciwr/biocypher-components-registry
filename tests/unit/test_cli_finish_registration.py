@@ -9,7 +9,6 @@ from cli import app
 from src.core.registration.service import submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 runner = CliRunner()
 
 

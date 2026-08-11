@@ -15,7 +15,6 @@ from src.core.registration.service import (
 )
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 scenarios("../features/us09_on_demand_revalidation.feature")
 
 
