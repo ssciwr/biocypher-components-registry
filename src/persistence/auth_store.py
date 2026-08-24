@@ -23,49 +23,11 @@ class AuthSessionStore:
 
     def _initialize_database(self) -> None:
         metadata.create_all(self.engine)
-        if self.engine.dialect.name != "sqlite":
-            return
-
-        with self.engine.begin() as connection:
-            columns = {
-                str(row["name"]): row
-                for row in connection.exec_driver_sql(
-                    "PRAGMA table_info(auth_sessions)"
-                ).mappings()
-            }
-            expected_columns = {"id_hash", "github_login", "expires_at"}
-            if set(columns) == expected_columns:
-                return
-
-            connection.exec_driver_sql("DROP TABLE IF EXISTS auth_sessions_new")
-            connection.exec_driver_sql(
-                """
-                CREATE TABLE auth_sessions_new (
-                    id_hash VARCHAR NOT NULL,
-                    github_login VARCHAR NOT NULL,
-                    expires_at VARCHAR NOT NULL,
-                    PRIMARY KEY (id_hash)
-                )
-                """
-            )
-            if expected_columns.issubset(columns):
-                connection.exec_driver_sql(
-                    """
-                    INSERT INTO auth_sessions_new (id_hash, github_login, expires_at)
-                    SELECT id_hash, github_login, expires_at
-                    FROM auth_sessions
-                    WHERE github_login IS NOT NULL AND expires_at IS NOT NULL
-                    """
-                )
-            connection.exec_driver_sql("DROP TABLE auth_sessions")
-            connection.exec_driver_sql(
-                "ALTER TABLE auth_sessions_new RENAME TO auth_sessions"
-            )
 
     def create_session(
         self,
         *,
-        github_login: str,
+        github_user_id: str,
         expires_at: datetime,
     ) -> str:
         """Store a hashed session token and return the raw cookie token."""
@@ -74,7 +36,7 @@ class AuthSessionStore:
             connection.execute(
                 insert(auth_sessions_table).values(
                     id_hash=_session_hash(token),
-                    github_login=github_login,
+                    github_user_id=github_user_id,
                     expires_at=expires_at.isoformat(),
                 )
             )
@@ -98,7 +60,7 @@ class AuthSessionStore:
         if datetime.fromisoformat(str(row["expires_at"])) <= datetime.now(UTC):
             return None
         return AuthSession(
-            github_login=str(row["github_login"]),
+            github_user_id=str(row["github_user_id"]),
         )
 
     def delete_session(self, token: str) -> None:

@@ -25,7 +25,7 @@ registration_sources_table = Table(
     Column("license_value", String, nullable=True),
     Column("doi", String, nullable=True),
     Column("cff_url", String, nullable=True),
-    Column("submitted_by_github_login", String, nullable=True),
+    Column("submitted_by_github_user_id", String, nullable=True),
     Column("is_active", Boolean, nullable=False),
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
@@ -42,7 +42,7 @@ auth_sessions_table = Table(
     "auth_sessions",
     metadata,
     Column("id_hash", String, primary_key=True),
-    Column("github_login", String, nullable=False),
+    Column("github_user_id", String, nullable=False),
     Column("expires_at", String, nullable=False),
 )
 
@@ -66,11 +66,11 @@ adapter_endorsements_table = Table(
     metadata,
     Column("id", String, primary_key=True),
     Column("adapter_id", String, nullable=False),
-    Column("github_login", String, nullable=False),
+    Column("github_user_id", String, nullable=False),
     Column("created_at", String, nullable=False),
     UniqueConstraint(
         "adapter_id",
-        "github_login",
+        "github_user_id",
         name="uq_adapter_endorsement_user",
     ),
 )

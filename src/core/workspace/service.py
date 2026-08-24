@@ -81,11 +81,13 @@ class Session:
     def __init__(
         self,
         session_id: str,
+        owner_github_user_id: str,
         workspace: Path,
         mcp_url: str,
         mcp_headers: dict[str, str],
     ):
         self.id = session_id
+        self.owner_github_user_id = owner_github_user_id
         self.token = secrets.token_urlsafe(32)
         self.workspace = workspace
         self.mcp_url = mcp_url
@@ -338,7 +340,7 @@ class SessionManager:
         self.mcp_connect = mcp_connect
         self.sessions: dict[str, Session] = {}
 
-    async def create(self) -> Session:
+    async def create(self, *, owner_github_user_id: str) -> Session:
         # mkdir is a blocking syscall; off-thread so one session's filesystem
         # latency (or a slow/networked workspaces_root) can't stall every
         # other session's SSE heartbeats and message dispatch on this loop.
@@ -354,7 +356,13 @@ class SessionManager:
             # references `session` yet, so clean up here before propagating.
             await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
             raise
-        session = Session(session_id, workspace, self.mcp_url, self.mcp_headers)
+        session = Session(
+            session_id,
+            owner_github_user_id,
+            workspace,
+            self.mcp_url,
+            self.mcp_headers,
+        ) # same authentication as using Github login for registering adapters
         if self.mcp_connect is not None:
             session.mcp_connect = self.mcp_connect
         session.actor = asyncio.create_task(session.run_actor())
