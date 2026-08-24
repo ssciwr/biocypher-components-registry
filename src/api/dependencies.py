@@ -88,7 +88,7 @@ def get_workspace_session(
     if session is None or not supplied:
         raise HTTPException(401, "unknown session or invalid session token")
     if session.owner_github_user_id != auth_session.github_user_id:
-        raise HTTPException(401, "authentication provided contained a mismatch")
+        raise HTTPException(401, "unknown session or invalid session token")
     if not pysecrets.compare_digest(supplied, session.token):
-        raise HTTPException(401, "invalid session token")
+        raise HTTPException(401, "unknown session or invalid session tokenn")
     return session
