@@ -45,13 +45,13 @@ class RegistrationStore(Protocol):
     def get_registry_entry(self, entry_id: str) -> RegistryEntry | None:
         """Return one active canonical registry entry by identifier when it exists."""
 
-    def endorse_adapter(self, adapter_id: str, github_login: str) -> None:
+    def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         """Persist one user's adapter endorsement idempotently."""
 
     def count_adapter_endorsements(self, adapter_id: str) -> int:
         """Return the number of GitHub users who endorsed one adapter."""
 
-    def has_adapter_endorsement(self, adapter_id: str, github_login: str) -> bool:
+    def has_adapter_endorsement(self, adapter_id: str, github_user_id: str) -> bool:
         """Return whether one GitHub user has endorsed one adapter."""
 
     def record_batch_refresh(

@@ -72,22 +72,23 @@ def get_session_manager(request: Request) -> SessionManager:
 def get_workspace_session(
     session_id: str,
     manager: Annotated[SessionManager, Depends(get_session_manager)],
+    auth_session: Annotated[AuthSession, Depends(get_current_auth_session)],
     authorization: Annotated[str | None, Header()] = None,
     token: Annotated[str | None, Query()] = None,
 ) -> Session:
-    """Resolve and authenticate one workspace session from its bearer token.
+    """Resolve a workspace session for the current GitHub user.
 
-    Unknown session ids and wrong tokens both return 401 with the same
-    message, so session ids cannot be enumerated by probing this dependency.
+    Unknown sessions, owner mismatches, and invalid tokens all return the same
+    401 response.
     """
     session = manager.get(session_id)
     supplied = token or ""
     if not supplied and authorization and authorization.startswith("Bearer "):
         supplied = authorization[len("Bearer ") :].strip()
-    if (
-        session is None
-        or not supplied
-        or not pysecrets.compare_digest(supplied, session.token)
-    ):
+    if session is None or not supplied:
         raise HTTPException(401, "unknown session or invalid session token")
+    if session.owner_github_user_id != auth_session.github_user_id:
+        raise HTTPException(401, "authentication provided contained a mismatch")
+    if not pysecrets.compare_digest(supplied, session.token):
+        raise HTTPException(401, "invalid session token")
     return session

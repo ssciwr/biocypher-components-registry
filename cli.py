@@ -46,8 +46,8 @@ from src.core.validation import (
 from src.core.validation.results import ValidationResult
 from src.persistence.factory import build_registration_store
 
-_DEFAULT_GITHUB_LOGIN = "sampleGithubLogin"
-_DEMO_GITHUB_LOGIN = "jmsssc"
+_DEFAULT_GITHUB_USER_ID = "0"
+_DEMO_GITHUB_USER_ID = "1"
 
 # ============================================================================
 # Constants
@@ -120,7 +120,7 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
         "codeRepository": spec["repository_location"],
         "programmingLanguage": "Python",
         "targetProduct": "BioCypher",
-        "creator": [{JSONLD_TYPE: "Person", "name": _DEMO_GITHUB_LOGIN}],
+        "creator": [{JSONLD_TYPE: "Person", "name": "BioCypher demo user"}],
         "keywords": spec["keywords"],
         "hasPart": [
             {
@@ -270,7 +270,7 @@ def _print_submission_request(
     adapter_id: str,
     repository_location: str,
     repository_kind: str,
-    github_login: str,
+    github_user_id: str,
 ) -> None:
     body = Text()
     body.append(ADAPTER_LABEL, style=STYLE_SECTION_HEADING)
@@ -281,8 +281,8 @@ def _print_submission_request(
     body.append(f"{repository_location}\n\n", style="white")
     body.append("Kind\n", style="bold")
     body.append(f"{repository_kind}\n\n", style="white")
-    body.append("GitHub Login\n", style="bold")
-    body.append(github_login, style="white")
+    body.append("GitHub User ID\n", style="bold")
+    body.append(github_user_id, style="white")
     console.print(
         Panel(
             body,
@@ -387,7 +387,7 @@ def _print_stored_registration(
     repository_location: str,
     repository_kind: str,
     status: str,
-    github_login: str,
+    github_user_id: str,
 ) -> None:
     body = Text()
     body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
@@ -400,8 +400,8 @@ def _print_stored_registration(
     body.append(f"{repository_kind}\n\n", style="white")
     body.append("Status\n", style="bold")
     body.append(f"{status}\n\n", style="white")
-    body.append("GitHub Login\n", style="bold")
-    body.append(github_login, style="white")
+    body.append("GitHub User ID\n", style="bold")
+    body.append(github_user_id, style="white")
     console.print(
         Panel(
             body,
@@ -482,11 +482,11 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
 # ============================================================================
 
 
-def _resolve_github_login(github_login: str | None) -> str:
-    if github_login is None:
-        return _DEFAULT_GITHUB_LOGIN
-    normalized_login = github_login.strip()
-    return normalized_login or _DEFAULT_GITHUB_LOGIN
+def _resolve_github_user_id(github_user_id: str | None) -> str:
+    if github_user_id is None:
+        return _DEFAULT_GITHUB_USER_ID
+    normalized_user_id = github_user_id.strip()
+    return normalized_user_id or _DEFAULT_GITHUB_USER_ID
 
 
 @app.command(
@@ -506,18 +506,18 @@ def submit_cmd(
         ...,
         help="Local repository path or supported repository URL.",
     ),
-    github_login: str | None = typer.Option(
-        _DEFAULT_GITHUB_LOGIN,
-        "--github-login",
-        help="GitHub login to attach to this registration.",
+    github_user_id: str | None = typer.Option(
+        _DEFAULT_GITHUB_USER_ID,
+        "--github-user-id",
+        help="GitHub user id to attach to this registration.",
     ),
 ) -> None:
-    resolved_github_login = _resolve_github_login(github_login)
+    resolved_github_user_id = _resolve_github_user_id(github_user_id)
     try:
         request = create_registration_request(
             adapter_name=adapter_name,
             repository_location=repository_location,
-            submitted_by_github_login=resolved_github_login,
+            submitted_by_github_user_id=resolved_github_user_id,
         )
     except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
@@ -528,7 +528,9 @@ def submit_cmd(
         adapter_id=request.adapter_id,
         repository_location=request.repository_location,
         repository_kind=request.repository_kind,
-        github_login=request.submitted_by_github_login or _DEFAULT_GITHUB_LOGIN,
+        github_user_id=(
+            request.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID
+        ),
     )
     console.print("[green]Registration request created[/green]")
 
@@ -552,20 +554,20 @@ def submit_registration_cmd(
         "--db-path",
         help=_DB_PATH_HELP,
     ),
-    github_login: str | None = typer.Option(
-        _DEFAULT_GITHUB_LOGIN,
-        "--github-login",
-        help="GitHub login to attach to this registration.",
+    github_user_id: str | None = typer.Option(
+        _DEFAULT_GITHUB_USER_ID,
+        "--github-user-id",
+        help="GitHub user id to attach to this registration.",
     ),
 ) -> None:
-    resolved_github_login = _resolve_github_login(github_login)
+    resolved_github_user_id = _resolve_github_user_id(github_user_id)
     try:
         store = build_registration_store(db_path)
         registration = submit_registration_record(
             adapter_name=adapter_name,
             repository_location=repository_location,
             store=store,
-            submitted_by_github_login=resolved_github_login,
+            submitted_by_github_user_id=resolved_github_user_id,
         )
     except (ValueError, OSError, typer.BadParameter) as exc:
         console.print(f"[red]{exc}[/red]")
@@ -577,7 +579,9 @@ def submit_registration_cmd(
         repository_location=registration.repository_location,
         repository_kind=registration.repository_kind,
         status=registration.status.value,
-        github_login=registration.submitted_by_github_login or _DEFAULT_GITHUB_LOGIN,
+        github_user_id=(
+            registration.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID
+        ),
     )
     console.print("[green]Registration stored[/green]")
 
@@ -772,7 +776,7 @@ def seed_demo_adapters_cmd(
                 repository_location=str(spec["repository_location"]),
                 store=store,
                 doi=spec.get("doi"),
-                submitted_by_github_login=_DEMO_GITHUB_LOGIN,
+                submitted_by_github_user_id=_DEMO_GITHUB_USER_ID,
             )
             store.mark_registration_valid(
                 registration_id=registration.registration_id,

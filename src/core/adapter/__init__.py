@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.core.adapter.discovery import (
+    AdapterDiscoveryResult,
+    discover_local_adapter,
+    discover_remote_adapter,
+    validate_discovered_adapter,
+)
 from src.core.adapter.request import (
     AdapterDistributionInput,
     AdapterFieldInput,
@@ -45,14 +51,6 @@ def build_adapter_request_from_mapping(
         raw=raw,
         output_override=output_override,
         dataset_generator_override=dataset_generator_override,
-    )
-
-
-from src.core.adapter.discovery import (
-    AdapterDiscoveryResult,
-    discover_local_adapter,
-    discover_remote_adapter,
-    validate_discovered_adapter,
 )
 
 
@@ -87,7 +85,7 @@ def create_registration_request(
     license_value: str | None = None,
     doi: str | None = None,
     cff_url: str | None = None,
-    submitted_by_github_login: str | None = None,
+    submitted_by_github_user_id: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized repository submission request."""
     from src.core.adapter.service import (
@@ -101,7 +99,7 @@ def create_registration_request(
         license_value=license_value,
         doi=doi,
         cff_url=cff_url,
-        submitted_by_github_login=submitted_by_github_login,
+        submitted_by_github_user_id=submitted_by_github_user_id,
     )
 
 

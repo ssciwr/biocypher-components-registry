@@ -175,7 +175,7 @@ def endorsed_by_current_user(
     adapter_id,
 ) -> bool:
     return auth_session is not None and store.has_adapter_endorsement(
-        adapter_id, auth_session.github_login
+        adapter_id, auth_session.github_user_id
     )
 
 
@@ -192,7 +192,7 @@ def endorse_adapter(
     entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
     if not entries:
         raise adapter_not_found_http_error(adapter_id)
-    store.endorse_adapter(adapter_id, auth_session.github_login)
+    store.endorse_adapter(adapter_id, auth_session.github_user_id)
     return AdapterEndorsementResponse(
         adapter_id=adapter_id,
         endorsement_count=store.count_adapter_endorsements(adapter_id),

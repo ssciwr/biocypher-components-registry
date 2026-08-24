@@ -34,7 +34,7 @@ def submit_registration(
     license_value: str | None = None,
     doi: str | None = None,
     cff_url: str | None = None,
-    submitted_by_github_login: str | None = None,
+    submitted_by_github_user_id: str | None = None,
 ) -> StoredRegistration:
     """Create and persist a registration submission.
 
@@ -46,7 +46,7 @@ def submit_registration(
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_login: GitHub login for browser submissions.
+        submitted_by_github_user_id: GitHub user id for browser submissions.
 
     Returns:
         The stored registration record with a tracked status.
@@ -58,7 +58,7 @@ def submit_registration(
         license_value=license_value,
         doi=doi,
         cff_url=cff_url,
-        submitted_by_github_login=submitted_by_github_login,
+        submitted_by_github_user_id=submitted_by_github_user_id,
     )
     return store.create_registration(request)
 

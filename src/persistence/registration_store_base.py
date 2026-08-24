@@ -55,7 +55,7 @@ class SQLAlchemyRegistrationStore:
             license_value=request.license_value,
             doi=request.doi,
             cff_url=request.cff_url,
-            submitted_by_github_login=request.submitted_by_github_login,
+            submitted_by_github_user_id=request.submitted_by_github_user_id,
         )
 
         with self.engine.begin() as connection:
@@ -75,7 +75,7 @@ class SQLAlchemyRegistrationStore:
                         license_value=registration.license_value,
                         doi=registration.doi,
                         cff_url=registration.cff_url,
-                        submitted_by_github_login=registration.submitted_by_github_login,
+                        submitted_by_github_user_id=registration.submitted_by_github_user_id,
                         is_active=True,
                         created_at=registration.created_at.isoformat(),
                         updated_at=registration.created_at.isoformat(),
@@ -233,17 +233,19 @@ class SQLAlchemyRegistrationStore:
             return None
         return self._registry_entry_row_to_entry(row)
 
-    def endorse_adapter(self, adapter_id: str, github_login: str) -> None:
+    def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         now = datetime.now(UTC).isoformat()
         try:
             with self.engine.begin() as connection:
-                if self._adapter_endorsement_row(connection, adapter_id, github_login):
+                if self._adapter_endorsement_row(
+                    connection, adapter_id, github_user_id
+                ):
                     return
                 connection.execute(
                     insert(adapter_endorsements_table).values(
                         id=str(uuid4()),
                         adapter_id=adapter_id,
-                        github_login=github_login,
+                        github_user_id=github_user_id,
                         created_at=now,
                     )
                 )
@@ -260,14 +262,14 @@ class SQLAlchemyRegistrationStore:
             ).scalar_one()
         return int(count)
 
-    def has_adapter_endorsement(self, adapter_id: str, github_login: str) -> bool:
+    def has_adapter_endorsement(self, adapter_id: str, github_user_id: str) -> bool:
         """Has this given user (usually the logged in user) already given an endorsement for this adapter?"""
         with self.engine.connect() as connection:
             return (
                 self._adapter_endorsement_row(
                     connection,
                     adapter_id,
-                    github_login,
+                    github_user_id,
                 )
                 is not None
             )
@@ -725,14 +727,14 @@ class SQLAlchemyRegistrationStore:
         self,
         connection: Engine | object,
         adapter_id: str,
-        github_login: str,
+        github_user_id: str,
     ) -> RowMapping | None:
-        """Load an endorsement row for one adapter/login pair."""
+        """Load an endorsement row for one adapter/user pair."""
         return (
             connection.execute(
                 select(adapter_endorsements_table).where(
                     adapter_endorsements_table.c.adapter_id == adapter_id,
-                    adapter_endorsements_table.c.github_login == github_login,
+                    adapter_endorsements_table.c.github_user_id == github_user_id,
                 )
             )
             .mappings()
@@ -868,7 +870,7 @@ class SQLAlchemyRegistrationStore:
             license_value=source_row.get("license_value"),
             doi=source_row.get("doi"),
             cff_url=source_row.get("cff_url"),
-            submitted_by_github_login=source_row.get("submitted_by_github_login"),
+            submitted_by_github_user_id=source_row.get("submitted_by_github_user_id"),
             metadata_path=self._resolve_metadata_path(source_row),
             metadata=metadata,
             profile_version=self._select_profile_version(current_entry, latest_event),

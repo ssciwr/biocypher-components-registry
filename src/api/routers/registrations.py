@@ -71,8 +71,8 @@ def create_registration(
             license_value=payload.license_value,
             doi=payload.doi,
             cff_url=payload.cff_url,
-            submitted_by_github_login=(
-                auth_session.github_login if auth_session is not None else None
+            submitted_by_github_user_id=(
+                auth_session.github_user_id if auth_session is not None else None
             ),
         )
     except Exception as exc:

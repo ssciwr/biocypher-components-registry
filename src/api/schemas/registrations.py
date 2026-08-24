@@ -87,7 +87,7 @@ class RegistrationCreateResponse(BaseModel):
     license_value: str | None = None
     doi: str | None = None
     cff_url: str | None = None
-    submitted_by_github_login: str | None = None
+    submitted_by_github_user_id: str | None = None
 
     @classmethod
     def from_stored(
@@ -105,7 +105,7 @@ class RegistrationCreateResponse(BaseModel):
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
-            submitted_by_github_login=registration.submitted_by_github_login,
+            submitted_by_github_user_id=registration.submitted_by_github_user_id,
         )
 
 
@@ -135,7 +135,7 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
-            submitted_by_github_login=registration.submitted_by_github_login,
+            submitted_by_github_user_id=registration.submitted_by_github_user_id,
             metadata_path=registration.metadata_path,
             metadata=registration.metadata,
             profile_version=registration.profile_version,
@@ -168,7 +168,7 @@ class RegistrationListItemResponse(RegistrationCreateResponse):
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
-            submitted_by_github_login=registration.submitted_by_github_login,
+            submitted_by_github_user_id=registration.submitted_by_github_user_id,
             profile_version=registration.profile_version,
             updated_at=registration.updated_at,
             uniqueness_key=registration.uniqueness_key,
