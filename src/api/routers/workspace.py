@@ -5,8 +5,9 @@ distinct from ``settings.api_v1_prefix`` so the workspace service can sit
 behind the registry's nginx unchanged. See ``docs/API.md`` for the full
 route-level contract (auth, SSE event shapes, error codes).
 
-Auth: every ``/sessions/{id}/...`` route requires the session token returned
-by ``POST /sessions``, either as ``Authorization: Bearer <token>`` or as a
+Auth: all routes require the registry GitHub auth session. Every
+``/sessions/{id}/...`` route also requires the session token returned by
+``POST /sessions``, either as ``Authorization: Bearer <token>`` or as a
 ``?token=`` query parameter (the query form exists for browser-native
 EventSource, which cannot set headers; prefer the header).
 """
@@ -23,7 +24,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from src.api.dependencies import get_session_manager, get_workspace_session
+from src.api.dependencies import (
+    get_current_auth_session,
+    get_session_manager,
+    get_workspace_session,
+)
 from src.api.schemas.workspace import (
     FileContentResponse,
     FileEntryResponse,
@@ -38,6 +43,7 @@ from src.api.schemas.workspace import (
     SessionStateResponse,
     workspace_error_responses,
 )
+from src.core.auth.models import AuthSession
 from src.core.workspace import client_loop as cl
 from src.core.workspace.service import (
     Session,
@@ -53,6 +59,7 @@ router = APIRouter()
 
 SessionManagerDep = Annotated[SessionManager, Depends(get_session_manager)]
 WorkspaceSessionDep = Annotated[Session, Depends(get_workspace_session)]
+CurrentAuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
 
 
 def _etag(text: str) -> str:
@@ -79,12 +86,17 @@ def _resolve(session: Session, path: str):
         "Allocate a workspace directory and open the MCP connection for a new "
         "agentic workspace session."
     ),
-    responses=workspace_error_responses(502),
+    responses=workspace_error_responses(401, 502),
 )
-async def create_session(manager: SessionManagerDep) -> SessionCreateResponse:
+async def create_session(
+    manager: SessionManagerDep,
+    auth_session: CurrentAuthSessionDep,
+) -> SessionCreateResponse:
     """Create a new workspace session."""
     try:
-        session = await manager.create()
+        session = await manager.create(
+            owner_github_user_id=auth_session.github_user_id
+        )
     except SessionStartupError as e:
         raise HTTPException(502, f"could not connect to MCP server: {e}")
     return SessionCreateResponse.from_session(session)
@@ -193,7 +205,11 @@ async def interrupt(session: WorkspaceSessionDep) -> InterruptResponse:
         "tool calls/results, usage, and filesystem changes. See docs/API.md "
         "for the full event catalog."
     ),
-    responses=workspace_error_responses(401),
+    response_class=StreamingResponse,
+    responses={
+        200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}},
+        **workspace_error_responses(401),
+    },
 )
 async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
     """Stream one session's events as text/event-stream."""

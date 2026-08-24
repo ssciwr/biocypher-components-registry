@@ -43,10 +43,10 @@ match the tables in this file.
 
 Two caveats when trying routes out in Swagger UI:
 
-1. There is no "Authorize" button (auth is a plain header parameter, not an
-   OpenAPI security scheme). For each request, fill the `authorization` field
-   with `Bearer <session_token>` — the word `Bearer`, a space, then the token
-   from `POST /sessions` — or put the bare token in the `token` query field.
+1. Workspace routes require the same registry GitHub session cookie that adapter registration does. For
+   `/sessions/{id}/...` requests, provide the `authorization` field with
+   `Bearer <session_token>` — the word `Bearer`, a space, then the token from
+   `POST /sessions` — or put the bare token in the `token` query field.
 2. Do not execute `GET .../events` from Swagger UI: it is an infinite SSE
    stream and the UI waits for the response to complete. Use `curl -N` (see
    the example below) or the frontend's SSE reader instead.
@@ -67,12 +67,11 @@ Consequences of the current single-process design:
   tools and file routes are confined per workspace, but one session's
   `run_command` can read another session's workspace directory. Acceptable
   for a single-user demo; multi-tenant use requires per-session containers.
-- **`POST /sessions` is unauthenticated and uncapped.** Anyone who can reach
-  the port can create sessions (each: MCP connection + directory + task) —
-  resource exhaustion is trivial. There is also no request-body limit and no
-  workspace disk quota. Until the registry merge adds user auth: bind to
-  localhost or a private network, front with a reverse proxy that sets
-  `client_max_body_size` and rate limits, and monitor disk usage.
+- **Session allocation is authenticated but uncapped.** Any signed-in user can
+  create sessions (each: MCP connection + directory + task), and there is still
+  no request-body limit or workspace disk quota.
+- **Todo for sessions/requests**: Front nginx with rate limits,
+  set `client_max_body_size`, and monitor disk usage before wider deployment.
 - **TLS is a deployment requirement, not built in.** The BYOK key travels in
   a request body and the session token in a header; both need HTTPS
   termination (nginx) on anything but localhost. The `?token=` query form
@@ -102,8 +101,9 @@ only delivered to the session's own event stream.
 
 ## Authentication
 
-`POST /sessions` returns a `session_token`. Every `/sessions/{id}/...` request
-must present it, either as
+`POST /sessions` requires the registry GitHub auth cookie and returns a
+`session_token`. Every `/sessions/{id}/...` request requires that same GitHub
+user plus the workspace token, either as
 
 ```
 Authorization: Bearer <session_token>
@@ -113,8 +113,8 @@ or as a `?token=<session_token>` query parameter. The query form exists for
 browser-native `EventSource`, which cannot set headers; prefer the header (a
 `fetch()`-based SSE reader can set it).
 
-Unknown session ids and wrong tokens both return **401** with the same body,
-so session ids cannot be enumerated.
+Unknown session ids, wrong users, and wrong tokens all return **401** with the
+same body, so session ids and ownership cannot be enumerated.
 
 ## Endpoints
 
@@ -137,6 +137,7 @@ connection.
     ]
   }
   ```
+- **401** — GitHub sign-in is required.
 - **502** — the MCP server could not be reached (session is not created).
 
 The `session_token` is shown exactly once; store it client-side for the
