@@ -528,9 +528,7 @@ def submit_cmd(
         adapter_id=request.adapter_id,
         repository_location=request.repository_location,
         repository_kind=request.repository_kind,
-        github_user_id=(
-            request.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID
-        ),
+        github_user_id=(request.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID),
     )
     console.print("[green]Registration request created[/green]")
 
