@@ -3,7 +3,7 @@ import bioCypherLogo from '../assets/logo-biocypher.png'
 import { client } from '../api/client/client.gen'
 
 type AuthUser = Readonly<{
-  github_login: string
+  authenticated: boolean
 }>
 
 type AppHeaderProps = Readonly<{
@@ -25,26 +25,21 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
             Explore
           </a>
           <a className="hover:text-slate-950" href="/register">
-            Create
-          </a>
-          <a className="hover:text-slate-950" href="/register">
             Register
           </a>
         </nav>
         <div className="flex items-center gap-3">
           {authUser ? (
             <span className="hidden items-center gap-2 sm:inline-flex">
-              <span className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700">
-                {authUser.github_login}
-              </span>
               <button
                 aria-label="Sign out of GitHub"
-                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600"
                 onClick={() => void onLogout()}
                 title="Sign out"
                 type="button"
               >
                 <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
+                Sign out
               </button>
             </span>
           ) : (
@@ -55,14 +50,13 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
               Sign in with GitHub
             </a>
           )}
-          <button
-            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-slate-300 px-5 py-3 text-base text-white"
-            disabled
-            type="button"
+          <a
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
+            href="/workspace"
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
             <b>MCP Workspace</b>
-          </button>
+          </a>
         </div>
       </div>
     </header>
