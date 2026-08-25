@@ -3,15 +3,16 @@ import {
   ArrowRightIcon,
   CloudArrowUpIcon,
   CommandLineIcon,
-  DocumentPlusIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
 import AppHeader from './components/AppHeader'
 import type { AuthUser } from './components/AppHeader'
 import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
+import WorkspacePage from './pages/workspace/WorkspacePage'
 import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
 import { client } from './api/client/client.gen'
+import { client as workspaceClient } from './api/workspace/client.gen'
 
 const actionCards = [
   {
@@ -23,21 +24,13 @@ const actionCards = [
     tone: 'bg-cyan-100 text-cyan-700',
   },
   {
-    label: 'Create',
-    icon: DocumentPlusIcon,
-    text: 'Create BioCypher adapters and metadata.',
-    cta: 'Start creating',
-    href: '/register',
-    featured: true,
-    tone: 'bg-white/20 text-white',
-  },
-  {
     label: 'Register adapter',
     icon: CloudArrowUpIcon,
     text: 'Submit your adapter repository to our registry, so others can use it.',
     cta: 'Register now',
     href: '/register',
-    tone: 'bg-blue-100 text-blue-700',
+    featured: true,
+    tone: 'bg-white/20 text-white',
   },
 ]
 
@@ -64,7 +57,7 @@ function readCachedAuthUser(): AuthUser | null {
 
   try {
     const user = JSON.parse(savedUser) as Partial<AuthUser>
-    return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
+    return user.authenticated === true ? { authenticated: true } : null
   } catch {
     globalThis.localStorage.removeItem(authUserKey)
     return null
@@ -73,6 +66,7 @@ function readCachedAuthUser(): AuthUser | null {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi-ts
+workspaceClient.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' })
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
@@ -159,6 +153,13 @@ function App() {
 
   if (pathname === '/register') {
     page = <RegisterPage authUser={authUser} authVerified={authVerified} />
+  } else if (pathname === '/workspace') {
+    page = (
+      <WorkspacePage
+        signedIn={Boolean(authUser && authVerified)}
+        signInUrl={client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/workspace' } })}
+      />
+    )
   } else if (pathname === '/adapters' || adapterId) {
     page = <AdaptersPage adapterId={adapterId} />
   }
@@ -221,7 +222,7 @@ function HomePage() {
 
       <section className="bg-slate-50">
         <div className="mx-auto max-w-6xl px-6 py-10 md:py-12">
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2">
             {actionCards.map((card) => {
               const Icon = card.icon
 
@@ -249,7 +250,7 @@ function HomePage() {
 
           <a
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            href="/adapters"
+            href="/workspace"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />
