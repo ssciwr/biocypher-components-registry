@@ -166,7 +166,7 @@ function App() {
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <AppHeader authUser={authUser} onLogout={logOut} />
+      <AppHeader authUser={authUser} onLogout={logOut} showWorkspaceLink={pathname !== '/workspace'} />
       {authError ? (
         <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
           {authError}

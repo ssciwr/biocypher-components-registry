@@ -9,9 +9,10 @@ type AuthUser = Readonly<{
 type AppHeaderProps = Readonly<{
   authUser: AuthUser | null
   onLogout: () => Promise<void>
+  showWorkspaceLink: boolean
 }>
 
-function AppHeader({ authUser, onLogout }: AppHeaderProps) {
+function AppHeader({ authUser, onLogout, showWorkspaceLink }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -50,13 +51,15 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
               Sign in with GitHub
             </a>
           )}
-          <a
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
-            href="/workspace"
-          >
-            <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-            <b>MCP Workspace</b>
-          </a>
+          {showWorkspaceLink && (
+            <a
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
+              href="/workspace"
+            >
+              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              <b>MCP Workspace</b>
+            </a>
+          )}
         </div>
       </div>
     </header>
