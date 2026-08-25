@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
+from src.api.dependencies import get_current_auth_session
+from src.core.auth.models import AuthSession
 from src.core.workspace.service import SessionManager
 from tests.support.workspace_fakes import (
     FakeRunner,
@@ -30,8 +32,15 @@ def manager(tmp_path):
 
 
 @pytest.fixture
-def client(manager):
-    with TestClient(create_app(workspace_manager=manager)) as test_client:
+def auth_session():
+    return AuthSession(github_user_id="12345")
+
+
+@pytest.fixture
+def client(manager, auth_session):
+    app = create_app(workspace_manager=manager)
+    app.dependency_overrides[get_current_auth_session] = lambda: auth_session
+    with TestClient(app) as test_client:
         yield test_client
 
 
@@ -65,6 +74,37 @@ def test_create_session_returns_tools_and_token(client):
     names = [t["name"] for t in body["tools"]]
     assert "get_phase_guidance" in names
     assert "write_file" in names
+
+
+def test_create_session_requires_github_auth(manager):
+    # Ensure authentication is required
+    with TestClient(create_app(workspace_manager=manager)) as anonymous:
+        response = anonymous.post(f"{PREFIX}/sessions")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "GitHub sign-in required."
+    assert manager.sessions == {}
+
+
+def test_session_routes_require_same_github_user(client):
+    """
+    Reject valid workspace tokens presented by another GitHub user.
+    """
+    created = client.post(f"{PREFIX}/sessions").json()
+    headers = {"Authorization": f"Bearer {created['session_token']}"}
+    same_user = client.get(
+        f"{PREFIX}/sessions/{created['session_id']}", headers=headers
+    )
+    client.app.dependency_overrides[get_current_auth_session] = (
+        lambda: AuthSession(github_user_id="67890")
+    )
+    # Another user cannot access the first user ("same_user")s session information
+    other_user = client.get(
+        f"{PREFIX}/sessions/{created['session_id']}", headers=headers
+    )
+    no_token = client.get(f"{PREFIX}/sessions/{created['session_id']}")
+    assert same_user.status_code == 200
+    assert other_user.status_code == 401
+    assert no_token.status_code == 401
 
 
 def test_auth_required_and_checked(client, session):
@@ -157,9 +197,13 @@ def test_events_stream_snapshot_and_token_query(manager):
     port = probe.getsockname()[1]
     probe.close()
 
+    app = create_app(workspace_manager=manager)
+    app.dependency_overrides[get_current_auth_session] = lambda: AuthSession(
+        github_user_id="12345"
+    )
     server = uvicorn.Server(
         uvicorn.Config(
-            create_app(workspace_manager=manager),
+            app,
             host="127.0.0.1",
             port=port,
             log_level="warning",
