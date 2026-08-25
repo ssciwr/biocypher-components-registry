@@ -4,6 +4,7 @@ import gzip
 import json
 from pathlib import Path
 
+from src.core.dataset.backends import native as native_backend
 from src.core.dataset.backends.native import NativeDatasetGenerator
 from src.core.dataset.request import GenerationRequest
 
@@ -40,10 +41,14 @@ def test_native_generator_builds_dataset_from_csv_and_tsv_gz(tmp_path: Path) -> 
     assert document["distribution"][0]["@id"] == "file_0"
     assert document["distribution"][1]["@id"] == "file_1"
     assert document["distribution"][0]["@id"] != document["recordSet"][0]["@id"]
-    record_sets = {record_set["@id"]: record_set for record_set in document["recordSet"]}
+    record_sets = {
+        record_set["@id"]: record_set for record_set in document["recordSet"]
+    }
     assert {"people", "scores"} == set(record_sets)
     assert record_sets["people"]["field"][0]["dataType"] == "cr:Int64"
-    assert record_sets["people"]["field"][0]["@id"].startswith(record_sets["people"]["@id"])
+    assert record_sets["people"]["field"][0]["@id"].startswith(
+        record_sets["people"]["@id"]
+    )
 
 
 def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
@@ -60,3 +65,4 @@ def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
 
     assert "Missing license; using 'UNKNOWN'." in result.stderr
     assert "Missing dataset version; using '0.1.0'." in result.stderr
+

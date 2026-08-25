@@ -25,6 +25,7 @@ def test_build_croissant_baker_command_includes_known_flags() -> None:
                 "name": "Dataset Creator",
                 "email": "dataset.creator@example.org",
             },
+            {"name": "   "},
         ],
         extra_args=["--custom-flag", "value"],
     )
