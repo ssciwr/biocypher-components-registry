@@ -51,7 +51,7 @@ def test_default_connect_mcp_reuses_client_loop_bootstrap():
 def test_create_and_delete_session(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         assert session.workspace.is_dir()
         names = [t["name"] for t in session.tool_defs]
         assert "get_phase_guidance" in names
@@ -75,7 +75,7 @@ def test_create_session_mcp_failure(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=broken)
         with pytest.raises(SessionStartupError, match="no route to MCP"):
-            await manager.create()
+            await manager.create(owner_github_user_id="12345")
         assert not manager.sessions
 
     asyncio.run(scenario())
@@ -113,7 +113,7 @@ def test_turn_with_tool_call(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         session.set_key("sk-test", None)
         session.client_factory = fake_client_factory(FakeRunner(turns))
         events = await run_turn(session, "hello")
@@ -145,7 +145,7 @@ def test_turn_api_error_rolls_back_history(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         session.set_key("sk-test", None)
         session.client_factory = fake_client_factory(FakeRunner(turns, error_at=0))
         events = await run_turn(session, "hello")
@@ -174,7 +174,7 @@ def test_turn_unexpected_error_confined_to_turn(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         session.set_key("sk-test", None)
         session.client_factory = fake_client_factory(ExplodingRunner())
         events = await run_turn(session, "hello")
@@ -209,7 +209,7 @@ def test_actor_death_unbricks_session(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=dying_mcp_connect)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         # Make the next inbox item explode inside the actor itself (not the
         # turn task) by poisoning turn-task creation.
         session._run_turn = None  # type: ignore[assignment]
@@ -229,7 +229,7 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
         from src.core.workspace import service
 
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         queue = session.subscribe()
         for i in range(service.EVENT_QUEUE_SIZE + 5):
             session.publish("text_delta", text=str(i))
@@ -244,7 +244,7 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
 def test_delete_publishes_session_closed(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         queue = session.subscribe()
         await manager.delete(session.id)
         events = []
@@ -264,7 +264,7 @@ def test_interrupt_cancels_queued_turn(tmp_path):
     async def scenario():
         # Session without a running actor: the turn stays queued, exactly the
         # window where interrupt() used to report "nothing to interrupt".
-        session = Session("sid", Path(tmp_path), "url", {})
+        session = Session("sid", "12345", Path(tmp_path), "url", {})
         queue = session.subscribe()
         session.busy = True
         session.inbox.put_nowait(("turn-9", "hello"))
@@ -283,7 +283,7 @@ def test_interrupt_cancels_queued_turn(tmp_path):
 def test_fs_change_event_from_file_tool(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
-        session = await manager.create()
+        session = await manager.create(owner_github_user_id="12345")
         queue = session.subscribe()
         write_file = next(t for t in session.file_tools if t.name == "write_file")
         out = await write_file.call({"path": "a.txt", "content": "hi"})
