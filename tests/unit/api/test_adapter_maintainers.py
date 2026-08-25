@@ -20,7 +20,7 @@ def test_latest_adapter_uses_github_repository_owner_avatar(tmp_path: Path) -> N
         adapter_id="example-adapter",
         adapter_name="Example Adapter",
         repository_location="https://github.com/biocypher/example",
-        submitted_by_github_login="submitter",
+        submitted_by_github_user_id="12345",
     )
     payload = create_adapter_client(store).get("/api/v1/adapters/latest").json()
     item = payload["items"][0]

@@ -131,7 +131,7 @@ def test_create_registration_endpoint_persists_registration(
     app = create_app()
     app.dependency_overrides[get_registration_store] = lambda: store
     app.dependency_overrides[get_optional_auth_session] = lambda: AuthSession(
-        github_login="edwinc"
+        github_user_id="12345"
     )
     client = TestClient(app)
 
@@ -155,13 +155,13 @@ def test_create_registration_endpoint_persists_registration(
     assert payload["status"] == "SUBMITTED"
     assert payload["license_value"] == "MIT"
     assert payload["doi"] == "10.5281/zenodo.1234567"
-    assert payload["submitted_by_github_login"] == "edwinc"
+    assert payload["submitted_by_github_user_id"] == "12345"
 
     stored = store.get_registration(payload["registration_id"])
     assert stored is not None
     assert stored.license_value == "MIT"
     assert stored.doi == "10.5281/zenodo.1234567"
-    assert stored.submitted_by_github_login == "edwinc"
+    assert stored.submitted_by_github_user_id == "12345"
 
 
 def test_create_registration_endpoint_maps_missing_repository_to_bad_request(

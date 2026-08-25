@@ -21,7 +21,7 @@ def test_registration_sources_table_has_expected_columns() -> None:
         "license_value",
         "doi",
         "cff_url",
-        "submitted_by_github_login",
+        "submitted_by_github_user_id",
         "is_active",
         "created_at",
         "updated_at",
@@ -92,6 +92,6 @@ def test_auth_sessions_table_has_expected_columns() -> None:
     assert auth_sessions_table.name == "auth_sessions"
     assert set(auth_sessions_table.columns.keys()) == {
         "id_hash",
-        "github_login",
+        "github_user_id",
         "expires_at",
     }

@@ -25,7 +25,7 @@ def create_adapter_entry(
     doi: str | None = None,
     cff_url: str | None = None,
     repository_location: str | None = None,
-    submitted_by_github_login: str | None = None,
+    submitted_by_github_user_id: str | None = None,
 ) -> None:
     """AI-Generated.
 
@@ -43,7 +43,7 @@ def create_adapter_entry(
         store,
         doi=doi,
         cff_url=cff_url,
-        submitted_by_github_login=submitted_by_github_login,
+        submitted_by_github_user_id=submitted_by_github_user_id,
     )
     store.mark_registration_valid(
         registration_id=registration.registration_id,
@@ -57,7 +57,7 @@ def create_adapter_entry(
 
 def create_adapter_client(
     store: SQLiteRegistrationStore,
-    github_login: str | None = None,
+    github_user_id: str | None = None,
 ) -> TestClient:
     """AI-Generated.
 
@@ -65,8 +65,8 @@ def create_adapter_client(
     """
     app = create_app()
     app.dependency_overrides[get_registration_store] = lambda: store
-    if github_login is not None:
+    if github_user_id is not None:
         app.dependency_overrides[get_optional_auth_session] = lambda: AuthSession(
-            github_login=github_login
+            github_user_id=github_user_id
         )
     return TestClient(app)
