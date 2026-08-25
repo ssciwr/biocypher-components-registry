@@ -981,6 +981,1102 @@
           }
         }
       }
+    },
+    "/agent/api/v1/sessions": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Create a workspace session",
+        "description": "Allocate a workspace directory and open the MCP connection for a new agentic workspace session.",
+        "operationId": "create_session_agent_api_v1_sessions_post",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCreateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "502": {
+            "description": "MCP server unreachable or the session's MCP connection died"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Get workspace session state",
+        "description": "Return session state, useful after a client reconnect.",
+        "operationId": "get_session_agent_api_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "End a workspace session",
+        "description": "Close the MCP connection, drop the history, and destroy the workspace directory and stored key.",
+        "operationId": "delete_session_agent_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/key": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Attach a BYOK credential to a session",
+        "description": "Store the user's Anthropic API key or auth token for this session only. Never send credentials as a chat message.",
+        "operationId": "set_key_agent_api_v1_sessions__session_id__key_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/messages": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Send a chat message",
+        "description": "Append a user turn and start the tool loop. Returns immediately; progress arrives on the events stream.",
+        "operationId": "post_message_agent_api_v1_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
+          "428": {
+            "description": "No API key set for this session yet"
+          },
+          "502": {
+            "description": "MCP server unreachable or the session's MCP connection died"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/interrupt": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Interrupt the running turn",
+        "description": "Cancel the running turn, or a turn that was accepted but has not started yet. History rolls back to the pre-turn snapshot.",
+        "operationId": "interrupt_agent_api_v1_sessions__session_id__interrupt_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterruptResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/events": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Stream session events",
+        "description": "Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog.",
+        "operationId": "events_agent_api_v1_sessions__session_id__events_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/files": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "List a workspace directory",
+        "description": "List one directory level (directories first, then files, both sorted). Omit path (or pass an empty string) for the workspace root.",
+        "operationId": "list_files_agent_api_v1_sessions__session_id__files_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "404": {
+            "description": "No such file or directory"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/api/v1/sessions/{session_id}/file": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Read a workspace file",
+        "description": "Read one text file's content and ETag for the editor pane.",
+        "operationId": "read_file_agent_api_v1_sessions__session_id__file_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "404": {
+            "description": "No such file or directory"
+          },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
+          "415": {
+            "description": "Not a text file"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Write a workspace file",
+        "description": "Create or overwrite one text file. Parent directories are created as needed. Send If-Match when saving a previously opened file.",
+        "operationId": "write_file_agent_api_v1_sessions__session_id__file_put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "description": "ETag from the last GET of this file; the write is rejected with 409 if the file changed since."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileWriteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Delete a workspace file or directory",
+        "description": "Delete one file or directory (recursively) from the tree pane.",
+        "operationId": "delete_file_agent_api_v1_sessions__session_id__file_delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid input: bad path, empty content, or missing key field"
+          },
+          "401": {
+            "description": "Unknown session or invalid session token"
+          },
+          "404": {
+            "description": "No such file or directory"
+          },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1735,17 +2831,17 @@
       },
       "AuthMeResponse": {
         "properties": {
-          "github_login": {
-            "type": "string",
-            "title": "Github Login"
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
           }
         },
         "type": "object",
         "required": [
-          "github_login"
+          "authenticated"
         ],
         "title": "AuthMeResponse",
-        "description": "Signed-in GitHub identity shown in the frontend header."
+        "description": "Browser-safe signed-in state."
       },
       "DatasetMetadataGenerateRequest": {
         "properties": {
@@ -1938,6 +3034,109 @@
         "title": "DatasetMetadataGenerateResponse",
         "description": "Response returned after generating dataset metadata."
       },
+      "FileContentResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content",
+          "etag"
+        ],
+        "title": "FileContentResponse",
+        "description": "Response returned when reading one workspace file."
+      },
+      "FileEntryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "is_dir": {
+            "type": "boolean",
+            "title": "Is Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "is_dir"
+        ],
+        "title": "FileEntryResponse",
+        "description": "One directory entry in a workspace file listing."
+      },
+      "FileListResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntryResponse"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "entries"
+        ],
+        "title": "FileListResponse",
+        "description": "Response returned when listing one workspace directory level."
+      },
+      "FileWriteRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "FileWriteRequest",
+        "description": "Full content of a file write."
+      },
+      "FileWriteResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "etag"
+        ],
+        "title": "FileWriteResponse",
+        "description": "Response returned when writing one workspace file."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1969,6 +3168,48 @@
         ],
         "title": "HealthResponse",
         "description": "Health-check response returned by the API."
+      },
+      "InterruptResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "InterruptResponse",
+        "description": "Response returned when a running or queued turn is interrupted."
+      },
+      "MessageCreateRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "MessageCreateRequest",
+        "description": "A chat turn submitted to a session."
+      },
+      "MessageCreateResponse": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "title": "Turn Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "turn_id"
+        ],
+        "title": "MessageCreateResponse",
+        "description": "Response returned when a chat turn is accepted."
       },
       "MetadataValidationCheckResponse": {
         "properties": {
@@ -2308,7 +3549,7 @@
             ],
             "title": "Cff Url"
           },
-          "submitted_by_github_login": {
+          "submitted_by_github_user_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -2317,7 +3558,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submitted By Github Login"
+            "title": "Submitted By Github User Id"
           }
         },
         "type": "object",
@@ -2421,7 +3662,7 @@
             ],
             "title": "Cff Url"
           },
-          "submitted_by_github_login": {
+          "submitted_by_github_user_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -2430,7 +3671,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submitted By Github Login"
+            "title": "Submitted By Github User Id"
           },
           "metadata_path": {
             "anyOf": [
@@ -2736,7 +3977,7 @@
             ],
             "title": "Cff Url"
           },
-          "submitted_by_github_login": {
+          "submitted_by_github_user_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -2745,7 +3986,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submitted By Github Login"
+            "title": "Submitted By Github User Id"
           },
           "profile_version": {
             "anyOf": [
@@ -2886,7 +4127,7 @@
             ],
             "title": "Cff Url"
           },
-          "submitted_by_github_login": {
+          "submitted_by_github_user_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -2895,7 +4136,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submitted By Github Login"
+            "title": "Submitted By Github User Id"
           },
           "metadata_path": {
             "anyOf": [
@@ -3056,7 +4297,7 @@
             ],
             "title": "Cff Url"
           },
-          "submitted_by_github_login": {
+          "submitted_by_github_user_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -3065,7 +4306,7 @@
                 "type": "null"
               }
             ],
-            "title": "Submitted By Github Login"
+            "title": "Submitted By Github User Id"
           },
           "metadata_path": {
             "anyOf": [
@@ -3472,6 +4713,135 @@
         ],
         "title": "RegistryRegistrationResponse",
         "description": "Response model for one registry registration overview row."
+      },
+      "SessionCreateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "session_token": {
+            "type": "string",
+            "title": "Session Token"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolDescriptor"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "session_token",
+          "model",
+          "tools"
+        ],
+        "title": "SessionCreateResponse",
+        "description": "Response returned when a workspace session is created."
+      },
+      "SessionKeyRequest": {
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "auth_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Token"
+          }
+        },
+        "type": "object",
+        "title": "SessionKeyRequest",
+        "description": "BYOK credential upload for one session; provide exactly one field."
+      },
+      "SessionStateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "has_key": {
+            "type": "boolean",
+            "title": "Has Key"
+          },
+          "busy": {
+            "type": "boolean",
+            "title": "Busy"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolDescriptor"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "model",
+          "has_key",
+          "busy",
+          "error",
+          "tools"
+        ],
+        "title": "SessionStateResponse",
+        "description": "Point-in-time session state, useful after a client reconnect."
+      },
+      "ToolDescriptor": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "ToolDescriptor",
+        "description": "One tool available to a session's agent loop."
       },
       "ValidationError": {
         "properties": {
