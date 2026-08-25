@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+import pytest
 
 from src.api.routers import metadata as metadata_router
 from src.api.app import create_app
@@ -368,6 +369,29 @@ def test_generate_dataset_metadata_endpoint_requires_file() -> None:
     assert response.status_code == 422
 
 
+# Covers compact helper edges for metadata upload/generation routing.
+def test_metadata_helpers_handle_parse_edges_and_file_fallback(tmp_path: Path) -> None:
+    output_path = tmp_path / "metadata.jsonld"
+    output_path.write_text('{"name": "from-file"}', encoding="utf-8")
+    with pytest.raises(metadata_router.HTTPException) as error:
+        metadata_router._parse_creators_json("{}")
+
+    assert (
+        metadata_router._resolve_validation_kind(
+            "auto", {"@type": "SoftwareSourceCode"}
+        )
+        == "adapter"
+    )
+    assert metadata_router._parse_creators_json(" ") == []
+    assert (
+        metadata_router._load_generated_metadata(
+            document=None, output_path=output_path
+        )["name"]
+        == "from-file"
+    )
+    assert error.value.status_code == 422
+
+
 # ===========================================================
 # Metadata Adapter Generation Endpoint Tests
 # ===========================================================
@@ -600,7 +624,9 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
         metadata["creator"][0]["identifier"] == "https://orcid.org/0000-0000-0000-0000"
     )
     assert metadata["hasPart"][0]["name"] == "People Dataset"
-    assert metadata["hasPart"][0]["creator"][0]["email"] == "dataset.creator@example.org"
+    assert (
+        metadata["hasPart"][0]["creator"][0]["email"] == "dataset.creator@example.org"
+    )
     assert (
         metadata["hasPart"][0]["creator"][0]["identifier"]
         == "https://orcid.org/0000-0000-0000-0001"
