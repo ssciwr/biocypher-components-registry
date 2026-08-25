@@ -19,7 +19,7 @@ const submittedRegistration = {
   repository_kind: 'remote',
   repository_location: draft.repositoryLocation,
   status: 'SUBMITTED',
-  submitted_by_github_login: 'jmsssc',
+  submitted_by_github_user_id: '12345',
 }
 
 describe('registration DOI check', () => {
@@ -36,7 +36,7 @@ describe('registration DOI check', () => {
 
 
   it('auto submits the saved draft after GitHub sign-in returns', () => {
-    cy.intercept('GET', '**/api/v1/auth/me', { body: { github_login: 'jmsssc' } })
+    cy.intercept('GET', '**/api/v1/auth/me', { body: { authenticated: true } })
     cy.intercept('GET', '**/api/v1/registrations/croissant-file-present-check*', { body: { has_croissant_file: true } })
     cy.intercept('POST', '**/api/v1/registrations', {
       body: submittedRegistration,
