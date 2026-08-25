@@ -42,7 +42,7 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
         return create_engine(
             f"sqlite+pysqlite:///{self.database_path}",
             poolclass=NullPool,
-        ) # Fix open sqlite handles (connections) bug seen in CI testing environment
+        )  # Fix open sqlite handles (connections) bug seen in CI testing environment
 
     def _ensure_registration_sources_columns(self, connection: Engine | object) -> None:
         columns = {
