@@ -1,9 +1,10 @@
 """Unit tests for src/core/workspace/client_loop.py — no network, no API key."""
 
 import json
+import time
 from contextlib import asynccontextmanager
-from types import SimpleNamespace
 
+from mcp.types import CallToolResult, TextContent, Tool
 import pytest
 from conftest import run
 
@@ -232,9 +233,9 @@ def test_edit_file(workspace, cl):
 
 
 def _mcp_result(text=None, structured=None, is_error=False):
-    content = [SimpleNamespace(type="text", text=t) for t in (text or [])]
-    return SimpleNamespace(
-        structuredContent=structured, content=content, isError=is_error
+    content = [TextContent(type="text", text=t) for t in (text or [])]
+    return CallToolResult(
+        content=content, structured_content=structured, is_error=is_error
     )
 
 
@@ -265,10 +266,10 @@ class FakeSession:
 
 
 def _tool_def(name="my_tool"):
-    return SimpleNamespace(
+    return Tool(
         name=name,
         description="desc",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {"q": {"type": "string"}},
         },
@@ -340,6 +341,16 @@ def test_run_command_runs_in_workspace_root(workspace, cl):
 def test_run_command_timeout(workspace, cl):
     out = run(cl.run_command.call({"command": "sleep 5", "timeout_seconds": 1}))
     assert out == "[tool error] command timed out after 1s"
+
+
+def test_run_command_timeout_kills_child_processes(workspace, cl):
+    marker = workspace / "child_survived"
+    command = "sh -c 'sleep 2; touch child_survived' & wait"
+    out = run(cl.run_command.call({"command": command, "timeout_seconds": 1}))
+    time.sleep(2.2)
+    assert out.startswith("[tool error]")
+    assert "timed out after 1s" in out
+    assert not marker.exists()
 
 
 def test_run_command_merges_stderr(workspace, cl):

@@ -40,7 +40,7 @@ def _github_response(payload: dict[str, object]) -> Mock:
     return response
 
 
-def test_github_login_start_sets_signed_state_and_safe_return(
+def test_github_oauth_start_sets_signed_state_and_safe_return(
     auth_env: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -60,7 +60,7 @@ def test_github_login_start_sets_signed_state_and_safe_return(
     assert response.cookies[settings.auth_return_to_cookie_name].strip('"') == "/"
 
 
-def test_github_callback_creates_session_cookie(
+def test_github_oauth_callback_creates_session_cookie(
     auth_env: None,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -82,7 +82,7 @@ def test_github_callback_creates_session_cookie(
     monkeypatch.setattr(
         auth.requests,
         "get",
-        Mock(return_value=_github_response({"login": "jmsssc"})),
+        Mock(return_value=_github_response({"id": 12345, "login": "jmsssc"})),
     )
     client = TestClient(app)
     client.cookies.set(
@@ -97,10 +97,10 @@ def test_github_callback_creates_session_cookie(
     assert response.status_code == 307
     assert response.headers["location"] == "http://localhost:5173/adapters"
     assert session is not None
-    assert session.github_login == "jmsssc"
+    assert session.github_user_id == "12345"
 
 
-def test_github_callback_rejects_invalid_state(auth_env: None) -> None:
+def test_github_oauth_callback_rejects_invalid_state(auth_env: None) -> None:
     """AI-Generated.
 
     Reject callbacks whose state does not match the signed cookie.
@@ -132,9 +132,11 @@ def test_github_payload_failures_raise_auth_error(
         auth._github_access_token("client-id", "client-secret", "code")
     with pytest.raises(HTTPException) as user_error:
         auth._github_user("gh-token")
+    with pytest.raises(HTTPException) as user_id_error:
+        auth._github_user_id({"id": "12345"})
     assert token_error.value.status_code == 400
     assert user_error.value.status_code == 400
-    assert token_error.value.detail == "GitHub login failed."
+    assert user_id_error.value.status_code == 400
 
 
 def test_auth_me_and_logout_use_session_dependencies() -> None:
@@ -146,12 +148,12 @@ def test_auth_me_and_logout_use_session_dependencies() -> None:
     store = Mock()
     app.dependency_overrides[get_auth_session_store] = lambda: store
     app.dependency_overrides[get_current_auth_session] = lambda: AuthSession(
-        github_login="jmsssc"
+        github_user_id="12345"
     )
     client = TestClient(app)
     client.cookies.set(settings.auth_session_cookie_name, "session-token")
     me_response = client.get("/api/v1/auth/me")
     logout_response = client.post("/api/v1/auth/logout")
-    assert me_response.json()["github_login"] == "jmsssc"
+    assert me_response.json()["authenticated"] is True
     assert logout_response.status_code == 204
     assert store.delete_session.call_args.args == ("session-token",)

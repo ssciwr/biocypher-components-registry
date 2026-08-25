@@ -24,8 +24,8 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
             "submit",
             "--name",
             "Example Adapter",
-            "--github-login",
-            "edwinc",
+            "--github-user-id",
+            "12345",
             str(repository),
         ],
     )
@@ -34,7 +34,7 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
     assert "Registration Request" in result.output
     assert "Registration request created" in result.output
     assert "example-adapter" in result.output
-    assert "edwinc" in result.output
+    assert "12345" in result.output
     assert "local" in result.output
 
 
@@ -72,7 +72,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
     assert result.exit_code == 0, result.output
     assert "Stored Registration" in result.output
     assert "Registration stored" in result.output
-    assert "sampleGithubLogin" in result.output
+    assert "0" in result.output
     assert "SUBMITTED" in result.output
 
     with sqlite3.connect(database_path) as connection:
@@ -82,7 +82,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
                 submitted_adapter_name,
                 repository_location,
                 source_kind,
-                submitted_by_github_login,
+                submitted_by_github_user_id,
                 is_active
             FROM registration_sources
             """
@@ -92,7 +92,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
             "Example Adapter",
             str(repository.resolve()),
             "local",
-            "sampleGithubLogin",
+            "0",
             1,
         )
 

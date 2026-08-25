@@ -28,7 +28,7 @@ def test_post_adapter_endorsement_records_single_github_user(tmp_path: Path) -> 
         adapter_id="example-adapter",
         adapter_name="Example Adapter",
     )
-    client = create_adapter_client(store, github_login="reader")
+    client = create_adapter_client(store, github_user_id="12345")
     first = client.post("/api/v1/adapters/example-adapter/endorse")
     second = client.post("/api/v1/adapters/example-adapter/endorse")
     detail = client.get("/api/v1/adapters/example-adapter").json()
