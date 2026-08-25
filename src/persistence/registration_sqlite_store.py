@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
@@ -38,7 +39,10 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
             connection.execute(text("DROP TABLE IF EXISTS registrations"))
 
     def _build_engine(self) -> Engine:
-        return create_engine(f"sqlite+pysqlite:///{self.database_path}")
+        return create_engine(
+            f"sqlite+pysqlite:///{self.database_path}",
+            poolclass=NullPool,
+        ) # Fix open sqlite handles (connections) bug seen in CI testing environment
 
     def _ensure_registration_sources_columns(self, connection: Engine | object) -> None:
         columns = {

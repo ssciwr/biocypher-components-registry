@@ -88,8 +88,9 @@ export async function listWorkspaceFiles(session: WorkspaceAccess, path = '') {
 export async function attachWorkspaceKey(session: WorkspaceAccess, apiKey: string) {
   await setKeyAgentApiV1SessionsSessionIdKeyPost({
     ...sessionOptions(session),
-    body: { api_key: apiKey },
-  })
+    body: { api_key: apiKey }, // Frontend only uses api_key, not auth_token, so we could remove auth_token
+  }) // todo: Remove auth_token (PR comment mentioned this as a separate issue).
+  // This is the BYOK key nor our key.
 }
 
 export async function sendWorkspaceMessage(

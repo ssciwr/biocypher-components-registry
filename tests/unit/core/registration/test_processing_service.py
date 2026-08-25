@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -191,9 +193,7 @@ def test_finish_registration_records_unchanged_event_for_repeat_processing(
     assert first.status == RegistrationStatus.VALID
     assert second.status == RegistrationStatus.VALID
 
-    import sqlite3
-
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         entry_count = connection.execute(
             "SELECT COUNT(*) FROM registry_entries"
         ).fetchone()
@@ -242,9 +242,7 @@ def test_finish_registration_rejects_same_version_changed_file_and_records_event
     with pytest.raises(DuplicateRegistrationError, match="Please bump the version"):
         finish_registration(submitted.registration_id, store)
 
-    import sqlite3
-
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         rejected_events = connection.execute(
             """
             SELECT COUNT(*)
@@ -340,9 +338,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
     assert latest_refresh.processed == 4
     assert latest_refresh.fetch_failed == 1
 
-    import sqlite3
-
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         fetch_failed_events = connection.execute(
             """
             SELECT COUNT(*)
@@ -416,9 +412,7 @@ def test_revalidate_registration_reprocesses_corrected_invalid_source(
     assert revalidated.metadata is not None
     assert revalidated.uniqueness_key == "example-adapter::1.0.0"
 
-    import sqlite3
-
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         revalidated_events = connection.execute(
             """
             SELECT COUNT(*)

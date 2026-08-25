@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -154,8 +155,8 @@ def source_record_exists_in_registration_sources(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that the submitted source is stored in the source table."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         row = connection.execute(
             """
@@ -177,8 +178,8 @@ def submitted_event_exists_in_registration_events(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that source submission created the expected event."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         row = connection.execute(
             """
@@ -222,8 +223,8 @@ def canonical_valid_record_exists_in_registry_entries(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that valid processing created a canonical registry entry."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         row = connection.execute(
             """
@@ -246,8 +247,8 @@ def valid_created_event_exists_in_registration_events(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that valid processing recorded the canonical-entry event."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         row = connection.execute(
             """
@@ -292,8 +293,8 @@ def canonical_registry_state_remains_correct_for_unchanged_processing(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that unchanged processing does not create another canonical entry."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         entry_count = connection.execute(
             "SELECT COUNT(*) FROM registry_entries"
@@ -340,8 +341,8 @@ def canonical_registry_state_remains_correct_for_duplicate_processing(
 ) -> None:
     """Assert that duplicate processing preserves the original canonical entry."""
     assert registration_architecture_context["duplicate_error"] is not None
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         entry_count = connection.execute(
             "SELECT COUNT(*) FROM registry_entries"
@@ -386,8 +387,8 @@ def canonical_registry_state_remains_correct_for_invalid_processing(
     registration_architecture_context: dict[str, Any],
 ) -> None:
     """Assert that invalid processing does not create canonical registry entries."""
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         entry_count = connection.execute(
             "SELECT COUNT(*) FROM registry_entries"
@@ -408,8 +409,8 @@ def outcome_is_recorded_in_registration_events_as(
     )
     if event_type == "UNCHANGED":
         registration_id = registration_architecture_context["registration_id"]
-    with sqlite3.connect(
-        registration_architecture_context["database_path"]
+    with closing(
+        sqlite3.connect(registration_architecture_context["database_path"])
     ) as connection:
         row = connection.execute(
             """
