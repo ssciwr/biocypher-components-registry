@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import anthropic
 import httpx
+from mcp.types import CallToolResult, TextContent, Tool
 
 
 class FakeMcp:
@@ -16,20 +17,20 @@ class FakeMcp:
     async def list_tools(self):
         return SimpleNamespace(
             tools=[
-                SimpleNamespace(
+                Tool(
                     name="get_phase_guidance",
                     description="MCP guidance tool",
-                    inputSchema={"type": "object", "properties": {}},
+                    input_schema={"type": "object", "properties": {}},
                 )
             ]
         )
 
     async def call_tool(self, name, arguments):
         self.calls.append((name, arguments))
-        return SimpleNamespace(
-            structuredContent=None,
-            content=[SimpleNamespace(type="text", text="mcp says hi")],
-            isError=False,
+        return CallToolResult(
+            structured_content=None,
+            content=[TextContent(type="text", text="mcp says hi")],
+            is_error=False,
         )
 
 

@@ -42,6 +42,7 @@ Run:
 import asyncio
 import json
 import os
+import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -171,12 +172,12 @@ async def open_mcp_session(url: str, headers: dict[str, str]):
 
 def render_tool_result(result) -> str:
     """Flatten an MCP CallToolResult to text for model context."""
-    if result.structuredContent is not None:
-        text = json.dumps(result.structuredContent)
+    if result.structured_content is not None:
+        text = json.dumps(result.structured_content)
     else:
         parts = [c.text for c in result.content if getattr(c, "type", None) == "text"]
         text = "\n".join(parts)
-    if result.isError:
+    if result.is_error:
         text = f"[tool error] {text}"
     return text
 
@@ -210,7 +211,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
         call,
         name=tool_name,
         description=mcp_tool_def.description or "",
-        input_schema=mcp_tool_def.inputSchema,
+        input_schema=mcp_tool_def.input_schema,
     )
 
 
@@ -400,15 +401,28 @@ def make_file_tools(
                 env=_exec_env(get_exec_bin()),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                start_new_session=True,
             )
             try:
                 out, _ = await asyncio.wait_for(
                     proc.communicate(), timeout=timeout_seconds
                 )
             except TimeoutError:
-                proc.kill()
+                # Ensure killing all child processes of the process too for extra reliance/security
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 await proc.wait()
                 return f"[tool error] command timed out after {timeout_seconds}s"
+            except asyncio.CancelledError:
+                # Ensure killing all child processes of the process too
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                raise
         except OSError as e:
             return f"[tool error] {e}"
         text = out.decode(errors="replace")
