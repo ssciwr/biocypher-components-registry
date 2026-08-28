@@ -73,3 +73,45 @@ def test_distribution_metadata_handles_missing_and_existing_dataset_processing_p
     assert missing.document is None
     assert dict_result.document["distribution"]["name"] == "people.csv"
     assert list_result.document["distribution"][0]["@type"] == "cr:FileObject"
+
+
+def test_distribution_metadata_ignores_blank_overrides() -> None:
+    """
+    Keep blank form fields from activating distribution updates.
+    """
+    document = {"distribution": []}
+    result = GenerationResult(output_path="", document=document)
+
+    updated = dataset_service._with_distribution_metadata(
+        result=result,
+        request=GenerationRequest(input_path="data.csv", output_path="", sha256=" "),
+    )
+
+    assert updated is result
+    assert updated.document == document
+    assert updated.document["distribution"] == []
+
+
+def test_distribution_metadata_prefers_file_object_entries() -> None:
+    """AI-Generated.
+
+    Apply overrides to the matching distribution FileObject in mixed lists.
+    """
+    document = {
+        "distribution": [
+            {"@type": "cr:FileObject", "name": "other.csv"},
+            {"@type": "sc:Thing"},
+            {"@type": "cr:FileObject", "name": "data.csv"},
+        ]
+    }
+    request = GenerationRequest(
+        input_path="data.csv", output_path="", filename="renamed.csv"
+    )
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document=document), request=request
+    )
+
+    assert updated.document["distribution"][0]["name"] == "other.csv"
+    assert updated.document["distribution"][1] == {"@type": "sc:Thing"}
+    assert updated.document["distribution"][2]["name"] == "renamed.csv"

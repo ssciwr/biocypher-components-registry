@@ -7,6 +7,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import typer
 
@@ -72,7 +73,7 @@ def _with_distribution_metadata(
         return result
 
     updated_document = deepcopy(document)
-    distribution = _first_distribution(updated_document)
+    distribution = _first_distribution(updated_document, request.input_path)
     _set_optional(distribution, "contentUrl", request.content_url)
     _set_optional(distribution, "encodingFormat", request.encoding_format)
     _set_optional(distribution, "name", request.filename)
@@ -84,15 +85,15 @@ def _with_distribution_metadata(
 # AI-Generated.
 # Keeps the post-generation override path inactive for untouched requests.
 def _has_distribution_metadata(request: GenerationRequest) -> bool:
-    return any(
-        value
-        for value in (
-            request.content_url,
-            request.encoding_format,
-            request.filename,
-            request.sha256,
-        )
-    )
+    for value in (
+        request.content_url,
+        request.encoding_format,
+        request.filename,
+        request.sha256,
+    ):
+        if value is not None and value.strip():
+            return True
+    return False
 
 
 # AI-Generated.
@@ -109,12 +110,36 @@ def _result_document(result: GenerationResult) -> dict[str, Any] | None:
 
 # AI-Generated.
 # Returns the editable FileObject, creating one only if the generator omitted it.
-def _first_distribution(document: dict[str, Any]) -> dict[str, Any]:
+def _first_distribution(document: dict[str, Any], input_path: str) -> dict[str, Any]:
     distribution = document.get("distribution")
     if isinstance(distribution, list):
+        fallback: dict[str, Any] | None = None
+        file_object: dict[str, Any] | None = None
+        input_name = Path(input_path).expanduser().name
         for item in distribution:
-            if isinstance(item, dict):
+            if not isinstance(item, dict):
+                continue
+            if fallback is None:
+                fallback = item
+            item_type = item.get("@type")
+            is_file_object = item_type in ("cr:FileObject", "FileObject")
+            if isinstance(item_type, list):
+                is_file_object = any(
+                    value in ("cr:FileObject", "FileObject") for value in item_type
+                )
+            if not is_file_object:
+                continue
+            if item.get("name") == input_name:
                 return item
+            content_url = str(item.get("contentUrl") or "")
+            if Path(urlparse(content_url).path).name == input_name:
+                return item
+            if file_object is None:
+                file_object = item
+        if file_object is not None:
+            return file_object
+        if fallback is not None:
+            return fallback
         file_object: dict[str, Any] = {"@type": "cr:FileObject"}
         distribution.insert(0, file_object)
         return file_object
