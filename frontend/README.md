@@ -2,6 +2,8 @@
 The frontend is a simple React application that uses generated `@hey-api/openapi-ts` functions it can import in JS - which are generated automatically from backned endpoints - to show, save and update information on BioCypher adapters.
 
 Frontend ---> `@hey-api/openapi-ts` client ---> FastAPI backend <---> Postgres
+This works the same way for the agentic workspace, also using openapi-ts, but the agentic workspace has its own client
+and own files/folders in the backend too. This is to deliberately keep the code decoupled and conceptually separated.
 
 ## Example of how requests map between our components:
 Full tool chain example for the adapter list:
@@ -20,7 +22,7 @@ Full tool chain example for the adapter list:
 I recommend to run the frontend with `pnpm run dev` and to run the backend using `uv` concurrently for local dev. That will use SQLite for the DB.
 
 When you make updates to the backend which frontend needs to see (changing parameters), rerun this command which regenerates the functions. Then after that, import those functions in the frontend:
-`pnpm run openapi-ts`
+`pnpm run openapi-ts` - this also updates the agentic workspace API openAPI-ts files.
 
 OpenAPI-ts just provides javascript(ts/typescript technically) functions you can call easily that run what your API provides.
 
@@ -56,7 +58,6 @@ If pull fails, check if your GHCR token is up to date on both the instance and l
 
 ## Decisions to make
 [ ] - How to mock backend for Cypress/full integration tests (SQLlite DB and run backend concurrently? That limits performance testing but as assessed below that is not a testing goal for this application)
-[ ] - How to mock authentication/login for those tests(probably write mock code)
 
 ## Smoke testing key inter-service calls/actions:
 
@@ -70,8 +71,9 @@ If pull fails, check if your GHCR token is up to date on both the instance and l
 [ ] - We need to improve the GHCR management and document the process for images/what tagging system we will use (how to tag, push, how to update from a specific tag on production, which branches you should build images for (--> soon, only main))
 [ ] - We need to document docker compose commands for bringing up/down services via docker compose -f specified chosen files without removing the volumes (v) so we keep the data in postgres
 [ ] - Agree on a date when we decide what data the backend will collect about adapters and from then onwards have a production build in use, and use migrations for all future changes.
-[ ] - Document how to perform migrations via SSH (from which directory) to make future project updates
-[ ] - Soon the MCP Workspace will need to be integrated too, need to research that.
+[ ] - Document how to perform migrations via SSH (from which directory) to make future project updates to the DB
+[x] - Integrate MCP workspace into the frontend
+[ ] - Add security/hardening for the MCP Workspace, this main issue collates the main tasks for that: https://github.com/ssciwr/biocypher-components-registry/issues/63
 
 ## Cross component reliably risks/areas:
 We discovered at the BioCypher Workshop that some researchers are mandated to use their own insitutions instances to store source code (e.g. GitLab). Therefore, the backend needs to be able to parse at least Github and Gitlab urls for the repository croissant files and ideally, maintainer information (if possible)
@@ -90,6 +92,8 @@ Until official release, the instance running on the server should be kept down w
 but it can also be taken down without the "-v" option so that the volumes remain (so: use docker-compose -f <file> down") without the -v flag for removing volumes,
 unless the volumes/existing adapters and data needs to be overwritten when a new data model comes out.
 
+Presently, only https is supported, http is not supported so IP-only server is not possible or accessible.
+
 ## Getting the repository to a useful state
 We need to make sure we kickstart the repository manually which means having a number of adapters with croissant files which are useful.
 (and possibly also the sample knowledge graph output from running create_knowledge_graph.py in the backend part)
@@ -105,9 +109,12 @@ Improved by Linting, SonarQube and our Software Development Life Cycle/Gherkin d
 ### Rate-limits decision
 We should analyze the backend to add rate limits to more costly actions to run and prevent users using our API to process data.
 
+We also need rate limits for the agentic workspace.
+
 ### Security Testing
 Partially tested by SonarQube, we need to look at how we keep the most sensitive data (email for registration / Github information)
-The Github token access should be reviewed
+The Github token access should be reviewed in concert with the API/authentication LLM API tokens (currently anthropic)
+Sandboxing needs to be tested after hardening of the agentic workspace/sandboxing of it.
 
 ### Domain Review
 We consulted with experts and adjusted the description we need, one minor feedback point was to use a dropdown for standard licenses rather than freetext for confident ease of use of the adapters
@@ -119,9 +126,9 @@ We should plan a beta test once the croissant file generator part is implemented
 We corrected search functionality behaviour (unclear system status in Nielens Usability terms) as it gave too little feedback.
 
 ## Manual testing in July 2026:
-[ ] - Run manual test of the website and changing between pages
-[ ] - Test adding adapter on slow 3G mode
-[ ] - Manually Test loading and searching on mobile slow 3G mode
+[x] - Run manual test of the website and changing between pages
+[x] - Test adding adapter on slow 3G mode
+[x] - Manually Test loading and searching on mobile slow 3G mode
 
 ## Use of AI
 ### For tests and integration
