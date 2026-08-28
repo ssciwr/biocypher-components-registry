@@ -46,7 +46,6 @@ def test_distribution_metadata_skips_requests_without_overrides() -> None:
     )
 
     assert updated is result
-    assert "name" not in updated.document["distribution"] # these two are to be more explicit in the test intention
     assert "sha256" not in updated.document["distribution"] # not added as not specified
     assert updated.document == document # document is the same, unchanged which implies the above two, but the above two are more explicit aobut what this should do.
     assert updated.document["distribution"]["name"] == "data.csv"
