@@ -9,6 +9,7 @@ import {
   attachWorkspaceKey,
   consumeWorkspaceEvents,
   createWorkspaceSession,
+  getWorkspaceSessionState,
   interruptWorkspaceTurn,
   sendWorkspaceMessage,
   workspaceErrorMessage,
@@ -18,6 +19,8 @@ import { useWorkspaceFiles } from './useWorkspaceFiles'
 type UseWorkspaceSessionOptions = Readonly<{
   signedIn: boolean
 }>
+
+type WorkspaceAccess = Pick<WorkspaceViewSession, 'id' | 'token'>
 
 function createMessage(kind: WorkspaceMessage['kind'], text: string): WorkspaceMessage {
   return { id: globalThis.crypto.randomUUID(), kind, text }
@@ -39,6 +42,21 @@ function viewSession(created: Awaited<ReturnType<typeof createWorkspaceSession>>
     id: created.session_id,
     token: created.session_token,
     tools: created.tools,
+  }
+}
+
+function applySessionState(
+  current: WorkspaceViewSession | null,
+  activeSession: WorkspaceAccess,
+  state: Awaited<ReturnType<typeof getWorkspaceSessionState>>,
+): WorkspaceViewSession | null {
+  if (!current || current.id !== activeSession.id) return current
+  return {
+    ...current,
+    busy: state.busy,
+    error: state.error,
+    hasLLMKey: state.has_key,
+    tools: state.tools,
   }
 }
 
@@ -94,6 +112,12 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     } finally {
       setPending('idle')
     }
+  }, [])
+
+  const syncSessionState = useCallback(async (activeSession: WorkspaceAccess) => {
+    const state = await getWorkspaceSessionState(activeSession)
+    setSession((current) => applySessionState(current, activeSession, state))
+    return state
   }, [])
 
   const {
@@ -185,7 +209,11 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
 
     void consumeWorkspaceEvents(activeSession, {
       onError: (eventError) => {
-        if (!controller.signal.aborted) setError(workspaceErrorMessage(eventError))
+        if (controller.signal.aborted) return
+        setError(workspaceErrorMessage(eventError))
+        void syncSessionState(activeSession).catch((syncError: unknown) => {
+          if (!controller.signal.aborted) setError(workspaceErrorMessage(syncError))
+        })
       },
       onEvent: (event) => {
         if (event.data === undefined && !event.event) return
@@ -197,11 +225,28 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
       },
       signal: controller.signal,
     }).catch((eventError: unknown) => {
-      if (!controller.signal.aborted) setError(workspaceErrorMessage(eventError))
+      if (controller.signal.aborted) return
+      setError(workspaceErrorMessage(eventError))
+      void syncSessionState(activeSession).catch((syncError: unknown) => {
+        if (!controller.signal.aborted) setError(workspaceErrorMessage(syncError))
+      })
     })
 
     return () => controller.abort()
-  }, [handleWorkspaceEvent, sessionId, sessionToken])
+  }, [handleWorkspaceEvent, sessionId, sessionToken, syncSessionState])
+
+  useEffect(() => {
+    if (!sessionId || !sessionToken || !session?.busy) return undefined
+
+    const activeSession = { id: sessionId, token: sessionToken }
+    const intervalId = globalThis.setInterval(() => {
+      void syncSessionState(activeSession).catch((syncError: unknown) => {
+        setError(workspaceErrorMessage(syncError))
+      })
+    }, 5000)
+
+    return () => globalThis.clearInterval(intervalId)
+  }, [session?.busy, sessionId, sessionToken, syncSessionState])
 
   // Set up a workspace session with the backend API
   async function startSession() {
@@ -251,6 +296,8 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     if (!session) return
     setError(null)
     try {
+      const state = await syncSessionState(session)
+      if (!state.busy) return
       await interruptWorkspaceTurn(session)
       appendMessage('status', 'Stop requested.')
     } catch (stopError) {

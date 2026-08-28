@@ -8,6 +8,7 @@
 import {
   createSessionAgentApiV1SessionsPost,
   eventsAgentApiV1SessionsSessionIdEventsGet,
+  getSessionAgentApiV1SessionsSessionIdGet,
   interruptAgentApiV1SessionsSessionIdInterruptPost,
   listFilesAgentApiV1SessionsSessionIdFilesGet,
   postMessageAgentApiV1SessionsSessionIdMessagesPost,
@@ -21,6 +22,7 @@ import type {
   WorkspaceSession,
   WorkspaceViewSession,
 } from './types'
+import type { SessionStateResponse } from '../../api/workspace'
 
 type WorkspaceAccess = Pick<WorkspaceViewSession, 'id' | 'token'>
 
@@ -56,6 +58,13 @@ export async function createWorkspaceSession(): Promise<WorkspaceSession> {
   const { data } = await createSessionAgentApiV1SessionsPost({
     throwOnError: true,
   })
+  return data
+}
+
+export async function getWorkspaceSessionState(
+  session: WorkspaceAccess,
+): Promise<SessionStateResponse> {
+  const { data } = await getSessionAgentApiV1SessionsSessionIdGet(sessionOptions(session))
   return data
 }
 
