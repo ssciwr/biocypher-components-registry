@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import GenericModal from '../../components/GenericModal'
 import {
   ChatPane,
   WorkspaceError,
@@ -23,14 +23,7 @@ and also gates access on the client side unelss the user is signed in to GitHUb.
  */
 function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
   const workspace = useWorkspaceSession({ signedIn })
-  const keySetup = workspace.session && !workspace.session.hasLLMKey ? (
-    <WorkspaceKeyForm
-      apiKey={workspace.apiKey}
-      onApiKeyChange={workspace.setApiKey}
-      onAttachKey={() => void workspace.attachKey()}
-      pending={workspace.pending}
-    />
-  ) : null
+  const needsKey = Boolean(workspace.session && !workspace.session.hasLLMKey)
 
   return (
     <section className="relative bg-slate-100">
@@ -54,7 +47,6 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
             <ChatPane
               canSend={workspace.canSend}
               chatEndRef={workspace.chatEndRef}
-              keySetup={keySetup}
               messages={workspace.messages}
               onPromptChange={workspace.setPrompt}
               onSend={() => void workspace.sendMessage()}
@@ -73,44 +65,44 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
           </div>
         </div>
       </div>
+      <GenericModal
+        content={(
+          <WorkspaceKeyForm
+            apiKey={workspace.apiKey}
+            error={workspace.error}
+            onApiKeyChange={workspace.setApiKey}
+            onAttachKey={() => void workspace.attachKey()}
+            pending={workspace.pending}
+          />
+        )}
+        contentClassName=""
+        open={needsKey}
+        panelClassName="w-full max-w-5xl rounded-lg border border-slate-200 bg-white p-5 text-left shadow-2xl sm:p-6"
+        showTitle={false}
+        title="Attach Anthropic API key"
+      />
       {!signedIn ? <div className="fixed inset-x-0 bottom-0 top-16 z-30 bg-slate-200/75" aria-hidden="true" /> : null}
-      {!signedIn ? <WorkspaceSignInDialog signInUrl={signInUrl} /> : null}
+      <GenericModal
+        content={(
+          <>
+            <a
+              className="inline-flex h-14 min-w-64 items-center justify-center rounded-lg bg-slate-950 px-8 text-base font-semibold text-white shadow-sm hover:bg-slate-800"
+              href={signInUrl}
+            >
+              Sign in with GitHub
+            </a>
+            <p className="mx-auto mt-4 max-w-xs text-sm leading-6 text-slate-400">
+              and provide a Claude API key to use the MCP Workspace
+            </p>
+          </>
+        )}
+        contentClassName="text-center"
+        open={!signedIn}
+        panelClassName="w-full max-w-md rounded-lg border border-slate-300 bg-white px-8 py-9 text-center shadow-2xl"
+        showTitle={false}
+        title="Sign in to use the MCP Workspace"
+      />
     </section>
-  )
-}
-
-
-function WorkspaceSignInDialog({ signInUrl }: Readonly<{ signInUrl: string }>) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog || dialog.open) return
-    dialog.showModal()
-  }, [])
-
-  return (
-    <dialog
-      aria-label="Sign in to use the MCP Workspace"
-      aria-modal="true"
-      className="fixed inset-x-0 bottom-0 top-16 z-40 m-0 h-auto max-h-none w-auto max-w-none border-0 bg-transparent px-4 py-0 backdrop:bg-transparent"
-      onCancel={(event) => event.preventDefault()}
-      ref={dialogRef}
-    >
-      <div className="flex h-full items-center justify-center">
-        <div className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-8 py-9 text-center shadow-2xl">
-          <a
-            className="inline-flex h-14 min-w-64 items-center justify-center rounded-lg bg-slate-950 px-8 text-base font-semibold text-white shadow-sm hover:bg-slate-800"
-            href={signInUrl}
-          >
-            Sign in with GitHub
-          </a>
-          <p className="mx-auto mt-4 max-w-xs text-sm leading-6 text-slate-400">
-            and provide a Claude API key to use the MCP Workspace
-          </p>
-        </div>
-      </div>
-    </dialog>
   )
 }
 

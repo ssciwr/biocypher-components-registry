@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react'
+import type { RefObject } from 'react'
 import ReactMarkdown from 'react-markdown'
 import {
   ExclamationTriangleIcon,
@@ -22,7 +22,6 @@ type TopBarProps = Readonly<{
 type ChatPaneProps = Readonly<{
   canSend: boolean
   chatEndRef: RefObject<HTMLDivElement | null>
-  keySetup: ReactNode
   messages: WorkspaceMessage[]
   onPromptChange: (value: string) => void
   onSend: () => void
@@ -100,7 +99,6 @@ export function WorkspaceError({ error }: Readonly<{ error: string | null }>) {
 export function ChatPane({
   canSend,
   chatEndRef,
-  keySetup,
   messages,
   onPromptChange,
   onSend,
@@ -132,7 +130,6 @@ export function ChatPane({
           <div ref={chatEndRef} />
         </div>
       </div>
-      {keySetup}
       <form
         className="flex gap-2 border-t border-slate-200 bg-white p-4"
         onSubmit={(event) => {

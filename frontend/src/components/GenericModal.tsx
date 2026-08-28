@@ -4,8 +4,11 @@ import { useEffect, useRef, type ReactNode } from 'react'
 type GenericModalProps = Readonly<{
   title: string
   content: ReactNode
+  contentClassName?: string
   open?: boolean
   onClose?: () => void
+  panelClassName?: string
+  showTitle?: boolean
 }>
 
 /**
@@ -16,8 +19,20 @@ type GenericModalProps = Readonly<{
  * @param onClose
  * @constructor
  */
-function GenericModal({ title, content, open = false, onClose }: GenericModalProps) {
+function GenericModal({
+  title,
+  content,
+  contentClassName,
+  open = false,
+  onClose,
+  panelClassName,
+  showTitle = true,
+}: GenericModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const canClose = Boolean(onClose)
+  const contentWrapperClassName = contentClassName ?? 'mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-300'
+  const dialogTitleId = showTitle ? 'generic-modal-title' : undefined
+  const resolvedPanelClassName = panelClassName ?? 'w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6'
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -34,7 +49,9 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
 
   return (
     <dialog
-      aria-labelledby="generic-modal-title"
+      aria-label={showTitle ? undefined : title}
+      aria-labelledby={dialogTitleId}
+      aria-modal="true"
       className="fixed inset-0 z-50 m-0 flex h-dvh max-h-none w-dvw max-w-none items-center justify-center border-0 bg-transparent p-4 backdrop:bg-black/40"
       ref={dialogRef}
       onCancel={(event) => {
@@ -42,31 +59,39 @@ function GenericModal({ title, content, open = false, onClose }: GenericModalPro
         onClose?.()
       }}
     >
-      <button
-        aria-label="Close modal"
-        className="absolute inset-0 cursor-default border-0 bg-transparent p-0 focus:outline-none"
-        tabIndex={-1}
-        type="button"
-        onClick={onClose}
-      />
-      <section className="relative z-10 w-full max-w-lg rounded-lg bg-white p-5 text-left shadow-xl dark:bg-zinc-900 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <h2
-            className="m-0 text-xl font-semibold text-zinc-950 dark:text-zinc-50"
-            id="generic-modal-title"
-          >
-            {title}
-          </h2>
-          <button
-            aria-label="Close modal"
-            className="inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-            type="button"
-            onClick={onClose}
-          >
-            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{content}</div>
+      {canClose ? (
+        <button
+          aria-label="Close modal"
+          className="absolute inset-0 cursor-default border-0 bg-transparent p-0 focus:outline-none"
+          tabIndex={-1}
+          type="button"
+          onClick={onClose}
+        />
+      ) : null}
+      <section className={`relative z-10 ${resolvedPanelClassName}`}>
+        {showTitle || canClose ? (
+          <div className="flex items-start justify-between gap-4">
+            {showTitle ? (
+              <h2
+                className="m-0 text-xl font-semibold text-zinc-950 dark:text-zinc-50"
+                id={dialogTitleId}
+              >
+                {title}
+              </h2>
+            ) : null}
+            {canClose ? (
+              <button
+                aria-label="Close modal"
+                className="inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                type="button"
+                onClick={onClose}
+              >
+                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={contentWrapperClassName}>{content}</div>
       </section>
     </dialog>
   )
