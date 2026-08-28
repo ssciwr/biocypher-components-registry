@@ -107,6 +107,8 @@ export function ChatPane({
   prompt,
   session,
 }: ChatPaneProps) {
+  const canSubmit = canSend && pending !== 'message'
+
   return (
     <section className="flex min-h-[620px] flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
@@ -141,6 +143,11 @@ export function ChatPane({
           className="max-h-32 min-h-11 flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white disabled:cursor-not-allowed disabled:text-slate-400"
           disabled={!session?.hasLLMKey || session.busy}
           onChange={(event) => onPromptChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            event.preventDefault()
+            if (canSubmit) onSend()
+          }}
           placeholder="Ask the agent..."
           value={prompt}
         />
@@ -156,7 +163,7 @@ export function ChatPane({
         ) : (
           <button
             className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={!canSend || pending === 'message'}
+            disabled={!canSubmit}
             type="submit"
           >
             <PaperAirplaneIcon className="h-5 w-5" aria-hidden="true" />
