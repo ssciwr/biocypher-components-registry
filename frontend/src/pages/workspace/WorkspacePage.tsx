@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   ChatPane,
   WorkspaceError,
@@ -80,25 +81,36 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
 
 
 function WorkspaceSignInDialog({ signInUrl }: Readonly<{ signInUrl: string }>) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog || dialog.open) return
+    dialog.showModal()
+  }, [])
+
   return (
-    <div className="fixed inset-x-0 bottom-0 top-16 z-40 flex items-center justify-center px-4">
-      <section
-        aria-label="Sign in to use the MCP Workspace"
-        aria-modal="true"
-        className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-8 py-9 text-center shadow-2xl"
-        role="dialog"
-      >
-        <a
-          className="inline-flex h-14 min-w-64 items-center justify-center rounded-lg bg-slate-950 px-8 text-base font-semibold text-white shadow-sm hover:bg-slate-800"
-          href={signInUrl}
-        >
-          Sign in with GitHub
-        </a>
-        <p className="mx-auto mt-4 max-w-xs text-sm leading-6 text-slate-400">
-          and provide a Claude API key to use the MCP Workspace
-        </p>
-      </section>
-    </div>
+    <dialog
+      aria-label="Sign in to use the MCP Workspace"
+      aria-modal="true"
+      className="fixed inset-x-0 bottom-0 top-16 z-40 m-0 h-auto max-h-none w-auto max-w-none border-0 bg-transparent px-4 py-0 backdrop:bg-transparent"
+      onCancel={(event) => event.preventDefault()}
+      ref={dialogRef}
+    >
+      <div className="flex h-full items-center justify-center">
+        <div className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-8 py-9 text-center shadow-2xl">
+          <a
+            className="inline-flex h-14 min-w-64 items-center justify-center rounded-lg bg-slate-950 px-8 text-base font-semibold text-white shadow-sm hover:bg-slate-800"
+            href={signInUrl}
+          >
+            Sign in with GitHub
+          </a>
+          <p className="mx-auto mt-4 max-w-xs text-sm leading-6 text-slate-400">
+            and provide a Claude API key to use the MCP Workspace
+          </p>
+        </div>
+      </div>
+    </dialog>
   )
 }
 

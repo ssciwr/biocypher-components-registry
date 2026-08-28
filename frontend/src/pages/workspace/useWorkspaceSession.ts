@@ -116,59 +116,61 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
 
   const handleWorkspaceEvent = useCallback((event: WorkspaceEvent) => {
     const data = eventData(event.data)
-    if (event.event === 'session_state') {
-      const errorText = typeof data.error === 'string' ? data.error : null
-      setSession((current) => current
-        ? {
+
+    // Switch through possible events and take actions in the UI accordingly.
+    switch (event.event) {
+      case 'session_state': {
+        const errorText = typeof data.error === 'string' ? data.error : null
+        setSession((current) => {
+          if (!current) return current
+          return {
             ...current,
             busy: data.busy === true,
             error: errorText,
             hasLLMKey: data.has_key === true,
           }
-        : current)
-      return
-    }
-    // Switch through possible events and take actions in the UI accordingly.
-    if (event.event === 'text_delta') {
-      if (typeof data.text === 'string' && data.text) appendAssistantDelta(data.text)
-      return
-    }
-    if (event.event === 'tool_call') {
-      const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
-      appendMessage('tool', `-> ${name}`)
-      return
-    }
-    if (event.event === 'tool_result') {
-      const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
-      const chars = finiteNumber(data.chars)
-      appendMessage('tool', `<- ${name} - ${chars} chars`)
-      return
-    }
-    if (event.event === 'fs_changed') {
-      const activeSession = sessionRef.current
-      if (activeSession) reloadCurrentDir(activeSession)
-      return
-    }
-    if (event.event === 'turn_started') {
-      setSession((current) => current ? { ...current, busy: true } : current)
-      return
-    }
-    if (event.event === 'turn_done') {
-      setSession((current) => current ? { ...current, busy: false } : current)
-      return
-    }
-    // Error scenarios - alert the user in hte UI first right away
-    if (event.event === 'turn_error' || event.event === 'session_error') {
-      const message = typeof data.message === 'string' && data.message
-        ? data.message
-        : 'Workspace turn failed.'
-      setSession((current) => current ? { ...current, busy: false, error: message } : current)
-      appendMessage('error', message)
-      return
-    }
-    if (event.event === 'session_closed') {
-      appendMessage('status', 'Session closed.')
-      setSession(null)
+        })
+        return
+      }
+      case 'text_delta':
+        if (typeof data.text === 'string' && data.text) appendAssistantDelta(data.text)
+        return
+      case 'tool_call': {
+        const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        appendMessage('tool', `-> ${name}`)
+        return
+      }
+      case 'tool_result': {
+        const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        appendMessage('tool', `<- ${name} - ${finiteNumber(data.chars)} chars`)
+        return
+      }
+      case 'fs_changed': {
+        const activeSession = sessionRef.current
+        if (activeSession) reloadCurrentDir(activeSession)
+        return
+      }
+      case 'turn_started':
+        setSession((current) => current ? { ...current, busy: true } : current)
+        return
+      case 'turn_done':
+        setSession((current) => current ? { ...current, busy: false } : current)
+        return
+      case 'turn_error':
+      case 'session_error': {
+        const message = typeof data.message === 'string' && data.message
+          ? data.message
+          : 'Workspace turn failed.'
+        // Error scenarios - alert the user in hte UI first right away
+        setSession((current) => current ? { ...current, busy: false, error: message } : current)
+        appendMessage('error', message)
+        return
+      }
+      case 'session_closed':
+        appendMessage('status', 'Session closed.')
+        setSession(null)
+        return
+      default:
     }
   }, [appendAssistantDelta, appendMessage, reloadCurrentDir])
 
@@ -232,7 +234,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   // This means submit to this workspaces remote server API session; basically send the users message/prompt over
   // and then we will naturally get the response in other functions
   async function sendMessage() {
-    if (!session || !session.hasLLMKey || !prompt.trim()) return
+    if (!session?.hasLLMKey || !prompt.trim()) return
     const content = prompt.trim()
     setPrompt('')
     appendMessage('user', content)

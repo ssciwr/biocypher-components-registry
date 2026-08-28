@@ -43,8 +43,8 @@ match the tables in this file.
 
 Two caveats when trying routes out in Swagger UI:
 
-1. Workspace routes require the same registry GitHub session cookie that adapter registration does. For
-   `/sessions/{id}/...` requests, provide the `authorization` field with
+1. Workspace routes require the registry GitHub session cookie. For
+   `/sessions/{id}/...` requests, also provide the `authorization` field with
    `Bearer <session_token>` — the word `Bearer`, a space, then the token from
    `POST /sessions` — or put the bare token in the `token` query field.
 2. Do not execute `GET .../events` from Swagger UI: it is an infinite SSE
@@ -137,7 +137,9 @@ connection.
     ]
   }
   ```
-- **401** — GitHub sign-in is required.
+- **401** — GitHub sign-in is required(to start a session). The frontend prompts the user to sign in first too.
+This is the same as the normal application authentication and differs from the 401 that is returned on other agentic
+workspace routes, where 401 means the session workspace key is invalid instead.
 - **502** — the MCP server could not be reached (session is not created).
 
 The `session_token` is shown exactly once; store it client-side for the
@@ -326,14 +328,14 @@ Delete a file or directory (recursively).
 
 ## Status code summary
 
-| Code | Meaning here |
-|---|---|
-| 400 | invalid input: bad path, empty message, key body without a key |
-| 401 | missing/wrong session token, or unknown session id |
+| Code | Meaning here                                                                                             |
+|---|----------------------------------------------------------------------------------------------------------|
+| 400 | invalid input: bad path, empty message, key body without a key                                           |
+| 401 | missing/wrong workspace session token, or unknown session id                                             |
 | 409 | conflict: turn already running, stale `If-Match`, no turn to interrupt, filesystem error on a file route |
-| 415 | binary file requested as text |
-| 428 | no API key set for the session yet |
-| 502 | MCP server unreachable / session's MCP connection died |
+| 415 | binary file requested as text                                                                            |
+| 428 | no API key set for the session yet                                                                       |
+| 502 | MCP server unreachable / session's MCP connection died                                                   |
 
 ## Configuration (env vars)
 
