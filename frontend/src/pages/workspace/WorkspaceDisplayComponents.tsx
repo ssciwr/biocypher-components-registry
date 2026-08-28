@@ -110,11 +110,11 @@ export function ChatPane({
   const canSubmit = canSend && pending !== 'message'
 
   return (
-    <section className="flex min-h-[620px] flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm xl:min-h-0">
       <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
         <h2 className="text-xs font-bold uppercase tracking-normal text-slate-500">Chat</h2>
       </div>
-      <div className="flex-1 overflow-auto bg-slate-50 p-4">
+      <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-4">
         <div className="grid gap-3">
           {messages.length === 0 ? (
             <div className="rounded-lg bg-white p-4 text-sm leading-6 text-slate-700">
@@ -133,43 +133,45 @@ export function ChatPane({
         </div>
       </div>
       <form
-        className="flex gap-2 border-t border-slate-200 bg-white p-4"
+        className="sticky bottom-0 z-10 shrink-0 border-t border-slate-200 bg-white/95 p-3"
         onSubmit={(event) => {
           event.preventDefault()
-          onSend()
+          if (canSubmit) onSend()
         }}
       >
-        <textarea
-          className="max-h-32 min-h-11 flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white disabled:cursor-not-allowed disabled:text-slate-400"
-          disabled={!session?.hasLLMKey || session.busy}
-          onChange={(event) => onPromptChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.shiftKey) return
-            event.preventDefault()
-            if (canSubmit) onSend()
-          }}
-          placeholder="Ask the agent..."
-          value={prompt}
-        />
-        {session?.busy ? (
-          <button
-            className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-red-200 hover:text-red-700"
-            onClick={onStop}
-            type="button"
-          >
-            <StopIcon className="h-5 w-5" aria-hidden="true" />
-            Stop
-          </button>
-        ) : (
-          <button
-            className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={!canSubmit}
-            type="submit"
-          >
-            <PaperAirplaneIcon className="h-5 w-5" aria-hidden="true" />
-            Send
-          </button>
-        )}
+        <div className="flex items-end gap-2 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-2 shadow-sm focus-within:border-blue-500 focus-within:bg-white">
+          <textarea
+            className="max-h-32 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-slate-500 disabled:cursor-not-allowed disabled:text-slate-400"
+            disabled={!session?.hasLLMKey || session.busy}
+            onChange={(event) => onPromptChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || event.shiftKey) return
+              event.preventDefault()
+              if (canSubmit) onSend()
+            }}
+            placeholder="Ask the agent..."
+            value={prompt}
+          />
+          {session?.busy ? (
+            <button
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
+              onClick={onStop}
+              type="button"
+            >
+              <StopIcon className="h-5 w-5" aria-hidden="true" />
+              Stop
+            </button>
+          ) : (
+            <button
+              aria-label="Send message"
+              className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={!canSubmit}
+              type="submit"
+            >
+              <PaperAirplaneIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </form>
     </section>
   )

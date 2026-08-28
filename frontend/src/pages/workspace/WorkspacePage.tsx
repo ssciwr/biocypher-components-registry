@@ -26,16 +26,16 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
   const needsKey = Boolean(workspace.session && !workspace.session.hasLLMKey)
 
   return (
-    <section className="relative bg-slate-100">
-      <div aria-hidden={!signedIn} className={signedIn ? '' : 'pointer-events-none select-none'}>
-        <div className="mx-auto flex min-h-[calc(100vh-9rem)] max-w-[1600px] flex-col gap-5 px-4 py-5 sm:px-6">
+    <section className="relative h-[calc(100vh-4rem)] overflow-hidden bg-slate-100">
+      <div aria-hidden={!signedIn} className={signedIn ? 'h-full' : 'pointer-events-none h-full select-none'}>
+        <div className="mx-auto flex h-full min-h-0 max-w-[1600px] flex-col gap-5 px-4 py-5 sm:px-6">
           <WorkspaceTopBar
             onStart={() => void workspace.startSession()}
             pending={workspace.pending}
             session={workspace.session}
           />
           <WorkspaceError error={workspace.error} />
-          <div className="grid flex-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_420px]">
+          <div className="grid min-h-0 flex-1 gap-5 overflow-auto xl:grid-cols-[280px_minmax(0,1fr)_420px] xl:overflow-hidden">
             <DirectoryPane
               currentDir={workspace.currentDir}
               files={workspace.files}

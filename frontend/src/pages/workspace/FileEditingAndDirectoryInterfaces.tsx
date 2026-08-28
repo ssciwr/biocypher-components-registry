@@ -37,7 +37,7 @@ function parentPath(path: string) {
 
 export function DirectoryPane({ currentDir, files, onOpenDir, onOpenFile, onRefresh, session }: DirectoryPaneProps) {
   return (
-    <aside className="flex min-h-80 flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
+    <aside className="flex min-h-80 flex-col rounded-lg border border-slate-200 bg-white shadow-sm xl:min-h-0 xl:overflow-hidden">
       <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
         <h2 className="text-xs font-bold uppercase tracking-normal text-slate-500">Directory</h2>
         {session ? (
@@ -51,7 +51,7 @@ export function DirectoryPane({ currentDir, files, onOpenDir, onOpenFile, onRefr
           </button>
         ) : null}
       </div>
-      <div className="flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto p-4">
         <p className="mb-4 break-all text-sm font-medium text-slate-700">/{currentDir || 'workspace'}</p>
         {currentDir ? (
           <button
@@ -89,7 +89,7 @@ export function DirectoryPane({ currentDir, files, onOpenDir, onOpenFile, onRefr
 
 export function EditorPane({ dirtyFile, onDraftChange, onSave, openFile, pending }: EditorPaneProps) {
   return (
-    <aside className="flex min-h-80 flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
+    <aside className="flex min-h-80 flex-col rounded-lg border border-slate-200 bg-white shadow-sm xl:min-h-0 xl:overflow-hidden">
       <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
         <h2 className="text-xs font-bold uppercase tracking-normal text-slate-500">File editor</h2>
         <button
@@ -101,10 +101,10 @@ export function EditorPane({ dirtyFile, onDraftChange, onSave, openFile, pending
           {pending === 'save' ? 'Saving...' : 'Save'}
         </button>
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
         <p className="min-h-5 break-all text-sm text-slate-600">{openFile?.path ?? 'no file open'}</p>
         <textarea
-          className="min-h-[520px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white disabled:bg-white"
+          className="min-h-[320px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white disabled:bg-white xl:min-h-0"
           disabled={!openFile}
           onChange={(event) => onDraftChange(event.target.value)}
           placeholder="open a file from the tree"
