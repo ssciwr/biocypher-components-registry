@@ -35,6 +35,20 @@ export function creatorToApiValue(creator: CreatorDraft): AdapterCreatorGenerate
   }
 }
 
+// Save creatro correction
+function creatorToCroissantValue(creator: CreatorDraft): Record<string, unknown> {
+  const creatorType = creator.creatorType === 'Organization' ? 'Organization' : 'Person'
+  const document: Record<string, unknown> = {
+    '@type': `sc:${creatorType}`,
+    name: creator.name.trim(),
+  }
+  setOptional(document, 'affiliation', creator.affiliation)
+  setOptional(document, 'email', creator.email)
+  setOptional(document, 'identifier', creator.orcid)
+  setOptional(document, 'url', creator.url)
+  return document
+}
+
 export function keywordsToApiValues(value: string) {
   return value
     .split(',')
@@ -90,6 +104,12 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
   setOptional(document, 'url', dataset.url)
   setOptional(document, 'citeAs', dataset.citation)
   setOptional(document, 'datePublished', dataset.datePublished)
+  const creators = dataset.creators
+    .filter((creator) => creator.name.trim())
+    .map(creatorToCroissantValue)
+  if (creators.length) {
+    document.creator = creators
+  }
 
   const distribution = buildDistribution(dataset, firstRecord(document.distribution))
   if (distribution) {
@@ -196,7 +216,7 @@ export function errorText(error: unknown, fallback: string) {
 }
 
 
-export function downloadMetadata(metadata: Record<string, unknown>, adapterName: string) {
+export function downloadMetadata(metadata: Record<string, unknown>) {
   const metadataJson = JSON.stringify(metadata, undefined, jsonIndentSpaces)
   const blob = new Blob([metadataJson], {
     type: 'application/ld+json',
@@ -204,7 +224,7 @@ export function downloadMetadata(metadata: Record<string, unknown>, adapterName:
   const url = globalThis.URL.createObjectURL(blob)
   const anchor = globalThis.document.createElement('a')
   anchor.href = url
-  anchor.download = `${adapterName.trim() || 'adapter'}-croissant.jsonld`
+  anchor.download = 'croissant.jsonld'
   anchor.click()
   globalThis.URL.revokeObjectURL(url)
 }
