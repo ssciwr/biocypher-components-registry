@@ -113,6 +113,32 @@ function restoreStoredDataset(dataset: Partial<DatasetDraft>): DatasetDraft {
   }
 }
 
+function hasRestorableDatasetDocument(dataset: unknown): dataset is Partial<DatasetDraft> {
+  if (typeof dataset !== 'object' || dataset === null || Array.isArray(dataset)) {
+    return false
+  }
+
+  const document = (dataset as Partial<DatasetDraft>).uploadedDocument
+  return typeof document === 'object' && document !== null && !Array.isArray(document)
+}
+
+function restorableDatasets(datasets: unknown): DatasetDraft[] {
+  if (!Array.isArray(datasets)) {
+    return []
+  }
+
+  return datasets
+    .filter(hasRestorableDatasetDocument)
+    .map(restoreStoredDataset)
+}
+
+function formForStorage(form: MetadataGeneratorForm): MetadataGeneratorForm {
+  return {
+    ...form,
+    datasets: restorableDatasets(form.datasets),
+  }
+}
+
 
 // Empty form, restore if set in GET param as resume=1
 function initialForm() {
@@ -131,9 +157,7 @@ function initialForm() {
       ...emptyForm,
       ...parsed,
       creators: Array.isArray(parsed.creators) ? parsed.creators : [],
-      datasets: Array.isArray(parsed.datasets)
-        ? parsed.datasets.map(restoreStoredDataset)
-        : [],
+      datasets: restorableDatasets(parsed.datasets),
     }
   } catch (storageError) {
     console.warn('Could not load metadata draft from localStorage.', storageError)
@@ -158,6 +182,9 @@ function CreateAdapterMetadataPage() {
   const [datasetDraft, setDatasetDraft] = useState<DatasetDraft>(emptyDataset)
   const [datasetCreatorDraft, setDatasetCreatorDraft] = useState<CreatorDraft>(emptyCreator)
   const [datasetManualField, setDatasetManualField] = useState<DatasetDatasetManualField>(emptyDatasetManualField)
+  const [editingCreatorId, setEditingCreatorId] = useState<string | null>(null)
+  const [editingDatasetCreatorId, setEditingDatasetCreatorId] = useState<string | null>(null)
+  const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null)
   const [step, setStep] = useState<MetadataStep>(1)
   const [error, setError] = useState<string | null>(null)
@@ -169,12 +196,7 @@ function CreateAdapterMetadataPage() {
     try {
       globalThis.localStorage.setItem(
         metadataDraftStorageKey,
-        JSON.stringify(form, (_key, value) => {
-          if (typeof File !== 'undefined' && value instanceof File) {
-            return undefined
-          }
-          return value
-        }),
+        JSON.stringify(formForStorage(form)),
       )
     } catch (storageError) {
       console.warn('Could not save metadata draft to localStorage.', storageError)
@@ -193,13 +215,37 @@ function CreateAdapterMetadataPage() {
 
     setForm((current) => ({
       ...current,
-      creators: [...current.creators, { ...creatorDraft, id: nextDraftId('creator') }],
+      creators: editingCreatorId
+        ? current.creators.map((creator) => {
+          if (creator.id !== editingCreatorId) {
+            return creator
+          }
+          return { ...creatorDraft, id: editingCreatorId }
+        })
+        : [...current.creators, { ...creatorDraft, id: nextDraftId('creator') }],
     }))
     setCreatorDraft(emptyCreator)
+    setEditingCreatorId(null)
+    setError(null)
+  }
+
+  function editCreator(id: string) {
+    const creatorToEdit = form.creators.find((creator) => creator.id === id)
+    if (!creatorToEdit) {
+      return
+    }
+
+    setCreatorDraft(creatorToEdit)
+    setEditingCreatorId(id)
     setError(null)
   }
 
   function removeCreator(id: string) {
+    if (editingCreatorId === id) {
+      setCreatorDraft(emptyCreator)
+      setEditingCreatorId(null)
+    }
+
     setForm((current) => ({
       ...current,
       creators: current.creators.filter((creator) => creator.id !== id),
@@ -214,16 +260,40 @@ function CreateAdapterMetadataPage() {
 
     setDatasetDraft((current) => ({
       ...current,
-      creators: [
-        ...current.creators,
-        { ...datasetCreatorDraft, id: nextDraftId('dataset-creator') },
-      ],
+      creators: editingDatasetCreatorId
+        ? current.creators.map((creator) => {
+          if (creator.id !== editingDatasetCreatorId) {
+            return creator
+          }
+          return { ...datasetCreatorDraft, id: editingDatasetCreatorId }
+        })
+        : [
+          ...current.creators,
+          { ...datasetCreatorDraft, id: nextDraftId('dataset-creator') },
+        ],
     }))
     setDatasetCreatorDraft(emptyCreator)
+    setEditingDatasetCreatorId(null)
+    setError(null)
+  }
+
+  function editDatasetCreator(id: string) {
+    const creatorToEdit = datasetDraft.creators.find((creator) => creator.id === id)
+    if (!creatorToEdit) {
+      return
+    }
+
+    setDatasetCreatorDraft(creatorToEdit)
+    setEditingDatasetCreatorId(id)
     setError(null)
   }
 
   function removeDatasetCreator(id: string) {
+    if (editingDatasetCreatorId === id) {
+      setDatasetCreatorDraft(emptyCreator)
+      setEditingDatasetCreatorId(null)
+    }
+
     setDatasetDraft((current) => ({
       ...current,
       creators: current.creators.filter((creator) => creator.id !== id),
@@ -264,17 +334,26 @@ function CreateAdapterMetadataPage() {
       input: file.name,
       sourceFile: file,
       sourceFileName: file.name,
+      uploadedDocument: undefined,
     }))
     setError(null)
   }
 
   function setDatasetMode(mode: DatasetMode) {
-    setDatasetDraft({ ...emptyDataset, mode })
+    setDatasetDraft((current) => ({ ...emptyDataset, id: current.id, mode }))
     setDatasetCreatorDraft(emptyCreator)
+    setEditingDatasetCreatorId(null)
     setError(null)
   }
 
   function removeDataset(id: string) {
+    if (editingDatasetId === id) {
+      setDatasetDraft(emptyDataset)
+      setDatasetCreatorDraft(emptyCreator)
+      setEditingDatasetCreatorId(null)
+      setEditingDatasetId(null)
+    }
+
     setForm((current) => ({
       ...current,
       datasets: current.datasets.filter((dataset) => dataset.id !== id),
@@ -295,11 +374,8 @@ function CreateAdapterMetadataPage() {
 
     setDatasetDraft(datasetToEdit)
     setDatasetCreatorDraft(emptyCreator)
-    setForm((current) => ({
-      ...current,
-      datasets: current.datasets.filter((dataset) => dataset.id !== id),
-    }))
-    setSelectedDatasetId((current) => (current === id ? null : current))
+    setEditingDatasetCreatorId(null)
+    setEditingDatasetId(id)
     setError(null)
   }
 
@@ -345,10 +421,17 @@ function CreateAdapterMetadataPage() {
   }
 
   async function prepareDatasetsForDetails() {
-    const datasetsToPrepare = [...form.datasets]
-    const hasPendingSourceFile = datasetDraft.mode === 'generate' && datasetDraft.sourceFile
+    let datasetsToPrepare = [...form.datasets]
+    const hasPendingSourceFile = datasetDraft.mode === 'generate' && datasetDraft.sourceFile && !datasetDraft.uploadedDocument
     const hasPendingCroissantFile = datasetDraft.mode === 'upload' && datasetDraft.uploadedDocument
-    if (hasPendingSourceFile || hasPendingCroissantFile) {
+    if (editingDatasetId) {
+      datasetsToPrepare = datasetsToPrepare.map((dataset) => {
+        if (dataset.id !== editingDatasetId) {
+          return dataset
+        }
+        return datasetDraft
+      })
+    } else if (hasPendingSourceFile || hasPendingCroissantFile) {
       datasetsToPrepare.push({ ...datasetDraft, id: nextDraftId('dataset') })
     }
 
@@ -386,6 +469,8 @@ function CreateAdapterMetadataPage() {
       setForm((current) => ({ ...current, datasets }))
       setDatasetDraft(emptyDataset)
       setDatasetCreatorDraft(emptyCreator)
+      setEditingDatasetCreatorId(null)
+      setEditingDatasetId(null)
       setSelectedDatasetId((current) => current ?? datasets[0]?.id ?? null)
       setStep(3)
     } catch (prepareError) {
@@ -531,6 +616,12 @@ function CreateAdapterMetadataPage() {
   const generatedMetadataJson = generatedMetadata
     ? JSON.stringify(generatedMetadata, undefined, 2)
     : ''
+  let datasetSubmitLabel = 'Add dataset'
+  if (isPreparingDatasets) {
+    datasetSubmitLabel = 'Saving dataset...'
+  } else if (editingDatasetId) {
+    datasetSubmitLabel = 'Save dataset'
+  }
 
   return (
     <section className="bg-slate-100">
@@ -556,14 +647,28 @@ function CreateAdapterMetadataPage() {
           <form className="grid gap-8" onSubmit={handleMetadataSubmit}>
             {step === 1 ? (
               <AdapterDetailsStep
+                creatorActionLabel={editingCreatorId ? 'Save creator' : 'Add creator'}
                 creatorDraft={creatorDraft}
                 form={form}
                 onAddCreator={addCreator}
                 onCreatorDraftChange={(field, value) => {
                   setCreatorDraft((current) => ({ ...current, [field]: value }))
                 }}
+                onEditCreator={editCreator}
                 onFormChange={(field, value) => {
-                  setForm((current) => ({ ...current, [field]: value }))
+                  setForm((current) => {
+                    if (field !== 'name') {
+                      return { ...current, [field]: value }
+                    }
+
+                    const shouldUpdateAdapterId = !current.adapterId.trim()
+                      || current.adapterId === adapterIdFromName(current.name)
+                    if (!shouldUpdateAdapterId) {
+                      return { ...current, name: value }
+                    }
+
+                    return { ...current, name: value, adapterId: adapterIdFromName(value) }
+                  })
                 }}
                 onRemoveCreator={removeCreator}
               />
@@ -571,6 +676,7 @@ function CreateAdapterMetadataPage() {
 
             {step === 2 ? (
               <DatasetBasicsStep
+                datasetCreatorActionLabel={editingDatasetCreatorId ? 'Save creator' : 'Add creator'}
                 datasetCreatorDraft={datasetCreatorDraft}
                 datasetDraft={datasetDraft}
                 datasets={form.datasets}
@@ -584,6 +690,7 @@ function CreateAdapterMetadataPage() {
                 onDatasetModeChange={setDatasetMode}
                 onDatasetUpload={handleDatasetUpload}
                 onDatasetSourceUpload={handleDatasetSourceUpload}
+                onEditDatasetCreator={editDatasetCreator}
                 onEditDataset={editDataset}
                 onRemoveDataset={removeDataset}
                 onRemoveDatasetCreator={removeDatasetCreator}
@@ -641,7 +748,7 @@ function CreateAdapterMetadataPage() {
                     disabled={isPreparingDatasets}
                     type="submit"
                   >
-                    {isPreparingDatasets ? 'Adding dataset...' : 'Add dataset'}
+                    {datasetSubmitLabel}
                   </button>
                 ) : null}
                 {step >= 3 ? (
@@ -721,7 +828,7 @@ function MetadataReadyPanel({
           </button>
           <button
             className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
-            onClick={() => downloadMetadata(metadata, adapterName)}
+            onClick={() => downloadMetadata(metadata)}
             type="button"
           >
             <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
@@ -746,6 +853,14 @@ function updateFieldList(
     }
     return { ...field, [fieldName]: value }
   })
+}
+
+function adapterIdFromName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 export default CreateAdapterMetadataPage

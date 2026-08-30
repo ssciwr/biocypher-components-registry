@@ -27,15 +27,18 @@ type MetadataTextField = 'adapterId'
   | 'version'
 
 type AdapterDetailsStepProps = Readonly<{
+  creatorActionLabel: string
   creatorDraft: CreatorDraft
   form: MetadataGeneratorForm
   onAddCreator: () => void
   onCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
+  onEditCreator: (id: string) => void
   onFormChange: (field: MetadataTextField, value: string) => void
   onRemoveCreator: (id: string) => void
 }>
 
 type DatasetBasicsStepProps = Readonly<{
+  datasetCreatorActionLabel: string
   datasetCreatorDraft: CreatorDraft
   datasetDraft: DatasetDraft
   datasets: DatasetDraft[]
@@ -45,6 +48,7 @@ type DatasetBasicsStepProps = Readonly<{
   onDatasetModeChange: (mode: DatasetMode) => void
   onDatasetSourceUpload: (file: File | null) => void
   onDatasetUpload: (file: File | null) => void
+  onEditDatasetCreator: (id: string) => void
   onEditDataset: (id: string) => void
   onRemoveDataset: (id: string) => void
   onRemoveDatasetCreator: (id: string) => void
@@ -76,6 +80,7 @@ type SelectedItemListProps<TItem extends { id: string }> = Readonly<{
   getLabel: (item: TItem) => string
   getSubtitle: (item: TItem) => string
   items: TItem[]
+  onEdit?: (id: string) => void
   onRemove: (id: string) => void
 }>
 
@@ -86,10 +91,12 @@ type RemoveItemButtonProps = Readonly<{
 
 // First step in the process, name and other key information.
 export function AdapterDetailsStep({
+  creatorActionLabel,
   creatorDraft,
   form,
   onAddCreator,
   onCreatorDraftChange,
+  onEditCreator,
   onFormChange,
   onRemoveCreator,
 }: AdapterDetailsStepProps) {
@@ -165,9 +172,11 @@ export function AdapterDetailsStep({
           getLabel={(creator) => creator.name}
           getSubtitle={(creator) => creator.creatorType}
           items={form.creators}
+          onEdit={onEditCreator}
           onRemove={onRemoveCreator}
         />
         <CreatorEditor
+          actionLabel={creatorActionLabel}
           draft={creatorDraft}
           onAdd={onAddCreator}
           onChange={onCreatorDraftChange}
@@ -179,6 +188,7 @@ export function AdapterDetailsStep({
 
 // Step 2
 export function DatasetBasicsStep({
+  datasetCreatorActionLabel,
   datasetCreatorDraft,
   datasetDraft,
   datasets,
@@ -188,6 +198,7 @@ export function DatasetBasicsStep({
   onDatasetModeChange,
   onDatasetSourceUpload,
   onDatasetUpload,
+  onEditDatasetCreator,
   onEditDataset,
   onRemoveDataset,
   onRemoveDatasetCreator,
@@ -257,9 +268,11 @@ export function DatasetBasicsStep({
                 getLabel={(creator) => creator.name}
                 getSubtitle={(creator) => creator.creatorType}
                 items={datasetDraft.creators}
+                onEdit={onEditDatasetCreator}
                 onRemove={onRemoveDatasetCreator}
               />
               <CreatorEditor
+                actionLabel={datasetCreatorActionLabel}
                 draft={datasetCreatorDraft}
                 onAdd={onAddDatasetCreator}
                 onChange={onDatasetCreatorDraftChange}
@@ -358,6 +371,7 @@ function SelectedItemList<TItem extends { id: string }>({
   getLabel,
   getSubtitle,
   items,
+  onEdit,
   onRemove,
 }: SelectedItemListProps<TItem>) {
   if (!items.length) {
@@ -382,7 +396,19 @@ function SelectedItemList<TItem extends { id: string }>({
               <span className="block font-semibold text-slate-950">{label}</span>
               <span className="mt-1 block text-slate-500">{getSubtitle(item)}</span>
             </span>
-            <RemoveItemButton label={label} onClick={() => onRemove(item.id)} />
+            <span className="flex gap-2">
+              {onEdit ? (
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                  onClick={() => onEdit(item.id)}
+                  type="button"
+                >
+                  <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
+                  Edit
+                </button>
+              ) : null}
+              <RemoveItemButton label={label} onClick={() => onRemove(item.id)} />
+            </span>
           </li>
         )
       })}

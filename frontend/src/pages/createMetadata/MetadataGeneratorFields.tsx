@@ -37,6 +37,7 @@ type SelectInputProps<TValue extends string> = Readonly<{
 }>
 
 type CreatorEditorProps = Readonly<{
+  actionLabel: string
   draft: CreatorDraft
   onAdd: () => void
   onChange: (field: keyof CreatorDraft, value: string) => void
@@ -82,9 +83,6 @@ const fieldDataTypeOptions: ReadonlyArray<SelectOption<string>> = [
  *  and is beginning not to make sense.
  */
 
-/*
- * AI-Generated.
- */
 export function TextInput({
   label,
   maxLength,
@@ -115,9 +113,6 @@ export function TextInput({
   )
 }
 
-/*
- * AI-Generated.
- */
 export function TextArea({
   label,
   maxLength,
@@ -147,9 +142,6 @@ export function TextArea({
   )
 }
 
-/*
- * AI-Generated.
- */
 export function SelectInput<TValue extends string>({
   label,
   onChange,
@@ -182,9 +174,6 @@ export function SelectInput<TValue extends string>({
   )
 }
 
-/*
- * AI-Generated.
- */
 export function FileInput({
   accept,
   label,
@@ -205,10 +194,8 @@ export function FileInput({
   )
 }
 
-/*
- * AI-Generated.
- */
 export function CreatorEditor({
+  actionLabel,
   draft,
   onAdd,
   onChange,
@@ -271,7 +258,7 @@ export function CreatorEditor({
         type="button"
       >
         <PlusIcon className="h-4 w-4" aria-hidden="true" />
-        Add creator
+        {actionLabel}
       </button>
     </div>
   )
