@@ -57,6 +57,7 @@ type DatasetBasicsStepProps = Readonly<{
 type DatasetDetailsStepProps = Readonly<{
   datasets: DatasetDraft[]
   datasetManualField: DatasetDatasetManualField
+  hideOverview?: boolean
   onAddManualField: () => void
   onDatasetChange: (field: keyof DatasetDraft, value: string) => void
   onFieldChange: (fieldId: string, field: keyof DatasetDatasetManualField, value: string) => void
@@ -304,6 +305,7 @@ export function DatasetBasicsStep({
 export function DatasetDetailsStep({
   datasets,
   datasetManualField,
+  hideOverview = false,
   onAddManualField,
   onDatasetChange,
   onFieldChange,
@@ -321,12 +323,14 @@ export function DatasetDetailsStep({
       title="Dataset details"
     >
       <div className="mt-7 grid gap-6">
-        <DatasetOverviewTable
-          datasets={datasets}
-          onEdit={onSelectDataset}
-          onRemove={onRemoveDataset}
-          selectedDatasetId={selectedDatasetId}
-        />
+        {hideOverview ? null : (
+          <DatasetOverviewTable
+            datasets={datasets}
+            onEdit={onSelectDataset}
+            onRemove={onRemoveDataset}
+            selectedDatasetId={selectedDatasetId}
+          />
+        )}
         {selectedDataset ? (
           <DatasetDetailsEditor
             dataset={selectedDataset}
