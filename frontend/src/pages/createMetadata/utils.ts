@@ -65,6 +65,15 @@ export function optionalValue(value: string) {
 }
 
 
+function dateAtUtcMidnight(value: string) {
+  const dateMatch = /^\d{4}-\d{2}-\d{2}/.exec(value.trim())
+  if (!dateMatch) {
+    return undefined
+  }
+  return `${dateMatch[0]}T00:00:00Z`
+}
+
+
 /*
  * Build multi part form body data for API
  */
@@ -79,7 +88,7 @@ export function datasetDraftToCroissantGenerateUploadForm(
     citation: optionalValue(dataset.citation),
     creators_json: JSON.stringify(dataset.creators.map(creatorToApiValue)),
     content_url: optionalValue(dataset.contentUrl),
-    date_published: optionalValue(dataset.datePublished),
+    date_published: dateAtUtcMidnight(dataset.datePublished),
     dataset_version: optionalValue(dataset.datasetVersion),
     description: optionalValue(dataset.description),
     encoding_format: optionalValue(dataset.encodingFormat),
@@ -103,7 +112,7 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
   setOptional(document, 'license', dataset.license)
   setOptional(document, 'url', dataset.url)
   setOptional(document, 'citeAs', dataset.citation)
-  setOptional(document, 'datePublished', dataset.datePublished)
+  setOptional(document, 'datePublished', dateAtUtcMidnight(dataset.datePublished))
   const creators = dataset.creators
     .filter((creator) => creator.name.trim())
     .map(creatorToCroissantValue)
