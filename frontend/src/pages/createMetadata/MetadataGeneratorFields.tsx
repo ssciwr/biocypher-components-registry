@@ -9,6 +9,7 @@ import type {
 import { normaliseOrcid } from './utils'
 
 type TextInputProps = Readonly<{
+  inputType?: 'date' | 'text'
   label: string
   maxLength?: number
   onChange: (value: string) => void
@@ -84,6 +85,7 @@ const fieldDataTypeOptions: ReadonlyArray<SelectOption<string>> = [
  */
 
 export function TextInput({
+  inputType = 'text',
   label,
   maxLength,
   onChange,
@@ -106,7 +108,7 @@ export function TextInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
-        type="text"
+        type={inputType}
         value={value}
       />
     </label>
@@ -328,15 +330,18 @@ export function DatasetGenerateEditor({
           label="Dataset version"
           maxLength={50}
           onChange={(value) => onChange('datasetVersion', value)}
-          placeholder="1.0.0"
+          placeholder="0.0.1"
+          required
           value={draft.datasetVersion}
         />
         <TextInput
+          inputType="date"
           label="Date published"
           maxLength={20}
           onChange={(value) => onChange('datePublished', value)}
           placeholder="2026-04-17"
-          value={draft.datePublished}
+          required
+          value={draft.datePublished.slice(0, 10)}
         />
       </div>
     </div>
@@ -386,13 +391,17 @@ export function DatasetDetailsEditor({
               label="Dataset version"
               maxLength={50}
               onChange={(value) => onChange('datasetVersion', value)}
+              placeholder="0.0.1"
+              required
               value={dataset.datasetVersion}
             />
             <TextInput
+              inputType="date"
               label="Date published"
               maxLength={20}
               onChange={(value) => onChange('datePublished', value)}
-              value={dataset.datePublished}
+              required
+              value={dataset.datePublished.slice(0, 10)}
             />
           </div>
           <TextArea
