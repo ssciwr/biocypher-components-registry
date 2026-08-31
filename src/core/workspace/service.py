@@ -362,7 +362,7 @@ class SessionManager:
             workspace,
             self.mcp_url,
             self.mcp_headers,
-        ) # same authentication as using Github login for registering adapters
+        )  # same authentication as using Github login for registering adapters
         if self.mcp_connect is not None:
             session.mcp_connect = self.mcp_connect
         session.actor = asyncio.create_task(session.run_actor())

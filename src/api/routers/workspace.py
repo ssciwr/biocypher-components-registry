@@ -94,9 +94,7 @@ async def create_session(
 ) -> SessionCreateResponse:
     """Create a new workspace session."""
     try:
-        session = await manager.create(
-            owner_github_user_id=auth_session.github_user_id
-        )
+        session = await manager.create(owner_github_user_id=auth_session.github_user_id)
     except SessionStartupError as e:
         raise HTTPException(502, f"could not connect to MCP server: {e}")
     return SessionCreateResponse.from_session(session)

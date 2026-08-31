@@ -51,7 +51,7 @@ def build_adapter_request_from_mapping(
         raw=raw,
         output_override=output_override,
         dataset_generator_override=dataset_generator_override,
-)
+    )
 
 
 def request_from_config(

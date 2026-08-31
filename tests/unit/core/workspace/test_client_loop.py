@@ -4,9 +4,9 @@ import json
 import time
 from contextlib import asynccontextmanager
 
-from mcp.types import CallToolResult, TextContent, Tool
 import pytest
 from conftest import run
+from mcp.types import CallToolResult, TextContent, Tool
 
 # ---------------------------------------------------------------- config
 

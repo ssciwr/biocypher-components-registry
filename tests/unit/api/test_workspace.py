@@ -94,8 +94,8 @@ def test_session_routes_require_same_github_user(client):
     same_user = client.get(
         f"{PREFIX}/sessions/{created['session_id']}", headers=headers
     )
-    client.app.dependency_overrides[get_current_auth_session] = (
-        lambda: AuthSession(github_user_id="67890")
+    client.app.dependency_overrides[get_current_auth_session] = lambda: AuthSession(
+        github_user_id="67890"
     )
     # Another user cannot access the first user ("same_user")s session information
     other_user = client.get(
