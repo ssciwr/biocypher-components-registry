@@ -3,6 +3,8 @@ const generatedDatasetMetadata = {
   name: 'People Dataset',
   description: 'Small people dataset.',
   license: 'MIT',
+  version: '0.0.1',
+  datePublished: '2026-04-17',
   distribution: [{ '@type': 'cr:FileObject', contentUrl: 'https://example.org/people.csv', name: 'people.csv' }],
   recordSet: [{ '@type': 'cr:RecordSet', name: 'People records', field: [] }],
 }
@@ -12,6 +14,8 @@ const uploadedDatasetMetadata = {
   name: 'Uploaded Dataset',
   description: 'Uploaded dataset.',
   license: 'MIT',
+  version: '0.0.1',
+  datePublished: '2026-04-17',
   distribution: [{ '@type': 'cr:FileObject', contentUrl: 'https://example.org/uploaded.csv', name: 'uploaded.csv' }],
   recordSet: [{ '@type': 'cr:RecordSet', name: 'Uploaded records', field: [] }],
 }
@@ -109,15 +113,19 @@ describe('adapter metadata generator editing', () => {
       mimeType: 'text/csv',
     })
     cy.contains('label', 'Dataset name').find('input').type('People Dataset')
+    cy.contains('label', 'Dataset version').find('input').type('0.0.1')
+    cy.contains('label', 'Date published').find('input').type('2026-04-17')
     addCreator('Dataset creators', 'Dataset Creator A')
     addCreator('Dataset creators', 'Dataset Creator B')
     cy.contains('button', 'Add dataset').click()
     cy.wait('@generateDataset')
     cy.contains('label', 'Dataset name').find('input').clear().type('People Dataset Edited')
-    cy.contains('button', 'Finish this stage').click()
+    cy.contains('button', 'Finalize datasets - Generate Croissant Now').click()
     cy.wait('@generateAdapter').then(({ request }) => {
       const dataset = request.body.dataset_documents[0]
       expect(dataset.name).to.equal('People Dataset Edited')
+      expect(dataset.version).to.equal('0.0.1')
+      expect(dataset.datePublished).to.equal('2026-04-17T00:00:00Z')
       expect(dataset.creator).to.have.length(2)
       expect(dataset.creator[0].name).to.equal('Dataset Creator A')
     })
@@ -128,13 +136,14 @@ describe('adapter metadata generator editing', () => {
     fillAdapterStep()
     addUploadedDataset()
     cy.contains('h2', 'Dataset details').should('be.visible')
-    cy.contains('button', 'Back').click()
+    cy.contains('button', 'Add another dataset & Save').click()
     editDatasetRow('Uploaded Dataset')
-    cy.contains('button', 'Back').click()
-    cy.contains('button', 'Continue').click()
+    cy.contains('h2', 'Basic dataset info').should('be.visible')
+    cy.contains('h2', 'Dataset details').should('be.visible')
+    cy.contains('button', 'Save changes').click()
     editDatasetRow('Uploaded Dataset')
     cy.contains('tr', 'Uploaded Dataset').should('be.visible')
-    cy.contains('button', 'Save dataset').should('be.visible')
+    cy.contains('button', 'Save changes').should('be.visible')
     cy.contains('No datasets added yet').should('not.exist')
   })
 })
