@@ -63,6 +63,15 @@ type DatasetDetailsEditorProps = Readonly<{
   onRemoveField: (fieldId: string) => void
 }>
 
+type LicenseSelectInputProps = Readonly<{
+  label?: string
+  licenseOptions: SelectOption[]
+  onChange: (value: string) => void
+  required?: boolean
+  surface?: 'muted' | 'plain'
+  value: string
+}>
+
 const creatorTypeOptions: ReadonlyArray<SelectOption<CreatorType>> = [
   { label: 'Person', value: 'Person' },
   { label: 'Organization', value: 'Organization' },
@@ -173,6 +182,29 @@ export function SelectInput<TValue extends string>({
         ))}
       </select>
     </label>
+  )
+}
+
+/*
+ * AI-Generated.
+ */
+export function LicenseSelectInput({
+  label = 'License',
+  licenseOptions,
+  onChange,
+  required = false,
+  surface = 'muted',
+  value,
+}: LicenseSelectInputProps) {
+  return (
+    <SelectInput
+      label={label}
+      onChange={onChange}
+      options={licenseOptions}
+      required={required}
+      surface={surface}
+      value={value}
+    />
   )
 }
 
@@ -296,10 +328,9 @@ export function DatasetGenerateEditor({
           placeholder="Example Dataset"
           value={draft.name}
         />
-        <SelectInput
-          label="License"
+        <LicenseSelectInput
+          licenseOptions={licenseOptions}
           onChange={(value) => onChange('license', value)}
-          options={licenseOptions}
           surface="plain"
           value={draft.license}
         />
@@ -379,10 +410,9 @@ export function DatasetDetailsEditor({
               required
               value={dataset.name}
             />
-            <SelectInput
-              label="License"
+            <LicenseSelectInput
+              licenseOptions={licenseOptions}
               onChange={(value) => onChange('license', value)}
-              options={licenseOptions}
               required
               surface="plain"
               value={dataset.license}

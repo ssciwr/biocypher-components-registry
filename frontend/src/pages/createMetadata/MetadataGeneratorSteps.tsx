@@ -5,7 +5,7 @@ import {
   DatasetDetailsEditor,
   DatasetGenerateEditor,
   FileInput,
-  SelectInput,
+  LicenseSelectInput,
   TextArea,
   TextInput,
 } from './MetadataGeneratorFields'
@@ -139,10 +139,9 @@ export function AdapterDetailsStep({
           required
           value={form.codeRepository}
         />
-        <SelectInput
-          label="License"
+        <LicenseSelectInput
+          licenseOptions={licenseOptions}
           onChange={(license) => onFormChange('license', license)}
-          options={licenseOptions}
           required
           value={form.license}
         />
