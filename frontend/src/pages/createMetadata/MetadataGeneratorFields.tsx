@@ -1,4 +1,4 @@
-import { DocumentArrowUpIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { DocumentArrowUpIcon, DocumentCheckIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import type {
   CreatorDraft,
   CreatorType,
@@ -12,6 +12,7 @@ type TextInputProps = Readonly<{
   inputType?: 'date' | 'text'
   label: string
   maxLength?: number
+  name?: string
   onChange: (value: string) => void
   placeholder?: string
   required?: boolean
@@ -40,6 +41,8 @@ type SelectInputProps<TValue extends string> = Readonly<{
 type CreatorEditorProps = Readonly<{
   actionLabel: string
   draft: CreatorDraft
+  isEditing?: boolean
+  nameInputName?: string
   onAdd: () => void
   onChange: (field: keyof CreatorDraft, value: string) => void
 }>
@@ -87,6 +90,8 @@ const fieldDataTypeOptions: ReadonlyArray<SelectOption<string>> = [
   { label: 'sc:URL', value: 'sc:URL' },
 ]
 
+export const datasetMetadataSectionId = 'dataset-metadata-section'
+
 
 /** todo note:
  *  Should review whether we should actually use a UI library like shadcn because the custom coding is extra code
@@ -97,6 +102,7 @@ export function TextInput({
   inputType = 'text',
   label,
   maxLength,
+  name,
   onChange,
   placeholder,
   required = false,
@@ -109,11 +115,12 @@ export function TextInput({
   }
 
   return (
-    <label className="grid gap-2 text-sm font-semibold text-slate-950">
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-950">
       <span>{label}{required ? ' *' : ''}</span>
       <input
-        className={`h-12 rounded-xl border border-slate-200 px-4 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
+        className={`h-12 w-full min-w-0 rounded-xl border border-slate-200 px-4 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
         maxLength={maxLength}
+        name={name}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
@@ -139,10 +146,10 @@ export function TextArea({
   }
 
   return (
-    <label className="grid gap-2 text-sm font-semibold text-slate-950">
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-950">
       <span>{label}{required ? ' *' : ''}</span>
       <textarea
-        className={`min-h-28 rounded-xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
+        className={`min-h-28 w-full min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 ${backgroundClass}`}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -167,10 +174,10 @@ export function SelectInput<TValue extends string>({
   }
 
   return (
-    <label className="grid gap-2 text-sm font-semibold text-slate-950">
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-950">
       <span>{label}{required ? ' *' : ''}</span>
       <select
-        className={`h-12 rounded-xl border border-slate-200 px-4 text-base font-normal text-slate-950 outline-none focus:border-blue-500 ${backgroundClass}`}
+        className={`h-12 w-full min-w-0 rounded-xl border border-slate-200 px-4 text-base font-normal text-slate-950 outline-none focus:border-blue-500 ${backgroundClass}`}
         onChange={(event) => onChange(event.target.value as TValue)}
         required={required}
         value={value}
@@ -231,15 +238,20 @@ export function FileInput({
 export function CreatorEditor({
   actionLabel,
   draft,
+  isEditing = false,
+  nameInputName,
   onAdd,
   onChange,
 }: CreatorEditorProps) {
+  const ActionIcon = isEditing ? DocumentCheckIcon : null
+
   return (
     <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div className="grid gap-4 md:grid-cols-2">
         <TextInput
           label="Name"
           maxLength={100}
+          name={nameInputName}
           onChange={(value) => onChange('name', value)}
           placeholder="Example: Robert Koch"
           surface="plain"
@@ -286,14 +298,16 @@ export function CreatorEditor({
         surface="plain"
         value={draft.url}
       />
-      <button
-        className="inline-flex h-11 w-fit cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-        onClick={onAdd}
-        type="button"
-      >
-        <PlusIcon className="h-4 w-4" aria-hidden="true" />
-        {actionLabel}
-      </button>
+      <div className="flex justify-end">
+        <button
+          className="inline-flex h-11 w-fit cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+          onClick={onAdd}
+          type="button"
+        >
+          {ActionIcon ? <ActionIcon className="h-4 w-4" aria-hidden="true" /> : null}
+          {actionLabel}
+        </button>
+      </div>
     </div>
   )
 }
@@ -326,6 +340,7 @@ export function DatasetGenerateEditor({
           maxLength={100}
           onChange={(value) => onChange('name', value)}
           placeholder="Example Dataset"
+          surface="plain"
           value={draft.name}
         />
         <LicenseSelectInput
@@ -340,6 +355,7 @@ export function DatasetGenerateEditor({
         maxLength={500}
         onChange={(value) => onChange('description', value)}
         placeholder="Small people dataset."
+        surface="plain"
         value={draft.description}
       />
       <div className="grid gap-4 md:grid-cols-2">
@@ -348,6 +364,7 @@ export function DatasetGenerateEditor({
           maxLength={200}
           onChange={(value) => onChange('url', value)}
           placeholder="https://example.org/people"
+          surface="plain"
           value={draft.url}
         />
         <TextInput
@@ -355,6 +372,7 @@ export function DatasetGenerateEditor({
           maxLength={200}
           onChange={(value) => onChange('citation', value)}
           placeholder="https://example.org/people"
+          surface="plain"
           value={draft.citation}
         />
         <TextInput
@@ -363,6 +381,7 @@ export function DatasetGenerateEditor({
           onChange={(value) => onChange('datasetVersion', value)}
           placeholder="0.0.1"
           required
+          surface="plain"
           value={draft.datasetVersion}
         />
         <TextInput
@@ -372,6 +391,7 @@ export function DatasetGenerateEditor({
           onChange={(value) => onChange('datePublished', value)}
           placeholder="2026-04-17"
           required
+          surface="plain"
           value={draft.datePublished.slice(0, 10)}
         />
       </div>
@@ -391,12 +411,19 @@ export function DatasetDetailsEditor({
   onRemoveField,
 }: DatasetDetailsEditorProps) {
   const fields = [...dataset.fields, ...dataset.manualFields]
+  const datasetName = dataset.name.trim() || 'Untitled dataset'
+  const datasetNameLabel = datasetName.length > 16 ? `${datasetName.slice(0, 16)}...` : datasetName
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h3 className="text-xl font-bold text-slate-950">Dataset metadata</h3>
+      <div className="rounded-xl border border-slate-200 bg-white" id={datasetMetadataSectionId}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <span className="flex min-w-0 flex-wrap items-center gap-3">
+            <h3 className="text-xl font-bold text-slate-950">Dataset metadata</h3>
+            <span className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" title={datasetName}>
+              {datasetNameLabel}
+            </span>
+          </span>
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
             {dataset.mode === 'upload' ? 'from Croissant file' : 'generated'}
           </span>
@@ -509,29 +536,44 @@ export function DatasetDetailsEditor({
           />
 
           {fields.length ? (
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+                <colgroup>
+                  <col className="w-16" />
+                  <col className="w-[22%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[36%]" />
+                  <col className="w-[18%]" />
+                </colgroup>
                 <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                   <tr>
+                    <th className="px-4 py-3">Actions</th>
                     <th className="px-4 py-3">Field name</th>
-                    <th className="px-4 py-3">Example</th>
                     <th className="px-4 py-3">Suggested datatype</th>
                     <th className="px-4 py-3">Description</th>
-                    <th className="px-4 py-3">Actions</th>
+                    <th className="px-4 py-3">Example</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {fields.map((field) => (
                     <tr key={field.id}>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-950">
-                        {field.name}
+                      <td className="px-4 py-3">
+                        <button
+                          aria-label={`Remove ${field.name}`}
+                          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:shadow-sm"
+                          onClick={() => onRemoveField(field.id)}
+                          title={`Remove ${field.name}`}
+                          type="button"
+                        >
+                          <TrashIcon className="h-4 w-4" aria-hidden="true" />
+                        </button>
                       </td>
-                      <td className="max-w-xs px-4 py-3 text-xs text-slate-700">
-                        {field.example}
+                      <td className="px-4 py-3 font-mono text-xs text-slate-950" title={field.name}>
+                        <span className="block truncate">{field.name}</span>
                       </td>
                       <td className="px-4 py-3">
                         <select
-                          className="h-10 min-w-36 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
                           onChange={(event) => onFieldChange(field.id, 'dataType', event.target.value)}
                           value={field.dataType}
                         >
@@ -544,20 +586,14 @@ export function DatasetDetailsEditor({
                       </td>
                       <td className="px-4 py-3">
                         <input
-                          className="h-10 min-w-64 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
                           maxLength={240}
                           onChange={(event) => onFieldChange(field.id, 'description', event.target.value)}
                           value={field.description}
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <button
-                          className="h-9 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
-                          onClick={() => onRemoveField(field.id)}
-                          type="button"
-                        >
-                          Remove
-                        </button>
+                      <td className="px-4 py-3 text-xs text-slate-700" title={field.example}>
+                        <span className="block truncate">{field.example}</span>
                       </td>
                     </tr>
                   ))}

@@ -9,6 +9,7 @@ import {
   DatasetBasicsStep,
   DatasetDetailsStep,
 } from './createMetadata/MetadataGeneratorSteps'
+import { datasetMetadataSectionId } from './createMetadata/MetadataGeneratorFields'
 import { emptyCreator, emptyDataset, emptyForm } from './createMetadata/options'
 import type {
   CreatorDraft,
@@ -132,6 +133,15 @@ function restorableDatasets(datasets: unknown): DatasetDraft[] {
     .map(restoreStoredDataset)
 }
 
+// Right after clicking "Add Creator"
+function focusCreatorNameInput(inputName: string) {
+  globalThis.requestAnimationFrame(() => {
+    const creatorNameInput = globalThis.document.querySelector<HTMLInputElement>(`input[name="${inputName}"]`)
+    creatorNameInput?.focus({ preventScroll: true })
+    globalThis.scrollTo({ left: 0, top: globalThis.document.documentElement.scrollHeight, behavior: 'smooth' })
+  })
+}
+
 function formForStorage(form: MetadataGeneratorForm): MetadataGeneratorForm {
   return {
     ...form,
@@ -205,8 +215,16 @@ function CreateAdapterMetadataPage() {
   }, [form])
 
   useEffect(() => {
+    if (step >= 3 && selectedDatasetId && !generatedMetadata) {
+      globalThis.requestAnimationFrame(() => {
+        // Scroll to what the user should pay attention to (i.e. the dataset form inputs)
+        globalThis.document.getElementById(datasetMetadataSectionId)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      })
+      return
+    }
+
     globalThis.scrollTo({ left: 0, top: 0 })
-  }, [step, generatedMetadata])
+  }, [generatedMetadata, selectedDatasetId, step])
 
   function addCreator() {
     if (!creatorDraft.name.trim()) {
@@ -239,6 +257,7 @@ function CreateAdapterMetadataPage() {
     setCreatorDraft(creatorToEdit)
     setEditingCreatorId(id)
     setError(null)
+    focusCreatorNameInput('adapter-creator-name')
   }
 
   function removeCreator(id: string) {
@@ -287,6 +306,7 @@ function CreateAdapterMetadataPage() {
     setDatasetCreatorDraft(creatorToEdit)
     setEditingDatasetCreatorId(id)
     setError(null)
+    focusCreatorNameInput('dataset-creator-name')
   }
 
   function removeDatasetCreator(id: string) {
@@ -425,7 +445,11 @@ function CreateAdapterMetadataPage() {
     setStep(2)
   }
 
-  async function prepareDatasetsForDetails(nextStep: MetadataStep = 3, shouldGenerateMetadata = false) {
+  async function prepareDatasetsForDetails(
+    nextStep: MetadataStep = 3,
+    shouldGenerateMetadata = false,
+    shouldReviewDatasets = false,
+  ) {
     let datasetsToPrepare = [...form.datasets]
     let nextSelectedDatasetId: string | null = null
     const hasPendingSourceFile = datasetDraft.mode === 'generate' && datasetDraft.sourceFile && !datasetDraft.uploadedDocument
@@ -484,7 +508,9 @@ function CreateAdapterMetadataPage() {
         await generateMetadata(datasets)
         return
       }
-      setSelectedDatasetId((current) => nextSelectedDatasetId ?? current ?? datasets[0]?.id ?? null)
+      setSelectedDatasetId((current) => (
+        shouldReviewDatasets ? null : nextSelectedDatasetId ?? current ?? datasets[0]?.id ?? null
+      ))
       setStep(nextStep)
     } catch (prepareError) {
       setError(errorText(prepareError, 'Dataset generation failed.'))
@@ -554,6 +580,14 @@ function CreateAdapterMetadataPage() {
     setError(null)
   }
 
+  function validateDatasetDetails(formElement: HTMLFormElement | null) {
+    if (formElement && !formElement.reportValidity()) {
+      return false
+    }
+    setError(null)
+    return true
+  }
+
   function removeSelectedField(fieldId: string) {
     updateSelectedDatasetDraft((dataset) => ({
       ...dataset,
@@ -584,7 +618,6 @@ function CreateAdapterMetadataPage() {
     const datasetDocuments = datasets.map(datasetDraftToDocument)
 
     setError(null)
-    setStep(4)
     setIsGenerating(true)
     try {
       const result = await generateAdapterMetadataApiV1MetadataAdaptersGeneratePost({
@@ -614,6 +647,7 @@ function CreateAdapterMetadataPage() {
         return
       }
 
+      setStep(4)
       setGeneratedMetadata(result.data.metadata)
       setError(null)
     } catch (metadataError) {
@@ -644,6 +678,7 @@ function CreateAdapterMetadataPage() {
   const selectedDataset = isEditingDataset
     ? datasetDraft
     : form.datasets.find((dataset) => dataset.id === selectedDatasetId)
+  const isReviewingDatasets = step >= 3 && !isEditingDataset && !selectedDataset
   const generatedMetadataJson = generatedMetadata
     ? JSON.stringify(generatedMetadata, undefined, 2)
     : ''
@@ -663,7 +698,7 @@ function CreateAdapterMetadataPage() {
           </h1>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className={`grid gap-8 ${generatedMetadata ? '' : 'lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start'}`}>
           {generatedMetadata ? (
             <MetadataReadyPanel
               adapterName={form.name}
@@ -671,6 +706,7 @@ function CreateAdapterMetadataPage() {
               metadataJson={generatedMetadataJson}
               onBack={() => {
                 setGeneratedMetadata(null)
+                setError(null)
                 setStep(3)
               }}
             />
@@ -681,6 +717,7 @@ function CreateAdapterMetadataPage() {
                 creatorActionLabel={editingCreatorId ? 'Save creator' : 'Add creator'}
                 creatorDraft={creatorDraft}
                 form={form}
+                isEditingCreator={Boolean(editingCreatorId)}
                 onAddCreator={addCreator}
                 onCreatorDraftChange={(field, value) => {
                   setCreatorDraft((current) => ({ ...current, [field]: value }))
@@ -711,6 +748,7 @@ function CreateAdapterMetadataPage() {
                 datasetCreatorDraft={datasetCreatorDraft}
                 datasetDraft={datasetDraft}
                 datasets={form.datasets}
+                isEditingDatasetCreator={Boolean(editingDatasetCreatorId)}
                 onAddDatasetCreator={addDatasetCreator}
                 onDatasetCreatorDraftChange={(field, value) => {
                   setDatasetCreatorDraft((current) => ({ ...current, [field]: value }))
@@ -741,7 +779,10 @@ function CreateAdapterMetadataPage() {
                 }}
                 onRemoveDataset={removeDataset}
                 onRemoveField={removeSelectedField}
-                onSelectDataset={setSelectedDatasetId}
+                onSelectDataset={(datasetId) => {
+                  setError(null)
+                  setSelectedDatasetId(datasetId)
+                }}
                 selectedDataset={selectedDataset}
                 selectedDatasetId={selectedDatasetId}
               />
@@ -749,51 +790,16 @@ function CreateAdapterMetadataPage() {
 
             <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between">
               <div className="flex gap-3">
-                {isEditingDataset ? (
-                  <button
-                    className="inline-flex h-12 cursor-pointer items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                    disabled={isGenerating || isPreparingDatasets}
-                    onClick={(event) => {
-                      const formElement = event.currentTarget.form
-                      if (formElement && !formElement.reportValidity()) {
-                        return
-                      }
-                      void prepareDatasetsForDetails(4, true)
-                    }}
-                    type="button"
-                  >
-                    Finalize datasets - Generate Croissant Now
-                    <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                ) : null}
                 {!isEditingDataset && step === 2 ? (
                   <button
                     className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
-                    onClick={() => setStep((current) => (current - 1) as MetadataStep)}
-                    type="button"
-                  >
-                    Back
-                  </button>
-                ) : null}
-                {!isEditingDataset && step === 3 ? (
-                  <button
-                    className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
-                    onClick={(event) => {
-                      const formElement = event.currentTarget.form
-                      if (formElement && !formElement.reportValidity()) {
-                        return
-                      }
-                      setDatasetDraft(emptyDataset)
-                      setDatasetCreatorDraft(emptyCreator)
-                      setEditingDatasetCreatorId(null)
-                      setEditingDatasetId(null)
-                      setSelectedDatasetId(null)
+                    onClick={() => {
                       setError(null)
-                      setStep(2)
+                      setStep((current) => (current - 1) as MetadataStep)
                     }}
                     type="button"
                   >
-                    Add another dataset & Save
+                    Back
                   </button>
                 ) : null}
               </div>
@@ -812,31 +818,78 @@ function CreateAdapterMetadataPage() {
                     Continue
                   </button>
                 ) : null}
-                {step === 2 ? (
+                {step === 2 && !isEditingDataset ? (
                   <button
-                    className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                     disabled={isPreparingDatasets}
                     type="submit"
                   >
                     {datasetSubmitLabel}
                   </button>
                 ) : null}
-                {step >= 3 && !isEditingDataset ? (
-                  <button
-                    className="inline-flex h-14 cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                    disabled={isGenerating}
-                    type="submit"
-                  >
-                    {isGenerating ? 'Generating...' : 'Finalize datasets - Generate Croissant Now'}
-                    <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
-                  </button>
+                {isEditingDataset ? (
+                  <div className="flex flex-wrap justify-end gap-3">
+                    <button
+                      className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      disabled={isPreparingDatasets}
+                      onClick={(event) => {
+                        if (validateDatasetDetails(event.currentTarget.form)) {
+                          void prepareDatasetsForDetails(3, false, true)
+                        }
+                      }}
+                      type="button"
+                    >
+                      {isPreparingDatasets ? 'Saving dataset...' : 'Save this dataset'}
+                    </button>
+                  </div>
+                ) : null}
+                {step >= 3 && !isEditingDataset && selectedDataset ? (
+                  <div className="flex flex-wrap justify-end gap-3">
+                    <button
+                      className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+                      onClick={(event) => {
+                        if (validateDatasetDetails(event.currentTarget.form)) {
+                          setSelectedDatasetId(null)
+                        }
+                      }}
+                      type="button"
+                    >
+                      Save this dataset
+                    </button>
+                  </div>
+                ) : null}
+                {isReviewingDatasets ? (
+                  <div className="flex flex-wrap justify-end gap-3">
+                    <button
+                      className="h-12 cursor-pointer rounded-lg bg-slate-200 px-5 text-base font-semibold text-slate-950 hover:bg-slate-300"
+                      onClick={() => {
+                        setDatasetDraft(emptyDataset)
+                        setDatasetCreatorDraft(emptyCreator)
+                        setEditingDatasetCreatorId(null)
+                        setEditingDatasetId(null)
+                        setError(null)
+                        setStep(2)
+                      }}
+                      type="button"
+                    >
+                      Add another dataset
+                    </button>
+                    <button
+                      className="inline-flex h-12 cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      disabled={isGenerating}
+                      type="submit"
+                    >
+                      {isGenerating ? 'Generating...' : 'Generate adapter Croissant file'}
+                      <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </div>
           </form>
           )}
 
-          <Stepper currentStep={step} />
+          {generatedMetadata ? null : <Stepper currentStep={step} />}
         </div>
       </div>
     </section>
@@ -858,7 +911,7 @@ function MetadataReadyPanel({
   const datasetCount = Array.isArray(metadata.hasPart) ? metadata.hasPart.length : 0
 
   return (
-    <section className="grid gap-6">
+    <section className="grid min-w-0 gap-6">
       <div>
         <h2 className="text-3xl font-bold text-slate-950">Adapter ready</h2>
         <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
@@ -883,14 +936,14 @@ function MetadataReadyPanel({
         </dl>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5">
         <h3 className="text-xl font-bold text-slate-950">JSON-LD preview</h3>
-        <pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-slate-100 p-5 text-xs leading-5 text-slate-950">
+        <pre className="mt-4 max-h-96 w-full max-w-[600px] overflow-auto rounded-xl bg-slate-100 p-5 text-xs leading-5 text-slate-950">
           {metadataJson}
         </pre>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
-            className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 hover:border-blue-300"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 hover:border-blue-300"
             onClick={onBack}
             type="button"
           >
