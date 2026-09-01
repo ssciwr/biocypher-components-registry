@@ -682,7 +682,7 @@ function CreateAdapterMetadataPage() {
   const generatedMetadataJson = generatedMetadata
     ? JSON.stringify(generatedMetadata, undefined, 2)
     : ''
-  let datasetSubmitLabel = 'Add dataset'
+  let datasetSubmitLabel = datasetDraft.mode === 'generate' ? 'Add dataset details' : 'Add dataset'
   if (isPreparingDatasets) {
     datasetSubmitLabel = editingDatasetId ? 'Saving changes...' : 'Saving dataset...'
   } else if (editingDatasetId) {

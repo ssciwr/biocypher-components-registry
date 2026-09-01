@@ -118,7 +118,7 @@ describe('adapter metadata generator editing', () => {
     cy.contains('label', 'Date published').find('input').type('2026-04-17')
     addCreator('Dataset creators', 'Dataset Creator A')
     addCreator('Dataset creators', 'Dataset Creator B')
-    cy.contains('button', 'Add dataset').click()
+    cy.contains('button', 'Add dataset details').click()
     cy.wait('@generateDataset')
     expectDatasetMetadataSection('People Dataset')
     cy.contains('label', 'Dataset name').find('input').clear().type('People Dataset Edited')
