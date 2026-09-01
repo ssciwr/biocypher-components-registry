@@ -14,15 +14,14 @@ from src.api.errors import (
 from src.api.schemas.registry import (
     RegistryEntryListResponse,
     RegistryEntryResponse,
-    RegistryRegistrationListResponse,
-    RegistryRegistrationResponse,
     RegistryRefreshLatestResponse,
     RegistryRefreshResponse,
+    RegistryRegistrationListResponse,
+    RegistryRegistrationResponse,
 )
 from src.core.registration.models import RegistrationStatus
 from src.core.registration.service import refresh_active_registrations
 from src.core.registration.store import RegistrationStore
-
 
 router = APIRouter()
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
@@ -59,9 +58,7 @@ def list_registry_registrations(
     status: Annotated[
         RegistrationStatus | None,
         Query(
-            description=(
-                "Filter registry registrations by public registration status."
-            )
+            description=("Filter registry registrations by public registration status.")
         ),
     ] = None,
     latest_event: Annotated[

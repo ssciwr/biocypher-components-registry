@@ -36,7 +36,7 @@ class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
                 "license_value",
                 "doi",
                 "cff_url",
-                "submitted_by_github_login",
+                "submitted_by_github_user_id",
             ):
                 connection.execute(
                     text(

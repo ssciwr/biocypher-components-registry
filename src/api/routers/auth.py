@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import hmac
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-import hmac
 from secrets import token_urlsafe
 from typing import Annotated, Any
 from urllib.parse import urlencode
@@ -27,7 +27,6 @@ from src.api.settings import settings
 from src.core.auth.models import AuthSession
 from src.persistence.auth_store import AuthSessionStore
 
-
 router = APIRouter()
 AuthSessionCookie = Annotated[
     str | None,
@@ -44,7 +43,7 @@ CurrentAuthSessionDependency = Annotated[
 
 
 @router.get("/auth/github/start", include_in_schema=False)
-def start_github_login(return_to: str | None = None) -> RedirectResponse:
+def start_github_oauth(return_to: str | None = None) -> RedirectResponse:
     """Redirect the browser to GitHub's OAuth consent screen."""
     client_id, _, session_secret = _github_oauth_config()
     state = token_urlsafe(24)
@@ -78,7 +77,7 @@ def start_github_login(return_to: str | None = None) -> RedirectResponse:
 
 
 @router.get("/auth/github/callback", include_in_schema=False)
-def finish_github_login(
+def finish_github_oauth(
     code: str,
     state: str,
     request: Request,
@@ -100,7 +99,7 @@ def finish_github_login(
     github_user = _github_user(token)
     expires_at = datetime.now(UTC) + timedelta(days=settings.auth_session_days)
     session_token = store.create_session(
-        github_login=str(github_user["login"]),
+        github_user_id=_github_user_id(github_user),
         expires_at=expires_at,
     )
     return_to = _safe_frontend_path(
@@ -200,12 +199,19 @@ def _github_user(access_token: str) -> dict[str, Any]:
     )
     response.raise_for_status()
     payload = response.json()
-    if not payload.get("login"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="GitHub login failed.",
-        )
+    _github_user_id(payload)
     return payload
+
+
+def _github_user_id(payload: dict[str, Any]) -> str:
+    """Extract GitHub's stable numeric user id as a string."""
+    raw_user_id = payload.get("id")
+    if type(raw_user_id) is int and raw_user_id > 0:
+        return str(raw_user_id)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="GitHub login failed.",
+    )
 
 
 def _signed_state(state: str, secret: str) -> str:

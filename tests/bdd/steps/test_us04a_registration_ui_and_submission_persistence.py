@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,6 @@ from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
 from cli import app
-
 
 scenarios("../features/us04a_registration_ui_and_submission_persistence.feature")
 
@@ -58,7 +58,7 @@ def store_valid_adapter_registration_from_cli(
 @then("the system stores the submission in the database")
 def submission_is_stored(registration_context: dict[str, Any]) -> None:
     """Assert that the submitted registration is persisted in SQLite."""
-    with sqlite3.connect(registration_context["database_path"]) as connection:
+    with closing(sqlite3.connect(registration_context["database_path"])) as connection:
         row = connection.execute(
             """
             SELECT submitted_adapter_name, repository_location, source_kind

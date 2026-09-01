@@ -8,13 +8,12 @@ from src.core.auth.models import AuthSession
 
 
 class AuthMeResponse(BaseModel):
-    """Signed-in GitHub identity shown in the frontend header."""
+    """Browser-safe signed-in state."""
 
-    github_login: str
+    authenticated: bool
 
     @classmethod
-    def from_session(cls, session: AuthSession) -> "AuthMeResponse":
+    def from_session(cls, session: AuthSession) -> AuthMeResponse:
         """Build the browser-safe auth response."""
-        return cls(
-            github_login=session.github_login,
-        )
+        _ = session
+        return cls(authenticated=True)

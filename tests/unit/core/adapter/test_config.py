@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import typer
 
 from src.core.adapter.config import (
     build_adapter_request_from_mapping,
@@ -66,10 +67,15 @@ def test_build_adapter_request_from_mapping_supports_existing_and_generated() ->
     assert request.validate is False
     assert request.dataset_paths == ["/data/dataset.jsonld"]
     assert len(request.generated_datasets) == 1
-    assert request.generated_datasets[0].input_path == "data/in/sample_networks_omnipath.tsv"
+    assert (
+        request.generated_datasets[0].input_path
+        == "data/in/sample_networks_omnipath.tsv"
+    )
 
 
-def test_build_adapter_request_from_mapping_inherits_adapter_creators_for_generated_datasets() -> None:
+def test_build_adapter_request_from_mapping_inherits_adapter_creators_for_generated_datasets() -> (
+    None
+):
     request = build_adapter_request_from_mapping(
         {
             "dataset_generator": "auto",
@@ -80,7 +86,12 @@ def test_build_adapter_request_from_mapping_inherits_adapter_creators_for_genera
                 "license": "MIT",
                 "code_repository": "https://example.org/repo",
                 "keywords": ["adapter", "biocypher"],
-                "creators": [{"name": "Alice", "identifier": "https://orcid.org/0000-0000-0000-0001"}],
+                "creators": [
+                    {
+                        "name": "Alice",
+                        "identifier": "https://orcid.org/0000-0000-0000-0001",
+                    }
+                ],
             },
             "datasets": [
                 {
@@ -93,11 +104,13 @@ def test_build_adapter_request_from_mapping_inherits_adapter_creators_for_genera
     )
 
     assert request.creators == ["Person|Alice||||https://orcid.org/0000-0000-0000-0001"]
-    assert request.generated_datasets[0].creators == ["Person|Alice||||https://orcid.org/0000-0000-0000-0001"]
+    assert request.generated_datasets[0].creators == [
+        "Person|Alice||||https://orcid.org/0000-0000-0000-0001"
+    ]
 
 
 def test_build_adapter_request_from_mapping_requires_dataset_mode() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(typer.BadParameter):
         build_adapter_request_from_mapping(
             {
                 "adapter": {

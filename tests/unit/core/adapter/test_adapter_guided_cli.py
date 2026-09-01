@@ -38,7 +38,9 @@ datasets:
     assert request.dataset_generator == "auto"
 
 
-def test_prompt_for_adapter_request_collects_existing_dataset_values(monkeypatch) -> None:
+def test_prompt_for_adapter_request_collects_existing_dataset_values(
+    monkeypatch,
+) -> None:
     prompt_values = iter(
         [
             "Example Adapter",
@@ -105,7 +107,9 @@ def test_prompt_for_adapter_request_defaults_adapter_id_from_name(monkeypatch) -
     assert request.adapter_id == "example-adapter"
 
 
-def test_prompt_for_adapter_request_collects_generated_dataset_values(monkeypatch) -> None:
+def test_prompt_for_adapter_request_collects_generated_dataset_values(
+    monkeypatch,
+) -> None:
     prompt_values = iter(
         [
             "Example Adapter",
@@ -136,12 +140,12 @@ def test_prompt_for_adapter_request_collects_generated_dataset_values(monkeypatc
     )
     confirm_values = iter(
         [
-            True,   # validate
+            True,  # validate
             False,  # add another creator
-            True,   # add dataset creator
+            True,  # add dataset creator
             False,  # add another dataset creator
             False,  # add another dataset
-            True,   # review proceed
+            True,  # review proceed
         ]
     )
 
@@ -156,7 +160,9 @@ def test_prompt_for_adapter_request_collects_generated_dataset_values(monkeypatc
     assert isinstance(dataset, GenerationRequest)
     assert dataset.input_path == "/data/example"
     assert dataset.name == "Generated Dataset"
-    assert dataset.creators == ["Denes Turei, denes@example.org, https://example.org/denes"]
+    assert dataset.creators == [
+        "Denes Turei, denes@example.org, https://example.org/denes"
+    ]
 
 
 def test_prompt_for_adapter_request_shows_metadata_panels(monkeypatch) -> None:
@@ -183,14 +189,12 @@ def test_prompt_for_adapter_request_shows_metadata_panels(monkeypatch) -> None:
 
     monkeypatch.setattr(typer, "prompt", lambda *args, **kwargs: next(prompt_values))
     monkeypatch.setattr(typer, "confirm", lambda *args, **kwargs: next(confirm_values))
-    monkeypatch.setattr(adapter_cli.console, "print", lambda *args, **kwargs: printed.extend(args))
+    monkeypatch.setattr(
+        adapter_cli.console, "print", lambda *args, **kwargs: printed.extend(args)
+    )
 
     adapter_cli.prompt_for_adapter_request(output_path="croissant.jsonld")
 
-    panel_titles = [
-        str(obj.renderable)
-        for obj in printed
-        if isinstance(obj, Panel)
-    ]
+    panel_titles = [str(obj.renderable) for obj in printed if isinstance(obj, Panel)]
     assert any("Adapter Metadata" in title for title in panel_titles)
     assert any("Embedded Dataset Metadata" in title for title in panel_titles)

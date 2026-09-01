@@ -2,26 +2,29 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from copy import deepcopy
 import json
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from src.core.adapter.request import AdapterGenerationRequest
 from src.core.adapter.backends.base import AdapterGenerator
 from src.core.adapter.document import (
     build_adapter_creator,
     build_adapter_document,
 )
-from src.core.dataset.service import execute_request as execute_dataset_request
+from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationResult
+from src.core.dataset.service import execute_request as execute_dataset_request
 from src.core.shared.creators import parse_adapter_creator_string
 from src.core.shared.errors import GeneratorError
 from src.core.shared.ids import slugify_identifier
 from src.core.shared.licenses import normalize_license_url
-from src.core.validation import validate_adapter_with_embedded_datasets, validate_dataset
+from src.core.validation import (
+    validate_adapter_with_embedded_datasets,
+    validate_dataset,
+)
 
 
 class NativeAdapterGenerator(AdapterGenerator):
@@ -33,7 +36,9 @@ class NativeAdapterGenerator(AdapterGenerator):
         """Build, serialize, and optionally validate adapter metadata."""
         datasets = [self._load_dataset(path) for path in request.dataset_paths]
         dataset_reports: list[str] = []
-        for dataset_index, dataset_request in enumerate(request.generated_datasets, start=1):
+        for dataset_index, dataset_request in enumerate(
+            request.generated_datasets, start=1
+        ):
             dataset_document, dataset_stdout, dataset_stderr = self._generate_dataset(
                 request.dataset_generator,
                 dataset_request,
@@ -99,7 +104,9 @@ class NativeAdapterGenerator(AdapterGenerator):
             document=document,
         )
 
-    def _generate_dataset(self, generator: str, request) -> tuple[dict[str, Any], str, str]:
+    def _generate_dataset(
+        self, generator: str, request
+    ) -> tuple[dict[str, Any], str, str]:
         """Generate one nested dataset document through the dataset service."""
         with TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "croissant_dataset.jsonld"
@@ -130,7 +137,9 @@ class NativeAdapterGenerator(AdapterGenerator):
         """Load and validate an existing dataset document from disk."""
         dataset_path = Path(path).expanduser()
         if not dataset_path.exists():
-            raise GeneratorError(f"Dataset metadata file does not exist: {dataset_path}")
+            raise GeneratorError(
+                f"Dataset metadata file does not exist: {dataset_path}"
+            )
 
         try:
             document = json.loads(dataset_path.read_text(encoding="utf-8"))

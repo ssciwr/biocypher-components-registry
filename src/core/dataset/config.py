@@ -27,7 +27,9 @@ def request_from_config(
     """
     raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
-        raise typer.BadParameter("Config file must contain a YAML mapping at the top level.")
+        raise typer.BadParameter(
+            "Config file must contain a YAML mapping at the top level."
+        )
 
     metadata = raw.get("metadata", {})
     if metadata is None:
@@ -44,9 +46,7 @@ def request_from_config(
         or _pick_first_value(raw, metadata, keys=("output",))
         or "croissant.jsonld"
     )
-    validate = bool(
-        _pick_first_value(raw, metadata, keys=("validate",), default=True)
-    )
+    validate = bool(_pick_first_value(raw, metadata, keys=("validate",), default=True))
 
     creators = _parse_creators(
         _pick_first_value(raw, metadata, keys=("creators",), default=[])
@@ -116,7 +116,9 @@ def _parse_extra_args(extra_args: Any) -> list[str]:
     """Validate optional passthrough CLI arguments from configuration."""
     if extra_args in (None, ""):
         return []
-    if not isinstance(extra_args, list) or not all(isinstance(arg, str) for arg in extra_args):
+    if not isinstance(extra_args, list) or not all(
+        isinstance(arg, str) for arg in extra_args
+    ):
         raise typer.BadParameter("'extra_args' must be a list of strings.")
     return list(extra_args)
 

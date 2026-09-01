@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlparse
 
-from src.core.adapter.request import (
-    AdapterGenerationRequest,
-    AdapterRegistrationRequest,
-)
 from src.core.adapter.backends import (
     list_adapter_generators,
     resolve_adapter_generator,
+)
+from src.core.adapter.request import (
+    AdapterGenerationRequest,
+    AdapterRegistrationRequest,
 )
 from src.core.dataset.request import GenerationResult
 from src.core.shared.errors import GeneratorError, InvalidRepoURLError
@@ -49,7 +49,7 @@ def create_registration_request(
     license_value: str | None = None,
     doi: str | None = None,
     cff_url: str | None = None,
-    submitted_by_github_login: str | None = None,
+    submitted_by_github_user_id: str | None = None,
 ) -> AdapterRegistrationRequest:
     """Create a normalized adapter registration request.
 
@@ -60,7 +60,7 @@ def create_registration_request(
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_login: GitHub login for browser submissions.
+        submitted_by_github_user_id: GitHub user id for browser submissions.
 
     Returns:
         A normalized registration request ready for the registry workflow.
@@ -74,7 +74,9 @@ def create_registration_request(
     if not normalized_name:
         raise ValueError("Adapter name is required.")
 
-    normalized_location = _normalize_repository_into_pure_branchless_location(repository_location)
+    normalized_location = _normalize_repository_into_pure_branchless_location(
+        repository_location
+    )
     if not normalized_location:
         raise ValueError("Repository location is required.")
 
@@ -103,11 +105,13 @@ def create_registration_request(
         license_value=normalized_license_value,
         doi=normalized_doi,
         cff_url=normalized_cff_url,
-        submitted_by_github_login=submitted_by_github_login,
+        submitted_by_github_user_id=submitted_by_github_user_id,
     )
 
 
-def _normalize_repository_into_pure_branchless_location(repository_location: str) -> str:
+def _normalize_repository_into_pure_branchless_location(
+    repository_location: str,
+) -> str:
     normalized_location = repository_location.strip()
     if normalized_location.startswith(("github.com/", "gitlab.com/")):
         normalized_location = f"https://{normalized_location}"
@@ -122,13 +126,17 @@ def _normalize_repository_into_pure_branchless_location(repository_location: str
                 path_parts = path_parts[:marker_index]
         if path_parts:
             path_parts[-1] = path_parts[-1].removesuffix(".git")
-        return parsed_location._replace(
-            netloc=parsed_location.netloc.lower(),
-            path=f"/{'/'.join(path_parts)}" if path_parts else "",
-            params="",
-            query="",
-            fragment="",
-        ).geturl().rstrip("/")
+        return (
+            parsed_location._replace(
+                netloc=parsed_location.netloc.lower(),
+                path=f"/{'/'.join(path_parts)}" if path_parts else "",
+                params="",
+                query="",
+                fragment="",
+            )
+            .geturl()
+            .rstrip("/")
+        )
     return normalized_location
 
 

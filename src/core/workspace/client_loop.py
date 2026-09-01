@@ -42,14 +42,16 @@ Run:
 import asyncio
 import json
 import os
+import signal
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools import beta_async_tool
 from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
@@ -147,14 +149,35 @@ def mcp_headers() -> dict[str, str]:
     return {"Authorization": auth} if auth else {}
 
 
+@asynccontextmanager
+async def open_mcp_session(url: str, headers: dict[str, str]):
+    """Open an initialized MCP session over streamable HTTP.
+
+    Headers go through an explicit http_client rather than a headers= kwarg
+    on streamable_http_client (mcp>=2.0 dropped that kwarg along with the
+    deprecated streamablehttp_client name); we own that client's lifecycle
+    since streamable_http_client won't enter/exit a client we pass in.
+
+    Shared by this CLI's main() and the API's SessionManager (as the default
+    ``connect_mcp``) so the mcp>=2.0 bootstrap only lives in one place.
+    """
+    async with (
+        create_mcp_http_client(headers=headers) as http_client,
+        streamable_http_client(url, http_client=http_client) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        yield session
+
+
 def render_tool_result(result) -> str:
     """Flatten an MCP CallToolResult to text for model context."""
-    if result.structuredContent is not None:
-        text = json.dumps(result.structuredContent)
+    if result.structured_content is not None:
+        text = json.dumps(result.structured_content)
     else:
         parts = [c.text for c in result.content if getattr(c, "type", None) == "text"]
         text = "\n".join(parts)
-    if result.isError:
+    if result.is_error:
         text = f"[tool error] {text}"
     return text
 
@@ -188,7 +211,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
         call,
         name=tool_name,
         description=mcp_tool_def.description or "",
-        input_schema=mcp_tool_def.inputSchema,
+        input_schema=mcp_tool_def.input_schema,
     )
 
 
@@ -378,15 +401,28 @@ def make_file_tools(
                 env=_exec_env(get_exec_bin()),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                start_new_session=True,
             )
             try:
                 out, _ = await asyncio.wait_for(
                     proc.communicate(), timeout=timeout_seconds
                 )
-            except asyncio.TimeoutError:
-                proc.kill()
+            except TimeoutError:
+                # Ensure killing all child processes of the process too for extra reliance/security
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 await proc.wait()
                 return f"[tool error] command timed out after {timeout_seconds}s"
+            except asyncio.CancelledError:
+                # Ensure killing all child processes of the process too
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                raise
         except OSError as e:
             return f"[tool error] {e}"
         text = out.decode(errors="replace")
@@ -544,24 +580,18 @@ async def main() -> None:
             "your Anthropic key, or to any non-empty value together with "
             "ANTHROPIC_BASE_URL for a local model."
         )
-    async with streamable_http_client(MCP_URL, headers=mcp_headers()) as (
-        read,
-        write,
-        _,
-    ):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools_result = await session.list_tools()
-            tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
+    async with open_mcp_session(MCP_URL, mcp_headers()) as session:
+        tools_result = await session.list_tools()
+        tools = [make_tool(t, session) for t in tools_result.tools] + FILE_TOOLS
 
-            if "--list-tools" in sys.argv:
-                for t in tools_result.tools:
-                    print(
-                        f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
-                    )
-                return
+        if "--list-tools" in sys.argv:
+            for t in tools_result.tools:
+                print(
+                    f"{t.name}: {(t.description or '').strip().splitlines()[0] if t.description else ''}"
+                )
+            return
 
-            await chat(tools, api_key, auth_token)
+        await chat(tools, api_key, auth_token)
 
 
 if __name__ == "__main__":

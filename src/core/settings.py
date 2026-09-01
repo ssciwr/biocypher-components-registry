@@ -21,7 +21,7 @@ settings = CoreSettings()
 
 def get_database_url() -> str | None:
     """Return the PostgreSQL database URL when configured.
-    
+
     Returns:
         Database URL if DATABASE_URL environment variable is set, None otherwise.
     """
@@ -32,7 +32,7 @@ def get_registration_database_path(
     database_path: str | Path | None = None,
 ) -> Path:
     """Return the explicit, environment, or default registry database path.
-    
+
     Used for SQLite database file location. Ignored when DATABASE_URL is set.
     """
     if database_path is not None:

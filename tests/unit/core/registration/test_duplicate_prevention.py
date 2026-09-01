@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sqlite3
+from contextlib import closing
+from pathlib import Path
 
 import pytest
 
@@ -178,7 +179,7 @@ def test_sqlite_store_rejects_duplicate_valid_uniqueness_key(tmp_path: Path) -> 
             observed_checksum="checksum-a",
         )
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         duplicate_event = connection.execute(
             """
             SELECT source_id, event_type

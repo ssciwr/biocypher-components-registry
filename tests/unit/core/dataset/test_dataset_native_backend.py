@@ -40,10 +40,14 @@ def test_native_generator_builds_dataset_from_csv_and_tsv_gz(tmp_path: Path) -> 
     assert document["distribution"][0]["@id"] == "file_0"
     assert document["distribution"][1]["@id"] == "file_1"
     assert document["distribution"][0]["@id"] != document["recordSet"][0]["@id"]
-    record_sets = {record_set["@id"]: record_set for record_set in document["recordSet"]}
+    record_sets = {
+        record_set["@id"]: record_set for record_set in document["recordSet"]
+    }
     assert {"people", "scores"} == set(record_sets)
     assert record_sets["people"]["field"][0]["dataType"] == "cr:Int64"
-    assert record_sets["people"]["field"][0]["@id"].startswith(record_sets["people"]["@id"])
+    assert record_sets["people"]["field"][0]["@id"].startswith(
+        record_sets["people"]["@id"]
+    )
 
 
 def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:

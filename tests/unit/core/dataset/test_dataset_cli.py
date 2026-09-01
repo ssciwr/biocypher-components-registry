@@ -8,7 +8,6 @@ from typer.testing import CliRunner
 from src.core.dataset import cli as dataset_cli
 from src.core.dataset.request import GenerationRequest as DatasetGenerationRequest
 
-
 runner = CliRunner()
 
 

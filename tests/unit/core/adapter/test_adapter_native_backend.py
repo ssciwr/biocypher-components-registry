@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from pathlib import Path
-from subprocess import CompletedProcess
 
 from src.core.adapter.backends.native import NativeAdapterGenerator
 from src.core.adapter.request import AdapterGenerationRequest
@@ -85,7 +84,9 @@ def test_native_adapter_generator_embeds_valid_dataset(tmp_path: Path) -> None:
     assert "Validation completed!" in result.stdout
 
 
-def test_native_adapter_generator_normalizes_known_license_keyword(tmp_path: Path) -> None:
+def test_native_adapter_generator_normalizes_known_license_keyword(
+    tmp_path: Path,
+) -> None:
     dataset_path = tmp_path / "dataset.jsonld"
     output_path = tmp_path / "adapter.jsonld"
     dataset_path.write_text(json.dumps(_valid_dataset_document()), encoding="utf-8")
@@ -133,7 +134,9 @@ def test_native_adapter_generator_keeps_unknown_license_keyword(tmp_path: Path) 
     assert result.document["license"] == "Custom-License"
 
 
-def test_native_adapter_generator_namespaces_embedded_dataset_ids(tmp_path: Path) -> None:
+def test_native_adapter_generator_namespaces_embedded_dataset_ids(
+    tmp_path: Path,
+) -> None:
     dataset_path_a = tmp_path / "dataset-a.jsonld"
     dataset_path_b = tmp_path / "dataset-b.jsonld"
     output_path = tmp_path / "adapter.jsonld"
@@ -163,7 +166,9 @@ def test_native_adapter_generator_namespaces_embedded_dataset_ids(tmp_path: Path
     assert first["recordSet"][0]["@id"] != second["recordSet"][0]["@id"]
 
 
-def test_native_adapter_generator_includes_generated_dataset_report(monkeypatch, tmp_path: Path) -> None:
+def test_native_adapter_generator_includes_generated_dataset_report(
+    monkeypatch, tmp_path: Path
+) -> None:
     output_path = tmp_path / "adapter.jsonld"
 
     def fake_execute_dataset_request(request: GenerationRequest, generator: str):

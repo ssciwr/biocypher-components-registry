@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 
 from src.core.dataset.backends import list_generators, resolve_generator
-from src.core.dataset.backends.auto_select import AutoDatasetGenerator, select_generator_for_request
+from src.core.dataset.backends.auto_select import (
+    AutoDatasetGenerator,
+    select_generator_for_request,
+)
 from src.core.dataset.backends.croissant_baker import CroissantBakerGenerator
 from src.core.dataset.backends.native import NativeDatasetGenerator
 from src.core.dataset.request import GenerationRequest
@@ -11,7 +14,9 @@ from src.core.shared.errors import UnsupportedGeneratorError
 
 
 def test_generation_request_validates_by_default() -> None:
-    request = GenerationRequest(input_path="/data/example.csv", output_path="out.jsonld")
+    request = GenerationRequest(
+        input_path="/data/example.csv", output_path="out.jsonld"
+    )
 
     assert request.validate is True
 
