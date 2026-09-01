@@ -14,7 +14,6 @@ from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationRequest
 from src.core.shared.constants import STANDARD_CONTEXT
 
-
 runner = CliRunner()
 
 
@@ -326,14 +325,18 @@ def test_adapter_guided_retries_after_backend_failure(monkeypatch) -> None:
     assert request.description == "fixed"
 
 
-def test_adapter_direct_supports_generated_dataset_configs(tmp_path: Path, monkeypatch) -> None:
+def test_adapter_direct_supports_generated_dataset_configs(
+    tmp_path: Path, monkeypatch
+) -> None:
     dataset_config = tmp_path / "dataset.yaml"
     dataset_config.write_text("input: /data/example\n", encoding="utf-8")
     captured: dict[str, object] = {}
 
     def fake_dataset_request_from_config(config_path: str) -> GenerationRequest:
         captured["config_path"] = config_path
-        return GenerationRequest(input_path="/data/example", output_path="croissant.jsonld")
+        return GenerationRequest(
+            input_path="/data/example", output_path="croissant.jsonld"
+        )
 
     def fake_execute_adapter_request(
         request: AdapterGenerationRequest,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 from src.core.settings import settings as core_settings
 
 load_dotenv()
+# Env var read at import time, same as the standalone agentic-workspace
+# service: the workspace API keeps its own versioned prefix (distinct from
+# api_v1_prefix) so it can sit behind the registry's nginx unchanged.
+_AGENT_API_PREFIX_ENV = "AGENT_API_PREFIX"
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +25,9 @@ class ApiSettings:
     app_title: str = "BioCypher Components Registry API"
     app_version: str = "0.2.0"
     api_v1_prefix: str = "/api/v1"
+    agent_api_prefix: str = field(
+        default_factory=lambda: os.getenv(_AGENT_API_PREFIX_ENV, "/agent/api/v1")
+    )
     registry_db_path_env: str = core_settings.registry_db_path_env
     default_registry_db_path: Path = core_settings.default_registry_db_path
     github_oauth_client_id_env: str = "GITHUB_OAUTH_CLIENT_ID"

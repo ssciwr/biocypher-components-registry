@@ -19,92 +19,75 @@ class AuthSessionStore:
     def __init__(self, engine: Engine) -> None:
         """Prepare the auth table for the configured database."""
         self.engine = engine
-        self._initialize_database()
+        self._dispose_after_use = engine.dialect.name == "sqlite"
+        try:
+            self._initialize_database()
+        finally:
+            if self._dispose_after_use:
+                self.engine.dispose()
 
     def _initialize_database(self) -> None:
         metadata.create_all(self.engine)
-        if self.engine.dialect.name != "sqlite":
-            return
-
-        with self.engine.begin() as connection:
-            columns = {
-                str(row["name"]): row
-                for row in connection.exec_driver_sql(
-                    "PRAGMA table_info(auth_sessions)"
-                ).mappings()
-            }
-            expected_columns = {"id_hash", "github_login", "expires_at"}
-            if set(columns) == expected_columns:
-                return
-
-            connection.exec_driver_sql("DROP TABLE IF EXISTS auth_sessions_new")
-            connection.exec_driver_sql(
-                """
-                CREATE TABLE auth_sessions_new (
-                    id_hash VARCHAR NOT NULL,
-                    github_login VARCHAR NOT NULL,
-                    expires_at VARCHAR NOT NULL,
-                    PRIMARY KEY (id_hash)
-                )
-                """
-            )
-            if expected_columns.issubset(columns):
-                connection.exec_driver_sql(
-                    """
-                    INSERT INTO auth_sessions_new (id_hash, github_login, expires_at)
-                    SELECT id_hash, github_login, expires_at
-                    FROM auth_sessions
-                    WHERE github_login IS NOT NULL AND expires_at IS NOT NULL
-                    """
-                )
-            connection.exec_driver_sql("DROP TABLE auth_sessions")
-            connection.exec_driver_sql(
-                "ALTER TABLE auth_sessions_new RENAME TO auth_sessions"
-            )
 
     def create_session(
         self,
         *,
-        github_login: str,
+        github_user_id: str,
         expires_at: datetime,
     ) -> str:
         """Store a hashed session token and return the raw cookie token."""
         token = token_urlsafe(32)
-        with self.engine.begin() as connection:
-            connection.execute(
-                insert(auth_sessions_table).values(
-                    id_hash=_session_hash(token),
-                    github_login=github_login,
-                    expires_at=expires_at.isoformat(),
+        try:
+            with self.engine.begin() as connection:
+                connection.execute(
+                    insert(auth_sessions_table).values(
+                        id_hash=_session_hash(token),
+                        github_user_id=github_user_id,
+                        expires_at=expires_at.isoformat(),
+                    )
                 )
-            )
-        return token
+            return token
+        finally:
+            if self._dispose_after_use:
+                self.engine.dispose()
 
     def get_session(self, token: str) -> AuthSession | None:
         """Return a valid session for the raw cookie token."""
-        with self.engine.connect() as connection:
-            row = connection.execute(
-                select(auth_sessions_table).where(
-                    auth_sessions_table.c.id_hash == _session_hash(token)
+        try:
+            with self.engine.connect() as connection:
+                row = (
+                    connection.execute(
+                        select(auth_sessions_table).where(
+                            auth_sessions_table.c.id_hash == _session_hash(token)
+                        )
+                    )
+                    .mappings()
+                    .first()
                 )
-            ).mappings().first()
 
-        if row is None:
-            return None
-        if datetime.fromisoformat(str(row["expires_at"])) <= datetime.now(UTC):
-            return None
-        return AuthSession(
-            github_login=str(row["github_login"]),
-        )
+            if row is None:
+                return None
+            if datetime.fromisoformat(str(row["expires_at"])) <= datetime.now(UTC):
+                return None
+            return AuthSession(
+                github_user_id=str(row["github_user_id"]),
+            )
+        finally:
+            if self._dispose_after_use:
+                self.engine.dispose()
 
     def delete_session(self, token: str) -> None:
         """Remove one browser auth session."""
-        with self.engine.begin() as connection:
-            connection.execute(
-                delete(auth_sessions_table).where(
-                    auth_sessions_table.c.id_hash == _session_hash(token)
+        try:
+            with self.engine.begin() as connection:
+                connection.execute(
+                    delete(auth_sessions_table).where(
+                        auth_sessions_table.c.id_hash == _session_hash(token)
+                    )
                 )
-            )
+        finally:
+            if self._dispose_after_use:
+                self.engine.dispose()
 
 
 def _session_hash(token: str) -> str:

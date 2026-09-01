@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +22,11 @@ from src.core.dataset.document import (
     build_field,
     build_record_set,
 )
+from src.core.dataset.formats.resolver import resolve_format_handler
+from src.core.dataset.request import FileInspection, GenerationRequest, GenerationResult
 from src.core.shared.creators import parse_dataset_creator_string
 from src.core.shared.errors import InputDiscoveryError, UnsupportedFormatError
 from src.core.shared.licenses import normalize_license_url
-from src.core.dataset.formats.resolver import resolve_format_handler
-from src.core.dataset.request import FileInspection, GenerationRequest, GenerationResult
 from src.core.validation.dataset import validate_dataset
 
 
@@ -50,12 +50,16 @@ class NativeDatasetGenerator(DatasetGenerator):
                 warnings.append(str(exc))
 
         if not inspections:
-            raise InputDiscoveryError("No supported dataset files were found in the input path.")
+            raise InputDiscoveryError(
+                "No supported dataset files were found in the input path."
+            )
 
         document = self._build_document(request, inspections, warnings)
         output_path = Path(request.output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8")
+        output_path.write_text(
+            json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
         stdout_lines = [
             "Success! Generated native Croissant metadata",
@@ -87,7 +91,10 @@ class NativeDatasetGenerator(DatasetGenerator):
             raise InputDiscoveryError(f"Input path does not exist: {input_path}")
         if input_path.is_file():
             return [input_path]
-        files = [input_path / relative_path for relative_path in discover_baker_files(str(input_path))]
+        files = [
+            input_path / relative_path
+            for relative_path in discover_baker_files(str(input_path))
+        ]
         if not files:
             raise InputDiscoveryError(f"No files were found under: {input_path}")
         return files
@@ -120,7 +127,9 @@ class NativeDatasetGenerator(DatasetGenerator):
             warnings.append("Missing URL; using a file:// URI for the input path.")
 
         creators = _build_creators(request.creators)
-        raw_date_published = request.date_published or _infer_date_published(inspections)
+        raw_date_published = request.date_published or _infer_date_published(
+            inspections
+        )
         date_published = _format_date_published(raw_date_published)
         if not request.date_published:
             warnings.append(f"Missing date published; using '{date_published}'.")
@@ -216,8 +225,7 @@ def _build_creator_from_mapping(raw: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     identifier = (
-        str(raw.get("identifier") or "").strip()
-        or str(raw.get("orcid") or "").strip()
+        str(raw.get("identifier") or "").strip() or str(raw.get("orcid") or "").strip()
     )
     return build_creator(
         name=name,
@@ -232,7 +240,9 @@ def _build_creator_from_mapping(raw: dict[str, Any]) -> dict[str, Any] | None:
 def _infer_date_published(inspections: list[FileInspection]) -> str:
     """Infer a publication date from the newest inspected source file."""
     latest_mtime = max(inspection.path.stat().st_mtime for inspection in inspections)
-    return _format_date_published(datetime.fromtimestamp(latest_mtime).date().isoformat())
+    return _format_date_published(
+        datetime.fromtimestamp(latest_mtime, tz=UTC).date().isoformat()
+    )
 
 
 def _format_date_published(value: str) -> str:

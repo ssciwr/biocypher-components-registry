@@ -16,7 +16,6 @@ from src.core.registration.models import (
     StoredRegistration,
 )
 
-
 # ===========================================================
 # Registry Schema Tests
 # ===========================================================

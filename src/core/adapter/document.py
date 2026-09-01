@@ -6,7 +6,6 @@ from typing import Any
 
 from src.core.shared.ids import slugify_identifier
 
-
 ADAPTER_CONTEXT: dict[str, Any] = {
     "@language": "en",
     "@vocab": "https://schema.org/",

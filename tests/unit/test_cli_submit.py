@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,7 +10,6 @@ from cli import app
 from src.core.adapter.service import create_registration_request
 from src.core.settings import settings as core_settings
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
-
 
 runner = CliRunner()
 
@@ -25,8 +25,8 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
             "submit",
             "--name",
             "Example Adapter",
-            "--github-login",
-            "edwinc",
+            "--github-user-id",
+            "12345",
             str(repository),
         ],
     )
@@ -35,7 +35,7 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
     assert "Registration Request" in result.output
     assert "Registration request created" in result.output
     assert "example-adapter" in result.output
-    assert "edwinc" in result.output
+    assert "12345" in result.output
     assert "local" in result.output
 
 
@@ -73,17 +73,17 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
     assert result.exit_code == 0, result.output
     assert "Stored Registration" in result.output
     assert "Registration stored" in result.output
-    assert "sampleGithubLogin" in result.output
+    assert "0" in result.output
     assert "SUBMITTED" in result.output
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         row = connection.execute(
             """
             SELECT
                 submitted_adapter_name,
                 repository_location,
                 source_kind,
-                submitted_by_github_login,
+                submitted_by_github_user_id,
                 is_active
             FROM registration_sources
             """
@@ -93,7 +93,7 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
             "Example Adapter",
             str(repository.resolve()),
             "local",
-            "sampleGithubLogin",
+            "0",
             1,
         )
 
@@ -242,8 +242,7 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path: Path) -
 
 
 def test_seed_demo_adapters_command_is_idempotent(tmp_path: Path) -> None:
-    """"// backend change made by jmsssc to adopt workshop feedback hence testing
-    """
+    """ "// backend change made by jmsssc to adopt workshop feedback hence testing"""
     database_path = tmp_path / "registry.sqlite3"
 
     first = runner.invoke(app, ["seed-demo-adapters", "--db-path", str(database_path)])

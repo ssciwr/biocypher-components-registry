@@ -51,9 +51,7 @@ MANDATORY_FIELDS = (
     "url",
 )
 
-DEFAULT_PROFILE_URL = (
-    "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/"
-)
+DEFAULT_PROFILE_URL = "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/"
 CROISSANT_CONFORMS_TO_URL = "http://mlcommons.org/croissant/1.0"
 DEFAULT_PROGRAMMING_LANGUAGE = "Python"
 DEFAULT_TARGET_PRODUCT = "BioCypher"

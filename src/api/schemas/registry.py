@@ -14,7 +14,6 @@ from src.core.registration.models import (
     StoredRegistration,
 )
 
-
 # ===========================================================
 # =====================  Output Models ======================
 # ===========================================================
@@ -33,7 +32,7 @@ class RegistryRefreshResponse(BaseModel):
     fetch_failed: int
 
     @classmethod
-    def from_summary(cls, summary: BatchRefreshSummary) -> "RegistryRefreshResponse":
+    def from_summary(cls, summary: BatchRefreshSummary) -> RegistryRefreshResponse:
         """Build an API response from a core batch refresh summary."""
         return cls(
             active_sources=summary.active_sources,
@@ -66,7 +65,7 @@ class RegistryRefreshLatestResponse(BaseModel):
     def from_record(
         cls,
         record: BatchRefreshRecord,
-    ) -> "RegistryRefreshLatestResponse":
+    ) -> RegistryRefreshLatestResponse:
         """Build an API response from a persisted core refresh record."""
         return cls(
             refresh_id=record.refresh_id,
@@ -104,7 +103,7 @@ class RegistryRegistrationResponse(BaseModel):
         registration: StoredRegistration,
         *,
         latest_event_type: str,
-    ) -> "RegistryRegistrationResponse":
+    ) -> RegistryRegistrationResponse:
         """Build a registry registration row from a stored registration."""
         return cls(
             registration_id=registration.registration_id,
@@ -142,7 +141,7 @@ class RegistryEntryResponse(BaseModel):
     is_active: bool
 
     @classmethod
-    def from_entry(cls, entry: RegistryEntry) -> "RegistryEntryResponse":
+    def from_entry(cls, entry: RegistryEntry) -> RegistryEntryResponse:
         """Build an API response from a core registry entry model."""
         return cls(
             entry_id=entry.entry_id,

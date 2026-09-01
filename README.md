@@ -135,15 +135,18 @@ uv run cli.py adapter direct --name "My Adapter" --description "..." --version "
 Run `uv run cli.py adapter --help` or `uv run cli.py dataset --help` for the full flag list of each mode.
 
 ## Agentic workspace
-The agentic workspace can be run through the API or directly through the command-line using
+The agentic workspace can be run through the API (see below) or directly through the command-line using
+```bash
+uv run python src/core/workspace/client_loop.py
+```
+Be aware that currently you need a Claude API key that is provided as environment variable:
+```bash
+export ANTHROPIC_API_KEY="<your key>"
+# or
+export ANTHROPIC_API_KEY_FILE="secrets/anthropic_api_key"
+```
+The API form serves per-session chat, directory, and file-editor routes under `/agent/api/v1` from the same FastAPI app as the routes below (BYOK: each session takes its own key via `POST /agent/api/v1/sessions/{id}/key`, no server-side `ANTHROPIC_API_KEY` needed). See [docs/API.md](docs/API.md) for the full route and SSE event contract.
 
-    uv run python src/core/workspace/client_loop.py
-
-Be aware that currently you need a Claude API key, provided via environment variables:
-
-    export ANTHROPIC_API_KEY="<your key>"
-    # or
-    export ANTHROPIC_API_KEY_FILE="secrets/anthropic_api_key"
 For more information on the agentic workspace, consult its [dedicated documentation](docs/agentic_workspace.md).
 
 ## REST API
@@ -206,6 +209,24 @@ curl http://localhost:8000/api/v1/registry/registrations
 curl -X POST http://localhost:8000/api/v1/registry/refreshes
 curl http://localhost:8000/api/v1/adapters
 ```
+
+The agentic workspace routes below are served under the `/agent/api/v1`
+prefix (kept distinct from `/api/v1` — see [docs/API.md](docs/API.md) for
+auth, SSE event shapes, and full error-code tables).
+
+| Method | Path | Description |
+| --- | --- | --- |
+| POST | `/sessions` | Create a workspace session (allocates a directory, opens the MCP connection) |
+| GET | `/sessions/{id}` | Get session state (model, `has_key`, `busy`, `error`, tools) |
+| DELETE | `/sessions/{id}` | End a session and destroy its workspace |
+| POST | `/sessions/{id}/key` | Attach a BYOK Anthropic API key/token to the session |
+| POST | `/sessions/{id}/messages` | Send a chat message and start a turn |
+| POST | `/sessions/{id}/interrupt` | Interrupt the running or queued turn |
+| GET | `/sessions/{id}/events` | SSE stream of turn/tool/usage/filesystem events |
+| GET | `/sessions/{id}/files` | List one workspace directory level |
+| GET | `/sessions/{id}/file` | Read one workspace file (with ETag) |
+| PUT | `/sessions/{id}/file` | Create or overwrite one workspace file (optional `If-Match`) |
+| DELETE | `/sessions/{id}/file` | Delete one workspace file or directory |
 
 ## Frontend Setup
 

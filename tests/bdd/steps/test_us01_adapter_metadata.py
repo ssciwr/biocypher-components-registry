@@ -8,7 +8,6 @@ from pytest_bdd import given, scenarios, then, when
 from src.core.shared.constants import METADATA_FILENAME
 from src.core.shared.files import fetch_local_metadata
 
-
 scenarios("../features/us01_adapter_metadata.feature")
 
 

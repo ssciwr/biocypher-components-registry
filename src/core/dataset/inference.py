@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import gzip
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ BOOLEAN_TYPE = "sc:Boolean"
 CSV_MIME = "text/csv"
 TSV_MIME = "text/tab-separated-values"
 
-_DTYPE_MAP: Dict[str, str] = {
+_DTYPE_MAP: dict[str, str] = {
     "O": TEXT_TYPE,
     "U": TEXT_TYPE,
     "S": TEXT_TYPE,
@@ -28,7 +28,7 @@ _DTYPE_MAP: Dict[str, str] = {
     "m": TEXT_TYPE,
 }
 
-_ENCODING_FORMAT_MAP: Dict[str, str] = {
+_ENCODING_FORMAT_MAP: dict[str, str] = {
     ".csv": CSV_MIME,
     ".tsv": TSV_MIME,
     ".tab": TSV_MIME,
@@ -41,7 +41,7 @@ def infer_fields_from_file(
     file_object_id: str,
     max_rows: int = 500,
     n_examples: int = 1,
-) -> Tuple[List[Dict[str, Any]], str]:
+) -> tuple[list[dict[str, Any]], str]:
     """Infer Croissant field definitions from a local tabular data file."""
     path = Path(file_path)
     encoding_format, sep = _detect_format(path)
@@ -51,7 +51,7 @@ def infer_fields_from_file(
     except Exception as exc:
         raise ValueError(f"Could not read {path}: {exc}") from exc
 
-    fields: List[Dict[str, Any]] = []
+    fields: list[dict[str, Any]] = []
     for col in df.columns:
         series = df[col]
         data_type = _dtype_to_croissant(series.dtype)
@@ -74,11 +74,10 @@ def infer_fields_from_file(
     return fields, encoding_format
 
 
-def _detect_format(path: Path) -> Tuple[str, str]:
+def _detect_format(path: Path) -> tuple[str, str]:
     """Detect the file MIME type and delimiter from path and file contents."""
     name = path.name.lower()
-    if name.endswith(".gz"):
-        name = name[:-3]
+    name = name.removesuffix(".gz")
 
     suffix = Path(name).suffix
     encoding_format = _ENCODING_FORMAT_MAP.get(suffix)
@@ -149,9 +148,9 @@ def _dtype_to_croissant(dtype: Any) -> str:
     return _DTYPE_MAP.get(getattr(dtype, "kind", "O"), TEXT_TYPE)
 
 
-def _extract_examples(series: Any, n: int = 1) -> List[Any]:
+def _extract_examples(series: Any, n: int = 1) -> list[Any]:
     """Collect the first unique non-null example values from a series."""
-    seen: List[Any] = []
+    seen: list[Any] = []
     for val in series.dropna():
         native = val.item() if hasattr(val, "item") else val
         if native not in seen:

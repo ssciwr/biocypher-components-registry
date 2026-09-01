@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Annotated, Literal
 
@@ -29,7 +29,6 @@ from src.core.validation import (
     validate_dataset,
 )
 from src.core.validation.results import ValidationResult
-
 
 router = APIRouter()
 
@@ -222,6 +221,7 @@ def _optional_validation_response(
         result=validation_result,
     )
 
+
 # renamed only because it was converted into a shared helper for both dataset generation routes
 def _execute_dataset_metadata_generation(
     *,
@@ -274,7 +274,7 @@ def _parse_creators_json(creators_json: str) -> list[AdapterCreatorGenerateReque
     try:
         raw_creators = json.loads(creators_json)
         if not isinstance(raw_creators, list):
-            raise ValueError("creators_json must be a JSON array.")
+            raise TypeError("creators_json must be a JSON array.")
         return [
             AdapterCreatorGenerateRequest.model_validate(creator)
             for creator in raw_creators

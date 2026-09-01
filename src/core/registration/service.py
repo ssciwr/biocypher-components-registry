@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 from src.core.adapter.discovery import (
@@ -34,7 +34,7 @@ def submit_registration(
     license_value: str | None = None,
     doi: str | None = None,
     cff_url: str | None = None,
-    submitted_by_github_login: str | None = None,
+    submitted_by_github_user_id: str | None = None,
 ) -> StoredRegistration:
     """Create and persist a registration submission.
 
@@ -46,7 +46,7 @@ def submit_registration(
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_login: GitHub login for browser submissions.
+        submitted_by_github_user_id: GitHub user id for browser submissions.
 
     Returns:
         The stored registration record with a tracked status.
@@ -58,7 +58,7 @@ def submit_registration(
         license_value=license_value,
         doi=doi,
         cff_url=cff_url,
-        submitted_by_github_login=submitted_by_github_login,
+        submitted_by_github_user_id=submitted_by_github_user_id,
     )
     return store.create_registration(request)
 
@@ -99,7 +99,9 @@ def finish_registration(
             errors=validation_errors or ["Adapter metadata is invalid."],
             profile_version=discovered.validation.profile_version,
             metadata=discovered.metadata,
-            metadata_path=str(discovered.metadata_path) if discovered.metadata_path else None,
+            metadata_path=str(discovered.metadata_path)
+            if discovered.metadata_path
+            else None,
             event_type=event_type,
             mlcroissant_valid=mlcroissant_valid,
             schema_valid=schema_valid,
@@ -107,13 +109,17 @@ def finish_registration(
         )
         return replace(
             stored,
-            metadata_path=str(discovered.metadata_path) if discovered.metadata_path else None,
+            metadata_path=str(discovered.metadata_path)
+            if discovered.metadata_path
+            else None,
         )
 
     stored = store.mark_registration_valid(
         registration_id=registration.registration_id,
         metadata=discovered.metadata,
-        metadata_path=str(discovered.metadata_path) if discovered.metadata_path else None,
+        metadata_path=str(discovered.metadata_path)
+        if discovered.metadata_path
+        else None,
         profile_version=discovered.validation.profile_version,
         uniqueness_key=_build_uniqueness_key(
             discovered.metadata,
@@ -124,7 +130,9 @@ def finish_registration(
 
     return replace(
         stored,
-        metadata_path=str(discovered.metadata_path) if discovered.metadata_path else None,
+        metadata_path=str(discovered.metadata_path)
+        if discovered.metadata_path
+        else None,
     )
 
 

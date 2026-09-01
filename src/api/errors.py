@@ -7,7 +7,6 @@ from fastapi import HTTPException, status
 from src.core.registration.errors import DuplicateRegistrationError
 from src.core.shared.errors import InvalidRepoURLError
 
-
 # ===========================================================
 # Error Mapping
 # ===========================================================

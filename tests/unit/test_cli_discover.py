@@ -10,7 +10,6 @@ from cli import app
 from src.core.shared.constants import STANDARD_CONTEXT
 from tests.support.croissant_fixtures import sample_dataset_document
 
-
 runner = CliRunner()
 
 

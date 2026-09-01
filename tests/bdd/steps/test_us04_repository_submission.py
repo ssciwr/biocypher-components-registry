@@ -9,7 +9,6 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from src.core.adapter.request import AdapterRegistrationRequest
 from src.core.adapter.service import create_registration_request
 
-
 scenarios("../features/us04_repository_submission.feature")
 
 

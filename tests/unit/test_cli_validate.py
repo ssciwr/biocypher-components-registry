@@ -10,7 +10,6 @@ from cli import app
 from src.core.adapter.document import build_adapter_creator, build_adapter_document
 from src.core.shared.constants import STANDARD_CONTEXT
 
-
 runner = CliRunner()
 
 

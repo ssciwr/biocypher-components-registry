@@ -75,7 +75,7 @@ class AdapterRegistrationRequest:
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_login: GitHub login for browser submissions.
+        submitted_by_github_user_id: GitHub user id for browser submissions.
     """
 
     adapter_name: str
@@ -87,7 +87,7 @@ class AdapterRegistrationRequest:
     license_value: str | None = None
     doi: str | None = None
     cff_url: str | None = None
-    submitted_by_github_login: str | None = None
+    submitted_by_github_user_id: str | None = None
 
     @property
     def repository_path(self) -> Path | None:

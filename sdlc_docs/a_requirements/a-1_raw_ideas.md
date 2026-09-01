@@ -17,7 +17,7 @@ considered proper requirements.
 
 3. Registry maintainers define a single validation schema that all croissant.jsonld files must satisfy.
     - Reviewed by human: Yes
-  
+
 4. To register an adapter, the adapter maintainer submits the adapter repository to the registry system. The system locates croissant.jsonld and performs validation.
     - Reviewed by human: Yes
 

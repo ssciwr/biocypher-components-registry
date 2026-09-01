@@ -1,12 +1,12 @@
 """Unit tests for src/core/workspace/client_loop.py — no network, no API key."""
 
 import json
-from types import SimpleNamespace
+import time
+from contextlib import asynccontextmanager
 
 import pytest
-
 from conftest import run
-
+from mcp.types import CallToolResult, TextContent, Tool
 
 # ---------------------------------------------------------------- config
 
@@ -44,6 +44,61 @@ def test_mcp_headers(monkeypatch, cl):
     assert cl.mcp_headers() == {}
     monkeypatch.setenv("BIOCYPHER_MCP_AUTH_HEADER", "Bearer abc")
     assert cl.mcp_headers() == {"Authorization": "Bearer abc"}
+
+
+# ----------------------------------------------------- MCP session bootstrap
+
+
+class _FakeMcpClientSession:
+    """Stands in for mcp.ClientSession; records what it was constructed with."""
+
+    def __init__(self, read, write):
+        self.read = read
+        self.write = write
+        self.initialized = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def initialize(self):
+        self.initialized = True
+
+
+def test_open_mcp_session_unpacks_two_tuple_stream(monkeypatch, cl):
+    """Regression test for the mcp>=2.0 upgrade: streamable_http_client's
+    context manager yields a 2-tuple (read_stream, write_stream), not 3. A
+    3-way unpack here crashes every real connection with ValueError — this
+    fakes the connector at the same shape the real mcp package uses, so it
+    fails the way production would if the unpack regresses.
+    """
+
+    @asynccontextmanager
+    async def fake_create_mcp_http_client(headers):
+        assert headers == {"Authorization": "Bearer tok"}
+        yield "http-client-sentinel"
+
+    @asynccontextmanager
+    async def fake_streamable_http_client(url, http_client):
+        assert url == "http://mcp.example"
+        assert http_client == "http-client-sentinel"
+        yield ("read-stream", "write-stream")
+
+    monkeypatch.setattr(cl, "create_mcp_http_client", fake_create_mcp_http_client)
+    monkeypatch.setattr(cl, "streamable_http_client", fake_streamable_http_client)
+    monkeypatch.setattr(cl, "ClientSession", _FakeMcpClientSession)
+
+    async def scenario():
+        async with cl.open_mcp_session(
+            "http://mcp.example", {"Authorization": "Bearer tok"}
+        ) as session:
+            assert isinstance(session, _FakeMcpClientSession)
+            assert session.initialized
+            assert (session.read, session.write) == ("read-stream", "write-stream")
+
+    run(scenario())
 
 
 # --------------------------------------------------------------- secrets
@@ -178,9 +233,9 @@ def test_edit_file(workspace, cl):
 
 
 def _mcp_result(text=None, structured=None, is_error=False):
-    content = [SimpleNamespace(type="text", text=t) for t in (text or [])]
-    return SimpleNamespace(
-        structuredContent=structured, content=content, isError=is_error
+    content = [TextContent(type="text", text=t) for t in (text or [])]
+    return CallToolResult(
+        content=content, structured_content=structured, is_error=is_error
     )
 
 
@@ -211,10 +266,10 @@ class FakeSession:
 
 
 def _tool_def(name="my_tool"):
-    return SimpleNamespace(
+    return Tool(
         name=name,
         description="desc",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {"q": {"type": "string"}},
         },
@@ -286,6 +341,16 @@ def test_run_command_runs_in_workspace_root(workspace, cl):
 def test_run_command_timeout(workspace, cl):
     out = run(cl.run_command.call({"command": "sleep 5", "timeout_seconds": 1}))
     assert out == "[tool error] command timed out after 1s"
+
+
+def test_run_command_timeout_kills_child_processes(workspace, cl):
+    marker = workspace / "child_survived"
+    command = "sh -c 'sleep 2; touch child_survived' & wait"
+    out = run(cl.run_command.call({"command": command, "timeout_seconds": 1}))
+    time.sleep(2.2)
+    assert out.startswith("[tool error]")
+    assert "timed out after 1s" in out
+    assert not marker.exists()
 
 
 def test_run_command_merges_stderr(workspace, cl):

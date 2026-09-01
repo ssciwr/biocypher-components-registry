@@ -20,7 +20,7 @@ def test_latest_adapter_uses_github_repository_owner_avatar(tmp_path: Path) -> N
         adapter_id="example-adapter",
         adapter_name="Example Adapter",
         repository_location="https://github.com/biocypher/example",
-        submitted_by_github_login="submitter",
+        submitted_by_github_user_id="12345",
     )
     payload = create_adapter_client(store).get("/api/v1/adapters/latest").json()
     item = payload["items"][0]
@@ -52,7 +52,9 @@ def test_latest_adapter_uses_gitlab_repository_owner(
 
     assert "maintainers" not in item
     assert maintainer["username"] == "gitlab-org"
-    assert maintainer["avatar_url"] == "https://gitlab.com/api/v4/groups/gitlab-org/avatar"
+    assert (
+        maintainer["avatar_url"] == "https://gitlab.com/api/v4/groups/gitlab-org/avatar"
+    )
     assert maintainer["profile_url"] == "https://gitlab.com/gitlab-org"
 
 

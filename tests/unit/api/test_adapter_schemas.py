@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -8,11 +8,13 @@ from src.api.schemas.adapters import (
     AdapterDetailResponse,
     AdapterLatestItemResponse,
     AdapterMaintainerResponse,
-    data_sources_from_metadata,
     _repository_url,
 )
-from src.core.registration.models import RegistryEntry, RegistrationStatus, StoredRegistration
-
+from src.core.registration.models import (
+    RegistrationStatus,
+    RegistryEntry,
+    StoredRegistration,
+)
 
 # ===========================================================
 # Adapter Schema Tests
@@ -77,16 +79,29 @@ def test_repository_maintainer_ignores_incomplete_repository_locations() -> None
     """
     assert AdapterMaintainerResponse.from_repository_location(None) is None
     assert AdapterMaintainerResponse.from_repository_location("not-a-url") is None
-    assert AdapterMaintainerResponse.from_repository_location("https://gitlab.com/org") is None
+    assert (
+        AdapterMaintainerResponse.from_repository_location("https://gitlab.com/org")
+        is None
+    )
 
 
 def test_adapter_items_use_singular_maintainer_and_keywords() -> None:
     """
     Cover adapter display responses with a string keyword list.
     """
-    now = datetime.now(timezone.utc)
-    entry = RegistryEntry("e1", "r1", "Example", "example::1.0", now, now, {"keywords": "a, b,, "})
-    registration = StoredRegistration("r1", "Example", "example", "github.com/org/repo", "remote", RegistrationStatus.VALID, now)
+    now = datetime.now(UTC)
+    entry = RegistryEntry(
+        "e1", "r1", "Example", "example::1.0", now, now, {"keywords": "a, b,, "}
+    )
+    registration = StoredRegistration(
+        "r1",
+        "Example",
+        "example",
+        "github.com/org/repo",
+        "remote",
+        RegistrationStatus.VALID,
+        now,
+    )
     latest_item = AdapterLatestItemResponse.from_entry(entry, registration, 2, True)
     detail_item = AdapterDetailResponse.from_entries("example", [entry], registration)
 

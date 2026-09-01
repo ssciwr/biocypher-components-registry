@@ -30,9 +30,7 @@ def validate_adapter(data: dict[str, Any]) -> ValidationResult:
     validator = validator_cls(schema)
 
     mlcroissant_errors = validate_with_mlcroissant(data)
-    schema_errors = [
-        _format_error(err) for err in validator.iter_errors(data)
-    ]
+    schema_errors = [_format_error(err) for err in validator.iter_errors(data)]
     semantic_errors = _semantic_errors(data)
     checks = [
         ValidationCheck(
@@ -54,9 +52,7 @@ def validate_adapter(data: dict[str, Any]) -> ValidationResult:
 
     errors: list[str] = []
     errors.extend(mlcroissant_errors)
-    errors.extend(
-        schema_errors
-    )
+    errors.extend(schema_errors)
     errors.extend(semantic_errors)
 
     return ValidationResult(
@@ -169,9 +165,7 @@ def _record_node_id(
 
 def _is_node_definition(node: dict[str, Any]) -> bool:
     keys = set(node)
-    if keys == {"@id"}:
-        return False
-    return True
+    return keys != {"@id"}
 
 
 def _file_object_reference_errors(data: dict[str, Any]) -> list[str]:
@@ -189,7 +183,9 @@ def _file_object_reference_errors(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _dataset_file_object_errors(dataset_index: int, dataset: dict[str, Any]) -> list[str]:
+def _dataset_file_object_errors(
+    dataset_index: int, dataset: dict[str, Any]
+) -> list[str]:
     """Validate ``fileObject`` references for every recordSet in a dataset."""
     dataset_name = str(dataset.get("name") or f"dataset[{dataset_index}]")
     distribution_ids = _distribution_ids(dataset)

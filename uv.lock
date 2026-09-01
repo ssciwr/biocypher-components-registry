@@ -231,11 +231,11 @@ performance = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.69" },
+    { name = "anthropic", specifier = ">=0.121,<1" },
     { name = "croissant-baker", git = "https://github.com/MIT-LCP/croissant-baker.git?rev=main" },
     { name = "fastapi", specifier = ">=0.136.0" },
     { name = "jsonschema", specifier = ">=4.23.0" },
-    { name = "mcp", specifier = ">=1.9" },
+    { name = "mcp", specifier = ">=2.0,<3" },
     { name = "mlcroissant", specifier = ">=1.0.22" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "prompt-toolkit" },

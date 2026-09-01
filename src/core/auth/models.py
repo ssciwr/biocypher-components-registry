@@ -9,4 +9,4 @@ from dataclasses import dataclass
 class AuthSession:
     """Current authenticated GitHub session."""
 
-    github_login: str
+    github_user_id: str

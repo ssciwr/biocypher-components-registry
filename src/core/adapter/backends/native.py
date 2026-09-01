@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from copy import deepcopy
 import json
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from src.core.adapter.request import AdapterGenerationRequest
 from src.core.adapter.backends.base import AdapterGenerator
 from src.core.adapter.document import (
     build_adapter_creator,
     build_adapter_document,
 )
-from src.core.dataset.service import execute_request as execute_dataset_request
+from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationResult
+from src.core.dataset.service import execute_request as execute_dataset_request
 from src.core.shared.creators import parse_adapter_creator_string
 from src.core.shared.errors import GeneratorError
 from src.core.shared.ids import slugify_identifier

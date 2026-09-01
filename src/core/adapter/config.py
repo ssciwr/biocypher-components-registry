@@ -48,7 +48,8 @@ def build_adapter_request_from_mapping(
     _apply_default_creators(generated_datasets, creators)
 
     return AdapterGenerationRequest(
-        output_path=output_override or str(adapter.get("output", "croissant_adapter.jsonld")),
+        output_path=output_override
+        or str(adapter.get("output", "croissant_adapter.jsonld")),
         name=required_string(adapter, "name"),
         description=required_string(adapter, "description"),
         version=required_string(adapter, "version"),
@@ -62,7 +63,9 @@ def build_adapter_request_from_mapping(
         validate=bool(raw.get("validate", adapter.get("validate", True))),
         creators=creators,
         keywords=keywords,
-        adapter_id=optional_string(adapter, "adapter_id", fallback_keys=("adapter-id",)),
+        adapter_id=optional_string(
+            adapter, "adapter_id", fallback_keys=("adapter-id",)
+        ),
         dataset_generator=dataset_generator,
         generated_datasets=generated_datasets,
     )
@@ -117,7 +120,9 @@ def _apply_dataset_entry(
         raise typer.BadParameter("Dataset mode must be one of: existing, generate.")
 
 
-def _resolve_creators_and_keywords(adapter: dict[str, Any]) -> tuple[list[str], list[str]]:
+def _resolve_creators_and_keywords(
+    adapter: dict[str, Any],
+) -> tuple[list[str], list[str]]:
     """Parse and validate adapter creators and keywords."""
     creators = parse_creator_strings(adapter.get("creators", []))
     keywords = parse_keyword_list(adapter.get("keywords", []))
@@ -208,21 +213,16 @@ def parse_creator_strings(value: object) -> list[str]:
                 or optional_string(entry, "type")
                 or "Person"
             )
-            affiliation = optional_string(entry, "affiliation") or optional_string(entry, "affiliations") or ""
+            affiliation = (
+                optional_string(entry, "affiliation")
+                or optional_string(entry, "affiliations")
+                or ""
+            )
             email = optional_string(entry, "email") or ""
             url = optional_string(entry, "url") or ""
             identifier = optional_string(entry, "identifier") or ""
             creators.append(
-                "|".join(
-                    [
-                        creator_type,
-                        name,
-                        affiliation,
-                        email,
-                        url,
-                        identifier,
-                    ]
-                )
+                f"{creator_type}|{name}|{affiliation}|{email}|{url}|{identifier}"
             )
         else:
             raise typer.BadParameter("Each creator must be a string or mapping.")

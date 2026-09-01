@@ -16,7 +16,6 @@ from src.core.dataset.backends.croissant_baker import (
 from src.core.dataset.backends.native import NativeDatasetGenerator
 from src.core.shared.errors import UnsupportedGeneratorError
 
-
 GENERATOR_HANDLERS: dict[str, Callable[[], DatasetGenerator]] = {
     "auto": AutoDatasetGenerator,
     "croissant-baker": CroissantBakerGenerator,
@@ -38,6 +37,7 @@ def resolve_generator(name: str) -> DatasetGenerator:
 def list_generators() -> list[str]:
     """Return the registered dataset generator names."""
     return sorted(GENERATOR_HANDLERS)
+
 
 __all__ = [
     "AutoDatasetGenerator",

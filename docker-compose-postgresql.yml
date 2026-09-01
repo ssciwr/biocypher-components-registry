@@ -31,8 +31,13 @@ services:
     environment:
       # PostgreSQL connection string
       DATABASE_URL: "postgresql://${POSTGRES_USER:-biocypher}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@database:5432/${POSTGRES_DB:-biocypher_registry}"
+      # Agentic workspace API (src/api/routers/workspace.py): per-session
+      # directories live on their own persisted volume.
+      AGENT_WORKSPACES_ROOT: /app/data/workspaces
     ports:
       - "8000:8000"
+    volumes:
+      - biocypher-workspaces-data:/app/data/workspaces
     depends_on:
       database:
         condition: service_healthy
@@ -87,4 +92,7 @@ networks:
 volumes:
   # PostgreSQL data directory
   biocypher-postgres-data:
+    driver: local
+  # Agentic workspace session directories
+  biocypher-workspaces-data:
     driver: local

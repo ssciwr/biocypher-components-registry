@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import replace
-import json
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import typer
 
-from src.core.dataset.request import GenerationRequest
 from src.core.dataset.backends import list_generators, resolve_generator
 from src.core.dataset.backends.croissant_baker import (
     build_croissant_baker_command as _build_croissant_baker_command,
 )
-from src.core.dataset.request import GenerationResult
+from src.core.dataset.request import GenerationRequest, GenerationResult
 from src.core.shared.errors import GeneratorError
 
 
@@ -48,7 +47,9 @@ def execute_request(
     ensure_supported_generator(generator)
     try:
         resolved = resolve_generator(generator)
-        if getattr(resolved, "name", "") == "croissant-baker" and hasattr(resolved, "executable"):
+        if getattr(resolved, "name", "") == "croissant-baker" and hasattr(
+            resolved, "executable"
+        ):
             resolved.executable = executable
         return _with_distribution_metadata(
             result=resolved.generate(request=request),

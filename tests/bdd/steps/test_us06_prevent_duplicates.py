@@ -11,7 +11,6 @@ from src.core.registration.errors import DuplicateRegistrationError
 from src.core.registration.service import finish_registration, submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
-
 scenarios("../features/us06_prevent_duplicates.feature")
 
 

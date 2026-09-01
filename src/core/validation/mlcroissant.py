@@ -27,9 +27,7 @@ def _parse_validation_error(message: str) -> list[str]:
     """Split an ``mlcroissant`` error block into individual messages."""
     lines = [line.rstrip() for line in message.splitlines() if line.strip()]
     bullet_errors = [
-        line.strip()[3:]
-        for line in lines
-        if line.strip().startswith("-  ")
+        line.strip()[3:] for line in lines if line.strip().startswith("-  ")
     ]
     if bullet_errors:
         return bullet_errors

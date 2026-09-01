@@ -1,7 +1,7 @@
 # User Stories
 
 - ## [10.03.2026]
-  
+
 #### US-01 Adapter metadata file exists
 
 **As an** adapter maintainer

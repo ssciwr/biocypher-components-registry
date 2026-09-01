@@ -28,11 +28,15 @@ def test_distribution_metadata_updates_file_backed_result(tmp_path: Path) -> Non
     written = json.loads(output_path.read_text(encoding="utf-8"))
 
     assert (
-        result.document["distribution"][0]["contentUrl"] # new in the metadata generator PR
+        result.document["distribution"][0][
+            "contentUrl"
+        ]  # new in the metadata generator PR
         == "https://example.org/people.csv"
     )
     assert result.document["distribution"][0]["name"] == "people.csv"
-    assert written["distribution"][0]["sha256"] == "abc123" # new in the metadata generator PR
+    assert (
+        written["distribution"][0]["sha256"] == "abc123"
+    )  # new in the metadata generator PR
 
 
 # If the user did not provide custom meta data sha/name, check that the document does not change at all (the final equality check)
@@ -46,12 +50,19 @@ def test_distribution_metadata_skips_requests_without_overrides() -> None:
     )
 
     assert updated is result
-    assert "sha256" not in updated.document["distribution"] # not added as not specified
-    assert updated.document == document # document is the same, unchanged which implies the above two, but the above two are more explicit aobut what this should do.
+    assert (
+        "sha256" not in updated.document["distribution"]
+    )  # not added as not specified
+    assert (
+        updated.document == document
+    )  # document is the same, unchanged which implies the above two, but the above two are more explicit aobut what this should do.
     assert updated.document["distribution"]["name"] == "data.csv"
 
+
 # Check for no document/no file case, and for existing distribution case
-def test_distribution_metadata_handles_missing_and_existing_dataset_processing_paths() -> None:
+def test_distribution_metadata_handles_missing_and_existing_dataset_processing_paths() -> (
+    None
+):
     request = GenerationRequest(
         input_path="data.csv", output_path="", filename="people.csv"
     )

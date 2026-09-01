@@ -12,9 +12,10 @@ from src.core.dataset.request import GenerationRequest
 Native backend is the Python metadata generator itself that manually creates the meta data in python
 By comparison, croissant-baker runs directly"""
 
+
 # Covers API creator maps and helper fallbacks
 def test_native_generator_maps_api_creators_and_helper_fallbacks(
-        tmp_path: Path,
+    tmp_path: Path,
 ) -> None:
     creators = native_backend._build_creators(
         [
@@ -91,4 +92,3 @@ def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
 
     assert "Missing license; using 'UNKNOWN'." in result.stderr
     assert "Missing dataset version; using '0.1.0'." in result.stderr
-

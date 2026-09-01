@@ -3,18 +3,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
-from src.api.routers import metadata as metadata_router
 from src.api.app import create_app
+from src.api.routers import metadata as metadata_router
 from src.api.schemas.metadata import (
     ADAPTER_METADATA_GENERATE_EXAMPLE,
     METADATA_VALIDATE_DATASET_EXAMPLE,
 )
 from src.core.adapter.document import build_adapter_creator, build_adapter_document
 from src.core.dataset.request import GenerationResult
-
 
 METADATA_VALIDATE_PATH = "/api/v1/metadata/validate"
 DATASET_GENERATE_PATH = "/api/v1/metadata/datasets/generate"

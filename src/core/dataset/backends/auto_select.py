@@ -23,7 +23,9 @@ class AutoDatasetGenerator(DatasetGenerator):
         selected_generator, reason = select_generator_for_request(request)
         result = selected_generator.generate(request)
 
-        delegate_name = getattr(selected_generator, "name", selected_generator.__class__.__name__)
+        delegate_name = getattr(
+            selected_generator, "name", selected_generator.__class__.__name__
+        )
         selection_lines = [
             f"Auto-selected generator: {delegate_name}",
             f"Reason: {reason}",
