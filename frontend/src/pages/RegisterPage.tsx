@@ -1,8 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
+import { RepositoryUrlInput } from '../components/RepositoryUrlInput'
 import {
-  checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet,
   createRegistrationApiV1RegistrationsPost,
   processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
   revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
@@ -47,25 +47,15 @@ type InlineStatusDisplay = Readonly<{
   text: string
 }>
 
-type MetadataCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
 type DoiCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'error'
 
 const draftKey = 'bcr-register-draft'
 const submitAfterAuthKey = 'bcr-register-submit-after-auth'
-const httpsUrlPattern = /^https:\/\/.+/i
 const pendingStatusIcon = (
   <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
 )
 const checkStatusIcon = <CheckIcon className="h-5 w-5" aria-hidden="true" />
 const failedStatusIcon = <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-const blockedStatusIcon = <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
-const metadataCheckDisplays: Record<MetadataCheckStatus, InlineStatusDisplay> = {
-  idle: { className: 'text-blue-700', icon: pendingStatusIcon, text: 'Checking Croissant file' },
-  checking: { className: 'text-blue-700', icon: pendingStatusIcon, text: 'Checking Croissant file' },
-  found: { className: 'text-emerald-600', icon: checkStatusIcon, text: 'Croissant file found at repository root' },
-  missing: { className: 'text-red-600', icon: failedStatusIcon, text: "Croissant file not found at this repository link's root" },
-  blocked: { className: 'text-red-600', icon: blockedStatusIcon, text: 'Could not check Croissant file' },
-}
 const doiCheckDisplays: Record<DoiCheckStatus, InlineStatusDisplay> = {
   idle: { className: 'text-blue-700', icon: failedStatusIcon, text: 'checking Crossref' },
   checking: { className: 'text-blue-700', icon: pendingStatusIcon, text: 'checking Crossref' },
@@ -252,7 +242,6 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [metadataCheckStatus, setMetadataCheckStatus] = useState<MetadataCheckStatus>('idle')
   const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
@@ -260,39 +249,11 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   }
 
   const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
-  const metadataCheckDisplay = metadataCheckDisplays[metadataCheckStatus]
   const doiCheckDisplay = doiCheckDisplays[doiCheckStatus]
   const canSubmitDirectly = Boolean(authUser)
   const idleSubmitButtonText = canSubmitDirectly ? 'Register adapter' : 'Sign in with GitHub'
   const submitButtonText = status === 'idle' ? idleSubmitButtonText : submitStatusText[status]
   const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
-
-  useEffect(() => {
-    const repositoryLocation = form.repositoryLocation.trim()
-    if (!httpsUrlPattern.test(repositoryLocation)) return
-
-    const controller = new AbortController()
-
-    void checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet({
-      query: { repository_url: repositoryLocation },
-      signal: controller.signal,
-    })
-      .then((metadataResult) => {
-        if (controller.signal.aborted) return
-        if (metadataResult.error || !metadataResult.data) {
-          setMetadataCheckStatus('blocked')
-          return
-        }
-        setMetadataCheckStatus(metadataResult.data.has_croissant_file ? 'found' : 'missing')
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setMetadataCheckStatus('blocked')
-      })
-
-    return () => controller.abort()
-  }, [form.repositoryLocation])
-
 
   async function checkDoiOnBlur(value: string) {
     const doi = registrationDoiValue(value)
@@ -481,34 +442,18 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 />
               </label>
 
-              <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                <span>
-                  Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small>
-                </span>
-                <input
-                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                  aria-invalid={metadataCheckStatus === 'missing' || metadataCheckStatus === 'blocked'}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    setError(null)
-                    setMetadataCheckStatus(httpsUrlPattern.test(value.trim()) ? 'checking' : 'idle')
-                    updateField('repositoryLocation', value)
-                  }}
-                  placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
-                  required
-                  type="url"
-                  value={form.repositoryLocation}
-                />
-                {metadataCheckStatus !== 'idle' ? (
-                  <span
-                    aria-live="polite"
-                    className={`inline-flex items-center gap-2 text-sm font-medium ${metadataCheckDisplay.className}`}
-                  >
-                    {metadataCheckDisplay.icon}
-                    {metadataCheckDisplay.text}
-                  </span>
-                ) : null}
-              </label>
+              <RepositoryUrlInput
+                inputClassName="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
+                label={<>Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small></>}
+                labelClassName="grid gap-3 text-sm font-semibold text-slate-950"
+                onChange={(value) => {
+                  setError(null)
+                  updateField('repositoryLocation', value)
+                }}
+                placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
+                required
+                value={form.repositoryLocation}
+              />
 
               <label className="grid gap-3 text-sm font-semibold text-slate-950">
                 <span>License</span>

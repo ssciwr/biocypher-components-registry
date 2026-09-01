@@ -169,7 +169,8 @@ class NativeAdapterGenerator(AdapterGenerator):
 
 
 def _build_creators(raw_creators: list[str | dict[str, str]]) -> list[dict[str, Any]]:
-    """Build adapter creator objects from API JSON or legacy strings."""
+    """Build adapter creator objects from API JSON or legacy strings.
+    Providing JSON just makes it clearer what is being sent"""
     creators: list[dict[str, Any]] = []
     for raw in raw_creators:
         if isinstance(raw, dict):

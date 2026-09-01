@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { DocumentArrowUpIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { RepositoryUrlInput } from '../../components/RepositoryUrlInput'
 import {
   CreatorEditor,
   DatasetDetailsEditor,
@@ -30,6 +31,7 @@ type AdapterDetailsStepProps = Readonly<{
   creatorActionLabel: string
   creatorDraft: CreatorDraft
   form: MetadataGeneratorForm
+  isEditingCreator: boolean
   onAddCreator: () => void
   onCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
   onEditCreator: (id: string) => void
@@ -42,6 +44,7 @@ type DatasetBasicsStepProps = Readonly<{
   datasetCreatorDraft: CreatorDraft
   datasetDraft: DatasetDraft
   datasets: DatasetDraft[]
+  isEditingDatasetCreator: boolean
   onAddDatasetCreator: () => void
   onDatasetCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
   onDatasetDraftChange: (field: keyof DatasetDraft, value: string) => void
@@ -95,6 +98,7 @@ export function AdapterDetailsStep({
   creatorActionLabel,
   creatorDraft,
   form,
+  isEditingCreator,
   onAddCreator,
   onCreatorDraftChange,
   onEditCreator,
@@ -131,8 +135,9 @@ export function AdapterDetailsStep({
           required
           value={form.version}
         />
-        <TextInput
-          label="Repository URL"
+        <RepositoryUrlInput
+          checkMode="none"
+          label="Repository URL *"
           maxLength={200}
           onChange={(codeRepository) => onFormChange('codeRepository', codeRepository)}
           placeholder="Example: https://github.com/biocypher/my-awesome-adapter"
@@ -178,6 +183,8 @@ export function AdapterDetailsStep({
         <CreatorEditor
           actionLabel={creatorActionLabel}
           draft={creatorDraft}
+          isEditing={isEditingCreator}
+          nameInputName="adapter-creator-name"
           onAdd={onAddCreator}
           onChange={onCreatorDraftChange}
         />
@@ -192,6 +199,7 @@ export function DatasetBasicsStep({
   datasetCreatorDraft,
   datasetDraft,
   datasets,
+  isEditingDatasetCreator,
   onAddDatasetCreator,
   onDatasetCreatorDraftChange,
   onDatasetDraftChange,
@@ -274,6 +282,8 @@ export function DatasetBasicsStep({
               <CreatorEditor
                 actionLabel={datasetCreatorActionLabel}
                 draft={datasetCreatorDraft}
+                isEditing={isEditingDatasetCreator}
+                nameInputName="dataset-creator-name"
                 onAdd={onAddDatasetCreator}
                 onChange={onDatasetCreatorDraftChange}
               />
@@ -402,8 +412,10 @@ function SelectedItemList<TItem extends { id: string }>({
             <span className="flex gap-2">
               {onEdit ? (
                 <button
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50"
+                  aria-label={`Edit ${label}`}
+                  className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm"
                   onClick={() => onEdit(item.id)}
+                  title={`Edit ${label}`}
                   type="button"
                 >
                   <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
@@ -442,60 +454,56 @@ function DatasetOverviewTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
+    <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
           <tr>
-            <th className="px-4 py-3">Dataset</th>
+            <th className="w-44 px-4 py-3">Dataset</th>
             <th className="px-4 py-3">Description</th>
-            <th className="px-4 py-3">Source</th>
-            <th className="px-4 py-3">Actions</th>
+            <th className="w-40 px-4 py-3">Source</th>
+            <th className="w-32 px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
           {datasets.map((dataset) => {
+            const label = datasetLabel(dataset)
+            const displayLabel = label.length > 15 ? `${label.slice(0, 15)}...` : label
             let rowClass = 'bg-white'
             if (dataset.id === selectedDatasetId) {
               rowClass = 'bg-blue-50'
             }
-            let sourceDetail = dataset.input ? `Source: ${dataset.input}` : 'Generate dataset Croissant'
-            if (dataset.mode === 'upload') {
-              sourceDetail = dataset.uploadedFileName
-                ? `Croissant file: ${dataset.uploadedFileName}`
-                : 'Croissant file upload'
-            }
-
             return (
               <tr className={rowClass} key={dataset.id}>
-                <td className="px-4 py-3 font-semibold text-slate-950">
-                  {datasetLabel(dataset)}
+                <td className="w-44 whitespace-nowrap px-4 py-3 font-semibold text-slate-950" title={label}>
+                  <span className="block">{displayLabel}</span>
                 </td>
-                <td className="max-w-md px-4 py-3 text-slate-700">
-                  {dataset.description || 'No description yet'}
+                <td className="max-w-xs px-4 py-3 text-slate-700" title={dataset.description || 'No description yet'}>
+                  <span className="block truncate">{dataset.description || 'No description yet'}</span>
                 </td>
-                <td className="px-4 py-3 text-slate-700">
+                <td className="w-40 px-4 py-3 text-slate-700">
                   <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                     {dataset.mode === 'upload' ? 'Croissant file' : 'Sample file'}
                   </span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    {sourceDetail}
-                  </span>
                 </td>
-                <td className="flex gap-2 px-4 py-3">
-                  {onEdit ? (
-                    <button
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50"
-                      onClick={() => onEdit(dataset.id)}
-                      type="button"
-                    >
-                      <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
-                      Edit
-                    </button>
-                  ) : null}
-                  <RemoveItemButton
-                    label={datasetLabel(dataset)}
-                    onClick={() => onRemove(dataset.id)}
-                  />
+                <td className="w-32 px-4 py-3">
+                  <span className="flex justify-end gap-2">
+                    {onEdit ? (
+                      <button
+                        aria-label={`Edit ${label}`}
+                        className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm"
+                        onClick={() => onEdit(dataset.id)}
+                        title={`Edit ${label}`}
+                        type="button"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
+                        Edit
+                      </button>
+                    ) : null}
+                    <RemoveItemButton
+                      label={label}
+                      onClick={() => onRemove(dataset.id)}
+                    />
+                  </span>
                 </td>
               </tr>
             )
@@ -510,8 +518,9 @@ function RemoveItemButton({ label, onClick }: RemoveItemButtonProps) {
   return (
     <button
       aria-label={`Remove ${label}`}
-      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600"
+      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-sm"
       onClick={onClick}
+      title={`Remove ${label}`}
       type="button"
     >
       <TrashIcon className="h-4 w-4" aria-hidden="true" />
