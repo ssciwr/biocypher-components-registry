@@ -78,6 +78,7 @@ function addUploadedDataset() {
   cy.contains('button', 'Add dataset').click()
 }
 
+
 describe('adapter metadata generator editing', () => {
   it('auto-populates adapter id from name', () => {
     visitGenerator()
@@ -119,8 +120,11 @@ describe('adapter metadata generator editing', () => {
     addCreator('Dataset creators', 'Dataset Creator B')
     cy.contains('button', 'Add dataset').click()
     cy.wait('@generateDataset')
+    expectDatasetMetadataSection('People Dataset')
     cy.contains('label', 'Dataset name').find('input').clear().type('People Dataset Edited')
-    cy.contains('button', 'Finalize datasets - Generate Croissant Now').click()
+    cy.contains('button', 'Save this dataset').click()
+    cy.contains('tr', 'People Dataset Edited').should('be.visible')
+    cy.contains('button', 'Generate adapter Croissant file').click()
     cy.wait('@generateAdapter').then(({ request }) => {
       const dataset = request.body.dataset_documents[0]
       expect(dataset.name).to.equal('People Dataset Edited')
@@ -136,14 +140,15 @@ describe('adapter metadata generator editing', () => {
     fillAdapterStep()
     addUploadedDataset()
     cy.contains('h2', 'Dataset details').should('be.visible')
-    cy.contains('button', 'Add another dataset & Save').click()
+    cy.contains('button', 'Save this dataset').click()
+    cy.contains('button', 'Add another dataset').click()
     editDatasetRow('Uploaded Dataset')
     cy.contains('h2', 'Basic dataset info').should('be.visible')
     cy.contains('h2', 'Dataset details').should('be.visible')
-    cy.contains('button', 'Save changes').click()
+    cy.contains('button', 'Save this dataset').click()
     editDatasetRow('Uploaded Dataset')
     cy.contains('tr', 'Uploaded Dataset').should('be.visible')
-    cy.contains('button', 'Save changes').should('be.visible')
+    cy.contains('button', 'Save this dataset').should('be.visible')
     cy.contains('No datasets added yet').should('not.exist')
   })
 })
