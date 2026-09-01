@@ -537,14 +537,7 @@ export function DatasetDetailsEditor({
 
           {fields.length ? (
             <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
-                <colgroup>
-                  <col className="w-16" />
-                  <col className="w-[22%]" />
-                  <col className="w-[18%]" />
-                  <col className="w-[36%]" />
-                  <col className="w-[18%]" />
-                </colgroup>
+              <table className="w-full min-w-[760px] divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Actions</th>
@@ -568,10 +561,10 @@ export function DatasetDetailsEditor({
                           <TrashIcon className="h-4 w-4" aria-hidden="true" />
                         </button>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-950" title={field.name}>
+                      <td className="max-w-48 px-4 py-3 font-mono text-xs text-slate-950" title={field.name}>
                         <span className="block truncate">{field.name}</span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="w-44 px-4 py-3">
                         <select
                           className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
                           onChange={(event) => onFieldChange(field.id, 'dataType', event.target.value)}
@@ -592,7 +585,7 @@ export function DatasetDetailsEditor({
                           value={field.description}
                         />
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-700" title={field.example}>
+                      <td className="max-w-40 px-4 py-3 text-xs text-slate-700" title={field.example}>
                         <span className="block truncate">{field.example}</span>
                       </td>
                     </tr>
