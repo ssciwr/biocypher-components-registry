@@ -57,11 +57,23 @@ function fillAdapterStep() {
 }
 
 /*
- * AI-Generated.
+ * AI-Generated - then human-modified
  */
 function editDatasetRow(name: string) {
-  cy.contains('tr', name).within(() => {
+  getDatasetRow(name).within(() => {
     cy.contains('button', 'Edit').click()
+  })
+}
+
+function getDatasetRow(name: string) {
+  return cy.get(`td[title="${name}"]`).closest('tr')
+}
+
+function expectDatasetMetadataSection(name: string) {
+  cy.contains('h2', 'Dataset details').should('be.visible')
+  cy.get('#dataset-metadata-section').within(() => {
+    cy.contains('h3', 'Dataset metadata').should('be.visible')
+    cy.contains('label', 'Dataset name').find('input').should('have.value', name)
   })
 }
 
@@ -123,7 +135,7 @@ describe('adapter metadata generator editing', () => {
     expectDatasetMetadataSection('People Dataset')
     cy.contains('label', 'Dataset name').find('input').clear().type('People Dataset Edited')
     cy.contains('button', 'Save this dataset').click()
-    cy.contains('tr', 'People Dataset Edited').should('be.visible')
+    getDatasetRow('People Dataset Edited').should('be.visible')
     cy.contains('button', 'Generate adapter Croissant file').click()
     cy.wait('@generateAdapter').then(({ request }) => {
       const dataset = request.body.dataset_documents[0]
@@ -147,7 +159,7 @@ describe('adapter metadata generator editing', () => {
     cy.contains('h2', 'Dataset details').should('be.visible')
     cy.contains('button', 'Save this dataset').click()
     editDatasetRow('Uploaded Dataset')
-    cy.contains('tr', 'Uploaded Dataset').should('be.visible')
+    getDatasetRow('Uploaded Dataset').should('be.visible')
     cy.contains('button', 'Save this dataset').should('be.visible')
     cy.contains('No datasets added yet').should('not.exist')
   })
