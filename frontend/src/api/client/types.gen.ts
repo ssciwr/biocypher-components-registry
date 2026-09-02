@@ -41,6 +41,38 @@ export type AdapterCatalogListResponse = {
 };
 
 /**
+ * AdapterCreatorGenerateRequest
+ *
+ * Structured creator input for adapter metadata generation.
+ */
+export type AdapterCreatorGenerateRequest = {
+    /**
+     * Creator Type
+     */
+    creator_type?: 'Person' | 'Organization';
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Affiliation
+     */
+    affiliation?: string | null;
+    /**
+     * Email
+     */
+    email?: string | null;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * Identifier
+     */
+    identifier?: string | null;
+};
+
+/**
  * AdapterDataSourceResponse
  *
  * Metadata-light dataset summary embedded in adapter Croissant metadata.
@@ -160,6 +192,10 @@ export type AdapterEmbeddedDatasetGenerateRequest = {
      */
     citation?: string | null;
     /**
+     * Content Url
+     */
+    content_url?: string | null;
+    /**
      * Dataset Version
      */
     dataset_version?: string | null;
@@ -168,9 +204,21 @@ export type AdapterEmbeddedDatasetGenerateRequest = {
      */
     date_published?: string | null;
     /**
+     * Encoding Format
+     */
+    encoding_format?: string | null;
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Sha256
+     */
+    sha256?: string | null;
+    /**
      * Creators
      */
-    creators?: Array<string>;
+    creators?: Array<AdapterCreatorGenerateRequest>;
     /**
      * Extra Args
      */
@@ -311,6 +359,12 @@ export type AdapterMetadataGenerateRequest = {
      */
     dataset_paths?: Array<string>;
     /**
+     * Dataset Documents
+     */
+    dataset_documents?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
      * Generated Datasets
      */
     generated_datasets?: Array<AdapterEmbeddedDatasetGenerateRequest>;
@@ -321,7 +375,7 @@ export type AdapterMetadataGenerateRequest = {
     /**
      * Creators
      */
-    creators: Array<string>;
+    creators: Array<AdapterCreatorGenerateRequest>;
     /**
      * Keywords
      */
@@ -330,14 +384,6 @@ export type AdapterMetadataGenerateRequest = {
      * Adapter Id
      */
     adapter_id?: string | null;
-    /**
-     * Programming Language
-     */
-    programming_language?: string;
-    /**
-     * Target Product
-     */
-    target_product?: string;
     /**
      * Generator
      */
@@ -418,11 +464,17 @@ export type AuthMeResponse = {
 };
 
 /**
- * DatasetMetadataGenerateRequest
- *
- * Request body for generating dataset metadata from server-side files.
+ * Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post
  */
-export type DatasetMetadataGenerateRequest = {
+export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
+    /**
+     * File
+     */
+    file: Blob | File;
+    /**
+     * Generator
+     */
+    generator?: 'auto' | 'croissant-baker' | 'native';
     /**
      * Validate
      */
@@ -448,6 +500,10 @@ export type DatasetMetadataGenerateRequest = {
      */
     citation?: string | null;
     /**
+     * Content Url
+     */
+    content_url?: string | null;
+    /**
      * Dataset Version
      */
     dataset_version?: string | null;
@@ -456,25 +512,21 @@ export type DatasetMetadataGenerateRequest = {
      */
     date_published?: string | null;
     /**
-     * Creators
+     * Encoding Format
      */
-    creators?: Array<string>;
+    encoding_format?: string | null;
     /**
-     * Extra Args
+     * Filename
      */
-    extra_args?: Array<string>;
+    filename?: string | null;
     /**
-     * Input Path
-     *
-     * Server-side file or directory path visible to the backend process.
+     * Sha256
      */
-    input_path: string;
+    sha256?: string | null;
     /**
-     * Generator
-     *
-     * Dataset metadata generator backend.
+     * Creators Json
      */
-    generator?: 'auto' | 'croissant-baker' | 'native';
+    creators_json?: string;
 };
 
 /**
@@ -1561,7 +1613,7 @@ export type ValidateMetadataApiV1MetadataValidatePostResponses = {
 export type ValidateMetadataApiV1MetadataValidatePostResponse = ValidateMetadataApiV1MetadataValidatePostResponses[keyof ValidateMetadataApiV1MetadataValidatePostResponses];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData = {
-    body: DatasetMetadataGenerateRequest;
+    body: BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost;
     path?: never;
     query?: never;
     url: '/api/v1/metadata/datasets/generate';

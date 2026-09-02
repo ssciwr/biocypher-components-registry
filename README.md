@@ -187,7 +187,7 @@ All routes below are served under the `/api/v1` prefix.
 | GET | `/registry/refreshes/latest` | Get the latest persisted batch refresh summary |
 | POST | `/registry/refreshes` | Process all active registrations once |
 | POST | `/metadata/validate` | Validate inline adapter or dataset metadata without persisting it |
-| POST | `/metadata/datasets/generate` | Generate dataset Croissant metadata from server-side files |
+| POST | `/metadata/datasets/generate` | Generate dataset Croissant metadata from an uploaded source file |
 | POST | `/metadata/adapters/generate` | Generate adapter Croissant metadata from existing/generated datasets |
 
 Example requests:

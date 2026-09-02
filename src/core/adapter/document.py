@@ -83,8 +83,6 @@ def build_adapter_document(
     keywords: list[str],
     datasets: list[dict[str, Any]],
     adapter_id: str | None = None,
-    programming_language: str = "Python",
-    target_product: str = "BioCypher",
 ) -> dict[str, Any]:
     """Assemble a full adapter metadata document."""
     document: dict[str, Any] = {
@@ -97,8 +95,6 @@ def build_adapter_document(
         "version": version,
         "license": license_value,
         "codeRepository": code_repository,
-        "programmingLanguage": programming_language,
-        "targetProduct": target_product,
         "creator": creators,
         "keywords": keywords,
         "hasPart": datasets,

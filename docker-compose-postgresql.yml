@@ -22,6 +22,8 @@ services:
   # Tier 2: Backend Container (FastAPI + Uvicorn)
   # ===========================================================
   backend:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: Dockerfile

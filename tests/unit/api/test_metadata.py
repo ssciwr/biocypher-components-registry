@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.routers import metadata as metadata_router
 from src.api.schemas.metadata import (
     ADAPTER_METADATA_GENERATE_EXAMPLE,
-    DATASET_METADATA_GENERATE_EXAMPLE,
     METADATA_VALIDATE_DATASET_EXAMPLE,
 )
 from src.core.adapter.document import build_adapter_creator, build_adapter_document
@@ -123,16 +123,6 @@ def _valid_adapter_document() -> dict[str, object]:
     )
 
 
-def _dataset_generate_payload(
-    input_path: str,
-    **overrides: object,
-) -> dict[str, object]:
-    """Build a minimal dataset generation request body for API tests."""
-    payload: dict[str, object] = {"input_path": input_path}
-    payload.update(overrides)
-    return payload
-
-
 def _adapter_generate_payload(**overrides: object) -> dict[str, object]:
     """Build a valid minimal adapter generation request body for API tests."""
     payload: dict[str, object] = {
@@ -141,7 +131,7 @@ def _adapter_generate_payload(**overrides: object) -> dict[str, object]:
         "version": "1.0.0",
         "license": "https://opensource.org/licenses/MIT",
         "code_repository": "https://github.com/example/example-adapter",
-        "creators": ["Example Creator"],
+        "creators": [{"name": "Example Creator"}],
         "keywords": ["adapter"],
     }
     payload.update(overrides)
@@ -245,7 +235,6 @@ def test_validate_metadata_endpoint_rejects_invalid_kind() -> None:
 
 def test_generate_dataset_metadata_endpoint_returns_generated_document(
     monkeypatch,
-    tmp_path,
 ) -> None:
     """Generate dataset metadata through the API without persisting it."""
     captured: dict[str, object] = {}
@@ -253,6 +242,7 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
     def fake_execute_dataset_request(request, generator):
         captured["request"] = request
         captured["generator"] = generator
+        captured["contents"] = Path(request.input_path).read_text(encoding="utf-8")
         document = _valid_dataset_document()
         Path(request.output_path).write_text(json.dumps(document), encoding="utf-8")
         return GenerationResult(
@@ -272,22 +262,42 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
 
     response = client.post(
         DATASET_GENERATE_PATH,
-        json=_dataset_generate_payload(
-            str(tmp_path),
-            generator="native",
-            name=" Example dataset ",
-            license=" https://opensource.org/licenses/MIT ",
-            validate=True,
-        ),
+        data={
+            "creators_json": json.dumps(
+                [
+                    {
+                        "creator_type": "Person",
+                        "name": "Dataset Creator",
+                        "email": "dataset.creator@example.org",
+                        "identifier": "https://orcid.org/0000-0000-0000-0001",
+                    }
+                ]
+            ),
+            "content_url": "https://example.org/files/people.csv",
+            "encoding_format": "text/csv",
+            "filename": "people.csv",
+            "generator": "native",
+            "name": " Example dataset ",
+            "license": " https://opensource.org/licenses/MIT ",
+            "sha256": "abc123",
+            "validate": "true",
+        },
+        files={"file": ("people.csv", b"id,name\n1,Alice\n", "text/csv")},
     )
 
     assert response.status_code == 200
     payload = response.json()
     request = captured["request"]
     assert captured["generator"] == "native"
-    assert request.input_path == str(tmp_path)
+    assert captured["contents"] == "id,name\n1,Alice\n"
+    assert Path(request.input_path).name == "people.csv"
     assert request.name == "Example dataset"
     assert request.license_value == "https://opensource.org/licenses/MIT"
+    assert request.content_url == "https://example.org/files/people.csv"
+    assert request.encoding_format == "text/csv"
+    assert request.filename == "people.csv"
+    assert request.sha256 == "abc123"
+    assert request.creators[0]["email"] == "dataset.creator@example.org"
     assert payload["metadata"]["name"] == "Example dataset"
     assert payload["generator"] == "native"
     assert payload["stdout"] == "generated"
@@ -298,7 +308,6 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
 
 def test_generate_dataset_metadata_endpoint_can_skip_validation(
     monkeypatch,
-    tmp_path,
 ) -> None:
     """Allow clients to request generation without a validation payload."""
 
@@ -318,7 +327,8 @@ def test_generate_dataset_metadata_endpoint_can_skip_validation(
 
     response = client.post(
         DATASET_GENERATE_PATH,
-        json=_dataset_generate_payload(str(tmp_path), validate=False),
+        data={"validate": "false"},
+        files={"file": ("people.csv", b"id,name\n1,Alice\n", "text/csv")},
     )
 
     assert response.status_code == 200
@@ -327,7 +337,6 @@ def test_generate_dataset_metadata_endpoint_can_skip_validation(
 
 def test_generate_dataset_metadata_endpoint_returns_generator_errors(
     monkeypatch,
-    tmp_path,
 ) -> None:
     """Return 400 when the core generator cannot produce metadata."""
 
@@ -343,23 +352,43 @@ def test_generate_dataset_metadata_endpoint_returns_generator_errors(
 
     response = client.post(
         DATASET_GENERATE_PATH,
-        json=_dataset_generate_payload(str(tmp_path)),
+        files={"file": ("people.csv", b"id,name\n1,Alice\n", "text/csv")},
     )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "No supported dataset files were found."
 
 
-def test_generate_dataset_metadata_endpoint_rejects_blank_input_path() -> None:
-    """Return 422 when the dataset input path is blank after normalization."""
+def test_generate_dataset_metadata_endpoint_requires_file() -> None:
+    """Return 422 when the uploaded dataset source file is missing."""
     client = TestClient(create_app())
 
-    response = client.post(
-        DATASET_GENERATE_PATH,
-        json=_dataset_generate_payload("   "),
-    )
+    response = client.post(DATASET_GENERATE_PATH, data={"generator": "native"})
 
     assert response.status_code == 422
+
+
+# Covers compact helper edges for metadata upload/generation routing.
+def test_metadata_helpers_handle_parse_edges_and_file_fallback(tmp_path: Path) -> None:
+    output_path = tmp_path / "metadata.jsonld"
+    output_path.write_text('{"name": "from-file"}', encoding="utf-8")
+    with pytest.raises(metadata_router.HTTPException) as error:
+        metadata_router._parse_creators_json("{}")
+
+    assert (
+        metadata_router._resolve_validation_kind(
+            "auto", {"@type": "SoftwareSourceCode"}
+        )
+        == "adapter"
+    )
+    assert metadata_router._parse_creators_json(" ") == []
+    assert (
+        metadata_router._load_generated_metadata(
+            document=None, output_path=output_path
+        )["name"]
+        == "from-file"
+    )
+    assert error.value.status_code == 422
 
 
 # ===========================================================
@@ -399,15 +428,34 @@ def test_generate_adapter_metadata_endpoint_returns_generated_document(
             name=" Example Adapter ",
             description=" Example adapter ",
             dataset_paths=[str(tmp_path / "dataset.jsonld")],
+            dataset_documents=[
+                {
+                    "@type": "sc:Dataset",
+                    "name": "Uploaded Dataset",
+                }
+            ],
             generated_datasets=[
                 {
                     "input": str(tmp_path / "data"),
                     "name": "Generated Dataset",
                     "license": "https://opensource.org/licenses/MIT",
+                    "creators": [
+                        {
+                            "creator_type": "Person",
+                            "name": "Dataset Creator",
+                            "identifier": "https://orcid.org/0000-0000-0000-0001",
+                        }
+                    ],
                 }
             ],
             creators=[
-                "Person|Example Creator|Example Lab||https://example.org|https://orcid.org/0000-0000-0000-0000"
+                {
+                    "creator_type": "Person",
+                    "name": "Example Creator",
+                    "affiliation": "Example Lab",
+                    "url": "https://example.org",
+                    "identifier": "https://orcid.org/0000-0000-0000-0000",
+                }
             ],
             keywords=["adapter", "biocypher"],
             dataset_generator="native",
@@ -421,9 +469,13 @@ def test_generate_adapter_metadata_endpoint_returns_generated_document(
     assert captured["generator"] == "native"
     assert request.name == "Example Adapter"
     assert request.dataset_paths == [str(tmp_path / "dataset.jsonld")]
+    assert request.dataset_documents[0]["name"] == "Uploaded Dataset"
     assert request.dataset_generator == "native"
+    assert request.creators[0]["url"] == "https://example.org"
+    assert request.creators[0]["identifier"] == "https://orcid.org/0000-0000-0000-0000"
     assert request.generated_datasets[0].input_path == str(tmp_path / "data")
     assert request.generated_datasets[0].name == "Generated Dataset"
+    assert request.generated_datasets[0].creators[0]["name"] == "Dataset Creator"
     assert payload["metadata"]["name"] == "Example Adapter"
     assert payload["generator"] == "native"
     assert payload["dataset_generator"] == "native"
@@ -497,7 +549,7 @@ def test_generate_adapter_metadata_endpoint_rejects_blank_required_lists() -> No
     response = client.post(
         ADAPTER_GENERATE_PATH,
         json=_adapter_generate_payload(
-            creators=["   "],
+            creators=[{"name": "   "}],
             keywords=[""],
         ),
     )
@@ -521,7 +573,14 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
             description="Adapter metadata generated through the API.",
             code_repository="https://github.com/example/people-adapter",
             creators=[
-                "Person|Example Creator|Example Lab|||https://orcid.org/0000-0000-0000-0000"
+                {
+                    "creator_type": "Person",
+                    "name": "Example Creator",
+                    "affiliation": "Example Lab",
+                    "email": "creator@example.org",
+                    "url": "https://example.org/creator",
+                    "identifier": "https://orcid.org/0000-0000-0000-0000",
+                }
             ],
             keywords=["adapter", "biocypher"],
             dataset_generator="native",
@@ -533,9 +592,20 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
                     "url": "https://example.org/people",
                     "license": "https://opensource.org/licenses/MIT",
                     "citation": "https://example.org/people",
+                    "content_url": "https://example.org/files/people.csv",
                     "dataset_version": "1.0.0",
                     "date_published": "2026-04-17",
-                    "creators": ["Person|Dataset Creator"],
+                    "encoding_format": "text/csv",
+                    "filename": "people-source.csv",
+                    "sha256": "abc123",
+                    "creators": [
+                        {
+                            "creator_type": "Person",
+                            "name": "Dataset Creator",
+                            "email": "dataset.creator@example.org",
+                            "identifier": "https://orcid.org/0000-0000-0000-0001",
+                        }
+                    ],
                 }
             ],
             validate=True,
@@ -547,8 +617,24 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
     metadata = payload["metadata"]
     assert metadata["@type"] == "SoftwareSourceCode"
     assert metadata["name"] == "People Adapter"
+    assert metadata["creator"][0]["email"] == "creator@example.org"
+    assert metadata["creator"][0]["url"] == "https://example.org/creator"
+    assert (
+        metadata["creator"][0]["identifier"] == "https://orcid.org/0000-0000-0000-0000"
+    )
     assert metadata["hasPart"][0]["name"] == "People Dataset"
-    assert metadata["hasPart"][0]["distribution"][0]["name"] == "people.csv"
+    assert (
+        metadata["hasPart"][0]["creator"][0]["email"] == "dataset.creator@example.org"
+    )
+    assert (
+        metadata["hasPart"][0]["creator"][0]["identifier"]
+        == "https://orcid.org/0000-0000-0000-0001"
+    )
+    distribution = metadata["hasPart"][0]["distribution"][0]
+    assert distribution["contentUrl"] == "https://example.org/files/people.csv"
+    assert distribution["encodingFormat"] == "text/csv"
+    assert distribution["name"] == "people-source.csv"
+    assert distribution["sha256"] == "abc123"
     assert payload["generator"] == "native"
     assert payload["dataset_generator"] == "native"
     assert payload["validation"]["kind"] == "adapter"
@@ -560,10 +646,8 @@ def test_metadata_generation_openapi_examples_are_available() -> None:
     schema = create_app().openapi()
     schemas = schema["components"]["schemas"]
 
-    dataset_example = schemas["DatasetMetadataGenerateRequest"]["example"]
     adapter_example = schemas["AdapterMetadataGenerateRequest"]["example"]
     validation_example = schemas["MetadataValidationRequest"]["example"]
 
-    assert dataset_example == DATASET_METADATA_GENERATE_EXAMPLE
     assert adapter_example == ADAPTER_METADATA_GENERATE_EXAMPLE
     assert validation_example == METADATA_VALIDATE_DATASET_EXAMPLE

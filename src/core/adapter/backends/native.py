@@ -34,7 +34,11 @@ class NativeAdapterGenerator(AdapterGenerator):
 
     def generate(self, request: AdapterGenerationRequest) -> GenerationResult:
         """Build, serialize, and optionally validate adapter metadata."""
-        datasets = [self._load_dataset(path) for path in request.dataset_paths]
+        datasets = [
+            self._load_dataset_document(document)
+            for document in request.dataset_documents
+        ]
+        datasets.extend(self._load_dataset(path) for path in request.dataset_paths)
         dataset_reports: list[str] = []
         for dataset_index, dataset_request in enumerate(
             request.generated_datasets, start=1
@@ -68,8 +72,6 @@ class NativeAdapterGenerator(AdapterGenerator):
             keywords=request.keywords,
             datasets=datasets,
             adapter_id=request.adapter_id,
-            programming_language=request.programming_language,
-            target_product=request.target_product,
         )
 
         output_path = Path(request.output_path)
@@ -148,25 +150,55 @@ class NativeAdapterGenerator(AdapterGenerator):
                 f"Dataset metadata file is not valid JSON: {dataset_path}"
             ) from exc
 
+        return self._load_dataset_document(document, source=str(dataset_path))
+
+    def _load_dataset_document(
+        self,
+        document: dict[str, Any],
+        *,
+        source: str = "uploaded dataset metadata",
+    ) -> dict[str, Any]:
+        """Validate and normalize one inline dataset document."""
         result = validate_dataset(document)
         if not result.is_valid:
             raise GeneratorError(
-                f"Dataset metadata file is not a valid Croissant dataset: {dataset_path}. "
+                f"Dataset metadata is not a valid Croissant dataset: {source}. "
                 + "; ".join(result.errors)
             )
         return _normalise_embedded_dataset(document)
 
 
-def _build_creators(raw_creators: list[str]) -> list[dict[str, Any]]:
-    """Parse serialized creator strings into adapter creator objects."""
+def _build_creators(raw_creators: list[str | dict[str, str]]) -> list[dict[str, Any]]:
+    """Build adapter creator objects from API JSON or legacy strings.
+    Providing JSON just makes it clearer what is being sent"""
     creators: list[dict[str, Any]] = []
     for raw in raw_creators:
+        if isinstance(raw, dict):
+            name = raw.get("name", "").strip()
+            if name:
+                identifier = (
+                    raw.get("identifier", "").strip() or raw.get("orcid", "").strip()
+                )
+                creators.append(
+                    build_adapter_creator(
+                        name=name,
+                        affiliation=raw.get("affiliation", "").strip(),
+                        email=raw.get("email", "").strip(),
+                        url=raw.get("url", "").strip(),
+                        identifier=identifier,
+                        creator_type=raw.get("creator_type", "Person").strip(),
+                    )
+                )
+            continue
+
         spec = parse_adapter_creator_string(raw)
         if spec and spec.name:
             creators.append(
                 build_adapter_creator(
                     name=spec.name,
                     affiliation=spec.affiliation,
+                    email=spec.email,
+                    url=spec.url,
                     identifier=spec.identifier,
                     creator_type=spec.creator_type,
                 )

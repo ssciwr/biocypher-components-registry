@@ -48,6 +48,7 @@ def build_creator(
     url: str = "",
     email: str = "",
     affiliation: str = "",
+    identifier: str = "",
     creator_type: str = "Person",
 ) -> dict[str, Any]:
     """Build a creator node for dataset metadata."""
@@ -63,6 +64,8 @@ def build_creator(
         creator["email"] = email
     if url:
         creator["url"] = url
+    if identifier:
+        creator["identifier"] = identifier
     return creator
 
 
