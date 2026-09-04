@@ -12,7 +12,6 @@ from src.api.routers import (
     metadata,
     registrations,
     registry,
-    workspace,
 )
 from src.api.settings import settings
 from src.core.workspace.service import SessionManager
@@ -79,11 +78,13 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         prefix=settings.api_v1_prefix,
         tags=["registry"],
     )
-    app.include_router(
+
+    """ Import workspace above and then restore this to restore workspace API:
+     app.include_router(
         workspace.router,
         prefix=settings.agent_api_prefix,
         tags=["workspace"],
-    )
+    )"""
 
     return app
 
