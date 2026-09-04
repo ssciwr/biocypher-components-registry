@@ -29,27 +29,46 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+          # The above ensures we get all existing release tags to properly create the right tag (increment etc)
 
       - name: Compute next release tag
         id: version
         shell: bash
         run: |
-          latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
-          if [ -z "$latest_tag" ]; then
-            next_tag="v0.1.0"
+          project_version="$(python3 -c 'import pathlib, tomllib; print(tomllib.load(pathlib.Path("pyproject.toml").open("rb"))["project"]["version"])')"
+          # Accept existing specified hardcoded vrsions in pyproject; especially for now to avoid updating a new image that remote could pull and update with
+          # Below is a little overcautious and can be changed back when are operate releases normally and create releases tags / promote images to release tags here at the end of this publish step in the future
+          IFS='.' read -r project_major project_minor project_patch <<< "$project_version"
+          latest_any_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
+          if [ -n "$latest_any_tag" ]; then
+            latest_any_version="${latest_any_tag#v}"
+            IFS='.' read -r latest_any_major latest_any_minor _latest_any_patch <<< "$latest_any_version"
+            if [ "$latest_any_major" -gt "$project_major" ] || { [ "$latest_any_major" -eq "$project_major" ] && [ "$latest_any_minor" -gt "$project_minor" ]; }; then
+              echo "pyproject.toml project.version $project_version is behind latest release tag $latest_any_tag" >&2
+              exit 1
+            fi
+          fi
+
+          latest_project_tag="$(git tag --list "v${project_major}.${project_minor}.[0-9]*" --sort=-v:refname | head -n 1)"
+          if [ -z "$latest_project_tag" ]; then
+            next_tag="v${project_major}.${project_minor}.$((10#$project_patch + 1))"
           else
-            version="${latest_tag#v}"
-            IFS='.' read -r major minor patch <<< "$version"
-            next_tag="v${major}.${minor}.$((patch + 1))"
+            latest_project_version="${latest_project_tag#v}"
+            IFS='.' read -r _latest_project_major _latest_project_minor latest_project_patch <<< "$latest_project_version"
+            next_tag="v${project_major}.${project_minor}.$((10#$latest_project_patch + 1))"
           fi
           echo "tag=$next_tag" >> "$GITHUB_OUTPUT"
 
-      - name: Create release tag
+      - name: Validate GHCR credentials
+        shell: bash
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          if { [ -n "$GHCR_USERNAME" ] && [ -z "$GHCR_PAT" ]; } || { [ -z "$GHCR_USERNAME" ] && [ -n "$GHCR_PAT" ]; }; then
+            echo "Set both GHCR_USERNAME and GHCR_PAT, or leave both unset to use GITHUB_TOKEN." >&2
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         # docker/setup-buildx-action v4.2.0.
@@ -60,10 +79,10 @@ jobs:
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_PAT != '' && secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish backend image
+      - name: Build and publish backend SHA image
         # docker/build-push-action v7.3.0.
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
@@ -71,12 +90,11 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      - name: Build and publish frontend image
+      - name: Build and publish frontend SHA image
         # docker/build-push-action v7.3.0.
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
@@ -86,7 +104,6 @@ jobs:
           build-args: |
             VITE_API_BASE_URL=
           tags: |
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
