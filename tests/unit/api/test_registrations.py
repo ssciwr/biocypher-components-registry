@@ -138,7 +138,6 @@ def test_create_registration_endpoint_persists_registration(
     response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",
@@ -148,8 +147,8 @@ def test_create_registration_endpoint_persists_registration(
     assert response.status_code == 201
     payload = response.json()
     assert payload["registration_id"]
-    assert payload["adapter_name"] == "Example Adapter"
-    assert payload["adapter_id"] == "example-adapter"
+    assert payload["adapter_name"] == payload["adapter_id"]
+    assert len(payload["adapter_id"]) == 32
     assert payload["repository_location"] == str(repository.resolve())
     assert payload["repository_kind"] == "local"
     assert payload["status"] == "SUBMITTED"
@@ -178,7 +177,6 @@ def test_create_registration_endpoint_maps_missing_repository_to_bad_request(
     response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(missing_repository),
         },
     )
@@ -202,7 +200,6 @@ def test_get_registration_endpoint_returns_stored_registration(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",
@@ -215,8 +212,8 @@ def test_get_registration_endpoint_returns_stored_registration(
     assert response.status_code == 200
     payload = response.json()
     assert payload["registration_id"] == registration_id
-    assert payload["adapter_name"] == "Example Adapter"
-    assert payload["adapter_id"] == "example-adapter"
+    assert payload["adapter_name"] == payload["adapter_id"]
+    assert len(payload["adapter_id"]) == 32
     assert payload["repository_location"] == str(repository.resolve())
     assert payload["repository_kind"] == "local"
     assert payload["status"] == "SUBMITTED"
@@ -281,7 +278,6 @@ def test_list_registrations_endpoint_returns_active_registrations(
     first_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "First Adapter",
             "repository_location": str(first_repository),
             "license_value": "MIT",
         },
@@ -289,7 +285,6 @@ def test_list_registrations_endpoint_returns_active_registrations(
     second_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Second Adapter",
             "repository_location": str(second_repository),
             "license_value": "Apache-2.0",
         },
@@ -303,10 +298,8 @@ def test_list_registrations_endpoint_returns_active_registrations(
         first_response.json()["registration_id"],
         second_response.json()["registration_id"],
     ]
-    assert [item["adapter_name"] for item in payload["items"]] == [
-        "First Adapter",
-        "Second Adapter",
-    ]
+    assert all(item["adapter_name"] == item["adapter_id"] for item in payload["items"])
+    assert all(len(item["adapter_id"]) == 32 for item in payload["items"])
     assert [item["status"] for item in payload["items"]] == [
         "SUBMITTED",
         "SUBMITTED",
@@ -338,7 +331,6 @@ def test_list_registrations_endpoint_omits_processed_metadata(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",
@@ -421,7 +413,6 @@ def test_process_registration_endpoint_marks_registration_valid(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",
@@ -474,7 +465,6 @@ def test_process_registration_endpoint_maps_processing_failure_to_bad_request(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
         },
     )
@@ -505,7 +495,6 @@ def test_revalidate_registration_endpoint_reprocesses_corrected_invalid_source(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",
@@ -567,7 +556,6 @@ def test_revalidate_registration_endpoint_rejects_submitted_registration(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
         },
     )
@@ -603,7 +591,6 @@ def test_list_registration_events_endpoint_returns_fetch_failed_event(
     create_response = client.post(
         "/api/v1/registrations",
         json={
-            "adapter_name": "Example Adapter",
             "repository_location": str(repository),
             "license_value": "MIT",
             "doi": "10.5281/zenodo.1234567",

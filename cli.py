@@ -758,7 +758,6 @@ def seed_demo_adapters_cmd(
                 skipped += 1
                 continue
             registration = submit_registration_record(
-                adapter_name=str(spec["adapter_name"]),
                 repository_location=str(spec["repository_location"]),
                 store=store,
                 doi=spec.get("doi"),

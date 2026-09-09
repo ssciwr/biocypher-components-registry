@@ -109,7 +109,6 @@ def test_finish_registration_command_marks_registration_valid(tmp_path: Path) ->
     )
     store = SQLiteRegistrationStore(database_path)
     registration = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -145,7 +144,6 @@ def test_finish_registration_command_reports_invalid_registration(
     )
     store = SQLiteRegistrationStore(database_path)
     registration = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )

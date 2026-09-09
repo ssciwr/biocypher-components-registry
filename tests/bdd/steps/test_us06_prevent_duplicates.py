@@ -133,7 +133,6 @@ def adapter_already_stored_with_uniqueness_key(
 
     store = SQLiteRegistrationStore(duplicate_context["database_path"])
     registration = submit_registration(
-        adapter_name="OmniPath Adapter",
         repository_location=str(repo_a),
         store=store,
     )
@@ -159,7 +158,6 @@ def another_registration_uses_same_uniqueness_key(
 
     store = SQLiteRegistrationStore(duplicate_context["database_path"])
     duplicate = submit_registration(
-        adapter_name="omnipath adapter",
         repository_location=str(repo_b),
         store=store,
     )

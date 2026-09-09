@@ -126,10 +126,10 @@ def test_submit_registration_rejects_main_master_branch_duplicate(
 ) -> None:
     """Reject branch-specific URLs that resolve to the same repository root."""
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
-    first = submit_registration("Example Adapter", main_url, store)
+    first = submit_registration(main_url, store)
 
     with pytest.raises(DuplicateRegistrationError):
-        submit_registration("Example Adapter", master_url, store)
+        submit_registration(master_url, store)
     active_registrations = store.list_active_registrations()
 
     assert first.repository_location == canonical_url
@@ -145,12 +145,8 @@ def test_sqlite_store_rejects_duplicate_valid_uniqueness_key(tmp_path: Path) -> 
     repo_2 = tmp_path / "repo-2"
     repo_1.mkdir()
     repo_2.mkdir()
-    first = store.create_registration(
-        create_registration_request("OmniPath Adapter", str(repo_1))
-    )
-    second = store.create_registration(
-        create_registration_request("omnipath adapter", str(repo_2))
-    )
+    first = store.create_registration(create_registration_request(str(repo_1)))
+    second = store.create_registration(create_registration_request(str(repo_2)))
 
     store.mark_registration_valid(
         registration_id=first.registration_id,
@@ -220,8 +216,8 @@ def test_finish_registration_rejects_duplicate_valid_adapter(tmp_path: Path) -> 
         encoding="utf-8",
     )
 
-    first = submit_registration("OmniPath Adapter", str(repo_a), store)
-    second = submit_registration("omnipath adapter", str(repo_b), store)
+    first = submit_registration(str(repo_a), store)
+    second = submit_registration(str(repo_b), store)
 
     finish_registration(first.registration_id, store)
 

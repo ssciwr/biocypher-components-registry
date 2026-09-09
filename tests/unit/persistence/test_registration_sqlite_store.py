@@ -38,7 +38,6 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -64,8 +63,9 @@ def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
             """
         ).fetchone()
 
-    assert source_row == (
-        "Example Adapter",
+    assert source_row is not None
+    assert len(source_row[0]) == 32
+    assert source_row[1:] == (
         str(repository.resolve()),
         "local",
         1,
@@ -93,7 +93,6 @@ def test_sqlite_store_returns_registration_with_identifier_and_timestamp(
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -110,7 +109,6 @@ def test_sqlite_store_can_load_registration_by_identifier(tmp_path: Path) -> Non
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -131,7 +129,6 @@ def test_sqlite_store_lists_active_registrations_with_check_state(
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -165,7 +162,6 @@ def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -262,7 +258,6 @@ def test_sqlite_store_marks_registration_invalid_and_persists_errors(
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -317,7 +312,6 @@ def test_sqlite_store_lists_registration_events(tmp_path: Path) -> None:
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -348,7 +342,6 @@ def test_sqlite_store_lists_active_registry_entries(tmp_path: Path) -> None:
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -389,7 +382,6 @@ def test_sqlite_store_loads_registry_entry_by_identifier(tmp_path: Path) -> None
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)
@@ -474,7 +466,6 @@ def test_sqlite_store_get_registration_reconstructs_status_from_three_tables(
     repository = tmp_path / "adapter-repo"
     repository.mkdir()
     request = create_registration_request(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
     )
     store = SQLiteRegistrationStore(database_path)

@@ -57,3 +57,24 @@ def test_post_adapter_endorsement_requires_github_session(tmp_path: Path) -> Non
     assert response.status_code == 401
     assert response.json()["detail"] == "GitHub sign-in required."
     assert store.count_adapter_endorsements("example-adapter") == 0
+
+
+def test_delete_adapter_requires_the_submitting_github_user(tmp_path: Path) -> None:
+    """AI-Generated.
+    Remove adapters only for the account that submitted them.
+    """
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    create_adapter_entry(
+        store,
+        tmp_path / "adapter-v1",
+        adapter_id="example-adapter",
+        adapter_name="Example Adapter",
+        submitted_by_github_user_id="owner-id",
+    )
+    owner = create_adapter_client(store, github_user_id="owner-id")
+    other = create_adapter_client(store, github_user_id="other-id")
+
+    assert owner.get("/api/v1/adapters/example-adapter").json()["can_delete"] is True
+    assert other.delete("/api/v1/adapters/example-adapter").status_code == 403
+    assert owner.delete("/api/v1/adapters/example-adapter").status_code == 204
+    assert owner.get("/api/v1/adapters/example-adapter").status_code == 404

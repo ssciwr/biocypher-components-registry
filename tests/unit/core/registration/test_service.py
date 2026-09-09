@@ -57,13 +57,12 @@ def test_submit_registration_persists_created_request(tmp_path: Path) -> None:
     store: RegistrationStore = MemoryRegistrationStore()
 
     stored = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
 
-    assert stored.adapter_name == "Example Adapter"
-    assert stored.adapter_id == "example-adapter"
+    assert stored.adapter_name == stored.adapter_id
+    assert len(stored.adapter_id) == 32
     assert stored.repository_kind == "local"
     assert stored.status == RegistrationStatus.SUBMITTED
 
