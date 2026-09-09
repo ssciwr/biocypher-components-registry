@@ -30,6 +30,7 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
       <div aria-hidden={!signedIn} className={signedIn ? 'h-full' : 'pointer-events-none h-full select-none'}>
         <div className="mx-auto flex h-full min-h-0 max-w-[1600px] flex-col gap-5 px-4 py-5 sm:px-6">
           <WorkspaceTopBar
+            agentActivity={workspace.agentActivity}
             onStart={() => void workspace.startSession()}
             pending={workspace.pending}
             session={workspace.session}

@@ -14,6 +14,7 @@ import type {
 } from './types'
 
 type TopBarProps = Readonly<{
+  agentActivity: string | null
   onStart: () => void
   pending: PendingAction
   session: WorkspaceViewSession | null
@@ -32,10 +33,15 @@ type ChatPaneProps = Readonly<{
 }>
 
 // Basic status label as the agentic workspace implements
-function workspaceSessionStatusLabel(session: WorkspaceViewSession | null, pending: PendingAction) {
-  if (pending !== 'idle') return pending
+function workspaceSessionStatusLabel(
+  session: WorkspaceViewSession | null,
+  pending: PendingAction,
+  agentActivity: string | null,
+) {
   if (!session) return 'not started'
   if (session.error) return 'error'
+  if (agentActivity) return `Agent ${agentActivity}`
+  if (pending !== 'idle') return pending
   if (session.busy) return 'running'
   return session.hasLLMKey ? 'ready' : 'needs key'
 }
@@ -49,7 +55,7 @@ function messageClass(kind: WorkspaceMessage['kind']) {
 }
 
 
-export function WorkspaceTopBar({ onStart, pending, session }: TopBarProps) {
+export function WorkspaceTopBar({ agentActivity, onStart, pending, session }: TopBarProps) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -61,7 +67,9 @@ export function WorkspaceTopBar({ onStart, pending, session }: TopBarProps) {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-          {workspaceSessionStatusLabel(session, pending)}
+          <span aria-live="polite" className={agentActivity ? 'agent-status-shimmer' : undefined}>
+            {workspaceSessionStatusLabel(session, pending, agentActivity)}
+          </span>
         </span>
         {!session ? (
           <button

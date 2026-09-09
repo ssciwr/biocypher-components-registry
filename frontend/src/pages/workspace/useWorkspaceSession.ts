@@ -61,6 +61,7 @@ function applySessionState(
 }
 
 export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
+  const [agentActivity, setAgentActivity] = useState<string | null>(null)
   const [session, setSession] = useState<WorkspaceViewSession | null>(null)
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [prompt, setPrompt] = useState('')
@@ -145,6 +146,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     switch (event.event) {
       case 'session_state': {
         const errorText = typeof data.error === 'string' ? data.error : null
+        setAgentActivity(data.busy === true ? 'Working' : null)
         setSession((current) => {
           if (!current) return current
           return {
@@ -156,16 +158,22 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
         })
         return
       }
+      case 'thinking_started':
+        setAgentActivity('Thinking')
+        return
       case 'text_delta':
+        setAgentActivity('Responding')
         if (typeof data.text === 'string' && data.text) appendAssistantDelta(data.text)
         return
       case 'tool_call': {
         const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        setAgentActivity(`Using ${name}`)
         appendMessage('tool', `-> ${name}`)
         return
       }
       case 'tool_result': {
         const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        setAgentActivity(`Reviewing ${name}`)
         appendMessage('tool', `<- ${name} - ${finiteNumber(data.chars)} chars`)
         return
       }
@@ -175,9 +183,11 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
         return
       }
       case 'turn_started':
+        setAgentActivity('Thinking')
         setSession((current) => current ? { ...current, busy: true } : current)
         return
       case 'turn_done':
+        setAgentActivity(null)
         setSession((current) => current ? { ...current, busy: false } : current)
         return
       case 'turn_error':
@@ -186,12 +196,14 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
           ? data.message
           : 'Workspace turn failed.'
         // Error scenarios - alert the user in hte UI first right away
+        setAgentActivity(null)
         setSession((current) => current ? { ...current, busy: false, error: message } : current)
         appendMessage('error', message)
         return
       }
       case 'session_closed':
         appendMessage('status', 'Session closed.')
+        setAgentActivity(null)
         setSession(null)
         return
       default:
@@ -254,6 +266,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     await runPending('session', async () => {
       const created = await createWorkspaceSession()
       const nextSession = viewSession(created)
+      setAgentActivity(null)
       setSession(nextSession)
       setMessages([
         createMessage(
@@ -285,6 +298,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     appendMessage('user', content)
     await runPending('message', async () => {
       await sendWorkspaceMessage(session, content)
+      setAgentActivity('Thinking')
       setSession((current) => current ? { ...current, busy: true } : current)
     }, (message) => {
       appendMessage('error', message)
@@ -308,6 +322,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   const canSend = Boolean(session?.hasLLMKey && prompt.trim() && !session.busy)
 
   return {
+    agentActivity,
     apiKey,
     attachKey,
     canSend,
