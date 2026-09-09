@@ -65,7 +65,6 @@ def create_registration(
     """Create and persist a submitted adapter registration."""
     try:
         registration = submit_registration(
-            adapter_name=payload.adapter_name,
             repository_location=payload.repository_location,
             store=store,
             license_value=payload.license_value,

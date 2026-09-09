@@ -66,7 +66,7 @@ function readCachedAuthUser(): AuthUser | null {
 
   try {
     const user = JSON.parse(savedUser) as Partial<AuthUser>
-    return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
+    return user.authenticated === true ? { authenticated: true } : null
   } catch {
     globalThis.localStorage.removeItem(authUserKey)
     return null
@@ -100,19 +100,18 @@ function App() {
       .then((result) => {
         if (ignore) return
 
-        if (result.data) {
-          setAuthUser(result.data)
+        if (result.data?.authenticated) {
+          const authenticatedUser = { authenticated: true } as const
+          setAuthUser(authenticatedUser)
           setAuthVerified(true)
-          cacheAuthUser(result.data)
+          cacheAuthUser(authenticatedUser)
           setAuthError(null)
           return
         }
 
         setAuthVerified(false)
-        if (result.response?.status === 401) {
-          setAuthUser(null)
-          cacheAuthUser(null)
-        }
+        setAuthUser(null)
+        cacheAuthUser(null)
         setAuthError(null)
       })
       .catch((error: unknown) => {

@@ -492,16 +492,11 @@ def _resolve_github_user_id(github_user_id: str | None) -> str:
 @app.command(
     "submit",
     help=(
-        "Submit an adapter name and repository location to create a registration "
+        "Submit a repository location to create a registration "
         "request for the registry workflow."
     ),
 )
 def submit_cmd(
-    adapter_name: str = typer.Option(
-        ...,
-        "--name",
-        help="Human-readable adapter name.",
-    ),
     repository_location: str = typer.Argument(
         ...,
         help="Local repository path or supported repository URL.",
@@ -515,7 +510,6 @@ def submit_cmd(
     resolved_github_user_id = _resolve_github_user_id(github_user_id)
     try:
         request = create_registration_request(
-            adapter_name=adapter_name,
             repository_location=repository_location,
             submitted_by_github_user_id=resolved_github_user_id,
         )
@@ -538,11 +532,6 @@ def submit_cmd(
     help=("Submit and persist an adapter registration in the configured database."),
 )
 def submit_registration_cmd(
-    adapter_name: str = typer.Option(
-        ...,
-        "--name",
-        help="Human-readable adapter name.",
-    ),
     repository_location: str = typer.Argument(
         ...,
         help="Local repository path or supported repository URL.",
@@ -562,7 +551,6 @@ def submit_registration_cmd(
     try:
         store = build_registration_store(db_path)
         registration = submit_registration_record(
-            adapter_name=adapter_name,
             repository_location=repository_location,
             store=store,
             submitted_by_github_user_id=resolved_github_user_id,

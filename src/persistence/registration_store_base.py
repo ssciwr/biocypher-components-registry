@@ -7,7 +7,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.engine import Engine, RowMapping
 from sqlalchemy.exc import IntegrityError
 
@@ -107,7 +107,7 @@ class SQLAlchemyRegistrationStore:
         """Return one stored registration by identifier when it exists."""
         with self.engine.connect() as connection:
             source_row = self._source_row(connection, registration_id)
-            if source_row is None:
+            if source_row is None or not source_row["is_active"]:
                 return None
             current_entry = self._current_registry_entry(connection, registration_id)
             latest_event = self._latest_event_for_source(connection, registration_id)
@@ -232,6 +232,49 @@ class SQLAlchemyRegistrationStore:
         if row is None:
             return None
         return self._registry_entry_row_to_entry(row)
+
+    # AI-Generated.
+    #
+    # Deactivate public entries, their sources, and now-invalid endorsements.
+    def remove_adapter(self, adapter_id: str, source_ids: list[str]) -> None:
+        """Deactivate an adapter and its source registrations."""
+        removed_at = datetime.now(UTC).isoformat()
+        with self.engine.begin() as connection:
+            connection.execute(
+                update(registry_entries_table)
+                .where(
+                    registry_entries_table.c.source_id.in_(source_ids),
+                    registry_entries_table.c.is_active.is_(True),
+                )
+                .values(is_active=False, updated_at=removed_at)
+            )
+            connection.execute(
+                update(registration_sources_table)
+                .where(registration_sources_table.c.id.in_(source_ids))
+                .values(
+                    is_active=False,
+                    updated_at=removed_at,
+                    current_registry_entry_id=None,
+                )
+            )
+            connection.execute(
+                delete(adapter_endorsements_table).where(
+                    adapter_endorsements_table.c.adapter_id == adapter_id
+                )
+            )
+            for source_id in source_ids:
+                self._insert_registration_event(
+                    connection,
+                    source_id=source_id,
+                    registry_entry_id=None,
+                    event_type="REMOVED",
+                    profile_version=None,
+                    metadata_json=None,
+                    error_details=None,
+                    message="Adapter removed by its submitting GitHub account.",
+                    started_at=removed_at,
+                    finished_at=removed_at,
+                )
 
     def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         now = datetime.now(UTC).isoformat()

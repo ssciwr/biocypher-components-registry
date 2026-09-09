@@ -45,6 +45,12 @@ class RegistrationStore(Protocol):
     def get_registry_entry(self, entry_id: str) -> RegistryEntry | None:
         """Return one active canonical registry entry by identifier when it exists."""
 
+    # AI-Generated.
+    #
+    # Deactivate a publicly visible adapter while preserving its history.
+    def remove_adapter(self, adapter_id: str, source_ids: list[str]) -> None:
+        """Deactivate an adapter and the registrations that supplied it."""
+
     def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         """Persist one user's adapter endorsement idempotently."""
 
