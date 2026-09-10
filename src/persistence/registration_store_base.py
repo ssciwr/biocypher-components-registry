@@ -233,48 +233,31 @@ class SQLAlchemyRegistrationStore:
             return None
         return self._registry_entry_row_to_entry(row)
 
-    # AI-Generated.
-    #
-    # Deactivate public entries, their sources, and now-invalid endorsements.
+    # Permanently remove previous entries, sources, events, and endorsements.
+    # THis is so reregistration is possible after deletion and not blocked by Registration entries/sources, and endorsements is just to be consistent with deleting the others.
     def remove_adapter(self, adapter_id: str, source_ids: list[str]) -> None:
-        """Deactivate an adapter and its source registrations."""
-        removed_at = datetime.now(UTC).isoformat()
+        """Remove an adapter and its source registrations."""
         with self.engine.begin() as connection:
-            connection.execute(
-                update(registry_entries_table)
-                .where(
-                    registry_entries_table.c.source_id.in_(source_ids),
-                    registry_entries_table.c.is_active.is_(True),
-                )
-                .values(is_active=False, updated_at=removed_at)
-            )
-            connection.execute(
-                update(registration_sources_table)
-                .where(registration_sources_table.c.id.in_(source_ids))
-                .values(
-                    is_active=False,
-                    updated_at=removed_at,
-                    current_registry_entry_id=None,
-                )
-            )
             connection.execute(
                 delete(adapter_endorsements_table).where(
                     adapter_endorsements_table.c.adapter_id == adapter_id
                 )
             )
-            for source_id in source_ids:
-                self._insert_registration_event(
-                    connection,
-                    source_id=source_id,
-                    registry_entry_id=None,
-                    event_type="REMOVED",
-                    profile_version=None,
-                    metadata_json=None,
-                    error_details=None,
-                    message="Adapter removed by its submitting GitHub account.",
-                    started_at=removed_at,
-                    finished_at=removed_at,
+            connection.execute(
+                delete(registration_events_table).where(
+                    registration_events_table.c.source_id.in_(source_ids)
                 )
+            )
+            connection.execute(
+                delete(registry_entries_table).where(
+                    registry_entries_table.c.source_id.in_(source_ids)
+                )
+            )
+            connection.execute(
+                delete(registration_sources_table).where(
+                    registration_sources_table.c.id.in_(source_ids)
+                )
+            )
 
     def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         now = datetime.now(UTC).isoformat()

@@ -61,12 +61,13 @@ def test_post_adapter_endorsement_requires_github_session(tmp_path: Path) -> Non
 
 def test_delete_adapter_requires_the_submitting_github_user(tmp_path: Path) -> None:
     """AI-Generated.
-    Remove adapters only for the account that submitted them.
+    Remove adapters only for the account that submitted them, then re-register.
     """
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    repository = tmp_path / "adapter-v1"
     create_adapter_entry(
         store,
-        tmp_path / "adapter-v1",
+        repository,
         adapter_id="example-adapter",
         adapter_name="Example Adapter",
         submitted_by_github_user_id="owner-id",
@@ -77,4 +78,12 @@ def test_delete_adapter_requires_the_submitting_github_user(tmp_path: Path) -> N
     assert owner.get("/api/v1/adapters/example-adapter").json()["can_delete"] is True
     assert other.delete("/api/v1/adapters/example-adapter").status_code == 403
     assert owner.delete("/api/v1/adapters/example-adapter").status_code == 204
-    assert owner.get("/api/v1/adapters/example-adapter").status_code == 404
+    create_adapter_entry(
+        store,
+        None,
+        adapter_id="example-adapter",
+        adapter_name="Example Adapter",
+        repository_location=str(repository),
+        submitted_by_github_user_id="other-id",
+    )
+    assert other.get("/api/v1/adapters/example-adapter").json()["can_delete"] is True
