@@ -344,13 +344,13 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
     if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
     if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
-    const submitTimer = globalThis.setTimeout(() => {
+    globalThis.queueMicrotask(() => {
       if (autoSubmitAttemptedRef.current) return
+
       autoSubmitAttemptedRef.current = true
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       void submitAuthenticatedRegistration(form)
-    }, 0)
-    return () => globalThis.clearTimeout(submitTimer)
+    })
   }, [authUser, authVerified, form, result, status, submitAuthenticatedRegistration])
 
   async function submitRegistration(event: { preventDefault: () => void }) {
