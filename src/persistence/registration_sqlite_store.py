@@ -8,6 +8,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
+from src.persistence.github_auth_migration import (
+    migrate_registration_github_login_columns,
+)
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
 
@@ -25,6 +28,7 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
         metadata.create_all(self.engine)
         with self.engine.begin() as connection:
             self._ensure_registration_sources_columns(connection)
+            migrate_registration_github_login_columns(connection)
             connection.execute(
                 text(
                     "CREATE UNIQUE INDEX IF NOT EXISTS "
