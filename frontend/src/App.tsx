@@ -12,8 +12,10 @@ import CreatePage from './pages/CreatePage'
 import CreateAdapterMetadataPage from './pages/CreateAdapterMetadataPage'
 import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
+import WorkspacePage from './pages/workspace/WorkspacePage'
 import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
 import { client } from './api/client/client.gen'
+import { client as workspaceClient } from './api/workspace/client.gen'
 
 const actionCards = [
   {
@@ -39,7 +41,8 @@ const actionCards = [
     text: 'Submit your adapter repository to our registry, so others can use it.',
     cta: 'Register now',
     href: '/register',
-    tone: 'bg-blue-100 text-blue-700',
+    featured: true,
+    tone: 'bg-white/20 text-white',
   },
 ]
 
@@ -66,7 +69,7 @@ function readCachedAuthUser(): AuthUser | null {
 
   try {
     const user = JSON.parse(savedUser) as Partial<AuthUser>
-    return typeof user.github_login === 'string' ? { github_login: user.github_login } : null
+    return user.authenticated === true ? { authenticated: true } : null
   } catch {
     globalThis.localStorage.removeItem(authUserKey)
     return null
@@ -75,6 +78,7 @@ function readCachedAuthUser(): AuthUser | null {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 client.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' }) // for openapi-ts
+workspaceClient.setConfig({ baseUrl: apiBaseUrl, credentials: 'include' })
 
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(readCachedAuthUser)
@@ -165,13 +169,20 @@ function App() {
     page = <CreateAdapterMetadataPage />
   } else if (pathname === '/register') {
     page = <RegisterPage authUser={authUser} authVerified={authVerified} />
+  } else if (pathname === '/workspace') {
+    page = (
+      <WorkspacePage
+        signedIn={Boolean(authUser && authVerified)}
+        signInUrl={client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/workspace' } })}
+      />
+    )
   } else if (pathname === '/adapters' || adapterId) {
     page = <AdaptersPage adapterId={adapterId} />
   }
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
-      <AppHeader authUser={authUser} onLogout={logOut} />
+      <AppHeader authUser={authUser} onLogout={logOut} showWorkspaceLink={pathname !== '/workspace'} />
       {authError ? (
         <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="alert">
           {authError}
@@ -227,7 +238,7 @@ function HomePage() {
 
       <section className="bg-slate-50">
         <div className="mx-auto max-w-6xl px-6 py-10 md:py-12">
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2">
             {actionCards.map((card) => {
               const Icon = card.icon
 
@@ -255,7 +266,7 @@ function HomePage() {
 
           <a
             className="mt-8 flex flex-col gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md md:flex-row md:items-center"
-            href="/adapters"
+            href="/workspace"
           >
             <span className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-blue-600 text-white">
               <CommandLineIcon className="h-7 w-7" aria-hidden="true" />

@@ -1,1 +1,19 @@
 @import 'tailwindcss';
+
+@keyframes agent-status-shimmer {
+  0%, 100% { background-position: 100% 50%; }
+  50% { background-position: 0% 50%; }
+}
+
+/* Makes a silver-black like effect that we often see on Agent "updates", somewhat like the iPhone 3 unlock screen text prompt */
+.agent-status-shimmer {
+  animation: agent-status-shimmer 3s ease-in-out infinite;
+  background: linear-gradient(110deg, #475569 20%, #111827 45%, #94a3b8 55%, #475569 80%);
+  background-clip: text;
+  background-size: 220% 100%;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-status-shimmer { animation: none; }
+}
