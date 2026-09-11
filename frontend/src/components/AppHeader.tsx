@@ -1,10 +1,7 @@
 import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
-import { client } from '../api/client/client.gen'
 
-type AuthUser = Readonly<{
-  github_login: string
-}>
+type AuthUser = Readonly<{ authenticated: true }>
 
 type AppHeaderProps = Readonly<{
   authUser: AuthUser | null
@@ -33,28 +30,16 @@ function AppHeader({ authUser, onLogout }: AppHeaderProps) {
         </nav>
         <div className="hidden items-center gap-3 md:flex">
           {authUser ? (
-            <span className="hidden items-center gap-2 sm:inline-flex">
-              <span className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700">
-                {authUser.github_login}
-              </span>
-              <button
-                aria-label="Sign out of GitHub"
-                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600"
-                onClick={() => void onLogout()}
-                title="Sign out"
-                type="button"
-              >
-                <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </span>
-          ) : (
-            <a
-              className="hidden cursor-pointer rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-blue-200 hover:text-blue-600 sm:inline-flex"
-              href={client.buildUrl({ url: '/api/v1/auth/github/start' })}
+            <button
+              aria-label="Sign out of GitHub"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600"
+              onClick={() => void onLogout()}
+              title="Sign out"
+              type="button"
             >
-              Sign in with GitHub
-            </a>
-          )}
+              <ArrowRightOnRectangleIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-slate-300 px-5 py-3 text-base text-white"
             disabled

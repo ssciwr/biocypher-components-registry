@@ -14,7 +14,6 @@ from src.core.registration.models import (
 )
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
-    "adapter_name": "CollecTRI Adapter",
     "repository_location": "https://gitlab.example.org/biocypher/collectri",
     "license_value": "MIT",
     "doi": "10.5281/zenodo.1234567",
@@ -29,11 +28,6 @@ class RegistrationCreateRequest(BaseModel):
         json_schema_extra={"example": REGISTRATION_CREATE_EXAMPLE}
     )
 
-    adapter_name: str = Field(
-        ...,
-        min_length=1,
-        description="Human-readable adapter name supplied by the maintainer.",
-    )
     repository_location: str = Field(
         ...,
         min_length=1,
@@ -55,7 +49,7 @@ class RegistrationCreateRequest(BaseModel):
         description="Optional submitted Citation File Format URL.",
     )
 
-    @field_validator("adapter_name", "repository_location")
+    @field_validator("repository_location")
     @classmethod
     def _strip_required_text(cls, value: str) -> str:
         """Normalize required text fields and reject blank values."""

@@ -129,7 +129,6 @@ def adapter_is_currently_marked_invalid(
 
     store = SQLiteRegistrationStore(revalidation_context["database_path"])
     registration = submit_registration(
-        adapter_name="Clinical Knowledge Adapter",
         repository_location=str(repository),
         store=store,
     )

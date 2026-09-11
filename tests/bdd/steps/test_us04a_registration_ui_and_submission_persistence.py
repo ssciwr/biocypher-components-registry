@@ -45,8 +45,6 @@ def store_valid_adapter_registration_from_cli(
         app,
         [
             "submit-registration",
-            "--name",
-            "Clinical Knowledge Adapter",
             str(registration_context["repository_path"]),
             "--db-path",
             str(registration_context["database_path"]),
@@ -66,8 +64,9 @@ def submission_is_stored(registration_context: dict[str, Any]) -> None:
             """
         ).fetchone()
 
-    assert row == (
-        "Clinical Knowledge Adapter",
+    assert row is not None
+    assert len(row[0]) == 32
+    assert row[1:] == (
         str(registration_context["repository_path"].resolve()),
         "local",
     )

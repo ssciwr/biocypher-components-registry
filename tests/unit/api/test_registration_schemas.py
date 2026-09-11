@@ -25,13 +25,11 @@ from src.core.registration.models import (
 def test_registration_create_request_normalizes_input_fields() -> None:
     """Normalize registration create input while keeping the API contract explicit."""
     request = RegistrationCreateRequest(
-        adapter_name="  Example Adapter  ",
         repository_location="  https://github.com/example/example-adapter  ",
         license_value="  MIT  ",
         doi="  10.5281/zenodo.1234567  ",
     )
 
-    assert request.adapter_name == "Example Adapter"
     assert request.repository_location == "https://github.com/example/example-adapter"
     assert request.license_value == "MIT"
     assert request.doi == "10.5281/zenodo.1234567"
@@ -40,7 +38,6 @@ def test_registration_create_request_normalizes_input_fields() -> None:
 def test_registration_create_request_treats_blank_optional_fields_as_missing() -> None:
     """Allow omitted optional fields by normalizing blank text to None."""
     request = RegistrationCreateRequest(
-        adapter_name="Example Adapter",
         repository_location="https://github.com/example/example-adapter",
         license_value="   ",
         doi="   ",
@@ -51,12 +48,9 @@ def test_registration_create_request_treats_blank_optional_fields_as_missing() -
 
 
 def test_registration_create_request_rejects_blank_required_fields() -> None:
-    """Reject blank required registration create fields."""
+    """Reject a blank required repository location."""
     with pytest.raises(ValidationError):
-        RegistrationCreateRequest(
-            adapter_name="   ",
-            repository_location="https://github.com/example/example-adapter",
-        )
+        RegistrationCreateRequest(repository_location="   ")
 
 
 def test_registration_create_response_maps_from_stored_registration() -> None:

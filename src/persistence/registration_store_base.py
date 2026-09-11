@@ -7,7 +7,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.engine import Engine, RowMapping
 from sqlalchemy.exc import IntegrityError
 
@@ -107,7 +107,7 @@ class SQLAlchemyRegistrationStore:
         """Return one stored registration by identifier when it exists."""
         with self.engine.connect() as connection:
             source_row = self._source_row(connection, registration_id)
-            if source_row is None:
+            if source_row is None or not source_row["is_active"]:
                 return None
             current_entry = self._current_registry_entry(connection, registration_id)
             latest_event = self._latest_event_for_source(connection, registration_id)
@@ -232,6 +232,32 @@ class SQLAlchemyRegistrationStore:
         if row is None:
             return None
         return self._registry_entry_row_to_entry(row)
+
+    # Permanently remove previous entries, sources, events, and endorsements.
+    # THis is so reregistration is possible after deletion and not blocked by Registration entries/sources, and endorsements is just to be consistent with deleting the others.
+    def remove_adapter(self, adapter_id: str, source_ids: list[str]) -> None:
+        """Remove an adapter and its source registrations."""
+        with self.engine.begin() as connection:
+            connection.execute(
+                delete(adapter_endorsements_table).where(
+                    adapter_endorsements_table.c.adapter_id == adapter_id
+                )
+            )
+            connection.execute(
+                delete(registration_events_table).where(
+                    registration_events_table.c.source_id.in_(source_ids)
+                )
+            )
+            connection.execute(
+                delete(registry_entries_table).where(
+                    registry_entries_table.c.source_id.in_(source_ids)
+                )
+            )
+            connection.execute(
+                delete(registration_sources_table).where(
+                    registration_sources_table.c.id.in_(source_ids)
+                )
+            )
 
     def endorse_adapter(self, adapter_id: str, github_user_id: str) -> None:
         now = datetime.now(UTC).isoformat()
