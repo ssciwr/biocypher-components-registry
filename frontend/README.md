@@ -1,9 +1,12 @@
 # The frontend
-The frontend is a simple React application that uses generated `@hey-api/openapi-ts` functions it can import in JS - which are generated automatically from backned endpoints - to show, save and update information on BioCypher adapters.
+The frontend is a simple React application that uses generated `@hey-api/openapi-ts` functions it can import in JS - which are generated automatically from the backned endpoint functions for both the normal API, and the agentic workspace API - to show, save and update information on BioCypher adapters.
 
 Frontend ---> `@hey-api/openapi-ts` client ---> FastAPI backend <---> Postgres
 This works the same way for the agentic workspace, also using openapi-ts, but the agentic workspace has its own client
-and own files/folders in the backend too. This is to deliberately keep the code decoupled and conceptually separated.
+and own files/folders in the backend too. This is to deliberately keep the code between the normal API and the agentic workspace decoupled and conceptually separated.
+
+If the frontend cannot render because of missing files/client files, you may need to regenerate the openapi-ts functions:
+`pnpm run openapi-ts`
 
 ## Example of how requests map between our components:
 Full tool chain example for the adapter list:
