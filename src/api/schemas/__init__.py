@@ -9,12 +9,10 @@ from src.api.schemas.adapters import (
 from src.api.schemas.common import HealthResponse
 from src.api.schemas.metadata import (
     ADAPTER_METADATA_GENERATE_EXAMPLE,
-    DATASET_METADATA_GENERATE_EXAMPLE,
     METADATA_VALIDATE_DATASET_EXAMPLE,
     AdapterEmbeddedDatasetGenerateRequest,
     AdapterMetadataGenerateRequest,
     AdapterMetadataGenerateResponse,
-    DatasetMetadataGenerateRequest,
     DatasetMetadataGenerateResponse,
     MetadataValidationCheckResponse,
     MetadataValidationRequest,
@@ -57,7 +55,6 @@ from src.api.schemas.workspace import (
 
 __all__ = [
     "ADAPTER_METADATA_GENERATE_EXAMPLE",
-    "DATASET_METADATA_GENERATE_EXAMPLE",
     "METADATA_VALIDATE_DATASET_EXAMPLE",
     "REGISTRATION_CREATE_EXAMPLE",
     "AdapterCatalogItemResponse",
@@ -67,7 +64,6 @@ __all__ = [
     "AdapterMetadataGenerateRequest",
     "AdapterMetadataGenerateResponse",
     "AdapterMetadataResponse",
-    "DatasetMetadataGenerateRequest",
     "DatasetMetadataGenerateResponse",
     "FileContentResponse",
     "FileEntryResponse",

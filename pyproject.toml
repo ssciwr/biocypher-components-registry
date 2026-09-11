@@ -1,6 +1,6 @@
 [project]
 name = "biocypher-components-registry"
-version = "0.2.0"
+version = "0.1.9"
 description = "Registry system for BioCypher adapters with metadata validation, registration workflows"
 readme = "README.md"
 requires-python = ">=3.12"

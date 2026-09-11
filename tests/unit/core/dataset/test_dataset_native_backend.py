@@ -4,8 +4,36 @@ import gzip
 import json
 from pathlib import Path
 
+from src.core.dataset.backends import native as native_backend
 from src.core.dataset.backends.native import NativeDatasetGenerator
 from src.core.dataset.request import GenerationRequest
+
+"""
+Native backend is the Python metadata generator itself that manually creates the meta data in python
+By comparison, croissant-baker runs directly"""
+
+
+# Covers API creator maps and helper fallbacks
+def test_native_generator_maps_api_creators_and_helper_fallbacks(
+    tmp_path: Path,
+) -> None:
+    creators = native_backend._build_creators(
+        [
+            {"name": "Dataset Creator", "orcid": "https://orcid.org/0000-0001"},
+            {"name": "   "},
+            "Legacy Creator,legacy@example.org,https://example.org",
+        ]
+    )
+    relative = NativeDatasetGenerator()._relative_to_input(
+        tmp_path.parent / "outside.csv", str(tmp_path)
+    )
+
+    assert len(creators) == 2
+    assert creators[0]["identifier"] == "https://orcid.org/0000-0001"
+    assert creators[1]["email"] == "legacy@example.org"
+    assert relative == str(tmp_path.parent / "outside.csv")
+    assert native_backend._format_date_published("not-a-date") == "not-a-date"
+    # These tests check the ORCID ID and email are kept in the creator objects ready for croissant file generation
 
 
 def test_native_generator_builds_dataset_from_csv_and_tsv_gz(tmp_path: Path) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from typing import Any
 
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.request import GenerationRequest, GenerationResult
@@ -80,8 +81,33 @@ def build_croissant_baker_command(
             command.extend([flag, value])
 
     for creator in request.creators:
-        if creator:
-            command.extend(["--creator", creator])
+        command.extend(_creator_args(creator))
 
     command.extend(request.extra_args)
     return command
+
+
+# Keeps branch-added structured creator support out of the original command loop.
+# Splitting into two functions keeps build_croissant_baker_command under the Sonar limit while
+# isolating the new API JSON creator path, e.g. mapping a {name, email,
+# identifier} creator into the pipe-delimited CLI value, from the pre-existing
+# string creator path. It's the mapping that increased it.
+def _creator_args(creator: str | dict[str, Any]) -> list[str]:
+    if not isinstance(creator, dict):
+        return ["--creator", creator] if creator else []
+
+    name = str(creator.get("name") or "").strip()
+    if not name:
+        return []
+
+    value = "|".join(
+        [
+            str(creator.get("creator_type") or "Person").strip(),
+            name,
+            str(creator.get("affiliation") or "").strip(),
+            str(creator.get("email") or "").strip(),
+            str(creator.get("url") or "").strip(),
+            str(creator.get("identifier") or "").strip(),
+        ]
+    )
+    return ["--creator", value]
