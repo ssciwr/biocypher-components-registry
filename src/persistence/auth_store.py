@@ -10,6 +10,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.engine import Engine
 
 from src.core.auth.models import AuthSession
+from src.persistence.github_auth_migration import migrate_auth_sessions_table
 from src.persistence.tables import auth_sessions_table, metadata
 
 
@@ -28,6 +29,8 @@ class AuthSessionStore:
 
     def _initialize_database(self) -> None:
         metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            migrate_auth_sessions_table(connection)
 
     def create_session(
         self,

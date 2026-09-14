@@ -282,6 +282,23 @@ Database selection:
 - `DATABASE_URL` set: PostgreSQL
 - otherwise: SQLite
 
+### GitHub Auth Identifier Migration
+
+If your backend was ran after the original Github authentication implementation,
+it has `github_login` or `submitted_by_github_login` columns.
+
+Now we user the github user ID as identity because more important than display (login = display name --> can change or swap between users)
+for the agentic workspace
+
+The below will trigger a full migration because it touches build_registration_store --> which constructs the databases.
+```bash
+uv run cli.py list-registrations
+```
+
+Existing username-only auth sessions and endorsements are removed the next time
+the backend or CLI opens the database, so those users can sign in or endorse
+again under their numeric GitHub user id.
+
 ## Docker Compose
 
 Docker files are available for local backend/database experiments:
