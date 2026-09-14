@@ -66,8 +66,8 @@ class AdapterRegistrationRequest:
     """Captures one submitted adapter registration request.
 
     Args:
-        adapter_name: Human-readable adapter name supplied by the maintainer.
-        adapter_id: Stable slug identifier derived from the adapter name.
+        adapter_name: Temporary submission name replaced by Croissant metadata.
+        adapter_id: Temporary identifier used before Croissant processing.
         description: Optional maintainer-facing adapter summary.
         repository_location: Submitted local path or repository URL.
         repository_kind: Normalized repository location type.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from src.core.adapter.backends import (
     list_adapter_generators,
@@ -15,7 +16,6 @@ from src.core.adapter.request import (
 )
 from src.core.dataset.request import GenerationResult
 from src.core.shared.errors import GeneratorError, InvalidRepoURLError
-from src.core.shared.ids import slugify_identifier
 
 
 def ensure_supported_generator(generator: str) -> str:
@@ -43,7 +43,6 @@ def execute_request(
 
 
 def create_registration_request(
-    adapter_name: str,
     repository_location: str,
     description: str | None = None,
     license_value: str | None = None,
@@ -54,7 +53,6 @@ def create_registration_request(
     """Create a normalized adapter registration request.
 
     Args:
-        adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or remote repository URL.
         description: Optional maintainer-facing adapter summary.
         license_value: Optional submitted adapter license text.
@@ -66,14 +64,10 @@ def create_registration_request(
         A normalized registration request ready for the registry workflow.
 
     Raises:
-        ValueError: If the adapter name or location is empty.
+        ValueError: If the repository location is empty.
         FileNotFoundError: If a submitted local repository path does not exist.
         InvalidRepoURLError: If a submitted URL is not a valid remote repository URL.
     """
-    normalized_name = adapter_name.strip()
-    if not normalized_name:
-        raise ValueError("Adapter name is required.")
-
     normalized_location = _normalize_repository_into_pure_branchless_location(
         repository_location
     )
@@ -95,9 +89,12 @@ def create_registration_request(
         )
         repository_kind = "local"
 
+    temporary_adapter_id = (
+        uuid4().hex
+    )  # ID does not need to be related to the name/content
     return AdapterRegistrationRequest(
-        adapter_name=normalized_name,
-        adapter_id=slugify_identifier(normalized_name),
+        adapter_name=temporary_adapter_id,  # This gets overwritten by the next /registrations/x/process call.
+        adapter_id=temporary_adapter_id,
         repository_location=normalized_repository_location,
         repository_kind=repository_kind,
         source=repository_location,

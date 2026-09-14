@@ -23,8 +23,6 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
         app,
         [
             "submit",
-            "--name",
-            "Example Adapter",
             "--github-user-id",
             "12345",
             str(repository),
@@ -34,7 +32,6 @@ def test_submit_command_creates_local_registration_request(tmp_path: Path) -> No
     assert result.exit_code == 0, result.output
     assert "Registration Request" in result.output
     assert "Registration request created" in result.output
-    assert "example-adapter" in result.output
     assert "12345" in result.output
     assert "local" in result.output
 
@@ -45,7 +42,7 @@ def test_submit_command_rejects_missing_local_repository(tmp_path: Path) -> None
 
     result = runner.invoke(
         app,
-        ["submit", "--name", "Example Adapter", str(repository)],
+        ["submit", str(repository)],
     )
 
     assert result.exit_code == 1
@@ -62,8 +59,6 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repository),
             "--db-path",
             str(database_path),
@@ -89,13 +84,9 @@ def test_submit_registration_command_persists_registration(tmp_path: Path) -> No
             """
         ).fetchone()
 
-        assert row == (
-            "Example Adapter",
-            str(repository.resolve()),
-            "local",
-            "0",
-            1,
-        )
+        assert row is not None
+        assert len(row[0]) == 32
+        assert row[1:] == (str(repository.resolve()), "local", "0", 1)
 
 
 def test_submit_registration_command_uses_environment_database_path(
@@ -112,8 +103,6 @@ def test_submit_registration_command_uses_environment_database_path(
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repository),
         ],
     )
@@ -133,8 +122,6 @@ def test_submit_registration_command_rejects_missing_local_repository(
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repository),
             "--db-path",
             str(database_path),
@@ -154,8 +141,6 @@ def test_list_registrations_command_shows_stored_registration(tmp_path: Path) ->
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repository),
             "--db-path",
             str(database_path),
@@ -169,8 +154,6 @@ def test_list_registrations_command_shows_stored_registration(tmp_path: Path) ->
 
     assert result.exit_code == 0, result.output
     assert "Stored Registrations" in result.output
-    assert "Example" in result.output
-    assert "Adapter" in result.output
     assert "SUBMITTED" in result.output
 
 
@@ -182,7 +165,6 @@ def test_show_registration_events_command_shows_event_history(tmp_path: Path) ->
     store = SQLiteRegistrationStore(database_path)
     created = store.create_registration(
         create_registration_request(
-            adapter_name="Example Adapter",
             repository_location=str(repository),
         )
     )
@@ -212,7 +194,6 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path: Path) -
     store = SQLiteRegistrationStore(database_path)
     created = store.create_registration(
         create_registration_request(
-            adapter_name="Example Adapter",
             repository_location=str(repository),
         )
     )

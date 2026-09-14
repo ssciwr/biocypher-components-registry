@@ -6,12 +6,14 @@ import {
   MagnifyingGlassIcon,
   RocketLaunchIcon,
   StarIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 import GenericModal from '../components/GenericModal'
 import LinkToModal from '../components/LinkToModal'
 import CitationEndorsement from '../components/CitationEndorsement'
 import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
+  deleteAdapterApiV1AdaptersAdapterIdDelete,
   getAdapterApiV1AdaptersAdapterIdGet,
   listLatestAdaptersApiV1AdaptersLatestGet,
   searchAdaptersApiV1AdaptersSearchGet,
@@ -142,6 +144,8 @@ function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
   const [endorsementError, setEndorsementError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -207,6 +211,33 @@ function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
       setEndorsementError(typeof error === 'string' && error ? error : (error as { details?: string; detail?: string } | undefined)?.details || (error as { details?: string; detail?: string } | undefined)?.detail || 'Could not endorse this adapter. Please try again.')
     } finally {
       setIsEndorsing(false)
+    }
+  }
+
+
+  async function deleteCurrentAdapter() {
+    if (!globalThis.confirm(`Remove ${adapter?.adapter_name ?? 'this adapter'} from the registry?`)) return
+
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      const result = await deleteAdapterApiV1AdaptersAdapterIdDelete({
+        path: { adapter_id: adapterId },
+      })
+      if (result.error || result.response?.status !== 204) {
+        const details = result.error as { details?: string; detail?: string } | undefined
+        const message = result.response?.status === 401
+          ? 'Your sign-in session has expired. Sign in again before removing this adapter.'
+          : details?.details || details?.detail || 'Could not remove this adapter. Please try again.'
+        setDeleteError(message)
+        return
+      }
+      globalThis.location.assign('/adapters')
+    } catch (error) {
+      const details = error as { details?: string; detail?: string } | undefined
+      setDeleteError(details?.details || details?.detail || 'Could not remove this adapter. Please try again.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -333,6 +364,20 @@ bc.run()`}
             </div>
             {endorsementError ? (
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
+            ) : null}
+            {adapter.can_delete ? (
+              <div className="mt-7 border-t border-slate-100 pt-5">
+                <button
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isDeleting}
+                  onClick={() => void deleteCurrentAdapter()}
+                  type="button"
+                >
+                  <TrashIcon className="h-4 w-4" aria-hidden="true" />
+                  {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
+                </button>
+                {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
+              </div>
             ) : null}
           </section>
 

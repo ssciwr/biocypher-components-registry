@@ -153,8 +153,8 @@ def active_sources_include_valid_and_invalid_adapters(
     _write_metadata(invalid_repo, invalid_document)
 
     store = SQLiteRegistrationStore(batch_registration_context["database_path"])
-    submit_registration("Batch Valid Adapter", str(valid_repo), store)
-    submit_registration("Batch Invalid Adapter", str(invalid_repo), store)
+    submit_registration(str(valid_repo), store)
+    submit_registration(str(invalid_repo), store)
 
 
 @given("one active source cannot be fetched and another is valid")
@@ -182,8 +182,8 @@ def one_active_source_cannot_be_fetched_and_another_is_valid(
     )
 
     store = SQLiteRegistrationStore(batch_registration_context["database_path"])
-    submit_registration("Fetch Valid Adapter", str(valid_repo), store)
-    broken = submit_registration("Missing Adapter", str(missing_repo), store)
+    submit_registration(str(valid_repo), store)
+    broken = submit_registration(str(missing_repo), store)
     batch_registration_context["broken_registration_id"] = broken.registration_id
     (missing_repo / "croissant.jsonld").unlink()
 
@@ -203,7 +203,7 @@ def an_active_source_previously_failed_validation(
     _write_metadata(repository, invalid_document)
 
     store = SQLiteRegistrationStore(batch_registration_context["database_path"])
-    registration = submit_registration("Corrected Adapter", str(repository), store)
+    registration = submit_registration(str(repository), store)
     batch_registration_context["corrected_registration_id"] = (
         registration.registration_id
     )

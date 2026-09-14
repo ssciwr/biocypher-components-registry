@@ -117,7 +117,6 @@ def test_finish_registration_marks_valid_record_and_persists_metadata(
     )
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -156,7 +155,6 @@ def test_finish_registration_persists_invalid_status_and_errors(
     )
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -182,7 +180,6 @@ def test_finish_registration_records_unchanged_event_for_repeat_processing(
     )
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -225,7 +222,6 @@ def test_finish_registration_rejects_same_version_changed_file_and_records_event
     )
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -279,7 +275,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
         ),
         encoding="utf-8",
     )
-    unchanged = submit_registration("Unchanged Adapter", str(unchanged_repo), store)
+    unchanged = submit_registration(str(unchanged_repo), store)
     finish_registration(unchanged.registration_id, store)
 
     valid_repo = tmp_path / "valid-repo"
@@ -295,7 +291,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
         ),
         encoding="utf-8",
     )
-    submit_registration("New Valid Adapter", str(valid_repo), store)
+    submit_registration(str(valid_repo), store)
 
     invalid_repo = tmp_path / "invalid-repo"
     invalid_repo.mkdir()
@@ -308,7 +304,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
         json.dumps(invalid_document),
         encoding="utf-8",
     )
-    submit_registration("Invalid Adapter", str(invalid_repo), store)
+    submit_registration(str(invalid_repo), store)
 
     missing_repo = tmp_path / "missing-repo"
     missing_repo.mkdir()
@@ -319,7 +315,7 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
         ),
         encoding="utf-8",
     )
-    missing = submit_registration("Missing Adapter", str(missing_repo), store)
+    missing = submit_registration(str(missing_repo), store)
     (missing_repo / "croissant.jsonld").unlink()
 
     summary = refresh_active_registrations(store)
@@ -370,8 +366,8 @@ def test_refresh_active_registrations_counts_duplicate_outcomes(
     (repo_a / "croissant.jsonld").write_text(json.dumps(metadata), encoding="utf-8")
     (repo_b / "croissant.jsonld").write_text(json.dumps(metadata), encoding="utf-8")
 
-    first = submit_registration("Duplicate Adapter", str(repo_a), store)
-    submit_registration("Duplicate Adapter Copy", str(repo_b), store)
+    first = submit_registration(str(repo_a), store)
+    submit_registration(str(repo_b), store)
     finish_registration(first.registration_id, store)
 
     summary = refresh_active_registrations(store)
@@ -398,7 +394,6 @@ def test_revalidate_registration_reprocesses_corrected_invalid_source(
 
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -447,7 +442,6 @@ def test_revalidate_registration_rejects_non_invalid_source(
     )
     store = SQLiteRegistrationStore(database_path)
     submitted = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )

@@ -111,7 +111,6 @@ def test_revalidate_registration_command_reprocesses_corrected_invalid_source(
     metadata_path.write_text(json.dumps(invalid_document), encoding="utf-8")
     store = SQLiteRegistrationStore(database_path)
     registration = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )

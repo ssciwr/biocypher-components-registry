@@ -158,6 +158,7 @@ class AdapterDetailResponse(BaseModel):
     data_sources: list[AdapterDataSourceResponse] = Field(default_factory=list)
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
+    can_delete: bool = False
 
     @classmethod
     def from_entries(
@@ -167,6 +168,7 @@ class AdapterDetailResponse(BaseModel):
         registration: StoredRegistration | None = None,
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
+        can_delete: bool = False,
     ) -> AdapterDetailResponse:
         """Build adapter detail from canonical entry and source data."""
         latest = latest_registry_entry(entries)
@@ -193,6 +195,7 @@ class AdapterDetailResponse(BaseModel):
             data_sources=data_sources_from_metadata(metadata),
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
+            can_delete=can_delete,
         )
 
 

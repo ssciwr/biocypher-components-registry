@@ -123,7 +123,6 @@ def submitted_registration_points_to_valid_metadata(
 
     store = SQLiteRegistrationStore(valid_registration_context["database_path"])
     registration = submit_registration(
-        adapter_name="Clinical Knowledge Adapter",
         repository_location=str(repository),
         store=store,
     )

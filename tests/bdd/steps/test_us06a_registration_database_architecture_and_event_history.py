@@ -138,7 +138,6 @@ def maintainer_submits_repository_source_with_valid_metadata(
 
     store = SQLiteRegistrationStore(registration_architecture_context["database_path"])
     registration = submit_registration(
-        adapter_name="Example Adapter",
         repository_location=str(repository),
         store=store,
     )
@@ -169,7 +168,7 @@ def source_record_exists_in_registration_sources(
 
     assert row is not None
     assert row[0] == registration_architecture_context["registration_id"]
-    assert row[1] == "Example Adapter"
+    assert len(row[1]) == 32
     assert row[2] == "local"
 
 
@@ -320,7 +319,6 @@ def another_source_is_processed_with_the_same_canonical_metadata(
     _write_metadata(repository, _valid_adapter_document())
     store = SQLiteRegistrationStore(registration_architecture_context["database_path"])
     duplicate = submit_registration(
-        adapter_name="Example Adapter Duplicate",
         repository_location=str(repository),
         store=store,
     )
@@ -363,7 +361,6 @@ def stored_registration_source_points_to_invalid_adapter_metadata(
 
     store = SQLiteRegistrationStore(registration_architecture_context["database_path"])
     registration = submit_registration(
-        adapter_name="Broken Adapter",
         repository_location=str(repository),
         store=store,
     )

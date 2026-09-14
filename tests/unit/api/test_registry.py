@@ -160,9 +160,9 @@ def test_list_registry_registrations_endpoint_returns_latest_event_type(
         encoding="utf-8",
     )
     store = SQLiteRegistrationStore(database_path)
-    valid = submit_registration("Valid Adapter", str(valid_repo), store)
-    invalid = submit_registration("Invalid Adapter", str(invalid_repo), store)
-    missing = submit_registration("Missing Adapter", str(missing_repo), store)
+    valid = submit_registration(str(valid_repo), store)
+    invalid = submit_registration(str(invalid_repo), store)
+    missing = submit_registration(str(missing_repo), store)
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
@@ -217,8 +217,8 @@ def test_list_registry_registrations_endpoint_filters_by_status_and_latest_event
         encoding="utf-8",
     )
     store = SQLiteRegistrationStore(database_path)
-    submit_registration("Valid Adapter", str(valid_repo), store)
-    invalid = submit_registration("Invalid Adapter", str(invalid_repo), store)
+    submit_registration(str(valid_repo), store)
+    invalid = submit_registration(str(invalid_repo), store)
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
@@ -267,7 +267,7 @@ def test_list_registry_entries_endpoint_returns_canonical_entries(
         encoding="utf-8",
     )
     store = SQLiteRegistrationStore(database_path)
-    submitted = submit_registration("Valid Adapter", str(repository), store)
+    submitted = submit_registration(str(repository), store)
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
@@ -319,7 +319,7 @@ def test_get_registry_entry_endpoint_returns_canonical_entry(
         encoding="utf-8",
     )
     store = SQLiteRegistrationStore(database_path)
-    submitted = submit_registration("Valid Adapter", str(repository), store)
+    submitted = submit_registration(str(repository), store)
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
@@ -385,9 +385,9 @@ def test_refresh_registry_endpoint_processes_active_sources(
         encoding="utf-8",
     )
     store = SQLiteRegistrationStore(database_path)
-    submit_registration("Valid Adapter", str(valid_repo), store)
-    submit_registration("Invalid Adapter", str(invalid_repo), store)
-    submit_registration("Missing Adapter", str(missing_repo), store)
+    submit_registration(str(valid_repo), store)
+    submit_registration(str(invalid_repo), store)
+    submit_registration(str(missing_repo), store)
     client = _create_registry_client(store)
 
     response = client.post("/api/v1/registry/refreshes")
