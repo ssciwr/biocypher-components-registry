@@ -80,7 +80,7 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
         open={needsKey}
         panelClassName="w-full max-w-5xl rounded-lg border border-slate-200 bg-white p-5 text-left shadow-2xl sm:p-6"
         showTitle={false}
-        title="Attach Anthropic API key"
+        title="Provide Anthropic API key"
       />
       {!signedIn ? <div className="fixed inset-x-0 bottom-0 top-16 z-30 bg-slate-200/75" aria-hidden="true" /> : null}
       <GenericModal

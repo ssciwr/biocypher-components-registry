@@ -65,7 +65,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   const [session, setSession] = useState<WorkspaceViewSession | null>(null)
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [prompt, setPrompt] = useState('')
-  const [apiKey, setApiKey] = useState('')
+  const [apiKey, setApiKey] = useState('') // load from load storage if present
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>('idle')
   const sessionRef = useRef(session)
@@ -74,6 +74,17 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  useEffect(() => {
+    const retrievedLocalApiKey = window.localStorage.getItem('apiKey')
+    setApiKey(retrievedLocalApiKey)
+  }, [])
+
+  useEffect(() => {
+    if (apiKey != '') {
+      window.localStorage.setItem('apiKey', apiKey)
+    } // could maybe also have a clear cache option?
+  }, [apiKey])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' })
