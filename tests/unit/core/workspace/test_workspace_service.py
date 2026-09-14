@@ -256,6 +256,23 @@ def test_delete_publishes_session_closed(tmp_path):
     asyncio.run(scenario())
 
 
+# Check idle expiry uses normal session teardown without touching active work.
+def test_reap_idle_sessions(tmp_path):
+    # Exercise session expiry without waiting for the production timeout.
+    async def scenario():
+        manager = make_manager(tmp_path)
+        active = await manager.create(owner_github_user_id="12345")
+        expired = await manager.create(owner_github_user_id="12345")
+        expired.last_activity -= service.IDLE_SESSION_SECONDS + 1
+        reaped = await manager.reap_idle_sessions()
+        assert reaped == 1
+        assert manager.get(active.id) is active
+        assert manager.get(expired.id) is None
+        await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
 def test_interrupt_cancels_queued_turn(tmp_path):
     from pathlib import Path
 

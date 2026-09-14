@@ -7,6 +7,7 @@
  */
 import {
   createSessionAgentApiV1SessionsPost,
+  deleteSessionAgentApiV1SessionsSessionIdDelete,
   eventsAgentApiV1SessionsSessionIdEventsGet,
   getSessionAgentApiV1SessionsSessionIdGet,
   interruptAgentApiV1SessionsSessionIdInterruptPost,
@@ -103,6 +104,13 @@ export async function attachWorkspaceKey(session: WorkspaceAccess, apiKey: strin
     body: { api_key: apiKey }, // Frontend only uses api_key, not auth_token, so we could remove auth_token
   }) // todo: Remove auth_token (PR comment mentioned this as a separate issue).
   // This is the BYOK key nor our key.
+}
+
+export async function endWorkspaceSession(session: WorkspaceAccess) {
+  await deleteSessionAgentApiV1SessionsSessionIdDelete({
+    ...sessionOptions(session),
+    keepalive: true,
+  })
 }
 
 export async function sendWorkspaceMessage(

@@ -19,10 +19,6 @@ from tests.support.workspace_fakes import (
     text_event,
 )
 
-pytestmark = pytest.mark.skip(
-    reason="workspace API is temporarily inacessible and therefore tests skipped"
-)
-
 PREFIX = "/agent/api/v1"
 
 

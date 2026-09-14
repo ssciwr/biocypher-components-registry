@@ -26,6 +26,7 @@ import os
 import secrets
 import shutil
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -42,6 +43,9 @@ READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
 EVENT_PREVIEW_CHARS = 500
 # Max events buffered per SSE subscriber; oldest are dropped beyond this.
 EVENT_QUEUE_SIZE = 1000
+# Close idle sessions after 24 hours
+IDLE_SESSION_SECONDS = 24 * 60 * 60  # gets overwritten in test
+IDLE_REAPER_SECONDS = 5 * 60
 
 
 class SessionStartupError(Exception):
@@ -104,6 +108,7 @@ class Session:
         self.busy = False
         self.turn_task: asyncio.Task | None = None
         self.actor: asyncio.Task | None = None
+        self.last_activity = time.monotonic()
         self._seq = 0
         # Test seams; the API layer never touches these.
         self.client_factory = AsyncAnthropic
@@ -124,9 +129,14 @@ class Session:
         self.api_key = api_key or None
         self.auth_token = auth_token or None
 
+    # Call this elsewhere to keep the workspace session alive, needed because otherwise SSE heartbeats would keep alive based on solely requests
+    def mark_active(self) -> None:
+        self.last_activity = time.monotonic()
+
     # ---------------------------------------------------------- events
 
     def publish(self, event_type: str, **data) -> None:
+        self.mark_active()
         self._seq += 1
         event = {"seq": self._seq, "type": event_type, "data": data}
         for queue in tuple(self.subscribers):
@@ -390,6 +400,28 @@ class SessionManager:
             return False
         await self._teardown(session)
         return True
+
+    # End idle sessions using normal deletion process which removes the API key and ends streams "nicely".
+    async def reap_idle_sessions(self) -> int:
+        now = time.monotonic()
+        idle_session_ids = [
+            session.id
+            for session in self.sessions.values()
+            if now - session.last_activity >= IDLE_SESSION_SECONDS
+        ]
+        deleted = await asyncio.gather(
+            *(self.delete(session_id) for session_id in idle_session_ids)
+        )
+        return sum(deleted)
+
+    # Stop any sessions which have been running for > 24 hours.
+    async def run_idle_reaper(self) -> None:
+        while True:
+            await asyncio.sleep(IDLE_REAPER_SECONDS)
+            try:
+                await self.reap_idle_sessions()
+            except Exception:
+                logger.exception("workspace idle-session cleanup failed")
 
     async def _teardown(self, session: Session) -> None:
         session.set_key(None, None)

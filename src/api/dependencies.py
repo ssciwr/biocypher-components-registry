@@ -91,4 +91,5 @@ def get_workspace_session(
         raise HTTPException(401, "unknown session or invalid session token")
     if not pysecrets.compare_digest(supplied, session.token):
         raise HTTPException(401, "unknown session or invalid session token")
+    session.mark_active()
     return session

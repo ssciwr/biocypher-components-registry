@@ -9,6 +9,7 @@ import {
   attachWorkspaceKey,
   consumeWorkspaceEvents,
   createWorkspaceSession,
+  endWorkspaceSession,
   getWorkspaceSessionState,
   interruptWorkspaceTurn,
   sendWorkspaceMessage,
@@ -65,7 +66,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   const [session, setSession] = useState<WorkspaceViewSession | null>(null)
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [prompt, setPrompt] = useState('')
-  const [apiKey, setApiKey] = useState('') // load from load storage if present
+  const [apiKey, setApiKey] = useState(() => window.localStorage.getItem('apiKey') ?? '')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>('idle')
   const sessionRef = useRef(session)
@@ -74,11 +75,6 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
-
-  useEffect(() => {
-    const retrievedLocalApiKey = window.localStorage.getItem('apiKey')
-    setApiKey(retrievedLocalApiKey)
-  }, [])
 
   useEffect(() => {
     if (apiKey != '') {
@@ -270,6 +266,14 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
 
     return () => globalThis.clearInterval(intervalId)
   }, [session?.busy, sessionId, sessionToken, syncSessionState])
+
+  useEffect(() => () => {
+    const activeSession = sessionRef.current
+    if (!activeSession) return
+    void endWorkspaceSession(activeSession).catch((endError: unknown) => {
+      console.error('Could not end workspace session.', endError)
+    })
+  }, [])
 
   // Set up a workspace session with the backend API
   async function startSession() {
