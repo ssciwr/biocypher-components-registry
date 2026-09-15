@@ -260,11 +260,9 @@ from closing the stream.
 | `session_error` | `{message}` | MCP connection died; session is unusable |
 | `session_closed` | `{}` | session was deleted; the stream ends after this event |
 
-Multiple subscribers are allowed (e.g. two browser tabs); events are fanned
-out to all of them. There is no replay — connect to the stream before sending
-messages — and the `id:` field is informational only (`Last-Event-ID` on
-reconnect is not honored). Each subscriber buffers at most 1000 events; a
-consumer that stalls longer than that loses the oldest events.
+Each session accepts one event stream. Disconnecting it ends the session and
+removes its workspace. There is no replay — connect before sending messages —
+and the `id:` field is informational only (`Last-Event-ID` is not honored).
 
 ### Files (directory pane + editor)
 

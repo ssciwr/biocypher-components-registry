@@ -561,6 +561,10 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetErrors = {
      */
     401: unknown;
     /**
+     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;

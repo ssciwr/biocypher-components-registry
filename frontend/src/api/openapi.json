@@ -1611,6 +1611,9 @@
           "401": {
             "description": "Unknown session or invalid session token"
           },
+          "409": {
+            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+          },
           "422": {
             "description": "Validation Error",
             "content": {

@@ -206,11 +206,13 @@ async def interrupt(session: WorkspaceSessionDep) -> InterruptResponse:
     response_class=StreamingResponse,
     responses={
         200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}},
-        **workspace_error_responses(401),
+        **workspace_error_responses(401, 409),
     },
 )
 async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
     """Stream one session's events as text/event-stream."""
+    if session.subscribers:
+        raise HTTPException(409, "workspace session already has an event stream")
     queue = session.subscribe()
 
     async def stream():
@@ -245,6 +247,7 @@ async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
                     return
         finally:
             session.unsubscribe(queue)
+            await manager.delete(session.id)
 
     return StreamingResponse(
         stream(),

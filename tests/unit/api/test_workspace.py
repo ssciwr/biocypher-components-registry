@@ -225,12 +225,21 @@ def test_events_stream_snapshot_and_token_query(manager):
         ) as response:
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/event-stream")
+            second_stream = httpx.get(
+                url, params={"token": created["session_token"]}, timeout=10
+            )
+            assert second_stream.status_code == 409
             for line in response.iter_lines():
                 lines.append(line)
                 if len(lines) >= 2:
                     break
         assert lines[0] == "event: session_state"
         assert '"has_key": false' in lines[1]
+        deadline = time_mod.monotonic() + 5
+        while manager.get(created["session_id"]) is not None:
+            assert time_mod.monotonic() < deadline, "session did not close"
+            time_mod.sleep(0.02)
+        assert manager.get(created["session_id"]) is None
     finally:
         server.should_exit = True
         thread.join(timeout=10)
