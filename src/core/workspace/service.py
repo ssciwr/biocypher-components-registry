@@ -52,6 +52,16 @@ class SessionStartupError(Exception):
     """MCP connection could not be established for a new session."""
 
 
+## I know these are quite obtuse but I just wanted to make the code clear without relying on Stream data classes or their defaults
+class WorkspaceStorageError(Exception):
+    """Workspace session directory could not be created. Specifically to capture this issue instead of erroring -->
+    returning SSE disconnect on error, which I hypothesize to displayed as Network Error"""
+
+
+class EventStreamAlreadyActive:
+    """A workspace session already has an active event stream."""
+
+
 # Default MCP connector; tests inject a fake with the same shape via
 # Session.mcp_connect. The mcp>=2.0 bootstrap itself lives once in
 # client_loop.open_mcp_session, shared with the CLI's main().
@@ -349,16 +359,26 @@ class SessionManager:
         self.mcp_headers = cl.mcp_headers() if mcp_headers is None else mcp_headers
         self.mcp_connect = mcp_connect
         self.sessions: dict[str, Session] = {}
+        self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
         # mkdir is a blocking syscall; off-thread so one session's filesystem
         # latency (or a slow/networked workspaces_root) can't stall every
         # other session's SSE heartbeats and message dispatch on this loop.
-        await asyncio.to_thread(self.workspaces_root.mkdir, parents=True, exist_ok=True)
+        try:
+            await asyncio.to_thread(
+                self.workspaces_root.mkdir, parents=True, exist_ok=True
+            )
+        except OSError as e:
+            logger.exception("Could not create workspace root")
+            raise WorkspaceStorageError from e
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
         try:
             await asyncio.to_thread(workspace.mkdir)
+        except OSError as e:
+            logger.exception("Could not create workspace directory")
+            raise WorkspaceStorageError from e
         except BaseException:
             # to_thread's worker thread runs mkdir to completion even if this
             # await is cancelled (e.g. task killed on shutdown), so the dir
@@ -394,7 +414,49 @@ class SessionManager:
     def get(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
+    # Reconnection cancels the short cleanup window before subscribing again.
+    def open_event_stream(
+        self, session: Session
+    ) -> asyncio.Queue | EventStreamAlreadyActive:
+        if session.subscribers:
+            return EventStreamAlreadyActive()
+        self._cancel_sse_disconnect(session.id)
+        return session.subscribe()
+
+    def close_event_stream(self, session: Session, queue: asyncio.Queue) -> None:
+        session.unsubscribe(queue)
+        if self.get(session.id) is session and not session.subscribers:
+            self._schedule_sse_disconnect(session.id)
+
+    # New event stream or deletion stops the scheduled cleanup task.
+    def _cancel_sse_disconnect(self, session_id: str) -> None:
+        task = self._sse_disconnect_tasks.pop(session_id, None)
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+
+    # schedule for deletion in 60 seconds time (that is controlled by _delete_after_sse_grace)
+    def _schedule_sse_disconnect(self, session_id: str) -> None:
+        self._cancel_sse_disconnect(session_id)
+        task = asyncio.create_task(self._delete_after_sse_60_second_timeout(session_id))
+        self._sse_disconnect_tasks[session_id] = task
+
+    # Delete only if the session still has no active event stream after 60 seconds
+    async def _delete_after_sse_60_second_timeout(self, session_id: str) -> None:
+        try:
+            await asyncio.sleep(60)
+            session = self.get(session_id)
+            if session is not None and not session.subscribers:
+                await self.delete(session_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("SSE reconnect cleanup failed: session_id=%s", session_id)
+        finally:
+            if self._sse_disconnect_tasks.get(session_id) is asyncio.current_task():
+                self._sse_disconnect_tasks.pop(session_id, None)
+
     async def delete(self, session_id: str) -> bool:
+        self._cancel_sse_disconnect(session_id)
         session = self.sessions.pop(session_id, None)
         if session is None:
             return False

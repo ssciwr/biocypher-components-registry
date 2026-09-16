@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateSessionAgentApiV1SessionsPostData, CreateSessionAgentApiV1SessionsPostErrors, CreateSessionAgentApiV1SessionsPostResponses, DeleteFileAgentApiV1SessionsSessionIdFileDeleteData, DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors, DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses, DeleteSessionAgentApiV1SessionsSessionIdDeleteData, DeleteSessionAgentApiV1SessionsSessionIdDeleteErrors, DeleteSessionAgentApiV1SessionsSessionIdDeleteResponses, EventsAgentApiV1SessionsSessionIdEventsGetData, EventsAgentApiV1SessionsSessionIdEventsGetErrors, EventsAgentApiV1SessionsSessionIdEventsGetResponse, EventsAgentApiV1SessionsSessionIdEventsGetResponses, GetSessionAgentApiV1SessionsSessionIdGetData, GetSessionAgentApiV1SessionsSessionIdGetErrors, GetSessionAgentApiV1SessionsSessionIdGetResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostData, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, ListFilesAgentApiV1SessionsSessionIdFilesGetData, ListFilesAgentApiV1SessionsSessionIdFilesGetErrors, ListFilesAgentApiV1SessionsSessionIdFilesGetResponses, PostMessageAgentApiV1SessionsSessionIdMessagesPostData, PostMessageAgentApiV1SessionsSessionIdMessagesPostErrors, PostMessageAgentApiV1SessionsSessionIdMessagesPostResponses, ReadFileAgentApiV1SessionsSessionIdFileGetData, ReadFileAgentApiV1SessionsSessionIdFileGetErrors, ReadFileAgentApiV1SessionsSessionIdFileGetResponses, SetKeyAgentApiV1SessionsSessionIdKeyPostData, SetKeyAgentApiV1SessionsSessionIdKeyPostErrors, SetKeyAgentApiV1SessionsSessionIdKeyPostResponses, WriteFileAgentApiV1SessionsSessionIdFilePutData, WriteFileAgentApiV1SessionsSessionIdFilePutErrors, WriteFileAgentApiV1SessionsSessionIdFilePutResponses } from './types.gen';
+import type { CreateSessionAgentApiV1SessionsPostData, CreateSessionAgentApiV1SessionsPostErrors, CreateSessionAgentApiV1SessionsPostResponses, DeleteSessionAgentApiV1SessionsSessionIdDeleteData, DeleteSessionAgentApiV1SessionsSessionIdDeleteErrors, DeleteSessionAgentApiV1SessionsSessionIdDeleteResponses, EventsAgentApiV1SessionsSessionIdEventsGetData, EventsAgentApiV1SessionsSessionIdEventsGetErrors, EventsAgentApiV1SessionsSessionIdEventsGetResponse, EventsAgentApiV1SessionsSessionIdEventsGetResponses, GetSessionAgentApiV1SessionsSessionIdGetData, GetSessionAgentApiV1SessionsSessionIdGetErrors, GetSessionAgentApiV1SessionsSessionIdGetResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostData, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, ListFilesAgentApiV1SessionsSessionIdFilesGetData, ListFilesAgentApiV1SessionsSessionIdFilesGetErrors, ListFilesAgentApiV1SessionsSessionIdFilesGetResponses, PostMessageAgentApiV1SessionsSessionIdMessagesPostData, PostMessageAgentApiV1SessionsSessionIdMessagesPostErrors, PostMessageAgentApiV1SessionsSessionIdMessagesPostResponses, ReadFileAgentApiV1SessionsSessionIdFileGetData, ReadFileAgentApiV1SessionsSessionIdFileGetErrors, ReadFileAgentApiV1SessionsSessionIdFileGetResponses, SetKeyAgentApiV1SessionsSessionIdKeyPostData, SetKeyAgentApiV1SessionsSessionIdKeyPostErrors, SetKeyAgentApiV1SessionsSessionIdKeyPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -89,29 +89,8 @@ export const eventsAgentApiV1SessionsSessionIdEventsGet = <ThrowOnError extends 
 export const listFilesAgentApiV1SessionsSessionIdFilesGet = <ThrowOnError extends boolean = false>(options: Options<ListFilesAgentApiV1SessionsSessionIdFilesGetData, ThrowOnError>): RequestResult<ListFilesAgentApiV1SessionsSessionIdFilesGetResponses, ListFilesAgentApiV1SessionsSessionIdFilesGetErrors, ThrowOnError> => (options.client ?? client).get<ListFilesAgentApiV1SessionsSessionIdFilesGetResponses, ListFilesAgentApiV1SessionsSessionIdFilesGetErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/files', ...options });
 
 /**
- * Delete a workspace file or directory
- *
- * Delete one file or directory (recursively) from the tree pane.
- */
-export const deleteFileAgentApiV1SessionsSessionIdFileDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteFileAgentApiV1SessionsSessionIdFileDeleteData, ThrowOnError>): RequestResult<DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses, DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors, ThrowOnError> => (options.client ?? client).delete<DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses, DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/file', ...options });
-
-/**
  * Read a workspace file
  *
- * Read one text file's content and ETag for the editor pane.
+ * Read one text file's content for the preview pane.
  */
 export const readFileAgentApiV1SessionsSessionIdFileGet = <ThrowOnError extends boolean = false>(options: Options<ReadFileAgentApiV1SessionsSessionIdFileGetData, ThrowOnError>): RequestResult<ReadFileAgentApiV1SessionsSessionIdFileGetResponses, ReadFileAgentApiV1SessionsSessionIdFileGetErrors, ThrowOnError> => (options.client ?? client).get<ReadFileAgentApiV1SessionsSessionIdFileGetResponses, ReadFileAgentApiV1SessionsSessionIdFileGetErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/file', ...options });
-
-/**
- * Write a workspace file
- *
- * Create or overwrite one text file. Parent directories are created as needed. Send If-Match when saving a previously opened file.
- */
-export const writeFileAgentApiV1SessionsSessionIdFilePut = <ThrowOnError extends boolean = false>(options: Options<WriteFileAgentApiV1SessionsSessionIdFilePutData, ThrowOnError>): RequestResult<WriteFileAgentApiV1SessionsSessionIdFilePutResponses, WriteFileAgentApiV1SessionsSessionIdFilePutErrors, ThrowOnError> => (options.client ?? client).put<WriteFileAgentApiV1SessionsSessionIdFilePutResponses, WriteFileAgentApiV1SessionsSessionIdFilePutErrors, ThrowOnError>({
-    url: '/agent/api/v1/sessions/{session_id}/file',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});

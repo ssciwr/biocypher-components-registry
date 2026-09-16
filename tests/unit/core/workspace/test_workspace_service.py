@@ -1,11 +1,16 @@
 """Unit tests for src/core/workspace/service.py — no network, fake MCP and Anthropic."""
 
 import asyncio
+from unittest.mock import AsyncMock, call
 
 import pytest
 
 from src.core.workspace import client_loop, service
-from src.core.workspace.service import SessionManager, SessionStartupError
+from src.core.workspace.service import (
+    EventStreamAlreadyActive,
+    SessionManager,
+    SessionStartupError,
+)
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -239,6 +244,53 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
         await manager.shutdown()
 
     asyncio.run(scenario())
+
+
+def test_open_event_stream_returns_already_active_for_duplicate(tmp_path):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        first_stream = manager.open_event_stream(session)
+        duplicate_result = manager.open_event_stream(session)
+        result = (
+            isinstance(first_stream, asyncio.Queue),
+            isinstance(duplicate_result, EventStreamAlreadyActive),
+            first_stream in session.subscribers,
+        )
+        await manager.shutdown()
+        return result
+
+    opened, duplicate_rejected, subscribed = asyncio.run(scenario())
+    assert opened
+    assert duplicate_rejected
+    assert subscribed
+
+
+# Ideally this basically gives us more protection about the "Network" erros we saw.
+def test_reconnect_then_61_second_timeout_deletes_session(tmp_path, monkeypatch):
+    async def scenario():
+        sleep = AsyncMock()
+        monkeypatch.setattr(service.asyncio, "sleep", sleep)
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        original_stream = manager.open_event_stream(session)
+        manager.close_event_stream(session, original_stream)
+        reconnected_stream = manager.open_event_stream(session)
+        retained = manager.get(session.id) is session
+        manager.close_event_stream(session, reconnected_stream)
+        await manager._sse_disconnect_tasks[session.id]
+        return (
+            retained,
+            sleep.await_args_list,
+            manager.get(session.id),
+            session.workspace.exists(),
+        )
+
+    retained, delays, expired_session, workspace_exists = asyncio.run(scenario())
+    assert retained
+    assert delays == [call(60)]
+    assert expired_session is None
+    assert not workspace_exists
 
 
 def test_delete_publishes_session_closed(tmp_path):

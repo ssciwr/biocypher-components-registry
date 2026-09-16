@@ -6,7 +6,7 @@ import {
 } from './WorkspaceDisplayComponents.tsx'
 import {
   DirectoryPane,
-  EditorPane,
+  FilePane,
 } from './FileEditingAndDirectoryInterfaces'
 import { WorkspaceKeyForm } from './WorkspaceKeyForm'
 import { useWorkspaceSession } from './useWorkspaceSession'
@@ -56,13 +56,7 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
               prompt={workspace.prompt}
               session={workspace.session}
             />
-            <EditorPane
-              dirtyFile={workspace.dirtyFile}
-              onDraftChange={workspace.updateDraft}
-              onSave={() => void workspace.saveWorkspaceFile()}
-              openFile={workspace.openFile}
-              pending={workspace.pending}
-            />
+            <FilePane openFile={workspace.openFile} />
           </div>
         </div>
       </div>

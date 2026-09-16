@@ -51,7 +51,7 @@ function applySessionState(
   activeSession: WorkspaceAccess,
   state: Awaited<ReturnType<typeof getWorkspaceSessionState>>,
 ): WorkspaceViewSession | null {
-  if (!current || current.id !== activeSession.id) return current
+  if (current?.id !== activeSession.id) return current
   return {
     ...current,
     busy: state.busy,
@@ -59,6 +59,17 @@ function applySessionState(
     hasLLMKey: state.has_key,
     tools: state.tools,
   }
+}
+
+// The below are here to satisfy SonarQube.
+function workspaceToolName(data: Record<string, unknown>): string {
+  if (typeof data.name === 'string' && data.name) return data.name
+  return 'tool'
+}
+
+function workspaceTurnErrorMessage(data: Record<string, unknown>): string {
+  if (typeof data.message === 'string' && data.message) return data.message
+  return 'Workspace turn failed.'
 }
 
 export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
@@ -130,7 +141,6 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
 
   const {
     currentDir,
-    dirtyFile,
     files,
     loadFiles,
     openDirectory,
@@ -138,10 +148,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     openWorkspaceFile,
     refreshFiles,
     reloadCurrentDir,
-    saveWorkspaceFile,
-    updateUsersDraftForFile,
   } = useWorkspaceFiles({
-    appendMessage,
     runPending,
     session,
   })
@@ -173,13 +180,13 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
         if (typeof data.text === 'string' && data.text) appendAssistantDelta(data.text)
         return
       case 'tool_call': {
-        const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        const name = workspaceToolName(data)
         setAgentActivity(`Using ${name}`)
         appendMessage('tool', `-> ${name}`)
         return
       }
       case 'tool_result': {
-        const name = typeof data.name === 'string' && data.name ? data.name : 'tool'
+        const name = workspaceToolName(data)
         setAgentActivity(`Reviewing ${name}`)
         appendMessage('tool', `<- ${name} - ${finiteNumber(data.chars)} chars`)
         return
@@ -199,9 +206,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
         return
       case 'turn_error':
       case 'session_error': {
-        const message = typeof data.message === 'string' && data.message
-          ? data.message
-          : 'Workspace turn failed.'
+        const message = workspaceTurnErrorMessage(data)
         // Error scenarios - alert the user in hte UI first right away
         setAgentActivity(null)
         setSession((current) => current ? { ...current, busy: false, error: message } : current)
@@ -343,7 +348,6 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     canSend,
     chatEndRef,
     currentDir,
-    dirtyFile,
     error,
     files,
     messages,
@@ -353,13 +357,11 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     pending,
     prompt,
     refreshFiles,
-    saveWorkspaceFile,
     sendMessage,
     session,
     setApiKey,
     setPrompt,
     startSession,
     stopTurn,
-    updateDraft: updateUsersDraftForFile,
   }
 }

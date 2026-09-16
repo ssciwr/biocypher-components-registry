@@ -18,10 +18,6 @@ export type FileContentResponse = {
      * Content
      */
     content: string;
-    /**
-     * Etag
-     */
-    etag: string;
 };
 
 /**
@@ -58,34 +54,6 @@ export type FileListResponse = {
      * Entries
      */
     entries: Array<FileEntryResponse>;
-};
-
-/**
- * FileWriteRequest
- *
- * Full content of a file write.
- */
-export type FileWriteRequest = {
-    /**
-     * Content
-     */
-    content: string;
-};
-
-/**
- * FileWriteResponse
- *
- * Response returned when writing one workspace file.
- */
-export type FileWriteResponse = {
-    /**
-     * Path
-     */
-    path: string;
-    /**
-     * Etag
-     */
-    etag: string;
 };
 
 /**
@@ -266,6 +234,10 @@ export type CreateSessionAgentApiV1SessionsPostErrors = {
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Issue creating workspace session
+     */
+    500: unknown;
     /**
      * MCP server unreachable or the session's MCP connection died
      */
@@ -455,7 +427,7 @@ export type PostMessageAgentApiV1SessionsSessionIdMessagesPostErrors = {
      */
     401: unknown;
     /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
+     * Conflict: turn running, filesystem error, or nothing to interrupt
      */
     409: unknown;
     /**
@@ -512,7 +484,7 @@ export type InterruptAgentApiV1SessionsSessionIdInterruptPostErrors = {
      */
     401: unknown;
     /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
+     * Conflict: turn running, filesystem error, or nothing to interrupt
      */
     409: unknown;
     /**
@@ -561,7 +533,7 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetErrors = {
      */
     401: unknown;
     /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
+     * An event stream is already active for this session.
      */
     409: unknown;
     /**
@@ -638,67 +610,6 @@ export type ListFilesAgentApiV1SessionsSessionIdFilesGetResponses = {
 
 export type ListFilesAgentApiV1SessionsSessionIdFilesGetResponse = ListFilesAgentApiV1SessionsSessionIdFilesGetResponses[keyof ListFilesAgentApiV1SessionsSessionIdFilesGetResponses];
 
-export type DeleteFileAgentApiV1SessionsSessionIdFileDeleteData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Session Id
-         */
-        session_id: string;
-    };
-    query: {
-        /**
-         * Path
-         */
-        path: string;
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
-    url: '/agent/api/v1/sessions/{session_id}/file';
-};
-
-export type DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors = {
-    /**
-     * Invalid input: bad path, empty content, or missing key field
-     */
-    400: unknown;
-    /**
-     * Unknown session or invalid session token
-     */
-    401: unknown;
-    /**
-     * No such file or directory
-     */
-    404: unknown;
-    /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
-     */
-    409: unknown;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DeleteFileAgentApiV1SessionsSessionIdFileDeleteError = DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors[keyof DeleteFileAgentApiV1SessionsSessionIdFileDeleteErrors];
-
-export type DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses = {
-    /**
-     * Successful Response
-     */
-    204: void;
-};
-
-export type DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponse = DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses[keyof DeleteFileAgentApiV1SessionsSessionIdFileDeleteResponses];
-
 export type ReadFileAgentApiV1SessionsSessionIdFileGetData = {
     body?: never;
     headers?: {
@@ -740,7 +651,7 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetErrors = {
      */
     404: unknown;
     /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
+     * Conflict: turn running, filesystem error, or nothing to interrupt
      */
     409: unknown;
     /**
@@ -763,64 +674,3 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetResponses = {
 };
 
 export type ReadFileAgentApiV1SessionsSessionIdFileGetResponse = ReadFileAgentApiV1SessionsSessionIdFileGetResponses[keyof ReadFileAgentApiV1SessionsSessionIdFileGetResponses];
-
-export type WriteFileAgentApiV1SessionsSessionIdFilePutData = {
-    body: FileWriteRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-        /**
-         * ETag from the last GET of this file; the write is rejected with 409 if the file changed since.
-         */
-        'If-Match'?: string;
-    };
-    path: {
-        /**
-         * Session Id
-         */
-        session_id: string;
-    };
-    query: {
-        /**
-         * Path
-         */
-        path: string;
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
-    url: '/agent/api/v1/sessions/{session_id}/file';
-};
-
-export type WriteFileAgentApiV1SessionsSessionIdFilePutErrors = {
-    /**
-     * Invalid input: bad path, empty content, or missing key field
-     */
-    400: unknown;
-    /**
-     * Unknown session or invalid session token
-     */
-    401: unknown;
-    /**
-     * Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt
-     */
-    409: unknown;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type WriteFileAgentApiV1SessionsSessionIdFilePutError = WriteFileAgentApiV1SessionsSessionIdFilePutErrors[keyof WriteFileAgentApiV1SessionsSessionIdFilePutErrors];
-
-export type WriteFileAgentApiV1SessionsSessionIdFilePutResponses = {
-    /**
-     * Successful Response
-     */
-    200: FileWriteResponse;
-};
-
-export type WriteFileAgentApiV1SessionsSessionIdFilePutResponse = WriteFileAgentApiV1SessionsSessionIdFilePutResponses[keyof WriteFileAgentApiV1SessionsSessionIdFilePutResponses];

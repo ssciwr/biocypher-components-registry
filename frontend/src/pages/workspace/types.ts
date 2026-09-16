@@ -34,10 +34,6 @@ export type WorkspaceMessage = Readonly<{
   text: string
 }>
 
-export type OpenWorkspaceFile = WorkspaceFile & Readonly<{
-  draft: string
-}>
-
-export type PendingAction = 'idle' | 'key' | 'message' | 'session' | 'file' | 'save'
+export type PendingAction = 'idle' | 'key' | 'message' | 'session' | 'file'
 
 export type WorkspaceFileAction = (entry: WorkspaceFileEntry) => void

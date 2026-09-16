@@ -1,7 +1,8 @@
 /*
  * Priority is to make it so we can interact with SSE functions over OpenAPI-TS
- * types without knowing the intricacies of what repeated JSON structures need
- * to be sent (e.g. If-Match as a header). This is largely a consequence of
+ * types without knowing the intricacies of repeated request structures.
+ *
+ *  This is largely a consequence of
  * OpenAPI-TS being oriented towards simpler HTTP calls whereas SSE has more
  * complexity and a little more boilerplate.
  */
@@ -15,7 +16,6 @@ import {
   postMessageAgentApiV1SessionsSessionIdMessagesPost,
   readFileAgentApiV1SessionsSessionIdFileGet,
   setKeyAgentApiV1SessionsSessionIdKeyPost,
-  writeFileAgentApiV1SessionsSessionIdFilePut,
 } from '../../api/workspace'
 import type { StreamEvent } from '../../api/workspace/core/serverSentEvents.gen'
 import type {
@@ -101,8 +101,8 @@ export async function listWorkspaceFiles(session: WorkspaceAccess, path = '') {
 export async function attachWorkspaceKey(session: WorkspaceAccess, apiKey: string) {
   await setKeyAgentApiV1SessionsSessionIdKeyPost({
     ...sessionOptions(session),
-    body: { api_key: apiKey }, // Frontend only uses api_key, not auth_token, so we could remove auth_token
-  }) // todo: Remove auth_token (PR comment mentioned this as a separate issue).
+    body: { api_key: apiKey },
+  })
   // This is the BYOK key nor our key.
 }
 
@@ -134,23 +134,6 @@ export async function readWorkspaceFile(
   const { data } = await readFileAgentApiV1SessionsSessionIdFileGet({
     ...sessionOptions(session),
     query: { path },
-  })
-  return data
-}
-
-export async function writeWorkspaceFile(
-  session: WorkspaceAccess,
-  file: WorkspaceFile,
-) {
-  const options = sessionOptions(session)
-  const { data } = await writeFileAgentApiV1SessionsSessionIdFilePut({
-    ...options,
-    body: { content: file.content },
-    headers: {
-      ...options.headers,
-      'If-Match': file.etag,
-    },
-    query: { path: file.path },
   })
   return data
 }

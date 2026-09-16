@@ -1022,6 +1022,9 @@
           "401": {
             "description": "Unknown session or invalid session token"
           },
+          "500": {
+            "description": "Issue creating workspace session"
+          },
           "502": {
             "description": "MCP server unreachable or the session's MCP connection died"
           },
@@ -1412,7 +1415,7 @@
             "description": "Unknown session or invalid session token"
           },
           "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+            "description": "Conflict: turn running, filesystem error, or nothing to interrupt"
           },
           "428": {
             "description": "No API key set for this session yet"
@@ -1515,7 +1518,7 @@
             "description": "Unknown session or invalid session token"
           },
           "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+            "description": "Conflict: turn running, filesystem error, or nothing to interrupt"
           },
           "422": {
             "description": "Validation Error",
@@ -1608,11 +1611,11 @@
               }
             }
           },
+          "409": {
+            "description": "An event stream is already active for this session."
+          },
           "401": {
             "description": "Unknown session or invalid session token"
-          },
-          "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
           },
           "422": {
             "description": "Validation Error",
@@ -1743,7 +1746,7 @@
           "workspace"
         ],
         "summary": "Read a workspace file",
-        "description": "Read one text file's content and ETag for the editor pane.",
+        "description": "Read one text file's content for the preview pane.",
         "operationId": "read_file_agent_api_v1_sessions__session_id__file_get",
         "parameters": [
           {
@@ -1834,239 +1837,10 @@
             "description": "No such file or directory"
           },
           "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
+            "description": "Conflict: turn running, filesystem error, or nothing to interrupt"
           },
           "415": {
             "description": "Not a text file"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "workspace"
-        ],
-        "summary": "Write a workspace file",
-        "description": "Create or overwrite one text file. Parent directories are created as needed. Send If-Match when saving a previously opened file.",
-        "operationId": "write_file_agent_api_v1_sessions__session_id__file_put",
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Session Id"
-            }
-          },
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "bcr_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Bcr Session"
-            }
-          },
-          {
-            "in": "header",
-            "name": "If-Match",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "description": "ETag from the last GET of this file; the write is rejected with 409 if the file changed since."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FileWriteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FileWriteResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input: bad path, empty content, or missing key field"
-          },
-          "401": {
-            "description": "Unknown session or invalid session token"
-          },
-          "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "workspace"
-        ],
-        "summary": "Delete a workspace file or directory",
-        "description": "Delete one file or directory (recursively) from the tree pane.",
-        "operationId": "delete_file_agent_api_v1_sessions__session_id__file_delete",
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Session Id"
-            }
-          },
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "bcr_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Bcr Session"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "400": {
-            "description": "Invalid input: bad path, empty content, or missing key field"
-          },
-          "401": {
-            "description": "Unknown session or invalid session token"
-          },
-          "404": {
-            "description": "No such file or directory"
-          },
-          "409": {
-            "description": "Conflict: turn running, stale If-Match, filesystem error, or nothing to interrupt"
           },
           "422": {
             "description": "Validation Error",
@@ -3189,17 +2963,12 @@
           "content": {
             "type": "string",
             "title": "Content"
-          },
-          "etag": {
-            "type": "string",
-            "title": "Etag"
           }
         },
         "type": "object",
         "required": [
           "path",
-          "content",
-          "etag"
+          "content"
         ],
         "title": "FileContentResponse",
         "description": "Response returned when reading one workspace file."
@@ -3249,39 +3018,6 @@
         ],
         "title": "FileListResponse",
         "description": "Response returned when listing one workspace directory level."
-      },
-      "FileWriteRequest": {
-        "properties": {
-          "content": {
-            "type": "string",
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "required": [
-          "content"
-        ],
-        "title": "FileWriteRequest",
-        "description": "Full content of a file write."
-      },
-      "FileWriteResponse": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "etag": {
-            "type": "string",
-            "title": "Etag"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "etag"
-        ],
-        "title": "FileWriteResponse",
-        "description": "Response returned when writing one workspace file."
       },
       "HTTPValidationError": {
         "properties": {

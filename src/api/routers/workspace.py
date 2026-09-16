@@ -15,13 +15,11 @@ EventSource, which cannot set headers; prefer the header).
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
-import shutil
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.dependencies import (
@@ -33,8 +31,6 @@ from src.api.schemas.workspace import (
     FileContentResponse,
     FileEntryResponse,
     FileListResponse,
-    FileWriteRequest,
-    FileWriteResponse,
     InterruptResponse,
     MessageCreateRequest,
     MessageCreateResponse,
@@ -46,9 +42,11 @@ from src.api.schemas.workspace import (
 from src.core.auth.models import AuthSession
 from src.core.workspace import client_loop as cl
 from src.core.workspace.service import (
+    EventStreamAlreadyActive,
     Session,
     SessionManager,
     SessionStartupError,
+    WorkspaceStorageError,
 )
 
 # Seconds between SSE heartbeat comments (keeps proxies from closing the
@@ -60,10 +58,6 @@ router = APIRouter()
 SessionManagerDep = Annotated[SessionManager, Depends(get_session_manager)]
 WorkspaceSessionDep = Annotated[Session, Depends(get_workspace_session)]
 CurrentAuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
-
-
-def _etag(text: str) -> str:
-    return f'"{hashlib.sha256(text.encode()).hexdigest()[:32]}"'
 
 
 def _resolve(session: Session, path: str):
@@ -86,7 +80,7 @@ def _resolve(session: Session, path: str):
         "Allocate a workspace directory and open the MCP connection for a new "
         "agentic workspace session."
     ),
-    responses=workspace_error_responses(401, 502),
+    responses=workspace_error_responses(401, 500, 502),
 )
 async def create_session(
     manager: SessionManagerDep,
@@ -95,6 +89,9 @@ async def create_session(
     """Create a new workspace session."""
     try:
         session = await manager.create(owner_github_user_id=auth_session.github_user_id)
+    except WorkspaceStorageError:
+        # Yes it is more specific but is to prevent server crash just ending SSE causing very vague "Network error"
+        raise HTTPException(500, "Issue creating workspace session.")
     except SessionStartupError as e:
         raise HTTPException(502, f"could not connect to MCP server: {e}")
     return SessionCreateResponse.from_session(session)
@@ -106,7 +103,9 @@ async def create_session(
     description="Return session state, useful after a client reconnect.",
     responses=workspace_error_responses(401),
 )
-async def get_session(session: WorkspaceSessionDep) -> SessionStateResponse:
+async def get_session(
+    session_id: str, session: WorkspaceSessionDep
+) -> SessionStateResponse:
     """Return the current state of one workspace session."""
     return SessionStateResponse.from_session(session)
 
@@ -122,10 +121,10 @@ async def get_session(session: WorkspaceSessionDep) -> SessionStateResponse:
     responses=workspace_error_responses(401),
 )
 async def delete_session(
-    session: WorkspaceSessionDep, manager: SessionManagerDep
+    session_id: str, session: WorkspaceSessionDep, manager: SessionManagerDep
 ) -> None:
     """Delete one workspace session and everything it owns."""
-    await manager.delete(session.id)
+    await manager.delete(session_id)
 
 
 @router.post(
@@ -138,7 +137,9 @@ async def delete_session(
     ),
     responses=workspace_error_responses(400, 401),
 )
-async def set_key(body: SessionKeyRequest, session: WorkspaceSessionDep) -> None:
+async def set_key(
+    session_id: str, body: SessionKeyRequest, session: WorkspaceSessionDep
+) -> None:
     """Attach a BYOK Anthropic credential to one session."""
     if not body.api_key and not body.auth_token:
         raise HTTPException(400, "provide api_key or auth_token")
@@ -161,7 +162,7 @@ async def set_key(body: SessionKeyRequest, session: WorkspaceSessionDep) -> None
     responses=workspace_error_responses(400, 401, 409, 428, 502),
 )
 async def post_message(
-    body: MessageCreateRequest, session: WorkspaceSessionDep
+    session_id: str, body: MessageCreateRequest, session: WorkspaceSessionDep
 ) -> MessageCreateResponse:
     """Start a new chat turn on one session."""
     if session.error:
@@ -188,7 +189,7 @@ async def post_message(
     ),
     responses=workspace_error_responses(401, 409),
 )
-async def interrupt(session: WorkspaceSessionDep) -> InterruptResponse:
+async def interrupt(session_id: str, session: WorkspaceSessionDep) -> InterruptResponse:
     """Interrupt the in-flight or queued turn on one session."""
     if not session.interrupt():
         raise HTTPException(409, "no turn is running")
@@ -206,14 +207,19 @@ async def interrupt(session: WorkspaceSessionDep) -> InterruptResponse:
     response_class=StreamingResponse,
     responses={
         200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}},
-        **workspace_error_responses(401, 409),
+        409: {"description": "An event stream is already active for this session."},
+        **workspace_error_responses(401),
     },
 )
-async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
+async def events(
+    session_id: str, session: WorkspaceSessionDep, manager: SessionManagerDep
+):
     """Stream one session's events as text/event-stream."""
-    if session.subscribers:
+    event_stream = manager.open_event_stream(session)
+    # If any SSE stream is open
+    if isinstance(event_stream, EventStreamAlreadyActive):
         raise HTTPException(409, "workspace session already has an event stream")
-    queue = session.subscribe()
+    queue = event_stream
 
     async def stream():
         try:
@@ -246,8 +252,7 @@ async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
                 if event["type"] == "session_closed":
                     return
         finally:
-            session.unsubscribe(queue)
-            await manager.delete(session.id)
+            manager.close_event_stream(session, queue)
 
     return StreamingResponse(
         stream(),
@@ -257,13 +262,13 @@ async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
 
 
 # File IO in the routes below is synchronous inside async handlers: it blocks
-# the event loop for the duration of one read/write. Fine at workspace scale
-# (text files, single user per session); revisit with anyio.to_thread if the
-# workspace ever holds large files.
+# # the event loop for the duration of one read/write. Fine at workspace scale
+# # (text files, single user per session); revisit with anyio.to_thread if the
+# # workspace ever holds large files.
 
 
 # ===========================================================
-# File Routes (directory pane + editor)
+# File Routes (directory pane + readable field contents preview pane)
 # ===========================================================
 
 
@@ -276,7 +281,9 @@ async def events(session: WorkspaceSessionDep, manager: SessionManagerDep):
     ),
     responses=workspace_error_responses(400, 401, 404),
 )
-async def list_files(session: WorkspaceSessionDep, path: str = "") -> FileListResponse:
+async def list_files(
+    session_id: str, session: WorkspaceSessionDep, path: str = ""
+) -> FileListResponse:
     """List one directory level of a session's workspace."""
     target = _resolve(session, path or ".")
     if not target.is_dir():
@@ -298,10 +305,12 @@ async def list_files(session: WorkspaceSessionDep, path: str = "") -> FileListRe
 @router.get(
     "/sessions/{session_id}/file",
     summary="Read a workspace file",
-    description="Read one text file's content and ETag for the editor pane.",
+    description="Read one text file's content for the preview pane.",
     responses=workspace_error_responses(400, 401, 404, 409, 415),
 )
-async def read_file(path: str, session: WorkspaceSessionDep) -> FileContentResponse:
+async def read_file(
+    session_id: str, path: str, session: WorkspaceSessionDep
+) -> FileContentResponse:
     """Read one text file from a session's workspace."""
     target = _resolve(session, path)
     if not target.is_file():
@@ -312,93 +321,4 @@ async def read_file(path: str, session: WorkspaceSessionDep) -> FileContentRespo
         raise HTTPException(415, f"not a text file: {path}")
     except OSError as e:
         raise HTTPException(409, f"filesystem error: {e}")
-    return FileContentResponse(path=path, content=content, etag=_etag(content))
-
-
-def _check_if_match(target, if_match: str) -> None:
-    """409 when the file changed (or vanished) since the editor loaded it.
-
-    The check is atomic against the agent's file tools (same event loop, no
-    await in between) but not against a concurrent run_command subprocess
-    writing the same file.
-    """
-    if not target.is_file():
-        raise HTTPException(409, "file no longer exists")
-    try:
-        current = _etag(target.read_text())
-    except UnicodeDecodeError:
-        raise HTTPException(415, "not a text file")
-    if current != if_match:
-        # The agent (or another editor) changed the file since it was loaded;
-        # the frontend re-fetches and shows a conflict banner.
-        raise HTTPException(409, "file changed since it was loaded")
-
-
-@router.put(
-    "/sessions/{session_id}/file",
-    summary="Write a workspace file",
-    description=(
-        "Create or overwrite one text file. Parent directories are created "
-        "as needed. Send If-Match when saving a previously opened file."
-    ),
-    responses=workspace_error_responses(400, 401, 409),
-    # If-Match is read from the raw request (not a Header parameter with a
-    # None default), so it is documented here by hand for the OpenAPI schema.
-    openapi_extra={
-        "parameters": [
-            {
-                "in": "header",
-                "name": "If-Match",
-                "schema": {"type": "string"},
-                "required": False,
-                "description": "ETag from the last GET of this file; the "
-                "write is rejected with 409 if the file changed since.",
-            }
-        ]
-    },
-)
-async def write_file(
-    path: str,
-    body: FileWriteRequest,
-    session: WorkspaceSessionDep,
-    request: Request,
-) -> FileWriteResponse:
-    """Create or overwrite one text file in a session's workspace."""
-    if_match = request.headers.get("if-match")
-    target = _resolve(session, path)
-    if target.is_dir():
-        raise HTTPException(409, f"is a directory: {path}")
-    try:
-        if if_match:
-            _check_if_match(target, if_match)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(body.content)
-    except OSError as e:
-        # e.g. a parent component is an existing file, or permissions
-        raise HTTPException(409, f"filesystem error: {e}")
-    session.publish("fs_changed", paths=[path])
-    return FileWriteResponse(path=path, etag=_etag(body.content))
-
-
-@router.delete(
-    "/sessions/{session_id}/file",
-    status_code=204,
-    summary="Delete a workspace file or directory",
-    description="Delete one file or directory (recursively) from the tree pane.",
-    responses=workspace_error_responses(400, 401, 404, 409),
-)
-async def delete_file(path: str, session: WorkspaceSessionDep) -> None:
-    """Delete one file or directory from a session's workspace."""
-    target = _resolve(session, path)
-    if target == session.workspace:
-        raise HTTPException(400, "refusing to delete the workspace root")
-    try:
-        if target.is_dir():
-            shutil.rmtree(target)
-        elif target.is_file():
-            target.unlink()
-        else:
-            raise HTTPException(404, f"no such file or directory: {path}")
-    except OSError as e:
-        raise HTTPException(409, f"filesystem error: {e}")
-    session.publish("fs_changed", paths=[path])
+    return FileContentResponse(path=path, content=content)
