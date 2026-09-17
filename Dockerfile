@@ -16,11 +16,11 @@ ENV PYTHONUNBUFFERED=1 \
 USER root
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git gosu \
+    && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system apiuser \
     && useradd --system --gid apiuser --home-dir /app apiuser \
-    && mkdir -p /app/data \
+    && mkdir -p /app/data /app/data/workspaces \
     && chown -R apiuser:apiuser /app
 # ====
 
@@ -41,10 +41,10 @@ RUN uv sync --frozen --no-dev
 # ====
 
 # ==== Container entrypoint ====
-USER root
+COPY --chown=apiuser:apiuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 555 /usr/local/bin/docker-entrypoint.sh
 
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+USER apiuser
 # ====
 
 # ==== Network configuration ====
