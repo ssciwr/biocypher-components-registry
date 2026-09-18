@@ -18,6 +18,7 @@ import asyncio
 import json
 import os
 import uuid
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Annotated
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -69,6 +70,21 @@ def _resolve(session: Session, path: str):
         return cl.resolve_in_root(path, session.workspace)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# Build the ZIP away from the request event loop to avoid potential thread errors/to avoid using sync in an async context which SonarQUbe does not like
+def _create_workspace_archive(workspace: Path) -> str:
+    with NamedTemporaryFile(suffix=".zip", delete=False) as file:
+        archive_path = file.name
+        try:
+            with ZipFile(file, "w", ZIP_DEFLATED) as archive:
+                for path in workspace.rglob("*"):
+                    if path.is_file() and not path.is_symlink():
+                        archive.write(path, path.relative_to(workspace))
+        except (OSError, RuntimeError):
+            os.unlink(archive_path)
+            raise
+    return archive_path
 
 
 # ===========================================================
@@ -319,18 +335,12 @@ async def list_files(
 )
 # Create .zip for user with the files from the workspace.
 async def download_files(session_id: str, session: WorkspaceSessionDep) -> FileResponse:
-    with NamedTemporaryFile(suffix=".zip", delete=False) as file:
-        archive_path = file.name
-        try:
-            with (
-                ZipFile(file, "w", ZIP_DEFLATED) as archive
-            ):  # the end of this context manager saves the zip to 'file' path.
-                for path in session.workspace.rglob("*"):
-                    if path.is_file() and not path.is_symlink():
-                        archive.write(path, path.relative_to(session.workspace))
-        except (OSError, RuntimeError):
-            os.unlink(archive_path)
-            raise HTTPException(409, "Could not prepare workspace download.")
+    try:
+        archive_path = await asyncio.to_thread(
+            _create_workspace_archive, session.workspace
+        )
+    except (OSError, RuntimeError):
+        raise HTTPException(409, "Could not prepare workspace download.") from None
     return FileResponse(
         archive_path,
         background=BackgroundTask(os.unlink, archive_path),
