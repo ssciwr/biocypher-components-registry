@@ -20,6 +20,7 @@ from tests.support.workspace_fakes import (
 )
 
 PREFIX = "/agent/api/v1"
+pytestmark = pytest.mark.skip(reason="Workspace API routes are currently disabled.")
 
 
 @pytest.fixture

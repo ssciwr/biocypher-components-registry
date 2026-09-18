@@ -157,6 +157,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
 
   const {
     currentDir,
+    downloadWorkspaceFiles,
     files,
     loadFiles,
     openDirectory,
@@ -390,6 +391,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     canSend,
     chatEndRef,
     currentDir,
+    downloadWorkspaceFiles,
     error,
     files,
     messages,

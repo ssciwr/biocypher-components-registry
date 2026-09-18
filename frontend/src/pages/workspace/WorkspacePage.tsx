@@ -44,6 +44,7 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
             <DirectoryPane
               currentDir={workspace.currentDir}
               files={workspace.files}
+              onDownload={() => void workspace.downloadWorkspaceFiles()}
               onOpenDir={workspace.openDirectory}
               onOpenFile={(entry) => void workspace.openWorkspaceFile(entry)}
               onRefresh={workspace.refreshFiles}

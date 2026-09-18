@@ -6,6 +6,7 @@ import type {
   WorkspaceViewSession,
 } from './types'
 import {
+  downloadWorkspaceFiles as downloadWorkspaceArchive,
   listWorkspaceFiles,
   readWorkspaceFile,
 } from './workspaceManageSSEProtocol'
@@ -65,12 +66,21 @@ export function useWorkspaceFiles({
     })
   }
 
+  /*
+   * AI-Generated.
+   */
+  async function downloadWorkspaceFiles() {
+    if (!session) return
+    await runPending('file', () => downloadWorkspaceArchive(session))
+  }
+
   function refreshFiles() {
     if (session) void loadFiles(session, currentDir)
   }
 
   return {
     currentDir,
+    downloadWorkspaceFiles,
     files,
     loadFiles,
     openDirectory,

@@ -16,11 +16,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
+from tempfile import NamedTemporaryFile
 from typing import Annotated
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from starlette.background import BackgroundTask
 
 from src.api.dependencies import (
     get_current_auth_session,
@@ -299,6 +303,39 @@ async def list_files(
             )
             for e in entries
         ],
+    )
+
+
+@router.get(
+    "/sessions/{session_id}/download",
+    response_class=FileResponse,
+    responses={
+        200: {
+            "content": {
+                "application/zip": {"schema": {"type": "string", "format": "binary"}}
+            }
+        }
+    },
+)
+# Create .zip for user with the files from the workspace.
+async def download_files(session_id: str, session: WorkspaceSessionDep) -> FileResponse:
+    with NamedTemporaryFile(suffix=".zip", delete=False) as file:
+        archive_path = file.name
+        try:
+            with (
+                ZipFile(file, "w", ZIP_DEFLATED) as archive
+            ):  # the end of this context manager saves the zip to 'file' path.
+                for path in session.workspace.rglob("*"):
+                    if path.is_file() and not path.is_symlink():
+                        archive.write(path, path.relative_to(session.workspace))
+        except (OSError, RuntimeError):
+            os.unlink(archive_path)
+            raise HTTPException(409, "Could not prepare workspace download.")
+    return FileResponse(
+        archive_path,
+        background=BackgroundTask(os.unlink, archive_path),
+        filename="workspace.zip",
+        media_type="application/zip",
     )
 
 

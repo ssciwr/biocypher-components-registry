@@ -9,6 +9,7 @@
 import {
   createSessionAgentApiV1SessionsPost,
   deleteSessionAgentApiV1SessionsSessionIdDelete,
+  downloadFilesAgentApiV1SessionsSessionIdDownloadGet,
   eventsAgentApiV1SessionsSessionIdEventsGet,
   getSessionAgentApiV1SessionsSessionIdGet,
   interruptAgentApiV1SessionsSessionIdInterruptPost,
@@ -96,6 +97,19 @@ export async function listWorkspaceFiles(session: WorkspaceAccess, path = '') {
     query: { path },
   })
   return data
+}
+
+export async function downloadWorkspaceFiles(session: WorkspaceAccess): Promise<void> {
+  const { data } = await downloadFilesAgentApiV1SessionsSessionIdDownloadGet({
+    ...sessionOptions(session),
+    parseAs: 'blob',
+  })
+  const downloadUrl = URL.createObjectURL(data)
+  const link = document.createElement('a')
+  link.download = 'workspace.zip'
+  link.href = downloadUrl
+  link.click()
+  URL.revokeObjectURL(downloadUrl)
 }
 
 export async function attachWorkspaceKey(session: WorkspaceAccess, apiKey: string) {

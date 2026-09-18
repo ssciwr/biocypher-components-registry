@@ -610,6 +610,47 @@ export type ListFilesAgentApiV1SessionsSessionIdFilesGetResponses = {
 
 export type ListFilesAgentApiV1SessionsSessionIdFilesGetResponse = ListFilesAgentApiV1SessionsSessionIdFilesGetResponses[keyof ListFilesAgentApiV1SessionsSessionIdFilesGetResponses];
 
+export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: {
+        /**
+         * Token
+         */
+        token?: string | null;
+    };
+    url: '/agent/api/v1/sessions/{session_id}/download';
+};
+
+export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetError = DownloadFilesAgentApiV1SessionsSessionIdDownloadGetErrors[keyof DownloadFilesAgentApiV1SessionsSessionIdDownloadGetErrors];
+
+export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Blob | File;
+};
+
+export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetResponse = DownloadFilesAgentApiV1SessionsSessionIdDownloadGetResponses[keyof DownloadFilesAgentApiV1SessionsSessionIdDownloadGetResponses];
+
 export type ReadFileAgentApiV1SessionsSessionIdFileGetData = {
     body?: never;
     headers?: {
