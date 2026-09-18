@@ -102,7 +102,7 @@ def test_turn_with_tool_call(tmp_path):
     from types import SimpleNamespace
 
     tool_use = SimpleNamespace(
-        type="tool_use", id="tu_1", name="get_phase_guidance", input={}
+        type="tool_use", id="tu_1", name="get_phase_guidance", input={"phase": "review"}
     )
     tool_response = {
         "role": "user",
@@ -144,7 +144,7 @@ def test_turn_with_tool_call(tmp_path):
         tool_call = next(e for e in events if e["type"] == "tool_call")
         result = next(e for e in events if e["type"] == "tool_result")
         assert result["data"]["name"] == "get_phase_guidance"
-        assert "args" not in tool_call["data"]
+        assert tool_call["data"]["args"] == {"phase": "review"}
         assert (
             result["data"]["preview"] == "[Succeeded]\nguidance text"
         )  # Succeeded replace "Exit code 2" etc (which is difficult for non-tech people to understand)
