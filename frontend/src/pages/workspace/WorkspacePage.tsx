@@ -35,7 +35,11 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
             pending={workspace.pending}
             session={workspace.session}
           />
-          <WorkspaceError error={workspace.error} />
+          <WorkspaceError
+            canRetry={workspace.canRetry}
+            error={workspace.error}
+            onRetry={() => void workspace.retryTurn()}
+          />
           <div className="grid min-h-0 flex-1 gap-5 overflow-auto xl:grid-cols-[280px_minmax(0,1fr)_420px] xl:overflow-hidden">
             <DirectoryPane
               currentDir={workspace.currentDir}
@@ -64,7 +68,6 @@ function WorkspacePage({ signedIn, signInUrl }: WorkspacePageProps) {
         content={(
           <WorkspaceKeyForm
             apiKey={workspace.apiKey}
-            error={workspace.error}
             onApiKeyChange={workspace.setApiKey}
             onAttachKey={() => void workspace.attachKey()}
             pending={workspace.pending}

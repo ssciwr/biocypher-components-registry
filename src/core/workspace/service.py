@@ -31,6 +31,7 @@ import uuid
 from pathlib import Path
 
 import anthropic
+import httpx
 from anthropic import AsyncAnthropic
 
 from src.core.workspace import client_loop as cl
@@ -89,6 +90,13 @@ def _tool_result_text(content) -> str:
             if _block_get(c, "type") == "text"
         )
     return str(content)
+
+
+# So that we display useful information on the frontend, not empty brackets.
+def _has_tool_details(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip() not in ("", "{}", "[]")
+    return value not in (None, {}, [])
 
 
 class Session:
@@ -223,7 +231,13 @@ class Session:
         self.publish("turn_started", turn_id=turn_id)
         snapshot = len(self.history)
         self.history.append({"role": "user", "content": content})
-        client = self.client_factory(api_key=self.api_key, auth_token=self.auth_token)
+        client = self.client_factory(
+            api_key=self.api_key,
+            auth_token=self.auth_token,
+            timeout=httpx.Timeout(
+                timeout=600, connect=60
+            ),  # Connect default is 5s and could be a cause of disconnects
+        )
         thinking = cl.thinking_config()
         runner = client.beta.messages.tool_runner(
             model=cl.MODEL,
@@ -254,17 +268,30 @@ class Session:
         except asyncio.CancelledError:
             self._fail_turn(snapshot, turn_id, "interrupted")
             raise
-        except anthropic.APIError as e:
+        except anthropic.APIError as error:
             # Same rationale as the CLI: a partial turn can leave a tool_use
             # without its tool_result, which would 400 on every next request.
-            self._fail_turn(snapshot, turn_id, str(e))
-        except Exception as e:  # noqa: BLE001
+            # Extra logging as this has been hard to debug before:
+            logger.exception("Workspace provider stream failed for turn %s", turn_id)
+            message = "Error from AI model stream. Please try again."
+            if isinstance(error, anthropic.AuthenticationError):
+                message = (
+                    "Your Anthropic API key was rejected. Check it or use another key."
+                )
+            elif "credit balance is too low" in str(error).lower():
+                message = (
+                    "Your Anthropic API key is out of credit. Add credit or use "
+                    "another key."
+                )
+            self._fail_turn(snapshot, turn_id, message)
+        except Exception:
             # Any other failure is confined to this turn: same rollback, and
             # the session (and its MCP connection) stays usable. Without this
             # the exception would propagate into run_actor and kill the
             # session with a dangling user message in history.
+            logger.exception("Workspace turn failed for turn %s", turn_id)
             self._fail_turn(
-                snapshot, turn_id, f"internal error: {type(e).__name__}: {e}"
+                snapshot, turn_id, "Workspace turn failed. Please try again."
             )
 
     def _fail_turn(self, snapshot: int, turn_id: str, message: str) -> None:
@@ -288,11 +315,12 @@ class Session:
         for block in content:
             if _block_get(block, "type") == "tool_use":
                 names_by_id[_block_get(block, "id")] = _block_get(block, "name")
-                self.publish(
-                    "tool_call",
-                    name=_block_get(block, "name"),
-                    args=_block_get(block, "input"),
-                )
+                details = {"name": _block_get(block, "name")}
+                tool_input = _block_get(block, "input")
+                if _has_tool_details(tool_input):
+                    details["args"] = tool_input
+                # otherwise, if there were no args, just display the tool name in the frontend
+                self.publish("tool_call", **details)
         return names_by_id
 
     def _publish_tool_results(self, tool_response, names_by_id: dict) -> None:
@@ -300,13 +328,20 @@ class Session:
             if _block_get(block, "type") != "tool_result":
                 continue
             text = _tool_result_text(_block_get(block, "content", ""))
-            self.publish(
-                "tool_result",
-                name=names_by_id.get(_block_get(block, "tool_use_id")),
-                is_error=bool(_block_get(block, "is_error", False)),
-                chars=len(text),
-                preview=text[:EVENT_PREVIEW_CHARS],
+            friendly_text = (
+                text.replace("[exit 0]", "[Succeeded]")
+                .replace("[exit 1]", "[Errored]")
+                .replace("[exit 2]", "[Command usage error]")
             )
+            details = {
+                "name": names_by_id.get(_block_get(block, "tool_use_id")),
+                "is_error": bool(_block_get(block, "is_error", False)),
+                "chars": len(text),
+            }
+            preview = friendly_text[:EVENT_PREVIEW_CHARS]
+            if _has_tool_details(preview):
+                details["preview"] = preview
+            self.publish("tool_result", **details)
 
     async def _emit_stream(self, stream) -> None:
         thinking_marked = False

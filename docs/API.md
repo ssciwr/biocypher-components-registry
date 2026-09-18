@@ -251,8 +251,8 @@ from closing the stream.
 | `turn_started` | `{turn_id}` | turn accepted by the worker |
 | `thinking_started` | `{}` | model is in a thinking block (show a marker) |
 | `text_delta` | `{text}` | assistant text, streamed |
-| `tool_call` | `{name, args}` | the model invoked a tool (render as a chip) |
-| `tool_result` | `{name, is_error, chars, preview}` | tool finished; `preview` is the first 500 chars, `chars` the full length that entered model context |
+| `tool_call` | `{name, args?}` | the model invoked a tool; `args` is omitted when empty |
+| `tool_result` | `{name, is_error, chars, preview?}` | tool finished; `preview` is the first 500 chars when non-empty, `chars` the full length that entered model context |
 | `usage` | `{input, cache_read, cache_write, output}` | token usage of one API call within the turn |
 | `fs_changed` | `{paths}` | workspace changed (agent write/edit or any `run_command` — empty-string path means "anything may have changed"); refresh the tree and open files |
 | `turn_done` | `{turn_id}` | turn finished; the session accepts the next message |

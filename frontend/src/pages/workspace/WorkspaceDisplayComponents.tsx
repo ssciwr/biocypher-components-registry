@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import ReactMarkdown from 'react-markdown'
 import {
+  ArrowPathIcon,
   ExclamationTriangleIcon,
   PaperAirplaneIcon,
   PlayIcon,
@@ -54,6 +55,34 @@ function messageClass(kind: WorkspaceMessage['kind']) {
   return 'bg-white text-slate-800'
 }
 
+function toolDetailsPreview(preview: string): string {
+  const trimmedPreview = preview.trim()
+  const withoutOuterBraces = trimmedPreview.startsWith('{') && trimmedPreview.endsWith('}')
+    ? trimmedPreview.slice(1, -1).trim()
+    : trimmedPreview
+  if (withoutOuterBraces.length <= 160) return withoutOuterBraces
+  return `${withoutOuterBraces.slice(0, 160)}…`
+}
+
+
+function ToolMessageText({ message }: Readonly<{ message: WorkspaceMessage }>) {
+  if (!message.details) return message.text
+
+  return (
+    <>
+      <p>{message.text}</p>
+      <details className="mt-2 rounded border border-slate-200 bg-white px-2 py-1 text-slate-700">
+        <summary className="cursor-pointer break-words text-slate-600 marker:text-base marker:text-slate-400">
+          {toolDetailsPreview(message.details)}
+        </summary>
+        <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-xs leading-5">
+          {message.details}
+        </pre>
+      </details>
+    </>
+  )
+}
+
 
 export function WorkspaceTopBar({ agentActivity, onStart, pending, session }: TopBarProps) {
   return (
@@ -90,14 +119,32 @@ export function WorkspaceTopBar({ agentActivity, onStart, pending, session }: To
 /*
  * AI-Generated.
  */
-export function WorkspaceError({ error }: Readonly<{ error: string | null }>) {
+export function WorkspaceError({
+  canRetry,
+  error,
+  onRetry,
+}: Readonly<{
+  canRetry: boolean
+  error: string | null
+  onRetry: () => void
+}>) {
   if (!error) return null
 
   return (
-    <p className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+    <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
       <ExclamationTriangleIcon className="h-5 w-5 flex-none" aria-hidden="true" />
-      {error}
-    </p>
+      <span className="flex-1">{error}</span>
+      {canRetry ? (
+        <button
+          className="inline-flex h-9 flex-none cursor-pointer items-center gap-2 rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-800 hover:bg-red-100"
+          onClick={onRetry}
+          type="button"
+        >
+          <ArrowPathIcon className="h-4 w-4" aria-hidden="true" />
+          Retry
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -189,6 +236,7 @@ export function ChatPane({
  * AI-Generated.
  */
 function MessageText({ message }: Readonly<{ message: WorkspaceMessage }>) {
+  if (message.kind === 'tool') return <ToolMessageText message={message} />
   if (message.kind !== 'assistant') return message.text
 
   return (

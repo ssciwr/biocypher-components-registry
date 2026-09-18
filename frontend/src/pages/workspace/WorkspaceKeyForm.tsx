@@ -3,7 +3,6 @@ import type { PendingAction } from './types'
 
 type WorkspaceKeyFormProps = Readonly<{
   apiKey: string
-  error?: string | null
   onApiKeyChange: (value: string) => void
   onAttachKey: () => void
   pending: PendingAction
@@ -12,7 +11,6 @@ type WorkspaceKeyFormProps = Readonly<{
 
 export function WorkspaceKeyForm({
   apiKey,
-  error = null,
   onApiKeyChange,
   onAttachKey,
   pending,
@@ -50,7 +48,6 @@ export function WorkspaceKeyForm({
           </button>
         </span>
       </label>
-      {error ? <p className="mt-3 text-sm font-medium text-red-700" role="alert">{error}</p> : null}
     </form>
   )
 }

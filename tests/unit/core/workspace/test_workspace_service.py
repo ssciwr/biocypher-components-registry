@@ -3,6 +3,8 @@
 import asyncio
 from unittest.mock import AsyncMock, call
 
+import anthropic
+import httpx
 import pytest
 
 from src.core.workspace import client_loop, service
@@ -90,7 +92,7 @@ def test_turn_with_tool_call(tmp_path):
     from types import SimpleNamespace
 
     tool_use = SimpleNamespace(
-        type="tool_use", id="tu_1", name="get_phase_guidance", input={"q": "x"}
+        type="tool_use", id="tu_1", name="get_phase_guidance", input={}
     )
     tool_response = {
         "role": "user",
@@ -98,7 +100,7 @@ def test_turn_with_tool_call(tmp_path):
             {
                 "type": "tool_result",
                 "tool_use_id": "tu_1",
-                "content": [{"type": "text", "text": "guidance text"}],
+                "content": [{"type": "text", "text": "[exit 0]\nguidance text"}],
             }
         ],
     }
@@ -129,9 +131,13 @@ def test_turn_with_tool_call(tmp_path):
         assert "tool_call" in types
         assert "tool_result" in types
         assert types.count("usage") == 2
+        tool_call = next(e for e in events if e["type"] == "tool_call")
         result = next(e for e in events if e["type"] == "tool_result")
         assert result["data"]["name"] == "get_phase_guidance"
-        assert result["data"]["preview"] == "guidance text"
+        assert "args" not in tool_call["data"]
+        assert (
+            result["data"]["preview"] == "[Succeeded]\nguidance text"
+        )  # Succeeded replace "Exit code 2" etc (which is difficult for non-tech people to understand)
         # user, assistant(tool_use), tool_result, assistant(final)
         assert len(session.history) == 4
         assert session.busy is False
@@ -140,7 +146,29 @@ def test_turn_with_tool_call(tmp_path):
     asyncio.run(scenario())
 
 
-def test_turn_api_error_rolls_back_history(tmp_path):
+@pytest.mark.parametrize(
+    ("error_kind", "error_message", "expected_message"),
+    [
+        (
+            "provider",
+            "provider error",
+            "Error from AI model stream. Please try again.",
+        ),
+        (
+            "provider",
+            "Your credit balance is too low to access the Anthropic API.",
+            "Your Anthropic API key is out of credit. Add credit or use another key.",
+        ),
+        (
+            "authentication",
+            "invalid x-api-key",
+            "Your Anthropic API key was rejected. Check it or use another key.",
+        ),
+    ],
+)
+def test_turn_api_error_rolls_back_history(
+    tmp_path, caplog, error_kind, error_message, expected_message
+):
     turns = [
         (
             FakeStream([text_event("hi")], final_message([])),
@@ -152,10 +180,22 @@ def test_turn_api_error_rolls_back_history(tmp_path):
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
         session.set_key("sk-test", None)
-        session.client_factory = fake_client_factory(FakeRunner(turns, error_at=0))
+        request = httpx.Request("POST", "https://api.anthropic.test")
+        if error_kind == "authentication":
+            error = anthropic.AuthenticationError(
+                error_message,
+                response=httpx.Response(401, request=request),
+                body=None,
+            )
+        else:
+            error = anthropic.APIError(error_message, request, body=None)
+        session.client_factory = fake_client_factory(
+            FakeRunner(turns, error_at=0, error=error)
+        )
         events = await run_turn(session, "hello")
         assert events[-1]["type"] == "turn_error"
-        assert "boom" in events[-1]["data"]["message"]
+        assert events[-1]["data"]["message"] == expected_message
+        assert error_message in caplog.text
         assert session.history == []
         assert session.busy is False
         # The session survives a failed turn: run a working one after it.
@@ -168,7 +208,7 @@ def test_turn_api_error_rolls_back_history(tmp_path):
     asyncio.run(scenario())
 
 
-def test_turn_unexpected_error_confined_to_turn(tmp_path):
+def test_turn_unexpected_error_confined_to_turn(tmp_path, caplog):
     class ExplodingRunner:
         def __aiter__(self):
             async def gen():
@@ -184,7 +224,10 @@ def test_turn_unexpected_error_confined_to_turn(tmp_path):
         session.client_factory = fake_client_factory(ExplodingRunner())
         events = await run_turn(session, "hello")
         assert events[-1]["type"] == "turn_error"
-        assert "unexpected bug" in events[-1]["data"]["message"]
+        assert (
+            events[-1]["data"]["message"] == "Workspace turn failed. Please try again."
+        )
+        assert "unexpected bug" in caplog.text
         assert session.history == []
         assert session.busy is False
         assert session.error is None  # session survives, actor keeps running

@@ -29,6 +29,7 @@ export type WorkspaceViewSession = Readonly<{
 }>
 
 export type WorkspaceMessage = Readonly<{
+  details: string | null
   id: string
   kind: 'assistant' | 'error' | 'status' | 'tool' | 'user'
   text: string

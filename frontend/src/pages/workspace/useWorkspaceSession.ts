@@ -23,8 +23,12 @@ type UseWorkspaceSessionOptions = Readonly<{
 
 type WorkspaceAccess = Pick<WorkspaceViewSession, 'id' | 'token'>
 
-function createMessage(kind: WorkspaceMessage['kind'], text: string): WorkspaceMessage {
-  return { id: globalThis.crypto.randomUUID(), kind, text }
+function createMessage(
+  kind: WorkspaceMessage['kind'],
+  text: string,
+  details: string | null = null,
+): WorkspaceMessage {
+  return { details, id: globalThis.crypto.randomUUID(), kind, text }
 }
 
 function eventData(data: unknown): Record<string, unknown> {
@@ -67,6 +71,13 @@ function workspaceToolName(data: Record<string, unknown>): string {
   return 'tool'
 }
 
+function workspaceToolDetails(data: Record<string, unknown>, key: 'args' | 'preview'): string | null {
+  const value = data[key]
+  if (typeof value === 'string') return value
+  if (value === undefined || value === null) return null
+  return JSON.stringify(value, null, 2)
+}
+
 function workspaceTurnErrorMessage(data: Record<string, unknown>): string {
   if (typeof data.message === 'string' && data.message) return data.message
   return 'Workspace turn failed.'
@@ -80,6 +91,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   const [apiKey, setApiKey] = useState(() => window.localStorage.getItem('apiKey') ?? '')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>('idle')
+  const [retryAvailable, setRetryAvailable] = useState(false)
   const sessionRef = useRef(session)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -98,8 +110,12 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   }, [messages])
 
   // To the chat UI
-  const appendMessage = useCallback((kind: WorkspaceMessage['kind'], text: string) => {
-    setMessages((current) => [...current, createMessage(kind, text)])
+  const appendMessage = useCallback((
+    kind: WorkspaceMessage['kind'],
+    text: string,
+    details: string | null = null,
+  ) => {
+    setMessages((current) => [...current, createMessage(kind, text, details)])
   }, [])
 
   // Chunk on incoming text to the already visible asisstant/chatbots message in the UI to make it append the
@@ -182,13 +198,13 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
       case 'tool_call': {
         const name = workspaceToolName(data)
         setAgentActivity(`Using ${name}`)
-        appendMessage('tool', `-> ${name}`)
+        appendMessage('tool', `-> ${name}`, workspaceToolDetails(data, 'args'))
         return
       }
       case 'tool_result': {
         const name = workspaceToolName(data)
         setAgentActivity(`Reviewing ${name}`)
-        appendMessage('tool', `<- ${name} - ${finiteNumber(data.chars)} chars`)
+        appendMessage('tool', `<- ${name} - ${finiteNumber(data.chars)} chars`, workspaceToolDetails(data, 'preview'))
         return
       }
       case 'fs_changed': {
@@ -202,13 +218,25 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
         return
       case 'turn_done':
         setAgentActivity(null)
+        setError(null)
+        setRetryAvailable(false)
         setSession((current) => current ? { ...current, busy: false } : current)
         return
-      case 'turn_error':
-      case 'session_error': {
+      case 'turn_error': {
         const message = workspaceTurnErrorMessage(data)
         // Error scenarios - alert the user in hte UI first right away
         setAgentActivity(null)
+        setError(message)
+        setRetryAvailable(true)
+        setSession((current) => current ? { ...current, busy: false, error: message } : current)
+        appendMessage('error', message)
+        return
+      }
+      case 'session_error': {
+        const message = workspaceTurnErrorMessage(data)
+        setAgentActivity(null)
+        setError(message)
+        setRetryAvailable(false)
         setSession((current) => current ? { ...current, busy: false, error: message } : current)
         appendMessage('error', message)
         return
@@ -306,23 +334,35 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
       setApiKey('')
       setSession((current) => current ? { ...current, hasLLMKey: true } : current)
       appendMessage('status', 'Key attached for this session.')
+    }, () => {
+      setSession(null)
+      void endWorkspaceSession(session).catch((endError: unknown) => {
+        console.error('Could not end workspace session after key attachment failed.', endError)
+      })
     })
   }
 
   // This means submit to this workspaces remote server API session; basically send the users message/prompt over
   // and then we will naturally get the response in other functions
-  async function sendMessage() {
-    if (!session?.hasLLMKey || !prompt.trim()) return
-    const content = prompt.trim()
-    setPrompt('')
+  async function sendMessage(retryContent?: string) {
+    if (!session?.hasLLMKey || session.busy) return
+    const content = retryContent ?? prompt.trim()
+    if (!content) return
+    if (!retryContent) setPrompt('')
     appendMessage('user', content)
+    setRetryAvailable(false)
     await runPending('message', async () => {
       await sendWorkspaceMessage(session, content)
       setAgentActivity('Thinking')
-      setSession((current) => current ? { ...current, busy: true } : current)
+      setSession((current) => current ? { ...current, busy: true, error: null } : current)
     }, (message) => {
       appendMessage('error', message)
     })
+  }
+
+  async function retryTurn() {
+    if (!retryAvailable) return
+    await sendMessage('retry/continue now') // Workaround that achieves our goal
   }
 
   // Interrupt the AI/stop generation and other tool uses/actions (e.g. prevent ongoing writing on more files)
@@ -340,11 +380,13 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   }
 
   const canSend = Boolean(session?.hasLLMKey && prompt.trim() && !session.busy)
+  const canRetry = Boolean(retryAvailable && session?.hasLLMKey && !session.busy)
 
   return {
     agentActivity,
     apiKey,
     attachKey,
+    canRetry,
     canSend,
     chatEndRef,
     currentDir,
@@ -357,6 +399,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     pending,
     prompt,
     refreshFiles,
+    retryTurn,
     sendMessage,
     session,
     setApiKey,
