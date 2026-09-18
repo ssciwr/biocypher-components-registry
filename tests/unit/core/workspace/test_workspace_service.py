@@ -88,6 +88,16 @@ def test_create_session_mcp_failure(tmp_path):
     asyncio.run(scenario())
 
 
+def test_create_reports_workspace_storage_error(tmp_path, monkeypatch):
+    manager = make_manager(tmp_path)
+    monkeypatch.setattr(service.asyncio, "to_thread", AsyncMock(side_effect=OSError))
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(manager.create(owner_github_user_id="12345"))
+    assert manager.sessions == {}
+    assert manager.get("missing") is None
+    assert not manager.workspaces_root.exists()
+
+
 def test_turn_with_tool_call(tmp_path):
     from types import SimpleNamespace
 
