@@ -1,11 +1,18 @@
 """Unit tests for src/core/workspace/service.py — no network, fake MCP and Anthropic."""
 
 import asyncio
+from unittest.mock import AsyncMock, call
 
+import anthropic
+import httpx
 import pytest
 
 from src.core.workspace import client_loop, service
-from src.core.workspace.service import SessionManager, SessionStartupError
+from src.core.workspace.service import (
+    EventStreamAlreadyActive,
+    SessionManager,
+    SessionStartupError,
+)
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -81,11 +88,21 @@ def test_create_session_mcp_failure(tmp_path):
     asyncio.run(scenario())
 
 
+def test_create_reports_workspace_storage_error(tmp_path, monkeypatch):
+    manager = make_manager(tmp_path)
+    monkeypatch.setattr(service.asyncio, "to_thread", AsyncMock(side_effect=OSError))
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(manager.create(owner_github_user_id="12345"))
+    assert manager.sessions == {}
+    assert manager.get("missing") is None
+    assert not manager.workspaces_root.exists()
+
+
 def test_turn_with_tool_call(tmp_path):
     from types import SimpleNamespace
 
     tool_use = SimpleNamespace(
-        type="tool_use", id="tu_1", name="get_phase_guidance", input={"q": "x"}
+        type="tool_use", id="tu_1", name="get_phase_guidance", input={"phase": "review"}
     )
     tool_response = {
         "role": "user",
@@ -93,7 +110,7 @@ def test_turn_with_tool_call(tmp_path):
             {
                 "type": "tool_result",
                 "tool_use_id": "tu_1",
-                "content": [{"type": "text", "text": "guidance text"}],
+                "content": [{"type": "text", "text": "[exit 0]\nguidance text"}],
             }
         ],
     }
@@ -124,9 +141,13 @@ def test_turn_with_tool_call(tmp_path):
         assert "tool_call" in types
         assert "tool_result" in types
         assert types.count("usage") == 2
+        tool_call = next(e for e in events if e["type"] == "tool_call")
         result = next(e for e in events if e["type"] == "tool_result")
         assert result["data"]["name"] == "get_phase_guidance"
-        assert result["data"]["preview"] == "guidance text"
+        assert tool_call["data"]["args"] == {"phase": "review"}
+        assert (
+            result["data"]["preview"] == "[Succeeded]\nguidance text"
+        )  # Succeeded replace "Exit code 2" etc (which is difficult for non-tech people to understand)
         # user, assistant(tool_use), tool_result, assistant(final)
         assert len(session.history) == 4
         assert session.busy is False
@@ -135,7 +156,29 @@ def test_turn_with_tool_call(tmp_path):
     asyncio.run(scenario())
 
 
-def test_turn_api_error_rolls_back_history(tmp_path):
+@pytest.mark.parametrize(
+    ("error_kind", "error_message", "expected_message"),
+    [
+        (
+            "provider",
+            "provider error",
+            "Error from AI model stream. Please try again.",
+        ),
+        (
+            "provider",
+            "Your credit balance is too low to access the Anthropic API.",
+            "Your Anthropic API key is out of credit. Add credit or use another key.",
+        ),
+        (
+            "authentication",
+            "invalid x-api-key",
+            "Your Anthropic API key was rejected. Check it or use another key.",
+        ),
+    ],
+)
+def test_turn_api_error_rolls_back_history(
+    tmp_path, caplog, error_kind, error_message, expected_message
+):
     turns = [
         (
             FakeStream([text_event("hi")], final_message([])),
@@ -147,10 +190,22 @@ def test_turn_api_error_rolls_back_history(tmp_path):
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
         session.set_key("sk-test", None)
-        session.client_factory = fake_client_factory(FakeRunner(turns, error_at=0))
+        request = httpx.Request("POST", "https://api.anthropic.test")
+        if error_kind == "authentication":
+            error = anthropic.AuthenticationError(
+                error_message,
+                response=httpx.Response(401, request=request),
+                body=None,
+            )
+        else:
+            error = anthropic.APIError(error_message, request, body=None)
+        session.client_factory = fake_client_factory(
+            FakeRunner(turns, error_at=0, error=error)
+        )
         events = await run_turn(session, "hello")
         assert events[-1]["type"] == "turn_error"
-        assert "boom" in events[-1]["data"]["message"]
+        assert events[-1]["data"]["message"] == expected_message
+        assert error_message in caplog.text
         assert session.history == []
         assert session.busy is False
         # The session survives a failed turn: run a working one after it.
@@ -163,7 +218,7 @@ def test_turn_api_error_rolls_back_history(tmp_path):
     asyncio.run(scenario())
 
 
-def test_turn_unexpected_error_confined_to_turn(tmp_path):
+def test_turn_unexpected_error_confined_to_turn(tmp_path, caplog):
     class ExplodingRunner:
         def __aiter__(self):
             async def gen():
@@ -179,7 +234,10 @@ def test_turn_unexpected_error_confined_to_turn(tmp_path):
         session.client_factory = fake_client_factory(ExplodingRunner())
         events = await run_turn(session, "hello")
         assert events[-1]["type"] == "turn_error"
-        assert "unexpected bug" in events[-1]["data"]["message"]
+        assert (
+            events[-1]["data"]["message"] == "Workspace turn failed. Please try again."
+        )
+        assert "unexpected bug" in caplog.text
         assert session.history == []
         assert session.busy is False
         assert session.error is None  # session survives, actor keeps running
@@ -241,6 +299,53 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
     asyncio.run(scenario())
 
 
+def test_open_event_stream_returns_already_active_for_duplicate(tmp_path):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        first_stream = manager.open_event_stream(session)
+        duplicate_result = manager.open_event_stream(session)
+        result = (
+            isinstance(first_stream, asyncio.Queue),
+            isinstance(duplicate_result, EventStreamAlreadyActive),
+            first_stream in session.subscribers,
+        )
+        await manager.shutdown()
+        return result
+
+    opened, duplicate_rejected, subscribed = asyncio.run(scenario())
+    assert opened
+    assert duplicate_rejected
+    assert subscribed
+
+
+# Ideally this basically gives us more protection about the "Network" erros we saw.
+def test_reconnect_then_61_second_timeout_deletes_session(tmp_path, monkeypatch):
+    async def scenario():
+        sleep = AsyncMock()
+        monkeypatch.setattr(service.asyncio, "sleep", sleep)
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        original_stream = manager.open_event_stream(session)
+        manager.close_event_stream(session, original_stream)
+        reconnected_stream = manager.open_event_stream(session)
+        retained = manager.get(session.id) is session
+        manager.close_event_stream(session, reconnected_stream)
+        await manager._sse_disconnect_tasks[session.id]
+        return (
+            retained,
+            sleep.await_args_list,
+            manager.get(session.id),
+            session.workspace.exists(),
+        )
+
+    retained, delays, expired_session, workspace_exists = asyncio.run(scenario())
+    assert retained
+    assert delays == [call(60)]
+    assert expired_session is None
+    assert not workspace_exists
+
+
 def test_delete_publishes_session_closed(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
@@ -252,6 +357,23 @@ def test_delete_publishes_session_closed(tmp_path):
             events.append(queue.get_nowait())
         assert events[-1]["type"] == "session_closed"
         assert not session.subscribers
+
+    asyncio.run(scenario())
+
+
+# Check idle expiry uses normal session teardown without touching active work.
+def test_reap_idle_sessions(tmp_path):
+    # Exercise session expiry without waiting for the production timeout.
+    async def scenario():
+        manager = make_manager(tmp_path)
+        active = await manager.create(owner_github_user_id="12345")
+        expired = await manager.create(owner_github_user_id="12345")
+        expired.last_activity -= service.IDLE_SESSION_SECONDS + 1
+        reaped = await manager.reap_idle_sessions()
+        assert reaped == 1
+        assert manager.get(active.id) is active
+        assert manager.get(expired.id) is None
+        await manager.shutdown()
 
     asyncio.run(scenario())
 

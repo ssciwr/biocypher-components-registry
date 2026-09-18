@@ -3,7 +3,7 @@
 HTTP/SSE API of the workspace backend (`src/api/routers/workspace.py` +
 `src/core/workspace/service.py`, request/response models in
 `src/api/schemas/workspace.py`). It serves the three-pane workspace UI —
-chat, directory tree, file editor — as part of the main
+chat, directory tree, file preview — as part of the main
 biocypher-components-registry FastAPI app, alongside the registration and
 registry routes under `/api/v1`.
 
@@ -43,8 +43,8 @@ match the tables in this file.
 
 Two caveats when trying routes out in Swagger UI:
 
-1. Workspace routes require the same registry GitHub session cookie that adapter registration does. For
-   `/sessions/{id}/...` requests, provide the `authorization` field with
+1. Workspace routes require the registry GitHub session cookie. For
+   `/sessions/{id}/...` requests, also provide the `authorization` field with
    `Bearer <session_token>` — the word `Bearer`, a space, then the token from
    `POST /sessions` — or put the bare token in the `token` query field.
 2. Do not execute `GET .../events` from Swagger UI: it is an infinite SSE
@@ -137,7 +137,9 @@ connection.
     ]
   }
   ```
-- **401** — GitHub sign-in is required.
+- **401** — GitHub sign-in is required(to start a session). The frontend prompts the user to sign in first too.
+This is the same as the normal application authentication and differs from the 401 that is returned on other agentic
+workspace routes, where 401 means the session workspace key is invalid instead.
 - **502** — the MCP server could not be reached (session is not created).
 
 The `session_token` is shown exactly once; store it client-side for the
@@ -249,22 +251,21 @@ from closing the stream.
 | `turn_started` | `{turn_id}` | turn accepted by the worker |
 | `thinking_started` | `{}` | model is in a thinking block (show a marker) |
 | `text_delta` | `{text}` | assistant text, streamed |
-| `tool_call` | `{name, args}` | the model invoked a tool (render as a chip) |
-| `tool_result` | `{name, is_error, chars, preview}` | tool finished; `preview` is the first 500 chars, `chars` the full length that entered model context |
+| `tool_call` | `{name, args?}` | the model invoked a tool; `args` is omitted when empty |
+| `tool_result` | `{name, is_error, chars, preview?}` | tool finished; `preview` is the first 500 chars when non-empty, `chars` the full length that entered model context |
 | `usage` | `{input, cache_read, cache_write, output}` | token usage of one API call within the turn |
-| `fs_changed` | `{paths}` | workspace changed (agent write/edit, any `run_command` — empty-string path means "anything may have changed" — or an editor `PUT`); refresh the tree and open files |
+| `fs_changed` | `{paths}` | workspace changed (agent write/edit or any `run_command` — empty-string path means "anything may have changed"); refresh the tree and open files |
 | `turn_done` | `{turn_id}` | turn finished; the session accepts the next message |
 | `turn_error` | `{turn_id, message}` | turn failed or was interrupted; history rolled back |
 | `session_error` | `{message}` | MCP connection died; session is unusable |
 | `session_closed` | `{}` | session was deleted; the stream ends after this event |
 
-Multiple subscribers are allowed (e.g. two browser tabs); events are fanned
-out to all of them. There is no replay — connect to the stream before sending
-messages — and the `id:` field is informational only (`Last-Event-ID` on
-reconnect is not honored). Each subscriber buffers at most 1000 events; a
-consumer that stalls longer than that loses the oldest events.
+Each session accepts one event stream. A disconnected stream leaves its session
+and workspace available for 60 seconds so the client can reconnect. There is
+no replay — connect before sending messages — and the `id:` field is
+informational only (`Last-Event-ID` is not honored).
 
-### Files (directory pane + editor)
+### Files (directory pane + preview)
 
 All `path` parameters are relative to the session workspace. Absolute paths
 and `..` are rejected with **400**; symlink escapes are blocked server-side.
@@ -290,50 +291,24 @@ Build the tree by fetching levels lazily as the user expands them.
 
 #### `GET /sessions/{id}/file?path=<file>`
 
-- **200** — `{"path": "a.txt", "content": "...", "etag": "\"c8bfeab3...\""}`
+- **200** — `{"path": "a.txt", "content": "..."}`
 - **404** — no such file.
 - **415** — not a text file.
 
-Keep the `etag`; the editor sends it back on save.
-
-#### `PUT /sessions/{id}/file?path=<file>`
-
-Create or overwrite a file. Parent directories are created as needed.
-
-Body: `{"content": "..."}`. Optional header: `If-Match: <etag>`.
-
-- **200** — `{"path": "a.txt", "etag": "<new etag>"}`
-- **409** — `If-Match` given and the file changed since it was loaded (the
-  agent or another editor wrote it), or the file was deleted, or the path is
-  a directory. Re-fetch, show a conflict banner, let the user decide.
-
-Send `If-Match` when saving an opened file; omit it when creating a new one.
-A successful `PUT` also emits `fs_changed` to all event subscribers.
-
-Filesystem errors (a parent path component is an existing file, permissions)
-also return **409** with the OS error message. The `If-Match` check is atomic
-against the agent's file tools, but not against a shell command
-(`run_command`) writing the same file at the same instant — a lost update
-there is theoretically possible and surfaces as the next `fs_changed`.
-
-#### `DELETE /sessions/{id}/file?path=<path>`
-
-Delete a file or directory (recursively).
-
-- **204** — deleted (emits `fs_changed`).
-- **400** — refusing to delete the workspace root.
-- **404** — no such file or directory.
+The workspace API is read-only: ask the assistant in chat to create, change,
+or delete files.
 
 ## Status code summary
 
-| Code | Meaning here |
-|---|---|
-| 400 | invalid input: bad path, empty message, key body without a key |
-| 401 | missing/wrong session token, or unknown session id |
-| 409 | conflict: turn already running, stale `If-Match`, no turn to interrupt, filesystem error on a file route |
-| 415 | binary file requested as text |
-| 428 | no API key set for the session yet |
-| 502 | MCP server unreachable / session's MCP connection died |
+| Code | Meaning here                                                                                             |
+|---|----------------------------------------------------------------------------------------------------------|
+| 400 | invalid input: bad path, empty message, key body without a key                                           |
+| 401 | missing/wrong workspace session token, or unknown session id                                             |
+| 409 | conflict: turn already running, no turn to interrupt, or filesystem error on a file route |
+| 415 | binary file requested as text                                                                            |
+| 428 | no API key set for the session yet                                                                       |
+| 500 | workspace session could not be created                                                                    |
+| 502 | MCP server unreachable / session's MCP connection died                                                   |
 
 ## Configuration (env vars)
 
@@ -372,10 +347,8 @@ curl -s -X POST $B/sessions/$SID/key -H "$AUTH" -H "Content-Type: application/js
 curl -s -X POST $B/sessions/$SID/messages -H "$AUTH" -H "Content-Type: application/json" \
      -d '{"content": "What BioCypher workflows are available?"}'
 
-# 4. browse and edit the workspace
+# 4. browse the workspace;
 curl -s "$B/sessions/$SID/files" -H "$AUTH"
-curl -s -X PUT "$B/sessions/$SID/file?path=notes.md" -H "$AUTH" \
-     -H "Content-Type: application/json" -d '{"content": "# Notes"}'
 
 # 5. clean up
 curl -s -X DELETE $B/sessions/$SID -H "$AUTH"

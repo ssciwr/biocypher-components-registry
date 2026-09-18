@@ -20,7 +20,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system apiuser \
     && useradd --system --gid apiuser --home-dir /app apiuser \
-    && chown apiuser:apiuser /app
+    && mkdir -p /app/data /app/data/workspaces \
+    && chown -R apiuser:apiuser /app
 # ====
 
 # ==== Python dependency installation ====
@@ -39,10 +40,18 @@ COPY --chown=apiuser:apiuser src/persistence ./src/persistence
 RUN uv sync --frozen --no-dev
 # ====
 
+# ==== Container entrypoint ====
+COPY --chown=apiuser:apiuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 555 /usr/local/bin/docker-entrypoint.sh
+
+USER apiuser
+# ====
+
 # ==== Network configuration ====
 EXPOSE 8000
 # ====
 
 # ==== Application startup ====
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["uv", "run", "--no-sync", "uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
 # ====

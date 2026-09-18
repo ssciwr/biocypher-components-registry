@@ -26,10 +26,12 @@ import os
 import secrets
 import shutil
 import sys
+import time
 import uuid
 from pathlib import Path
 
 import anthropic
+import httpx
 from anthropic import AsyncAnthropic
 
 from src.core.workspace import client_loop as cl
@@ -42,10 +44,23 @@ READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
 EVENT_PREVIEW_CHARS = 500
 # Max events buffered per SSE subscriber; oldest are dropped beyond this.
 EVENT_QUEUE_SIZE = 1000
+# Close idle sessions after 24 hours
+IDLE_SESSION_SECONDS = 24 * 60 * 60  # gets overwritten in test
+IDLE_REAPER_SECONDS = 5 * 60
 
 
 class SessionStartupError(Exception):
     """MCP connection could not be established for a new session."""
+
+
+## I know these are quite obtuse but I just wanted to make the code clear without relying on Stream data classes or their defaults
+class WorkspaceStorageError(Exception):
+    """Workspace session directory could not be created. Specifically to capture this issue instead of erroring -->
+    returning SSE disconnect on error, which I hypothesize to displayed as Network Error"""
+
+
+class EventStreamAlreadyActive:
+    """A workspace session already has an active event stream."""
 
 
 # Default MCP connector; tests inject a fake with the same shape via
@@ -77,6 +92,13 @@ def _tool_result_text(content) -> str:
     return str(content)
 
 
+# So that we display useful information on the frontend, not empty brackets.
+def _has_tool_details(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip() not in ("", "{}", "[]")
+    return value not in (None, {}, [])
+
+
 class Session:
     def __init__(
         self,
@@ -104,6 +126,7 @@ class Session:
         self.busy = False
         self.turn_task: asyncio.Task | None = None
         self.actor: asyncio.Task | None = None
+        self.last_activity = time.monotonic()
         self._seq = 0
         # Test seams; the API layer never touches these.
         self.client_factory = AsyncAnthropic
@@ -124,9 +147,14 @@ class Session:
         self.api_key = api_key or None
         self.auth_token = auth_token or None
 
+    # Call this elsewhere to keep the workspace session alive, needed because otherwise SSE heartbeats would keep alive based on solely requests
+    def mark_active(self) -> None:
+        self.last_activity = time.monotonic()
+
     # ---------------------------------------------------------- events
 
     def publish(self, event_type: str, **data) -> None:
+        self.mark_active()
         self._seq += 1
         event = {"seq": self._seq, "type": event_type, "data": data}
         for queue in tuple(self.subscribers):
@@ -203,7 +231,13 @@ class Session:
         self.publish("turn_started", turn_id=turn_id)
         snapshot = len(self.history)
         self.history.append({"role": "user", "content": content})
-        client = self.client_factory(api_key=self.api_key, auth_token=self.auth_token)
+        client = self.client_factory(
+            api_key=self.api_key,
+            auth_token=self.auth_token,
+            timeout=httpx.Timeout(
+                timeout=600, connect=60
+            ),  # Connect default is 5s and could be a cause of disconnects
+        )
         thinking = cl.thinking_config()
         runner = client.beta.messages.tool_runner(
             model=cl.MODEL,
@@ -234,17 +268,30 @@ class Session:
         except asyncio.CancelledError:
             self._fail_turn(snapshot, turn_id, "interrupted")
             raise
-        except anthropic.APIError as e:
+        except anthropic.APIError as error:
             # Same rationale as the CLI: a partial turn can leave a tool_use
             # without its tool_result, which would 400 on every next request.
-            self._fail_turn(snapshot, turn_id, str(e))
-        except Exception as e:  # noqa: BLE001
+            # Extra logging as this has been hard to debug before:
+            logger.exception("Workspace provider stream failed for turn %s", turn_id)
+            message = "Error from AI model stream. Please try again."
+            if isinstance(error, anthropic.AuthenticationError):
+                message = (
+                    "Your Anthropic API key was rejected. Check it or use another key."
+                )
+            elif "credit balance is too low" in str(error).lower():
+                message = (
+                    "Your Anthropic API key is out of credit. Add credit or use "
+                    "another key."
+                )
+            self._fail_turn(snapshot, turn_id, message)
+        except Exception:
             # Any other failure is confined to this turn: same rollback, and
             # the session (and its MCP connection) stays usable. Without this
             # the exception would propagate into run_actor and kill the
             # session with a dangling user message in history.
+            logger.exception("Workspace turn failed for turn %s", turn_id)
             self._fail_turn(
-                snapshot, turn_id, f"internal error: {type(e).__name__}: {e}"
+                snapshot, turn_id, "Workspace turn failed. Please try again."
             )
 
     def _fail_turn(self, snapshot: int, turn_id: str, message: str) -> None:
@@ -268,11 +315,12 @@ class Session:
         for block in content:
             if _block_get(block, "type") == "tool_use":
                 names_by_id[_block_get(block, "id")] = _block_get(block, "name")
-                self.publish(
-                    "tool_call",
-                    name=_block_get(block, "name"),
-                    args=_block_get(block, "input"),
-                )
+                details = {"name": _block_get(block, "name")}
+                tool_input = _block_get(block, "input")
+                if _has_tool_details(tool_input):
+                    details["args"] = tool_input
+                # otherwise, if there were no args, just display the tool name in the frontend
+                self.publish("tool_call", **details)
         return names_by_id
 
     def _publish_tool_results(self, tool_response, names_by_id: dict) -> None:
@@ -280,13 +328,20 @@ class Session:
             if _block_get(block, "type") != "tool_result":
                 continue
             text = _tool_result_text(_block_get(block, "content", ""))
-            self.publish(
-                "tool_result",
-                name=names_by_id.get(_block_get(block, "tool_use_id")),
-                is_error=bool(_block_get(block, "is_error", False)),
-                chars=len(text),
-                preview=text[:EVENT_PREVIEW_CHARS],
+            friendly_text = (
+                text.replace("[exit 0]", "[Succeeded]")
+                .replace("[exit 1]", "[Errored]")
+                .replace("[exit 2]", "[Command usage error]")
             )
+            details = {
+                "name": names_by_id.get(_block_get(block, "tool_use_id")),
+                "is_error": bool(_block_get(block, "is_error", False)),
+                "chars": len(text),
+            }
+            preview = friendly_text[:EVENT_PREVIEW_CHARS]
+            if _has_tool_details(preview):
+                details["preview"] = preview
+            self.publish("tool_result", **details)
 
     async def _emit_stream(self, stream) -> None:
         thinking_marked = False
@@ -339,16 +394,26 @@ class SessionManager:
         self.mcp_headers = cl.mcp_headers() if mcp_headers is None else mcp_headers
         self.mcp_connect = mcp_connect
         self.sessions: dict[str, Session] = {}
+        self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
         # mkdir is a blocking syscall; off-thread so one session's filesystem
         # latency (or a slow/networked workspaces_root) can't stall every
         # other session's SSE heartbeats and message dispatch on this loop.
-        await asyncio.to_thread(self.workspaces_root.mkdir, parents=True, exist_ok=True)
+        try:
+            await asyncio.to_thread(
+                self.workspaces_root.mkdir, parents=True, exist_ok=True
+            )
+        except OSError as e:
+            logger.exception("Could not create workspace root")
+            raise WorkspaceStorageError from e
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
         try:
             await asyncio.to_thread(workspace.mkdir)
+        except OSError as e:
+            logger.exception("Could not create workspace directory")
+            raise WorkspaceStorageError from e
         except BaseException:
             # to_thread's worker thread runs mkdir to completion even if this
             # await is cancelled (e.g. task killed on shutdown), so the dir
@@ -384,12 +449,76 @@ class SessionManager:
     def get(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
+    # Reconnection cancels the short cleanup window before subscribing again.
+    def open_event_stream(
+        self, session: Session
+    ) -> asyncio.Queue | EventStreamAlreadyActive:
+        if session.subscribers:
+            return EventStreamAlreadyActive()
+        self._cancel_sse_disconnect(session.id)
+        return session.subscribe()
+
+    def close_event_stream(self, session: Session, queue: asyncio.Queue) -> None:
+        session.unsubscribe(queue)
+        if self.get(session.id) is session and not session.subscribers:
+            self._schedule_sse_disconnect(session.id)
+
+    # New event stream or deletion stops the scheduled cleanup task.
+    def _cancel_sse_disconnect(self, session_id: str) -> None:
+        task = self._sse_disconnect_tasks.pop(session_id, None)
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+
+    # schedule for deletion in 60 seconds time (that is controlled by _delete_after_sse_grace)
+    def _schedule_sse_disconnect(self, session_id: str) -> None:
+        self._cancel_sse_disconnect(session_id)
+        task = asyncio.create_task(self._delete_after_sse_60_second_timeout(session_id))
+        self._sse_disconnect_tasks[session_id] = task
+
+    # Delete only if the session still has no active event stream after 60 seconds
+    async def _delete_after_sse_60_second_timeout(self, session_id: str) -> None:
+        try:
+            await asyncio.sleep(60)
+            session = self.get(session_id)
+            if session is not None and not session.subscribers:
+                await self.delete(session_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("SSE reconnect cleanup failed: session_id=%s", session_id)
+        finally:
+            if self._sse_disconnect_tasks.get(session_id) is asyncio.current_task():
+                self._sse_disconnect_tasks.pop(session_id, None)
+
     async def delete(self, session_id: str) -> bool:
+        self._cancel_sse_disconnect(session_id)
         session = self.sessions.pop(session_id, None)
         if session is None:
             return False
         await self._teardown(session)
         return True
+
+    # End idle sessions using normal deletion process which removes the API key and ends streams "nicely".
+    async def reap_idle_sessions(self) -> int:
+        now = time.monotonic()
+        idle_session_ids = [
+            session.id
+            for session in self.sessions.values()
+            if now - session.last_activity >= IDLE_SESSION_SECONDS
+        ]
+        deleted = await asyncio.gather(
+            *(self.delete(session_id) for session_id in idle_session_ids)
+        )
+        return sum(deleted)
+
+    # Stop any sessions which have been running for > 24 hours.
+    async def run_idle_reaper(self) -> None:
+        while True:
+            await asyncio.sleep(IDLE_REAPER_SECONDS)
+            try:
+                await self.reap_idle_sessions()
+            except Exception:
+                logger.exception("workspace idle-session cleanup failed")
 
     async def _teardown(self, session: Session) -> None:
         session.set_key(None, None)

@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,8 +33,14 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.workspace_manager = workspace_manager or SessionManager()
-        yield
-        await app.state.workspace_manager.shutdown()
+        idle_reaper = asyncio.create_task(app.state.workspace_manager.run_idle_reaper())
+        try:
+            yield
+        finally:
+            idle_reaper.cancel()
+            with suppress(asyncio.CancelledError):
+                await idle_reaper
+            await app.state.workspace_manager.shutdown()
 
     app = FastAPI(
         title=settings.app_title,
@@ -78,6 +85,12 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         prefix=settings.api_v1_prefix,
         tags=["registry"],
     )
+    # agentic workspace temporarily hidden/not enabled
+    """app.include_router(
+        workspace.router,
+        prefix=settings.agent_api_prefix,
+        tags=["workspace"],
+    )"""
 
     """ Import workspace above and then restore this to restore workspace API:
      app.include_router(

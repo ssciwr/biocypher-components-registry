@@ -19,11 +19,8 @@ from tests.support.workspace_fakes import (
     text_event,
 )
 
-pytestmark = pytest.mark.skip(
-    reason="workspace API is temporarily inacessible and therefore tests skipped"
-)
-
 PREFIX = "/agent/api/v1"
+pytestmark = pytest.mark.skip(reason="Workspace API routes are currently disabled.")
 
 
 @pytest.fixture
@@ -229,70 +226,30 @@ def test_events_stream_snapshot_and_token_query(manager):
         ) as response:
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/event-stream")
+            second_stream = httpx.get(
+                url, params={"token": created["session_token"]}, timeout=10
+            )
+            assert second_stream.status_code == 409
             for line in response.iter_lines():
                 lines.append(line)
                 if len(lines) >= 2:
                     break
         assert lines[0] == "event: session_state"
         assert '"has_key": false' in lines[1]
+        assert manager.get(created["session_id"]) is not None
+        deleted = httpx.delete(
+            f"{base}/sessions/{created['session_id']}",
+            params={"token": created["session_token"]},
+            timeout=10,
+        )
+        assert deleted.status_code == 204
+        assert manager.get(created["session_id"]) is None
     finally:
         server.should_exit = True
         thread.join(timeout=10)
 
 
 # ----------------------------------------------------------------- files
-
-
-def test_file_roundtrip_and_listing(client, session):
-    sid, headers, _ = session
-    put = client.put(
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "sub/a.txt"},
-        headers=headers,
-        json={"content": "hello"},
-    )
-    assert put.status_code == 200
-    etag = put.json()["etag"]
-
-    got = client.get(
-        f"{PREFIX}/sessions/{sid}/file", params={"path": "sub/a.txt"}, headers=headers
-    )
-    assert got.status_code == 200
-    assert got.json() == {"path": "sub/a.txt", "content": "hello", "etag": etag}
-
-    listing = client.get(
-        f"{PREFIX}/sessions/{sid}/files", params={"path": ""}, headers=headers
-    ).json()
-    assert listing["entries"] == [{"name": "sub", "path": "sub", "is_dir": True}]
-
-
-def test_file_etag_conflict(client, session):
-    sid, headers, session_obj = session
-    url = f"{PREFIX}/sessions/{sid}/file"
-    etag = client.put(
-        url, params={"path": "a.txt"}, headers=headers, json={"content": "v1"}
-    ).json()["etag"]
-
-    # the agent changes the file behind the editor's back
-    (session_obj.workspace / "a.txt").write_text("agent version")
-
-    stale = client.put(
-        url,
-        params={"path": "a.txt"},
-        headers={**headers, "If-Match": etag},
-        json={"content": "v2"},
-    )
-    assert stale.status_code == 409
-
-    current = client.get(url, params={"path": "a.txt"}, headers=headers).json()["etag"]
-    ok = client.put(
-        url,
-        params={"path": "a.txt"},
-        headers={**headers, "If-Match": current},
-        json={"content": "v2"},
-    )
-    assert ok.status_code == 200
-    assert (session_obj.workspace / "a.txt").read_text() == "v2"
 
 
 def test_file_path_confinement(client, session):
@@ -302,51 +259,3 @@ def test_file_path_confinement(client, session):
             f"{PREFIX}/sessions/{sid}/file", params={"path": path}, headers=headers
         )
         assert response.status_code == 400, path
-
-
-def test_file_put_under_file_parent_is_409_not_500(client, session):
-    sid, headers, _ = session
-    url = f"{PREFIX}/sessions/{sid}/file"
-    assert (
-        client.put(
-            url, params={"path": "a.txt"}, headers=headers, json={"content": "x"}
-        ).status_code
-        == 200
-    )
-    response = client.put(
-        url, params={"path": "a.txt/b.txt"}, headers=headers, json={"content": "y"}
-    )
-    assert response.status_code == 409
-    assert "filesystem error" in response.json()["detail"]
-
-
-def test_file_delete(client, session):
-    sid, headers, session_obj = session
-    client.put(
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-        json={"content": "x"},
-    )
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-    )
-    assert response.status_code == 204
-    assert not (session_obj.workspace / "gone.txt").exists()
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-    )
-    assert response.status_code == 404
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "."},
-        headers=headers,
-    )
-    assert response.status_code == 400
