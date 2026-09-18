@@ -1,4 +1,4 @@
-import { ArrowRightOnRectangleIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
 import { client } from '../api/client/client.gen'
 
@@ -9,10 +9,9 @@ type AuthUser = Readonly<{
 type AppHeaderProps = Readonly<{
   authUser: AuthUser | null
   onLogout: () => Promise<void>
-  showWorkspaceLink: boolean
 }>
 
-function AppHeader({ authUser, onLogout, showWorkspaceLink }: AppHeaderProps) {
+function AppHeader({ authUser, onLogout }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -54,6 +53,7 @@ function AppHeader({ authUser, onLogout, showWorkspaceLink }: AppHeaderProps) {
               Sign in with GitHub
             </a>
           )}
+          {/* agentic workspace temporarily hidden/not enabled
           {showWorkspaceLink && (
             <a
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-base text-white hover:bg-blue-700"
@@ -63,6 +63,7 @@ function AppHeader({ authUser, onLogout, showWorkspaceLink }: AppHeaderProps) {
               <b>MCP Workspace</b>
             </a>
           )}
+          */}
         </div>
       </div>
     </header>
