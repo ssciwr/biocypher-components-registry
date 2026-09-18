@@ -67,12 +67,14 @@ function toolDetailsPreview(preview: string): string {
 
 function ToolMessageText({ message }: Readonly<{ message: WorkspaceMessage }>) {
   if (!message.details) return message.text
+  const detailsLabel = message.text.startsWith('->') ? 'Input' : 'Result'
 
   return (
     <>
       <p>{message.text}</p>
       <details className="mt-2 rounded border border-slate-200 bg-white px-2 py-1 text-slate-700">
         <summary className="cursor-pointer break-words text-slate-600 marker:text-base marker:text-slate-400">
+          <span className="font-semibold text-slate-700">{detailsLabel}: </span>
           {toolDetailsPreview(message.details)}
         </summary>
         <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-xs leading-5">
