@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Seconds to wait for the MCP connection when creating a session.
 READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
 # Chars of each tool result included in the tool_result SSE event.
-EVENT_PREVIEW_CHARS = 500
+EVENT_PREVIEW_CHARS = 5000
 # Max events buffered per SSE subscriber; oldest are dropped beyond this.
 EVENT_QUEUE_SIZE = 1000
 # Close idle sessions after 24 hours

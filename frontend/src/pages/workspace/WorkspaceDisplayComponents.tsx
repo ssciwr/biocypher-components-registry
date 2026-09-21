@@ -1,5 +1,8 @@
-import type { RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { jsonrepair } from 'jsonrepair'
+import { JsonView, allExpanded, defaultStyles } from 'react-json-view-lite'
+import 'react-json-view-lite/dist/index.css'
 import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
@@ -60,26 +63,45 @@ function toolDetailsPreview(preview: string): string {
   const withoutOuterBraces = trimmedPreview.startsWith('{') && trimmedPreview.endsWith('}')
     ? trimmedPreview.slice(1, -1).trim()
     : trimmedPreview
-  if (withoutOuterBraces.length <= 160) return withoutOuterBraces
-  return `${withoutOuterBraces.slice(0, 160)}…`
+  if (withoutOuterBraces.length <= 80) return withoutOuterBraces
+  return `${withoutOuterBraces.slice(0, 80)}…`
 }
 
 
 function ToolMessageText({ message }: Readonly<{ message: WorkspaceMessage }>) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
   if (!message.details) return message.text
   const detailsLabel = message.text.startsWith('->') ? 'Input' : 'Result'
+  const trimmedDetails = message.details.trim()
+  let jsonDetails: object | null = null
+
+  if (trimmedDetails.startsWith('{') || trimmedDetails.startsWith('[')) {
+    try {
+      const parsedDetails: unknown = JSON.parse(jsonrepair(trimmedDetails))
+      if (typeof parsedDetails === 'object' && parsedDetails !== null) jsonDetails = parsedDetails
+    } catch {
+      jsonDetails = null
+    }
+  }
 
   return (
     <>
       <p>{message.text}</p>
-      <details className="mt-2 rounded border border-slate-200 bg-white px-2 py-1 text-slate-700">
+      <details
+        className="mt-2 rounded border border-slate-200 bg-white px-2 py-1 text-slate-700"
+        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+      >
         <summary className="cursor-pointer break-words text-slate-600 marker:text-base marker:text-slate-400">
-          <span className="font-semibold text-slate-700">{detailsLabel}: </span>
-          {toolDetailsPreview(message.details)}
+          <span className="font-semibold text-slate-700">{detailsLabel}</span>
+          {!detailsOpen ? `: ${toolDetailsPreview(message.details)}` : null}
         </summary>
-        <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-xs leading-5">
-          {message.details}
-        </pre>
+        <div className="mt-2 max-h-80 overflow-auto border-t border-slate-200 pt-2 text-xs leading-5">
+          {jsonDetails ? (
+            <JsonView compactTopLevel data={jsonDetails} shouldExpandNode={allExpanded} style={defaultStyles} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words">{message.details}</pre>
+          )}
+        </div>
       </details>
     </>
   )
