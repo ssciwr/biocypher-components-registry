@@ -43,3 +43,6 @@ performance = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.coverage.run]
+omit = ["tests/*"]
