@@ -82,19 +82,23 @@ def final_message(content, input_tokens=10, output_tokens=5):
 class FakeRunner:
     """Mimics tool_runner: yields streams, hands out tool responses between."""
 
-    def __init__(self, turns, error_at=None):
+    def __init__(self, turns, error_at=None, error=None):
         # turns: list of (FakeStream, tool_response_dict_or_None)
         self.turns = turns
         self.error_at = error_at
+        self.error = error
         self._responses = [resp for _, resp in turns]
 
     def __aiter__(self):
         async def gen():
             for i, (stream, _) in enumerate(self.turns):
                 if self.error_at == i:
+                    if self.error is not None:
+                        raise self.error
+                    request = httpx.Request("POST", "https://api.anthropic.test")
                     raise anthropic.APIError(
-                        "boom",
-                        httpx.Request("POST", "https://api.anthropic.test"),
+                        "LLM Provider (Anthropic) error - check if their services are down and try later",
+                        request,
                         body=None,
                     )
                 yield stream
@@ -106,7 +110,7 @@ class FakeRunner:
 
 
 def fake_client_factory(runner):
-    def factory(api_key=None, auth_token=None):
+    def factory(api_key=None, auth_token=None, timeout=None):
         return SimpleNamespace(
             beta=SimpleNamespace(
                 messages=SimpleNamespace(tool_runner=lambda **kwargs: runner)

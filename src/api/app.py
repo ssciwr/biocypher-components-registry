@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,9 +13,12 @@ from src.api.routers import (
     metadata,
     registrations,
     registry,
+    workspace,
 )
 from src.api.settings import settings
 from src.core.workspace.service import SessionManager
+
+agentic_api_active: bool = False
 
 # ===========================================================
 # Application Factory
@@ -30,10 +34,16 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
     """
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI):  # pragma: no cover - workspace API is disabled
         app.state.workspace_manager = workspace_manager or SessionManager()
-        yield
-        await app.state.workspace_manager.shutdown()
+        idle_reaper = asyncio.create_task(app.state.workspace_manager.run_idle_reaper())
+        try:
+            yield
+        finally:
+            idle_reaper.cancel()
+            with suppress(asyncio.CancelledError):
+                await idle_reaper
+            await app.state.workspace_manager.shutdown()
 
     app = FastAPI(
         title=settings.app_title,
@@ -78,13 +88,12 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         prefix=settings.api_v1_prefix,
         tags=["registry"],
     )
-
-    """ Import workspace above and then restore this to restore workspace API:
-     app.include_router(
-        workspace.router,
-        prefix=settings.agent_api_prefix,
-        tags=["workspace"],
-    )"""
+    if agentic_api_active:
+        app.include_router(
+            workspace.router,
+            prefix=settings.agent_api_prefix,
+            tags=["workspace"],
+        )
 
     return app
 

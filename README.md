@@ -291,7 +291,9 @@ docker compose -f docker-compose-sqlite.yml up
 docker compose -f docker-compose-postgresql.yml up
 ```
 
-The compose files expose the backend API on http://localhost:8000. The PostgreSQL compose file also exposes the database on port 5432 and requires `POSTGRES_PASSWORD` to be set (via a `.env` file with `KEY=VALUE` lines or exported shell variables); it fails fast if that variable is missing. `POSTGRES_DB` and `POSTGRES_USER` are optional and default to `biocypher_registry` and `biocypher`. The frontend service in both compose files points at a `./frontend-placeholder` directory and only serves a static Nginx placeholder; it is not wired to the real `frontend/` app. For frontend development, use the Vite workflow in `frontend/` instead.
+The compose files expose the backend API on http://localhost:8000. The backend runs as the unprivileged `apiuser`; fresh named volumes inherit the writable `/app/data` directories from the image. The PostgreSQL compose file also exposes the database on port 5432 and requires `POSTGRES_PASSWORD` to be set (via a `.env` file with `KEY=VALUE` lines or exported shell variables); it fails fast if that variable is missing. `POSTGRES_DB` and `POSTGRES_USER` are optional and default to `biocypher_registry` and `biocypher`. The frontend service in both compose files points at a `./frontend-placeholder` directory and only serves a static Nginx placeholder; it is not wired to the real `frontend/` app. For frontend development, use the Vite workflow in `frontend/` instead.
+
+If an existing sqlite database has issues for local development, I recommend to wipe it and remount hte volume/restart the docker container completely.
 
 ## Project Structure
 

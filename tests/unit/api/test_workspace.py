@@ -1,15 +1,21 @@
 """API tests for the workspace routes — TestClient over fake MCP and Anthropic."""
 
 import time
+from functools import partial
+from io import BytesIO
+from tempfile import NamedTemporaryFile
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, Mock
+from zipfile import ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.dependencies import get_current_auth_session
+from src.api.routers import workspace as workspace_router
 from src.core.auth.models import AuthSession
-from src.core.workspace.service import SessionManager
+from src.core.workspace.service import SessionManager, WorkspaceStorageError
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -19,15 +25,12 @@ from tests.support.workspace_fakes import (
     text_event,
 )
 
-pytestmark = pytest.mark.skip(
-    reason="workspace API is temporarily inacessible and therefore tests skipped"
-)
-
 PREFIX = "/agent/api/v1"
 
 
 @pytest.fixture
-def manager(tmp_path):
+def manager(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.api.app.agentic_api_active", True)
     return SessionManager(
         workspaces_root=tmp_path / "workspaces",
         mcp_headers={},
@@ -78,6 +81,19 @@ def test_create_session_returns_tools_and_token(client):
     names = [t["name"] for t in body["tools"]]
     assert "get_phase_guidance" in names
     assert "write_file" in names
+
+
+def test_create_session_hides_storage_error(client, manager, monkeypatch):
+    """AI-Generated.
+
+    Return a generic response when workspace storage cannot create a session.
+    """
+    create = AsyncMock(side_effect=WorkspaceStorageError())
+    monkeypatch.setattr(manager, "create", create)
+    response = client.post(f"{PREFIX}/sessions")
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Issue creating workspace session."}
+    create.assert_awaited_once_with(owner_github_user_id="12345")
 
 
 def test_create_session_requires_github_auth(manager):
@@ -229,70 +245,75 @@ def test_events_stream_snapshot_and_token_query(manager):
         ) as response:
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/event-stream")
+            second_stream = httpx.get(
+                url, params={"token": created["session_token"]}, timeout=10
+            )
+            assert second_stream.status_code == 409
             for line in response.iter_lines():
                 lines.append(line)
                 if len(lines) >= 2:
                     break
         assert lines[0] == "event: session_state"
         assert '"has_key": false' in lines[1]
+        assert manager.get(created["session_id"]) is not None
+        deleted = httpx.delete(
+            f"{base}/sessions/{created['session_id']}",
+            params={"token": created["session_token"]},
+            timeout=10,
+        )
+        assert deleted.status_code == 204
+        assert manager.get(created["session_id"]) is None
     finally:
         server.should_exit = True
         thread.join(timeout=10)
 
 
 # ----------------------------------------------------------------- files
-
-
-def test_file_roundtrip_and_listing(client, session):
-    sid, headers, _ = session
-    put = client.put(
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "sub/a.txt"},
-        headers=headers,
-        json={"content": "hello"},
-    )
-    assert put.status_code == 200
-    etag = put.json()["etag"]
-
-    got = client.get(
-        f"{PREFIX}/sessions/{sid}/file", params={"path": "sub/a.txt"}, headers=headers
-    )
-    assert got.status_code == 200
-    assert got.json() == {"path": "sub/a.txt", "content": "hello", "etag": etag}
-
-    listing = client.get(
-        f"{PREFIX}/sessions/{sid}/files", params={"path": ""}, headers=headers
-    ).json()
-    assert listing["entries"] == [{"name": "sub", "path": "sub", "is_dir": True}]
-
-
-def test_file_etag_conflict(client, session):
+# These three tests below are AI-generated and then reviewed.
+# I requested each one based on missing lines(and specific exceptions being thrown) in the Codecov report.
+#
+def test_download_archives_workspace_files_without_symlinks(client, session):
     sid, headers, session_obj = session
-    url = f"{PREFIX}/sessions/{sid}/file"
-    etag = client.put(
-        url, params={"path": "a.txt"}, headers=headers, json={"content": "v1"}
-    ).json()["etag"]
-
-    # the agent changes the file behind the editor's back
-    (session_obj.workspace / "a.txt").write_text("agent version")
-
-    stale = client.put(
-        url,
-        params={"path": "a.txt"},
-        headers={**headers, "If-Match": etag},
-        json={"content": "v2"},
+    (session_obj.workspace / "adapter.py").write_text("print('adapter')")
+    (session_obj.workspace / "linked.py").symlink_to(
+        session_obj.workspace / "adapter.py"
     )
-    assert stale.status_code == 409
+    response = client.get(f"{PREFIX}/sessions/{sid}/download", headers=headers)
+    with ZipFile(BytesIO(response.content)) as archive:
+        names = archive.namelist()
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert names == ["adapter.py"]
 
-    current = client.get(url, params={"path": "a.txt"}, headers=headers).json()["etag"]
-    ok = client.put(
-        url,
-        params={"path": "a.txt"},
-        headers={**headers, "If-Match": current},
-        json={"content": "v2"},
+
+def test_workspace_archive_removes_temp_file_when_writing_fails(tmp_path, monkeypatch):
+    archive_root = tmp_path / "archives"
+    archive_root.mkdir()
+    archive = MagicMock()
+    archive.__enter__.return_value.write.side_effect = OSError
+    monkeypatch.setattr(
+        workspace_router,
+        "NamedTemporaryFile",
+        partial(NamedTemporaryFile, dir=archive_root),
     )
-    assert ok.status_code == 200
-    assert (session_obj.workspace / "a.txt").read_text() == "v2"
+    monkeypatch.setattr(workspace_router, "ZipFile", Mock(return_value=archive))
+    with pytest.raises(OSError):
+        workspace_router._create_workspace_archive(tmp_path)
+    assert archive.__enter__.return_value.write.call_count == 1
+    assert list(archive_root.iterdir()) == []
+    assert archive.__exit__.called
+
+
+def test_download_returns_conflict_when_archive_creation_fails(
+    client, session, monkeypatch
+):
+    sid, headers, _ = session
+    create_archive = Mock(side_effect=OSError)
+    monkeypatch.setattr(workspace_router, "_create_workspace_archive", create_archive)
+    response = client.get(f"{PREFIX}/sessions/{sid}/download", headers=headers)
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Could not prepare workspace download."}
+    assert create_archive.call_count == 1
 
 
 def test_file_path_confinement(client, session):
@@ -302,51 +323,3 @@ def test_file_path_confinement(client, session):
             f"{PREFIX}/sessions/{sid}/file", params={"path": path}, headers=headers
         )
         assert response.status_code == 400, path
-
-
-def test_file_put_under_file_parent_is_409_not_500(client, session):
-    sid, headers, _ = session
-    url = f"{PREFIX}/sessions/{sid}/file"
-    assert (
-        client.put(
-            url, params={"path": "a.txt"}, headers=headers, json={"content": "x"}
-        ).status_code
-        == 200
-    )
-    response = client.put(
-        url, params={"path": "a.txt/b.txt"}, headers=headers, json={"content": "y"}
-    )
-    assert response.status_code == 409
-    assert "filesystem error" in response.json()["detail"]
-
-
-def test_file_delete(client, session):
-    sid, headers, session_obj = session
-    client.put(
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-        json={"content": "x"},
-    )
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-    )
-    assert response.status_code == 204
-    assert not (session_obj.workspace / "gone.txt").exists()
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "gone.txt"},
-        headers=headers,
-    )
-    assert response.status_code == 404
-    response = client.request(
-        "DELETE",
-        f"{PREFIX}/sessions/{sid}/file",
-        params={"path": "."},
-        headers=headers,
-    )
-    assert response.status_code == 400

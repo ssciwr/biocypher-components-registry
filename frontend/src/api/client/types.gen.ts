@@ -454,13 +454,13 @@ export type AdapterMetadataResponse = {
 /**
  * AuthMeResponse
  *
- * Signed-in GitHub identity shown in the frontend header.
+ * Browser-safe signed-in state.
  */
 export type AuthMeResponse = {
     /**
-     * Github Login
+     * Authenticated
      */
-    github_login: string;
+    authenticated: boolean;
 };
 
 /**
@@ -738,9 +738,9 @@ export type RegistrationCreateResponse = {
      */
     cff_url?: string | null;
     /**
-     * Submitted By Github Login
+     * Submitted By Github User Id
      */
-    submitted_by_github_login?: string | null;
+    submitted_by_github_user_id?: string | null;
 };
 
 /**
@@ -799,9 +799,9 @@ export type RegistrationDetailResponse = {
      */
     cff_url?: string | null;
     /**
-     * Submitted By Github Login
+     * Submitted By Github User Id
      */
-    submitted_by_github_login?: string | null;
+    submitted_by_github_user_id?: string | null;
     /**
      * Metadata Path
      */
@@ -942,9 +942,9 @@ export type RegistrationListItemResponse = {
      */
     cff_url?: string | null;
     /**
-     * Submitted By Github Login
+     * Submitted By Github User Id
      */
-    submitted_by_github_login?: string | null;
+    submitted_by_github_user_id?: string | null;
     /**
      * Profile Version
      */
@@ -1015,9 +1015,9 @@ export type RegistrationProcessResponse = {
      */
     cff_url?: string | null;
     /**
-     * Submitted By Github Login
+     * Submitted By Github User Id
      */
-    submitted_by_github_login?: string | null;
+    submitted_by_github_user_id?: string | null;
     /**
      * Metadata Path
      */
@@ -1090,9 +1090,9 @@ export type RegistrationRevalidateResponse = {
      */
     cff_url?: string | null;
     /**
-     * Submitted By Github Login
+     * Submitted By Github User Id
      */
-    submitted_by_github_login?: string | null;
+    submitted_by_github_user_id?: string | null;
     /**
      * Metadata Path
      */
