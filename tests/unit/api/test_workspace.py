@@ -5,7 +5,7 @@ from functools import partial
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from zipfile import ZipFile
 
 import pytest
@@ -15,7 +15,7 @@ from src.api.app import create_app
 from src.api.dependencies import get_current_auth_session
 from src.api.routers import workspace as workspace_router
 from src.core.auth.models import AuthSession
-from src.core.workspace.service import SessionManager
+from src.core.workspace.service import SessionManager, WorkspaceStorageError
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -81,6 +81,19 @@ def test_create_session_returns_tools_and_token(client):
     names = [t["name"] for t in body["tools"]]
     assert "get_phase_guidance" in names
     assert "write_file" in names
+
+
+def test_create_session_hides_storage_error(client, manager, monkeypatch):
+    """AI-Generated.
+
+    Return a generic response when workspace storage cannot create a session.
+    """
+    create = AsyncMock(side_effect=WorkspaceStorageError())
+    monkeypatch.setattr(manager, "create", create)
+    response = client.post(f"{PREFIX}/sessions")
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Issue creating workspace session."}
+    create.assert_awaited_once_with(owner_github_user_id="12345")
 
 
 def test_create_session_requires_github_auth(manager):
