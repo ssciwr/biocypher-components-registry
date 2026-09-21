@@ -31,7 +31,7 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
     """
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI):  # pragma: no cover - workspace API is disabled
         app.state.workspace_manager = workspace_manager or SessionManager()
         idle_reaper = asyncio.create_task(app.state.workspace_manager.run_idle_reaper())
         try:
