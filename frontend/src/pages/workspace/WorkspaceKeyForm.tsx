@@ -29,10 +29,9 @@ export function WorkspaceKeyForm({
           Anthropic API key
         </span>
         <span className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-          {/* eslint-disable-next-line react/no-autofocus */}
           <input
             autoComplete="off"
-            autoFocus
+            autoFocus // NOSONAR: this key dialog has one initial action, so focusing its sole field is intentional.
             className="h-14 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-5 text-base font-normal outline-none focus:border-blue-500 focus:bg-white"
             onChange={(event) => onApiKeyChange(event.target.value)}
             placeholder="sk-ant-..."
