@@ -1,13 +1,19 @@
 """API tests for the workspace routes — TestClient over fake MCP and Anthropic."""
 
 import time
+from functools import partial
+from io import BytesIO
+from tempfile import NamedTemporaryFile
 from types import SimpleNamespace
+from unittest.mock import MagicMock, Mock
+from zipfile import ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.dependencies import get_current_auth_session
+from src.api.routers import workspace as workspace_router
 from src.core.auth.models import AuthSession
 from src.core.workspace.service import SessionManager
 from tests.support.workspace_fakes import (
@@ -250,6 +256,51 @@ def test_events_stream_snapshot_and_token_query(manager):
 
 
 # ----------------------------------------------------------------- files
+# These three tests below are AI-generated and then reviewed.
+# I requested each one based on missing lines(and specific exceptions being thrown) in the Codecov report.
+#
+def test_download_archives_workspace_files_without_symlinks(client, session):
+    sid, headers, session_obj = session
+    (session_obj.workspace / "adapter.py").write_text("print('adapter')")
+    (session_obj.workspace / "linked.py").symlink_to(
+        session_obj.workspace / "adapter.py"
+    )
+    response = client.get(f"{PREFIX}/sessions/{sid}/download", headers=headers)
+    with ZipFile(BytesIO(response.content)) as archive:
+        names = archive.namelist()
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert names == ["adapter.py"]
+
+
+def test_workspace_archive_removes_temp_file_when_writing_fails(tmp_path, monkeypatch):
+    archive_root = tmp_path / "archives"
+    archive_root.mkdir()
+    archive = MagicMock()
+    archive.__enter__.return_value.write.side_effect = OSError
+    monkeypatch.setattr(
+        workspace_router,
+        "NamedTemporaryFile",
+        partial(NamedTemporaryFile, dir=archive_root),
+    )
+    monkeypatch.setattr(workspace_router, "ZipFile", Mock(return_value=archive))
+    with pytest.raises(OSError):
+        workspace_router._create_workspace_archive(tmp_path)
+    assert archive.__enter__.return_value.write.call_count == 1
+    assert list(archive_root.iterdir()) == []
+    assert archive.__exit__.called
+
+
+def test_download_returns_conflict_when_archive_creation_fails(
+    client, session, monkeypatch
+):
+    sid, headers, _ = session
+    create_archive = Mock(side_effect=OSError)
+    monkeypatch.setattr(workspace_router, "_create_workspace_archive", create_archive)
+    response = client.get(f"{PREFIX}/sessions/{sid}/download", headers=headers)
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Could not prepare workspace download."}
+    assert create_archive.call_count == 1
 
 
 def test_file_path_confinement(client, session):

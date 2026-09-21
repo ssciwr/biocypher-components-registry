@@ -233,9 +233,9 @@ export function ChatPane({
           />
           {session?.busy ? (
             <div className="flex flex-none items-center gap-3">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-600" role="status">
+              <output className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" aria-hidden="true" />
-              </span>
+              </output>
               <button
                 className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
                 onClick={onStop}
