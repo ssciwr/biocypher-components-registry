@@ -15,7 +15,6 @@ export function WorkspaceKeyForm({
   onAttachKey,
   pending,
 }: WorkspaceKeyFormProps) {
-  // TODO: show available workspace tools here if users need tool visibility.
   return (
     <form
       className="bg-white"
