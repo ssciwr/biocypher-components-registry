@@ -29,6 +29,7 @@ export function WorkspaceKeyForm({
           Anthropic API key
         </span>
         <span className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          {/* eslint-disable-next-line react/no-autofocus */}
           <input
             autoComplete="off"
             autoFocus
