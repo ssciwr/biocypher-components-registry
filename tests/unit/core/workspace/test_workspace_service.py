@@ -318,6 +318,27 @@ def test_turn_unexpected_error_confined_to_turn(tmp_path, caplog):
     asyncio.run(scenario())
 
 
+# Cover an interrupted provider stream without stopping the session actor.
+def test_turn_cancellation_rolls_back_history(tmp_path):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        session.set_key("sk-test", None)
+        session.client_factory = fake_client_factory(
+            FakeRunner([(FakeStream([], final_message([])), None)])
+        )
+        session._emit_stream = AsyncMock(side_effect=asyncio.CancelledError())
+        events = await run_turn(session, "hello")
+        await manager.shutdown()
+        return events, session.history, session.busy
+
+    events, history, busy = asyncio.run(scenario())
+    assert events[-1]["type"] == "turn_error"
+    assert events[-1]["data"]["message"] == "interrupted"
+    assert history == []
+    assert busy is False
+
+
 def test_actor_death_unbricks_session(tmp_path):
     from contextlib import asynccontextmanager
 
@@ -417,6 +438,41 @@ def test_reconnect_then_61_second_timeout_deletes_session(tmp_path, monkeypatch)
     assert not workspace_exists
 
 
+# AI-Generated:
+# We may change how the cleanup task works/when it happens
+# Remove a delayed cleanup task after either interruption or a cleanup failure.
+def test_sse_disconnect_cleanup_handles_interruption_and_failure(
+    tmp_path, monkeypatch, caplog
+):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        sleep = AsyncMock(side_effect=[asyncio.CancelledError(), None, None])
+        monkeypatch.setattr(service.asyncio, "sleep", sleep)
+        with pytest.raises(asyncio.CancelledError):
+            await manager._delete_after_sse_60_second_timeout(session.id)
+        delete = manager.delete
+        failed_delete = AsyncMock(side_effect=RuntimeError("workspace unavailable"))
+        manager.delete = failed_delete
+        manager._sse_disconnect_tasks[session.id] = asyncio.current_task()
+        await manager._delete_after_sse_60_second_timeout(session.id)
+        session.subscribe()
+        await manager._delete_after_sse_60_second_timeout(session.id)
+        manager.delete = delete
+        await manager.shutdown()
+        return (
+            sleep.await_count,
+            failed_delete.await_args_list,
+            manager._sse_disconnect_tasks,
+        )
+
+    sleep_count, delete_calls, cleanup_tasks = asyncio.run(scenario())
+    assert sleep_count == 3
+    assert len(delete_calls) == 1
+    assert cleanup_tasks == {}
+    assert "SSE reconnect cleanup failed" in caplog.text
+
+
 def test_delete_publishes_session_closed(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
@@ -447,6 +503,26 @@ def test_reap_idle_sessions(tmp_path):
         await manager.shutdown()
 
     asyncio.run(scenario())
+
+
+# AI-Generated:
+# Keep the reaper running across one failed idle-session cleanup cycle.
+def test_idle_reaper_logs_cleanup_failure(tmp_path, monkeypatch, caplog):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+        reap = AsyncMock(side_effect=RuntimeError("workspace unavailable"))
+        monkeypatch.setattr(service.asyncio, "sleep", sleep)
+        monkeypatch.setattr(manager, "reap_idle_sessions", reap)
+        with pytest.raises(asyncio.CancelledError):
+            await manager.run_idle_reaper()
+        return sleep.await_count, reap.await_count
+
+    sleep_count, reaper_count = asyncio.run(scenario())
+    assert sleep_count == 2
+    assert reaper_count == 1
+    assert "workspace idle-session cleanup failed" in caplog.text
+    # repeat should still be working.
 
 
 def test_interrupt_cancels_queued_turn(tmp_path):
