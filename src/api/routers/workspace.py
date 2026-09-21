@@ -330,7 +330,8 @@ async def list_files(
             "content": {
                 "application/zip": {"schema": {"type": "string", "format": "binary"}}
             }
-        }
+        },
+        409: {"description": "The workspace download could not be prepared."},
     },
 )
 # Create .zip for user with the files from the workspace.
