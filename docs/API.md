@@ -242,7 +242,7 @@ id: 42
 data: {"text": "Let me check the available workflows."}
 ```
 
-A comment line `: heartbeat` is sent after 15 idle seconds to keep proxies
+A comment line `: heartbeat` is sent after 5 idle seconds to keep proxies
 from closing the stream.
 
 | Event | Data | Meaning |

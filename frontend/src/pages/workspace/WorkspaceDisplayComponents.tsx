@@ -210,14 +210,19 @@ export function ChatPane({
             value={prompt}
           />
           {session?.busy ? (
-            <button
-              className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
-              onClick={onStop}
-              type="button"
-            >
-              <StopIcon className="h-5 w-5" aria-hidden="true" />
-              Stop
-            </button>
+            <div className="flex flex-none items-center gap-3">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-600" role="status">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" aria-hidden="true" />
+              </span>
+              <button
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
+                onClick={onStop}
+                type="button"
+              >
+                <StopIcon className="h-5 w-5" aria-hidden="true" />
+                Stop
+              </button>
+            </div>
           ) : (
             <button
               aria-label="Send message"

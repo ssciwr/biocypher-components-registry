@@ -79,7 +79,6 @@ export async function consumeWorkspaceEvents(
     onSseError: options.onError,
     onSseEvent: options.onEvent,
     signal: options.signal,
-    sseMaxRetryAttempts: 5,
   })
 
   // This looks odd, but the openapi-ts SSE client is a "lazy" generated. Consuming the stream events makes onSseEvent fire as expected.

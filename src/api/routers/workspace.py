@@ -56,7 +56,7 @@ from src.core.workspace.service import (
 
 # Seconds between SSE heartbeat comments (keeps proxies from closing the
 # stream while the agent is idle).
-HEARTBEAT_SECONDS = 15
+HEARTBEAT_SECONDS = 5  # specifically this amount due to this report: https://github.com/enisdenjo/graphql-sse/issues/99
 
 router = APIRouter()
 

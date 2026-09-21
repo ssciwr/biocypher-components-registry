@@ -23,6 +23,8 @@ type UseWorkspaceSessionOptions = Readonly<{
 
 type WorkspaceAccess = Pick<WorkspaceViewSession, 'id' | 'token'>
 
+const eventStreamReconnectMessage = 'The workspace connection was interrupted. Reconnecting automatically…'
+
 function createMessage(
   kind: WorkspaceMessage['kind'],
   text: string,
@@ -263,13 +265,19 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     void consumeWorkspaceEvents(activeSession, {
       onError: (eventError) => {
         if (controller.signal.aborted) return
-        setError(workspaceErrorMessage(eventError))
+        console.error('Workspace event stream interrupted. Reconnecting.', eventError)
+        setAgentActivity('Reconnecting')
+        setError(eventStreamReconnectMessage)
+        setRetryAvailable(false)
         void syncSessionState(activeSession).catch((syncError: unknown) => {
-          if (!controller.signal.aborted) setError(workspaceErrorMessage(syncError))
+          if (!controller.signal.aborted) {
+            console.error('Could not refresh workspace state while reconnecting.', syncError)
+          }
         })
       },
       onEvent: (event) => {
         if (event.data === undefined && !event.event) return
+        setError(null)
         handleWorkspaceEvent({
           data: event.data,
           event: event.event ?? 'message',
@@ -278,10 +286,16 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
       },
       signal: controller.signal,
     }).catch((eventError: unknown) => {
+      // this is sometimes: https://github.com/enisdenjo/graphql-sse/issues/99
       if (controller.signal.aborted) return
-      setError(workspaceErrorMessage(eventError))
+      console.error('Workspace event stream stopped. Reconnecting.', eventError)
+      setAgentActivity('Reconnecting')
+      setError(eventStreamReconnectMessage)
+      setRetryAvailable(false)
       void syncSessionState(activeSession).catch((syncError: unknown) => {
-        if (!controller.signal.aborted) setError(workspaceErrorMessage(syncError))
+        if (!controller.signal.aborted) {
+          console.error('Could not refresh workspace state after the event stream stopped.', syncError)
+        }
       })
     })
 
