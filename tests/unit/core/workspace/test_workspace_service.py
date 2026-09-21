@@ -1,7 +1,8 @@
 """Unit tests for src/core/workspace/service.py — no network, fake MCP and Anthropic."""
 
 import asyncio
-from unittest.mock import AsyncMock, call
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, call
 
 import anthropic
 import httpx
@@ -91,11 +92,81 @@ def test_create_session_mcp_failure(tmp_path):
 def test_create_reports_workspace_storage_error(tmp_path, monkeypatch):
     manager = make_manager(tmp_path)
     monkeypatch.setattr(service.asyncio, "to_thread", AsyncMock(side_effect=OSError))
+    create_session = manager.create(owner_github_user_id="12345")
     with pytest.raises(service.WorkspaceStorageError):
-        asyncio.run(manager.create(owner_github_user_id="12345"))
+        asyncio.run(create_session)
     assert manager.sessions == {}
     assert manager.get("missing") is None
     assert not manager.workspaces_root.exists()
+
+
+def test_create_reports_workspace_directory_storage_error(tmp_path, monkeypatch):
+    """
+    Report storage failures after the workspace root has been prepared.
+    """
+    manager = make_manager(tmp_path)
+    monkeypatch.setattr(
+        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError])
+    )
+    create_session = manager.create(owner_github_user_id="12345")
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(create_session)
+    assert manager.sessions == {}
+    assert manager.get("missing") is None
+    assert not manager.workspaces_root.exists()
+
+
+def test_create_can_lead_to_mcp_startup_timeout(tmp_path, monkeypatch):
+    # Workspaces are removed, when their MCP connection does not become ready in time.
+    manager = make_manager(tmp_path)
+    monkeypatch.setattr(service, "READY_TIMEOUT", 0)
+    create_session = manager.create(owner_github_user_id="12345")
+    with pytest.raises(SessionStartupError, match="timed out"):
+        asyncio.run(create_session)
+    assert manager.sessions == {}
+    assert manager._sse_disconnect_tasks == {}
+    # assert manager.workspaces_root.is_dir()
+
+
+def test_tool_events_hide_empty_values(tmp_path):
+    # UI Niceties from the backend: Empty dict tool responses are omitted (Rather just the tool name)
+    session = service.Session("sid", "12345", tmp_path, "url", {})
+    queue = session.subscribe()
+    names = session._publish_tool_calls(
+        [SimpleNamespace(type="tool_use", id="tool-1", name="guidance", input={})]
+    )
+    session._publish_tool_results(
+        {"content": [{"type": "tool_result", "tool_use_id": "tool-1", "content": ""}]},
+        names,
+    )
+    tool_call, tool_result = queue.get_nowait(), queue.get_nowait()
+    assert names == {"tool-1": "guidance"}
+    assert tool_call["data"] == {"name": "guidance"}
+    assert "preview" not in tool_result["data"]
+
+
+def test_stream_starts_with_thinking_started_event(tmp_path):
+    session = service.Session("sid", "12345", tmp_path, "url", {})
+    queue = session.subscribe()
+    stream = FakeStream(
+        [SimpleNamespace(type="thinking"), SimpleNamespace(type="thinking")], None
+    )
+    asyncio.run(session._emit_stream(stream))
+    event = queue.get_nowait()
+    assert event["type"] == "thinking_started"
+    assert event["seq"] == 1
+    assert queue.empty()
+
+
+def test_interrupt_cancels_active_turn(tmp_path):
+    # Interupptions stop any current API call and LLM cost to the user...
+    session = service.Session("sid", "12345", tmp_path, "url", {})
+    turn_task = Mock()
+    turn_task.done.return_value = False
+    session.turn_task = turn_task
+    assert session.interrupt()
+    assert turn_task.cancel.call_count == 1
+    assert session.turn_task is turn_task
 
 
 def test_turn_with_tool_call(tmp_path):
