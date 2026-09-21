@@ -20,11 +20,11 @@ from tests.support.workspace_fakes import (
 )
 
 PREFIX = "/agent/api/v1"
-pytestmark = pytest.mark.skip(reason="Workspace API routes are currently disabled.")
 
 
 @pytest.fixture
-def manager(tmp_path):
+def manager(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.api.app.agentic_api_active", True)
     return SessionManager(
         workspaces_root=tmp_path / "workspaces",
         mcp_headers={},
