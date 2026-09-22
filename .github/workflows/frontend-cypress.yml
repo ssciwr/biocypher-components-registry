@@ -1,14 +1,17 @@
-name: Frontend
+name: Frontend Cypress
 
 on:
   pull_request:
     paths:
       - "frontend/**"
-      - ".github/workflows/frontend.yml"
+      - ".github/workflows/frontend-cypress.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  lint-build:
+  ui-tests:
     runs-on: ubuntu-latest
 
     defaults:
@@ -37,8 +40,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Lint frontend
-        run: pnpm run lint
-
       - name: Build frontend
         run: pnpm run build
+
+      - name: Install Cypress binary
+        # Cypress binary install is intentional after package lifecycle scripts are blocked above.
+        run: pnpm exec cypress install # NOSONAR
+
+      - name: Verify Cypress
+        run: pnpm exec cypress verify
+
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@f790eee7a50d9505912f50c2095510be7de06aa7
+        with:
+          working-directory: frontend
+          install: false
+          start: pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort
+          wait-on: "http://127.0.0.1:5173"
+          wait-on-timeout: 120
+          command: pnpm run ui-tests

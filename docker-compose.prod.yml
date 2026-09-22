@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/ssciwr/biocypher-components-registry/frontend:0.2.0
+    image: ghcr.io/ssciwr/biocypher-components-registry/frontend:sha-b0f53f549d35b89db6e114466f4d155cda07d463
     environment:
       # When integrating, adjust this in .env.
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
@@ -46,10 +46,11 @@ services:
       - biocypher-network
 
   backend:
-    image: ghcr.io/ssciwr/biocypher-components-registry/backend:0.2.0
+    image: ghcr.io/ssciwr/biocypher-components-registry/backend:sha-b0f53f549d35b89db6e114466f4d155cda07d463
     env_file: .env
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
+      AGENT_WORKSPACES_ROOT: /app/data/workspaces
       # When integrating, adjust these public HTTPS URLs in .env.
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://registry.biocypher.org}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://registry.biocypher.org}

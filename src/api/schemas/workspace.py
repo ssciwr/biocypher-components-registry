@@ -27,12 +27,6 @@ class MessageCreateRequest(BaseModel):
     content: str
 
 
-class FileWriteRequest(BaseModel):
-    """Full content of a file write."""
-
-    content: str
-
-
 # ===========================================================
 # =====================  Output Models ======================
 # ===========================================================
@@ -119,14 +113,6 @@ class FileContentResponse(BaseModel):
 
     path: str
     content: str
-    etag: str
-
-
-class FileWriteResponse(BaseModel):
-    """Response returned when writing one workspace file."""
-
-    path: str
-    etag: str
 
 
 # ===========================================================
@@ -137,10 +123,10 @@ WORKSPACE_ERROR_DESCRIPTIONS: dict[int, str] = {
     400: "Invalid input: bad path, empty content, or missing key field",
     401: "Unknown session or invalid session token",
     404: "No such file or directory",
-    409: "Conflict: turn running, stale If-Match, filesystem error, "
-    "or nothing to interrupt",
+    409: "Conflict: turn running, filesystem error, or nothing to interrupt",
     415: "Not a text file",
     428: "No API key set for this session yet",
+    500: "Issue creating workspace session",
     502: "MCP server unreachable or the session's MCP connection died",
 }
 
