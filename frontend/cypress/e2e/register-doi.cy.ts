@@ -2,7 +2,6 @@ const doi = '10.5555/12345678'
 const draftKey = 'bcr-register-draft'
 const submitAfterAuthKey = 'bcr-register-submit-after-auth'
 const draft = {
-  adapterName: 'Auto Submit Adapter',
   repositoryLocation: 'https://github.com/biocypher/auto-submit-adapter',
   licenseValue: 'MIT',
   doi,
@@ -10,7 +9,7 @@ const draft = {
 }
 const submittedRegistration = {
   adapter_id: 'auto-submit-adapter',
-  adapter_name: draft.adapterName,
+  adapter_name: 'Auto Submit Adapter',
   created_at: '2026-07-29T12:00:00Z',
   license_value: draft.licenseValue,
   doi,
@@ -61,7 +60,6 @@ describe('registration DOI check', () => {
       },
     })
     cy.wait('@createRegistration').its('request.body').should('deep.include', {
-      adapter_name: draft.adapterName,
       repository_location: draft.repositoryLocation,
       license_value: draft.licenseValue,
       doi,

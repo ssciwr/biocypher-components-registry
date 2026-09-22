@@ -159,6 +159,10 @@ export type AdapterDetailResponse = {
      * Endorsed By Current User
      */
     endorsed_by_current_user?: boolean;
+    /**
+     * Can Delete
+     */
+    can_delete?: boolean;
 };
 
 /**
@@ -662,12 +666,6 @@ export type MetadataValidationResponse = {
  * Request body for creating an adapter registration.
  */
 export type RegistrationCreateRequest = {
-    /**
-     * Adapter Name
-     *
-     * Human-readable adapter name supplied by the maintainer.
-     */
-    adapter_name: string;
     /**
      * Repository Location
      *
@@ -1496,6 +1494,36 @@ export type SearchAdaptersApiV1AdaptersSearchGetResponses = {
 };
 
 export type SearchAdaptersApiV1AdaptersSearchGetResponse = SearchAdaptersApiV1AdaptersSearchGetResponses[keyof SearchAdaptersApiV1AdaptersSearchGetResponses];
+
+export type DeleteAdapterApiV1AdaptersAdapterIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Adapter Id
+         */
+        adapter_id: string;
+    };
+    query?: never;
+    url: '/api/v1/adapters/{adapter_id}';
+};
+
+export type DeleteAdapterApiV1AdaptersAdapterIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteAdapterApiV1AdaptersAdapterIdDeleteError = DeleteAdapterApiV1AdaptersAdapterIdDeleteErrors[keyof DeleteAdapterApiV1AdaptersAdapterIdDeleteErrors];
+
+export type DeleteAdapterApiV1AdaptersAdapterIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteAdapterApiV1AdaptersAdapterIdDeleteResponse = DeleteAdapterApiV1AdaptersAdapterIdDeleteResponses[keyof DeleteAdapterApiV1AdaptersAdapterIdDeleteResponses];
 
 export type GetAdapterApiV1AdaptersAdapterIdGetData = {
     body?: never;

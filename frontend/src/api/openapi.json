@@ -265,6 +265,56 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Remove an adapter",
+        "description": "Remove an adapter submitted by the current GitHub account.",
+        "operationId": "delete_adapter_api_v1_adapters__adapter_id__delete",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/adapters/{adapter_id}/endorse": {
@@ -1818,6 +1868,9 @@
               }
             }
           },
+          "409": {
+            "description": "The workspace download could not be prepared."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2246,6 +2299,11 @@
           "endorsed_by_current_user": {
             "type": "boolean",
             "title": "Endorsed By Current User",
+            "default": false
+          },
+          "can_delete": {
+            "type": "boolean",
+            "title": "Can Delete",
             "default": false
           }
         },
@@ -3384,12 +3442,6 @@
       },
       "RegistrationCreateRequest": {
         "properties": {
-          "adapter_name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Adapter Name",
-            "description": "Human-readable adapter name supplied by the maintainer."
-          },
           "repository_location": {
             "type": "string",
             "minLength": 1,
@@ -3435,13 +3487,11 @@
         },
         "type": "object",
         "required": [
-          "adapter_name",
           "repository_location"
         ],
         "title": "RegistrationCreateRequest",
         "description": "Request body for creating an adapter registration.",
         "example": {
-          "adapter_name": "CollecTRI Adapter",
           "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
           "doi": "10.5281/zenodo.1234567",
           "license_value": "MIT",

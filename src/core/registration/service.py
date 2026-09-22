@@ -27,7 +27,6 @@ from src.core.shared.ids import slugify_identifier
 
 
 def submit_registration(
-    adapter_name: str,
     repository_location: str,
     store: RegistrationStore,
     description: str | None = None,
@@ -38,8 +37,10 @@ def submit_registration(
 ) -> StoredRegistration:
     """Create and persist a registration submission.
 
+    Note on adapter_name: This former property is now always extracted with croissant, and not needed or possible to
+    supply here to avoid confusion.
+
     Args:
-        adapter_name: Human-readable adapter name provided by the maintainer.
         repository_location: Local repository path or remote repository URL.
         store: Persistence backend used to save the submission.
         description: Optional maintainer-facing adapter summary.
@@ -52,7 +53,6 @@ def submit_registration(
         The stored registration record with a tracked status.
     """
     request = create_registration_request(
-        adapter_name=adapter_name,
         repository_location=repository_location,
         description=description,
         license_value=license_value,

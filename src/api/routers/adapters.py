@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.dependencies import (
     get_current_auth_session,
@@ -166,6 +166,7 @@ def get_adapter(
         endorsed_by_current_user=endorsed_by_current_user(
             auth_session, store, adapter_id
         ),
+        can_delete=can_delete_adapter(auth_session, entries, store),
     )
 
 
@@ -177,6 +178,51 @@ def endorsed_by_current_user(
     return auth_session is not None and store.has_adapter_endorsement(
         adapter_id, auth_session.github_user_id
     )
+
+
+# AI-Generated.
+#
+# Determine whether the signed-in GitHub account submitted every adapter source.
+def can_delete_adapter(
+    auth_session: AuthSession | None,
+    entries: list[RegistryEntry],
+    store: RegistrationStore,
+) -> bool:
+    if auth_session is None:
+        return False
+    for entry in entries:
+        registration = store.get_registration(entry.source_id)
+        if (
+            registration is None
+            or registration.submitted_by_github_user_id != auth_session.github_user_id
+        ):
+            return False
+    return True
+
+
+@router.delete(
+    "/adapters/{adapter_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove an adapter",
+    description="Remove an adapter submitted by the current GitHub account.",
+)
+# AI-Generated.
+#
+# Remove an adapter only when its sources belong to the current GitHub account.
+def delete_adapter(
+    adapter_id: str,
+    auth_session: AuthSessionDep,
+    store: RegistrationStoreDep,
+) -> None:
+    entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
+    if not entries:
+        raise adapter_not_found_http_error(adapter_id)
+    if not can_delete_adapter(auth_session, entries, store):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the submitting GitHub account can remove this adapter.",
+        )
+    store.remove_adapter(adapter_id, sorted({entry.source_id for entry in entries}))
 
 
 @router.post(

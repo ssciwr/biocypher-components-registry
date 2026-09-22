@@ -79,7 +79,6 @@ def ensure_supported_generator(generator: str) -> str:
 
 
 def create_registration_request(
-    adapter_name: str,
     repository_location: str,
     description: str | None = None,
     license_value: str | None = None,
@@ -93,7 +92,6 @@ def create_registration_request(
     )
 
     return _create_registration_request(
-        adapter_name=adapter_name,
         repository_location=repository_location,
         description=description,
         license_value=license_value,

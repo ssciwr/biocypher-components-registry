@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, scenarios, then, when
 
 from src.core.adapter.request import AdapterRegistrationRequest
 from src.core.adapter.service import create_registration_request
@@ -16,17 +16,6 @@ scenarios("../features/us04_repository_submission.feature")
 def submission_context() -> dict[str, Any]:
     """Provide shared mutable state for repository submission scenarios."""
     return {}
-
-
-@given(
-    parsers.parse('a maintainer wants to register an adapter named "{adapter_name}"')
-)
-def valid_adapter_name(
-    submission_context: dict[str, Any],
-    adapter_name: str,
-) -> None:
-    """Store the submitted adapter name in the scenario context."""
-    submission_context["adapter_name"] = adapter_name
 
 
 @given("the maintainer provides a local repository location")
@@ -52,7 +41,6 @@ def supported_repository_url(submission_context: dict[str, Any]) -> None:
 def repository_submission_is_accepted(submission_context: dict[str, Any]) -> None:
     """Create a registration request from the submitted repository details."""
     submission_context["request"] = create_registration_request(
-        adapter_name=submission_context["adapter_name"],
         repository_location=submission_context["repository_location"],
     )
 
@@ -65,8 +53,8 @@ def system_creates_local_registration_request(
     request = submission_context["request"]
 
     assert isinstance(request, AdapterRegistrationRequest)
-    assert request.adapter_name == submission_context["adapter_name"]
-    assert request.adapter_id == "clinical-knowledge-adapter"
+    assert request.adapter_name == request.adapter_id
+    assert len(request.adapter_id) == 32
     assert request.repository_kind == "local"
     assert request.repository_path is not None
     assert request.repository_path.is_dir()
@@ -80,8 +68,8 @@ def system_creates_remote_registration_request(
     request = submission_context["request"]
 
     assert isinstance(request, AdapterRegistrationRequest)
-    assert request.adapter_name == submission_context["adapter_name"]
-    assert request.adapter_id == "clinical-knowledge-adapter"
+    assert request.adapter_name == request.adapter_id
+    assert len(request.adapter_id) == 32
     assert request.repository_kind == "remote"
     assert request.repository_location == submission_context["repository_location"]
     assert request.repository_path is None

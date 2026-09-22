@@ -135,8 +135,6 @@ def test_refresh_registry_command_processes_active_sources_and_reports_summary(
         app,
         [
             "submit-registration",
-            "--name",
-            "Batch Valid Adapter",
             str(valid_repo),
             "--db-path",
             str(database_path),
@@ -146,8 +144,6 @@ def test_refresh_registry_command_processes_active_sources_and_reports_summary(
         app,
         [
             "submit-registration",
-            "--name",
-            "Batch Invalid Adapter",
             str(invalid_repo),
             "--db-path",
             str(database_path),

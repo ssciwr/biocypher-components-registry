@@ -13,7 +13,7 @@ import CreateAdapterMetadataPage from './pages/CreateAdapterMetadataPage'
 import RegisterPage from './pages/RegisterPage'
 import AdaptersPage from './pages/AdaptersPage'
 import WorkspacePage from './pages/workspace/WorkspacePage'
-import { getMeApiV1AuthMeGet, logoutApiV1AuthLogoutPost } from './api/client'
+import { getMeApiV1AuthMeGet, healthCheckApiV1HealthGet, logoutApiV1AuthLogoutPost } from './api/client'
 import { client } from './api/client/client.gen'
 import { client as workspaceClient } from './api/workspace/client.gen'
 
@@ -85,6 +85,7 @@ function App() {
   const [authVerified, setAuthVerified] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [pathname, setPathname] = useState(globalThis.location.pathname)
+  const [backendOnline, setBackendOnline] = useState(false)
 
   /*
    * AI-Generated.
@@ -104,19 +105,18 @@ function App() {
       .then((result) => {
         if (ignore) return
 
-        if (result.data) {
-          setAuthUser(result.data)
+        if (result.data?.authenticated) {
+          const authenticatedUser = { authenticated: true } as const
+          setAuthUser(authenticatedUser)
           setAuthVerified(true)
-          cacheAuthUser(result.data)
+          cacheAuthUser(authenticatedUser)
           setAuthError(null)
           return
         }
 
         setAuthVerified(false)
-        if (result.response?.status === 401) {
-          setAuthUser(null)
-          cacheAuthUser(null)
-        }
+        setAuthUser(null)
+        cacheAuthUser(null)
         setAuthError(null)
       })
       .catch((error: unknown) => {
@@ -136,6 +136,15 @@ function App() {
     const updatePathname = () => setPathname(globalThis.location.pathname)
     globalThis.addEventListener('popstate', updatePathname)
     return () => globalThis.removeEventListener('popstate', updatePathname)
+  }, [])
+
+  useEffect(() => {
+    void healthCheckApiV1HealthGet()
+      .then((result) => setBackendOnline(result.response?.status === 200))
+      .catch((error: unknown) => {
+        console.error('Could not check backend health.', error)
+        setBackendOnline(false)
+      })
   }, [])
 
 
@@ -161,7 +170,7 @@ function App() {
 
   const adapterPathMatch = /^\/adapters\/([^/]+)$/.exec(pathname)
   const adapterId = adapterPathMatch?.[1]
-  let page = <HomePage />
+  let page = <HomePage backendOnline={backendOnline} />
 
   if (pathname === '/create') {
     page = <CreatePage />
@@ -194,13 +203,14 @@ function App() {
   )
 }
 
-function HomePage() {
+function HomePage({ backendOnline }: { backendOnline: boolean }) {
   return (
     <>
       <section className="bg-blue-50">
         <div className="mx-auto max-w-5xl px-6 pb-14 pt-6 text-center md:pb-20">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-blue-600">
-            <span className="h-2 w-2 rounded-full bg-lime-500" aria-hidden="true" />
+            <span className={`h-2 w-2 rounded-full ${backendOnline ? 'bg-lime-500' : 'bg-red-500'}`} aria-hidden="true" />
+            <span className="sr-only">Backend {backendOnline ? 'available' : 'unavailable'}</span>
             <span>Discover adapters, generate metadata, and register components</span>
           </div>
           <h1 className="mx-auto mt-7 max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">

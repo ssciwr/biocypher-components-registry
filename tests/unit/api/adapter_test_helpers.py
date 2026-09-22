@@ -38,7 +38,6 @@ def create_adapter_entry(
         repository_location = str(repository)
     metadata_path = str(repository / "croissant.jsonld") if repository else None
     registration = submit_registration(
-        adapter_name,
         repository_location,
         store,
         doi=doi,

@@ -19,7 +19,6 @@ type RegisterPageProps = Readonly<{
 }>
 
 type RegistrationForm = {
-  adapterName: string
   repositoryLocation: string
   licenseValue: string
   doi: string
@@ -69,7 +68,6 @@ const submitStatusText: Record<'processing' | 'submitting', string> = {
 }
 
 const emptyForm: RegistrationForm = {
-  adapterName: '',
   repositoryLocation: '',
   licenseValue: '',
   doi: '',
@@ -286,7 +284,6 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
     try {
       const registrationResult = await createRegistrationApiV1RegistrationsPost({
         body: {
-          adapter_name: registrationForm.adapterName,
           repository_location: registrationForm.repositoryLocation,
           license_value: registrationForm.licenseValue.trim() || undefined,
           doi: doi || undefined,
@@ -430,18 +427,6 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
             <h2 className="text-2xl font-bold text-slate-950">Registration details</h2>
 
             <div className="mt-8 grid gap-6">
-              <label className="grid gap-3 text-sm font-semibold text-slate-950">
-                <span>Adapter name*</span>
-                <input
-                  className="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
-                  onChange={(event) => updateField('adapterName', event.target.value)}
-                  placeholder="Example: Clinical Visit Adapter"
-                  required
-                  type="text"
-                  value={form.adapterName}
-                />
-              </label>
-
               <RepositoryUrlInput
                 inputClassName="h-14 rounded-xl border border-slate-200 bg-slate-50 px-5 text-base font-normal text-slate-950 outline-none placeholder:text-slate-500 focus:border-blue-500 focus:bg-white"
                 label={<>Repository location <small>(Any repository url, GitHub, GitLab, etc.)*</small></>}

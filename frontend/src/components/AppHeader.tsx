@@ -2,9 +2,7 @@ import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import bioCypherLogo from '../assets/logo-biocypher.png'
 import { client } from '../api/client/client.gen'
 
-type AuthUser = Readonly<{
-  authenticated: boolean
-}>
+type AuthUser = Readonly<{ authenticated: true }>
 
 type AppHeaderProps = Readonly<{
   authUser: AuthUser | null

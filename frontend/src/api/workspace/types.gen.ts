@@ -635,6 +635,10 @@ export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetData = {
 
 export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetErrors = {
     /**
+     * The workspace download could not be prepared.
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;

@@ -119,8 +119,6 @@ def test_finish_registration_command_rejects_duplicate_valid_adapter(
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repo_a),
             "--db-path",
             str(database_path),
@@ -130,8 +128,6 @@ def test_finish_registration_command_rejects_duplicate_valid_adapter(
         app,
         [
             "submit-registration",
-            "--name",
-            "Example Adapter",
             str(repo_b),
             "--db-path",
             str(database_path),
