@@ -70,7 +70,7 @@ class WorkspaceStorageError(Exception):
     returning SSE disconnect on error, which I hypothesize to displayed as Network Error"""
 
 
-class EventStreamAlreadyActive:
+class EventStreamAlreadyActive(Exception):
     """A workspace session already has an active event stream."""
 
 
@@ -490,11 +490,13 @@ class SessionManager:
         return self.sessions.get(session_id)
 
     # Reconnection cancels the short cleanup window before subscribing again.
-    def open_event_stream(
-        self, session: Session
-    ) -> asyncio.Queue | EventStreamAlreadyActive:
+    def open_event_stream(self, session: Session) -> asyncio.Queue:
+        """Subscribe the session's only event stream.
+
+        Raises EventStreamAlreadyActive if another stream is open.
+        """
         if session.subscribers:
-            return EventStreamAlreadyActive()
+            raise EventStreamAlreadyActive
         self._cancel_sse_disconnect(session.id)
         return session.subscribe()
 

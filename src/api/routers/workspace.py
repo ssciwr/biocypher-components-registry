@@ -247,11 +247,12 @@ async def events(
     session_id: str, session: WorkspaceSessionDep, manager: SessionManagerDep
 ):
     """Stream one session's events as text/event-stream."""
-    event_stream = manager.open_event_stream(session)
-    # If any SSE stream is open
-    if isinstance(event_stream, EventStreamAlreadyActive):
-        raise HTTPException(409, "workspace session already has an event stream")
-    queue = event_stream
+    try:
+        queue = manager.open_event_stream(session)
+    except EventStreamAlreadyActive:
+        raise HTTPException(
+            409, "workspace session already has an event stream"
+        ) from None
 
     async def stream():
         try:

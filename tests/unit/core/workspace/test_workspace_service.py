@@ -405,24 +405,18 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
     asyncio.run(scenario())
 
 
-def test_open_event_stream_returns_already_active_for_duplicate(tmp_path):
+def test_open_event_stream_rejects_duplicate(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
         first_stream = manager.open_event_stream(session)
-        duplicate_result = manager.open_event_stream(session)
-        result = (
-            isinstance(first_stream, asyncio.Queue),
-            isinstance(duplicate_result, EventStreamAlreadyActive),
-            first_stream in session.subscribers,
-        )
+        with pytest.raises(EventStreamAlreadyActive):
+            manager.open_event_stream(session)
+        assert isinstance(first_stream, asyncio.Queue)
+        assert session.subscribers == {first_stream}
         await manager.shutdown()
-        return result
 
-    opened, duplicate_rejected, subscribed = asyncio.run(scenario())
-    assert opened
-    assert duplicate_rejected
-    assert subscribed
+    asyncio.run(scenario())
 
 
 # Ideally this basically gives us more protection about the "Network" erros we saw.

@@ -202,6 +202,14 @@ def test_interrupt_without_turn(client, session):
     assert response.status_code == 409
 
 
+def test_events_rejects_second_stream(client, session):
+    sid, headers, session_obj = session
+    queue = session_obj.subscribe()
+    response = client.get(f"{PREFIX}/sessions/{sid}/events", headers=headers)
+    assert response.status_code == 409
+    session_obj.unsubscribe(queue)
+
+
 def test_events_stream_snapshot_and_token_query(manager):
     # TestClient cannot cancel an infinite SSE response, so this test runs a
     # real uvicorn server in a thread and closes a real TCP connection.
