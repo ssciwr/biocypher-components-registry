@@ -17,7 +17,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import uuid
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Annotated
@@ -52,6 +51,7 @@ from src.core.workspace.service import (
     SessionLimitError,
     SessionManager,
     SessionStartupError,
+    TurnInFlightError,
     WorkspaceStorageError,
 )
 
@@ -205,11 +205,10 @@ async def post_message(
         raise HTTPException(428, "no API key set for this session; POST .../key first")
     if not body.content.strip():
         raise HTTPException(400, "content must not be empty")
-    if session.busy:
-        raise HTTPException(409, "a turn is already running")
-    session.busy = True
-    turn_id = uuid.uuid4().hex
-    session.inbox.put_nowait((turn_id, body.content))
+    try:
+        turn_id = session.submit(body.content)
+    except TurnInFlightError:
+        raise HTTPException(409, "a turn is already running") from None
     return MessageCreateResponse(turn_id=turn_id)
 
 
@@ -218,13 +217,12 @@ async def post_message(
     status_code=202,
     summary="Interrupt the running turn",
     description=(
-        "Cancel the running turn, or a turn that was accepted but has not "
-        "started yet. History rolls back to the pre-turn snapshot."
+        "Cancel the running turn. History rolls back to the pre-turn snapshot."
     ),
     responses=workspace_error_responses(401, 409),
 )
 async def interrupt(session_id: str, session: WorkspaceSessionDep) -> InterruptResponse:
-    """Interrupt the in-flight or queued turn on one session."""
+    """Interrupt the in-flight turn on one session."""
     if not session.interrupt():
         raise HTTPException(409, "no turn is running")
     return InterruptResponse(status="interrupting")

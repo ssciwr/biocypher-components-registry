@@ -1495,7 +1495,7 @@
           "workspace"
         ],
         "summary": "Interrupt the running turn",
-        "description": "Cancel the running turn, or a turn that was accepted but has not started yet. History rolls back to the pre-turn snapshot.",
+        "description": "Cancel the running turn. History rolls back to the pre-turn snapshot.",
         "operationId": "interrupt_agent_api_v1_sessions__session_id__interrupt_post",
         "parameters": [
           {
@@ -3218,7 +3218,7 @@
           "status"
         ],
         "title": "InterruptResponse",
-        "description": "Response returned when a running or queued turn is interrupted."
+        "description": "Response returned when a running turn is interrupted."
       },
       "MessageCreateRequest": {
         "properties": {

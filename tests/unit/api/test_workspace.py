@@ -188,12 +188,12 @@ def test_message_requires_key_then_runs(client, session):
 def test_message_conflict_while_busy(client, session):
     sid, headers, session_obj = session
     session_obj.set_key("sk-test", None)
-    session_obj.busy = True
+    session_obj.turn_task = Mock(done=Mock(return_value=False))
     response = client.post(
         f"{PREFIX}/sessions/{sid}/messages", headers=headers, json={"content": "hi"}
     )
     assert response.status_code == 409
-    session_obj.busy = False
+    session_obj.turn_task = None
 
 
 def test_interrupt_without_turn(client, session):

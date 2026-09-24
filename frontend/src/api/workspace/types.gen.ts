@@ -69,7 +69,7 @@ export type HttpValidationError = {
 /**
  * InterruptResponse
  *
- * Response returned when a running or queued turn is interrupted.
+ * Response returned when a running turn is interrupted.
  */
 export type InterruptResponse = {
     /**

@@ -217,12 +217,11 @@ is rolled back from history — the user simply retries.
 
 #### `POST /sessions/{id}/interrupt`
 
-Cancel the running turn (or a turn that was accepted but has not started
-yet). History rolls back to the pre-turn snapshot and a `turn_error` event
+Cancel the running turn. History rolls back to the pre-turn snapshot and a `turn_error` event
 with message `"interrupted"` is emitted.
 
 - **202** — `{"status": "interrupting"}`
-- **409** — no turn is running or queued.
+- **409** — no turn is running.
 
 #### `GET /sessions/{id}/events`
 

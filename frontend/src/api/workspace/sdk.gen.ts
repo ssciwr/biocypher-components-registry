@@ -70,7 +70,7 @@ export const postMessageAgentApiV1SessionsSessionIdMessagesPost = <ThrowOnError 
 /**
  * Interrupt the running turn
  *
- * Cancel the running turn, or a turn that was accepted but has not started yet. History rolls back to the pre-turn snapshot.
+ * Cancel the running turn. History rolls back to the pre-turn snapshot.
  */
 export const interruptAgentApiV1SessionsSessionIdInterruptPost = <ThrowOnError extends boolean = false>(options: Options<InterruptAgentApiV1SessionsSessionIdInterruptPostData, ThrowOnError>): RequestResult<InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, ThrowOnError> => (options.client ?? client).post<InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/interrupt', ...options });
 

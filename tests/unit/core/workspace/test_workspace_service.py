@@ -13,6 +13,7 @@ from src.core.workspace.service import (
     EventStreamAlreadyActive,
     SessionManager,
     SessionStartupError,
+    TurnInFlightError,
 )
 from tests.support.workspace_fakes import (
     FakeRunner,
@@ -43,8 +44,7 @@ async def collect_until_done(queue, timeout=5.0):
 
 async def run_turn(session, content):
     queue = session.subscribe()
-    session.busy = True
-    session.inbox.put_nowait(("turn-1", content))
+    session.submit(content)
     events = await collect_until_done(queue)
     session.unsubscribe(queue)
     return events
@@ -344,31 +344,45 @@ def test_actor_death_unbricks_session(tmp_path):
 
     class DyingMcp:
         async def list_tools(self):
-            from types import SimpleNamespace
-
             return SimpleNamespace(tools=[])
 
         async def call_tool(self, name, arguments):  # pragma: no cover
             raise AssertionError("not used")
 
+    connections = []
+
     @asynccontextmanager
     async def dying_mcp_connect(url, headers):
+        # Mimic the streamable-HTTP transport: a failure in its background
+        # task cancels the owning task and surfaces as an error on exit.
         mcp = DyingMcp()
-        yield mcp
-        # context exit is fine; death is simulated via the queue poison below
+        mcp.die = asyncio.current_task().cancel
+        connections.append(mcp)
+        try:
+            yield mcp
+        except asyncio.CancelledError:
+            raise ConnectionError("transport lost") from None
 
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=dying_mcp_connect)
         session = await manager.create(owner_github_user_id="12345")
-        # Make the next inbox item explode inside the actor itself (not the
-        # turn task) by poisoning turn-task creation.
-        session._run_turn = None  # type: ignore[assignment]
-        session.busy = True
-        session.inbox.put_nowait(("turn-x", "boom"))
+        queue = session.subscribe()
+        turn_started = asyncio.Event()
+
+        async def hanging_turn(turn_id, content):
+            turn_started.set()
+            await asyncio.Event().wait()
+
+        session._run_turn = hanging_turn  # type: ignore[method-assign]
+        session.submit("hello")
+        await turn_started.wait()
+        connections[-1].die()
         await asyncio.wait_for(session.actor, timeout=5)
-        assert session.error is not None
+        await asyncio.wait({session.turn_task}, timeout=5)
+        assert session.error == "ConnectionError: transport lost"
+        assert session.turn_task.cancelled()
         assert session.busy is False
-        assert session.inbox.empty()
+        assert queue.get_nowait()["type"] == "session_error"
         await manager.shutdown()
 
     asyncio.run(scenario())
@@ -525,26 +539,29 @@ def test_idle_reaper_logs_cleanup_failure(tmp_path, monkeypatch, caplog):
     # repeat should still be working.
 
 
-def test_interrupt_cancels_queued_turn(tmp_path):
-    from pathlib import Path
-
-    from src.core.workspace.service import Session
-
+def test_submit_rejects_second_turn_and_interrupt_frees_slot(tmp_path):
     async def scenario():
-        # Session without a running actor: the turn stays queued, exactly the
-        # window where interrupt() used to report "nothing to interrupt".
-        session = Session("sid", "12345", Path(tmp_path), "url", {})
-        queue = session.subscribe()
-        session.busy = True
-        session.inbox.put_nowait(("turn-9", "hello"))
-        assert session.interrupt() is True
-        assert session.busy is False
-        assert session.inbox.empty()
-        event = queue.get_nowait()
-        assert event["type"] == "turn_error"
-        assert event["data"] == {"turn_id": "turn-9", "message": "interrupted"}
-        # nothing queued, nothing running -> nothing to interrupt
+        session = service.Session("sid", "12345", tmp_path, "url", {})
+        release = asyncio.Event()
+
+        async def slow_turn(turn_id, content):
+            await release.wait()
+
+        session._run_turn = slow_turn  # type: ignore[method-assign]
         assert session.interrupt() is False
+        session.submit("first")
+        # busy from submission on, before the turn task has even started
+        assert session.busy is True
+        with pytest.raises(TurnInFlightError):
+            session.submit("second")
+        assert session.interrupt() is True
+        await asyncio.wait({session.turn_task})
+        assert session.busy is False
+        assert session.interrupt() is False
+        session.submit("third")
+        release.set()
+        await session.turn_task
+        assert session.busy is False
 
     asyncio.run(scenario())
 

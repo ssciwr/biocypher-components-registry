@@ -8,8 +8,8 @@ Each workspace session owns:
   managers must be entered and exited by the same task),
 - optionally a user-supplied Anthropic key/token (BYOK, held in memory only).
 
-Turns are serialized per session: the actor consumes one message at a time
-from the session inbox. Progress is fanned out to SSE subscribers as events;
+Turns are serialized per session: :meth:`Session.submit` starts at most one
+turn task at a time; the actor task only owns the MCP connection. Progress is fanned out to SSE subscribers as events;
 full tool results never leave this process (only truncated text enters model
 context, and events carry a short preview).
 
@@ -58,6 +58,10 @@ class SessionStartupError(Exception):
 
 class SessionLimitError(Exception):
     """The user already holds MAX_SESSIONS_PER_USER sessions."""
+
+
+class TurnInFlightError(Exception):
+    """A turn is already running on this session."""
 
 
 ## I know these are quite obtuse but I just wanted to make the code clear without relying on Stream data classes or their defaults
@@ -177,11 +181,11 @@ class Session:
         self.auth_token: str | None = None
         self.tools: list = []
         self.tool_defs: list[dict] = []
-        self.inbox: asyncio.Queue = asyncio.Queue()
         self.subscribers: set[asyncio.Queue] = set()
         self.ready = asyncio.Event()
+        # Set to make the actor leave the MCP context and finish.
+        self.closed = asyncio.Event()
         self.error: str | None = None
-        self.busy = False
         self.turn_task: asyncio.Task | None = None
         self.actor: asyncio.Task | None = None
         self.last_activity = time.monotonic()
@@ -196,6 +200,10 @@ class Session:
             get_exec_bin=lambda: _exec_bin(self.workspace),
             on_fs_change=self._on_fs_change,
         )
+
+    @property
+    def busy(self) -> bool:
+        return self.turn_task is not None and not self.turn_task.done()
 
     @property
     def has_key(self) -> bool:
@@ -241,7 +249,12 @@ class Session:
     # ----------------------------------------------------------- actor
 
     async def run_actor(self) -> None:
-        """Own the MCP connection and consume the inbox, one turn at a time."""
+        """Own the MCP connection until the session is closed.
+
+        The streamable-HTTP context managers must be entered and exited by
+        the same task; ``call_tool`` itself works from any task, so turns run
+        in their own tasks (see :meth:`submit`).
+        """
         try:
             async with self.mcp_connect(self.mcp_url, self.mcp_headers) as mcp:
                 listed = await mcp.list_tools()
@@ -253,37 +266,22 @@ class Session:
                     for t in list(listed.tools) + self.file_tools
                 ]
                 self.ready.set()
-                while True:
-                    item = await self.inbox.get()
-                    if item is None:
-                        return
-                    turn_id, content = item
-                    self.turn_task = asyncio.create_task(
-                        self._run_turn(turn_id, content)
-                    )
-                    try:
-                        await self.turn_task
-                    except asyncio.CancelledError:
-                        # Swallow only a turn interrupt (the turn already
-                        # rolled back and emitted turn_error). If the actor
-                        # itself is being cancelled, the cancellation must
-                        # propagate.
-                        task = asyncio.current_task()
-                        if task is not None and task.cancelling():
-                            raise
-                    finally:
-                        self.turn_task = None
-                        self.busy = False
+                await self.closed.wait()
         except Exception as e:  # noqa: BLE001
             # Broad by design: the session becomes unusable, record why.
             self.error = f"{type(e).__name__}: {e}"
             self.ready.set()
-            # Unbrick clients: no turn will ever run again, so nothing may
-            # stay queued or claim the busy slot.
-            self.busy = False
-            while not self.inbox.empty():
-                self.inbox.get_nowait()
+            # A running turn would only fail on the dead MCP connection.
+            self.interrupt()
             self.publish("session_error", message=self.error)
+
+    def submit(self, content: str) -> str:
+        """Start a turn and return its id; raise TurnInFlightError if busy."""
+        if self.busy:
+            raise TurnInFlightError
+        turn_id = uuid.uuid4().hex
+        self.turn_task = asyncio.create_task(self._run_turn(turn_id, content))
+        return turn_id
 
     async def _run_turn(self, turn_id: str, content: str) -> None:
         self.publish("turn_started", turn_id=turn_id)
@@ -319,9 +317,8 @@ class Session:
                 if tool_response is not None:
                     self.history.append(tool_response)
                     self._publish_tool_results(tool_response, names_by_id)
-            # busy flips before the terminal event so that a client reacting
-            # to turn_done can immediately POST the next message without 409.
-            self.busy = False
+            # No await after the terminal event: the task is done (busy is
+            # False) before any client can react to turn_done.
             self.publish("turn_done", turn_id=turn_id)
         except asyncio.CancelledError:
             self._fail_turn(snapshot, turn_id, "interrupted")
@@ -355,7 +352,6 @@ class Session:
     def _fail_turn(self, snapshot: int, turn_id: str, message: str) -> None:
         """Roll the partial turn back and report it; the session stays usable."""
         del self.history[snapshot:]
-        self.busy = False
         self.publish("turn_error", turn_id=turn_id, message=message)
 
     def _publish_usage(self, usage) -> None:
@@ -411,27 +407,9 @@ class Session:
                 thinking_marked = True
 
     def interrupt(self) -> bool:
-        if self.turn_task is not None and not self.turn_task.done():
+        if self.busy:
             self.turn_task.cancel()
             return True
-        if self.busy:
-            # Turn accepted but not yet dequeued by the actor: pull it back
-            # out of the inbox so it never starts. The poison pill (None)
-            # must survive draining — put it back.
-            interrupted = False
-            requeue = []
-            while not self.inbox.empty():
-                item = self.inbox.get_nowait()
-                if item is None:
-                    requeue.append(item)
-                else:
-                    interrupted = True
-                    self.publish("turn_error", turn_id=item[0], message="interrupted")
-            for item in requeue:
-                self.inbox.put_nowait(item)
-            if interrupted:
-                self.busy = False
-                return True
         return False
 
 
@@ -584,9 +562,11 @@ class SessionManager:
 
     async def _teardown(self, session: Session) -> None:
         session.set_key(None, None)
-        session.interrupt()
+        if session.interrupt():
+            # Let the turn roll back before its workspace disappears.
+            await asyncio.wait({session.turn_task}, timeout=10)
+        session.closed.set()
         if session.actor is not None and not session.actor.done():
-            session.inbox.put_nowait(None)
             try:
                 await asyncio.wait_for(session.actor, timeout=10)
             except Exception:  # noqa: BLE001 - best-effort teardown; any actor

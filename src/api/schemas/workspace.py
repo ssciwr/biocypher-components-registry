@@ -88,7 +88,7 @@ class MessageCreateResponse(BaseModel):
 
 
 class InterruptResponse(BaseModel):
-    """Response returned when a running or queued turn is interrupted."""
+    """Response returned when a running turn is interrupted."""
 
     status: str
 
