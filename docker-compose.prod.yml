@@ -47,6 +47,8 @@ services:
 
   backend:
     image: ghcr.io/ssciwr/biocypher-components-registry/backend:sha-b0f53f549d35b89db6e114466f4d155cda07d463
+    # Reaps processes orphaned by killed run_command process groups.
+    init: true
     env_file: .env
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3

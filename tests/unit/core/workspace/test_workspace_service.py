@@ -106,7 +106,7 @@ def test_create_reports_workspace_directory_storage_error(tmp_path, monkeypatch)
     """
     manager = make_manager(tmp_path)
     monkeypatch.setattr(
-        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError])
+        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError, None])
     )
     create_session = manager.create(owner_github_user_id="12345")
     with pytest.raises(service.WorkspaceStorageError):

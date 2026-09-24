@@ -49,6 +49,7 @@ from src.core.workspace import client_loop as cl
 from src.core.workspace.service import (
     EventStreamAlreadyActive,
     Session,
+    SessionLimitError,
     SessionManager,
     SessionStartupError,
     WorkspaceStorageError,
@@ -57,6 +58,12 @@ from src.core.workspace.service import (
 # Seconds between SSE heartbeat comments (keeps proxies from closing the
 # stream while the agent is idle).
 HEARTBEAT_SECONDS = 5  # specifically this amount due to this report: https://github.com/enisdenjo/graphql-sse/issues/99
+
+# Tool state in the workspace (session venv, HOME caches), not user files;
+# left out of the download.
+ARCHIVE_EXCLUDED = {".venv", ".cache"}
+# Largest file the preview pane will load.
+MAX_PREVIEW_BYTES = 1_000_000
 
 router = APIRouter()
 
@@ -79,8 +86,11 @@ def _create_workspace_archive(workspace: Path) -> str:
         try:
             with ZipFile(file, "w", ZIP_DEFLATED) as archive:
                 for path in workspace.rglob("*"):
+                    relative = path.relative_to(workspace)
+                    if relative.parts[0] in ARCHIVE_EXCLUDED:
+                        continue
                     if path.is_file() and not path.is_symlink():
-                        archive.write(path, path.relative_to(workspace))
+                        archive.write(path, relative)
         except (OSError, RuntimeError):
             os.unlink(archive_path)
             raise
@@ -100,7 +110,7 @@ def _create_workspace_archive(workspace: Path) -> str:
         "Allocate a workspace directory and open the MCP connection for a new "
         "agentic workspace session."
     ),
-    responses=workspace_error_responses(401, 500, 502),
+    responses=workspace_error_responses(401, 429, 500, 502),
 )
 async def create_session(
     manager: SessionManagerDep,
@@ -109,6 +119,10 @@ async def create_session(
     """Create a new workspace session."""
     try:
         session = await manager.create(owner_github_user_id=auth_session.github_user_id)
+    except SessionLimitError:
+        raise HTTPException(
+            429, "Too many open workspace sessions; end one and try again."
+        )
     except WorkspaceStorageError:
         # Yes it is more specific but is to prevent server crash just ending SSE causing very vague "Network error"
         raise HTTPException(500, "Issue creating workspace session.")
@@ -354,7 +368,7 @@ async def download_files(session_id: str, session: WorkspaceSessionDep) -> FileR
     "/sessions/{session_id}/file",
     summary="Read a workspace file",
     description="Read one text file's content for the preview pane.",
-    responses=workspace_error_responses(400, 401, 404, 409, 415),
+    responses=workspace_error_responses(400, 401, 404, 409, 413, 415),
 )
 async def read_file(
     session_id: str, path: str, session: WorkspaceSessionDep
@@ -363,6 +377,8 @@ async def read_file(
     target = _resolve(session, path)
     if not target.is_file():
         raise HTTPException(404, f"no such file: {path}")
+    if target.stat().st_size > MAX_PREVIEW_BYTES:
+        raise HTTPException(413, f"file too large to preview: {path}")
     try:
         content = target.read_text()
     except UnicodeDecodeError:

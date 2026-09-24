@@ -293,6 +293,7 @@ Build the tree by fetching levels lazily as the user expands them.
 
 - **200** — `{"path": "a.txt", "content": "..."}`
 - **404** — no such file.
+- **413** — file larger than 1 MB.
 - **415** — not a text file.
 
 The workspace API is read-only: ask the assistant in chat to create, change,
@@ -305,8 +306,10 @@ or delete files.
 | 400 | invalid input: bad path, empty message, key body without a key                                           |
 | 401 | missing/wrong workspace session token, or unknown session id                                             |
 | 409 | conflict: turn already running, no turn to interrupt, or filesystem error on a file route |
+| 413 | file too large to preview (> 1 MB)                                                                       |
 | 415 | binary file requested as text                                                                            |
 | 428 | no API key set for the session yet                                                                       |
+| 429 | user already holds `AGENT_MAX_SESSIONS_PER_USER` sessions                                                |
 | 500 | workspace session could not be created                                                                    |
 | 502 | MCP server unreachable / session's MCP connection died                                                   |
 
@@ -317,6 +320,8 @@ or delete files.
 | `AGENT_API_PREFIX` | `/agent/api/v1` | route prefix (registry nginx convention) |
 | `AGENT_WORKSPACES_ROOT` | `./workspaces` | parent dir of per-session workspaces (`/app/data/workspaces` in the compose stacks) |
 | `AGENT_SESSION_READY_TIMEOUT` | `30` | seconds to wait for MCP on session create |
+| `AGENT_MAX_SESSIONS_PER_USER` | `3` | concurrent sessions per GitHub user |
+| `AGENT_SANDBOX_USER` | unset (`sandbox` in the Docker image) | user `run_command` runs as via sudo; unset runs as the API user |
 | `BIOCYPHER_MCP_URL` | `https://mcp.biocypher.org/mcp` | MCP server |
 | `BIOCYPHER_MCP_AUTH_HEADER[_FILE]` | — | MCP auth header, read once at service start |
 | `CLAUDE_MODEL` | `claude-opus-4-8` | model for all sessions |

@@ -90,22 +90,24 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   const [session, setSession] = useState<WorkspaceViewSession | null>(null)
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [prompt, setPrompt] = useState('')
-  const [apiKey, setApiKey] = useState(() => window.localStorage.getItem('apiKey') ?? '')
+  const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>('idle')
   const [retryAvailable, setRetryAvailable] = useState(false)
   const sessionRef = useRef(session)
+  // Last user message, resent by retry: a failed turn is rolled back on the
+  // backend, so the model has no record of it.
+  const lastUserContentRef = useRef<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     sessionRef.current = session
   }, [session])
 
+  // Earlier versions persisted the BYOK key here; remove any leftover copy.
   useEffect(() => {
-    if (apiKey != '') {
-      window.localStorage.setItem('apiKey', apiKey)
-    } // could maybe also have a clear cache option?
-  }, [apiKey])
+    globalThis.localStorage.removeItem('apiKey')
+  }, [])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' })
@@ -364,6 +366,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     const content = retryContent ?? prompt.trim()
     if (!content) return
     if (!retryContent) setPrompt('')
+    lastUserContentRef.current = content
     appendMessage('user', content)
     setRetryAvailable(false)
     await runPending('message', async () => {
@@ -376,8 +379,8 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
   }
 
   async function retryTurn() {
-    if (!retryAvailable) return
-    await sendMessage('retry/continue now') // Workaround that achieves our goal
+    if (!retryAvailable || !lastUserContentRef.current) return
+    await sendMessage(lastUserContentRef.current)
   }
 
   // Interrupt the AI/stop generation and other tool uses/actions (e.g. prevent ongoing writing on more files)

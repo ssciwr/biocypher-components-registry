@@ -35,12 +35,28 @@ Consequences without isolation:
   reading. Either way the secret never sits in the process environment where
   `/proc/*/environ` or child processes could see it. Used for
   `ANTHROPIC_API_KEY` and `BIOCYPHER_MCP_AUTH_HEADER`.
-- **Subprocess env scrubbing** (`_exec_env`): `run_command` subprocesses get a
-  copy of the environment with all `SECRET_ENV_VARS` and their `_FILE`
-  variants removed.
+- **Subprocess env allowlist** (`_exec_env`): `run_command` subprocesses get
+  only `EXEC_ENV_ALLOWLIST` (`PATH`, `LANG`, `LC_ALL`, `TZ`) plus `HOME` set
+  to the workspace, so no backend secret (OAuth/session secrets,
+  `DATABASE_URL`, API keys) is inherited.
 - **Result caps and timeouts**: tool results truncated at
-  `MCP_RESULT_MAX_CHARS`; `run_command` killed after `timeout_seconds`
-  (default 300 s).
+  `MCP_RESULT_MAX_CHARS`; `run_command` output is read with the same byte
+  cap (memory stays bounded) and the command is killed after
+  `timeout_seconds` (default 300 s, clamped to `MAX_COMMAND_SECONDS` = 600 s).
+- **Sandbox user** (`AGENT_SANDBOX_USER`, set to `sandbox` in the Docker
+  image): `run_command` runs via `sudo -u sandbox` (sudoers rule in the
+  `Dockerfile` allows apiuser to become `sandbox` only). `sandbox` shares
+  just the `workspace` group with apiuser: it can reach the setgid
+  workspaces directory but not the registry database (`umask 007` plus the
+  entrypoint's permission fix-up), the API process's `/proc` entries, or the
+  service venv. Each session gets its own `.venv` in the workspace, created
+  as `sandbox`, for `pip install`. Needs `sudo` to work in the container, so
+  do not set `no-new-privileges`; `init: true` in compose reaps processes
+  orphaned by killed commands. Known limit: all sessions share the one
+  `sandbox` uid, so a command can read other sessions' workspaces.
+- **Per-user limits**: at most `AGENT_MAX_SESSIONS_PER_USER` sessions per
+  GitHub user; chat messages capped at 100 000 chars; file preview capped at
+  1 MB.
 
 What code-level hardening cannot fix: `run_command` is arbitrary code
 execution by design. Everything below exists to contain it.

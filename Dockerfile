@@ -15,13 +15,30 @@ ENV PYTHONUNBUFFERED=1 \
 # ==== System dependencies and application user ====
 USER root
 
+# Agentic workspace sandbox: run_command executes as `sandbox`, which shares
+# only the `workspace` group with apiuser. The sudoers rule lets apiuser run
+# commands as sandbox and nothing else; env_reset + umask_override give every
+# command a clean environment and group-writable files.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git sudo \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system apiuser \
-    && useradd --system --gid apiuser --home-dir /app apiuser \
+    && groupadd --system workspace \
+    && useradd --system --gid apiuser --groups workspace --home-dir /app apiuser \
+    && useradd --system --gid workspace --no-create-home --home-dir /nonexistent \
+        --shell /usr/sbin/nologin sandbox \
+    && printf '%s\n' \
+        'Defaults:apiuser !use_pty, !requiretty, env_reset, umask=0007, umask_override' \
+        'apiuser ALL=(sandbox) NOPASSWD: ALL' \
+        > /etc/sudoers.d/workspace-sandbox \
+    && chmod 440 /etc/sudoers.d/workspace-sandbox \
     && mkdir -p /app/data /app/data/workspaces \
-    && chown -R apiuser:apiuser /app
+    && chown -R apiuser:apiuser /app \
+    && chgrp workspace /app/data/workspaces \
+    && chmod 751 /app/data \
+    && chmod 2770 /app/data/workspaces
+
+ENV AGENT_SANDBOX_USER=sandbox
 # ====
 
 # ==== Python dependency installation ====

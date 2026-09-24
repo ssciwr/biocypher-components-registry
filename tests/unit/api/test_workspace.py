@@ -323,3 +323,32 @@ def test_file_path_confinement(client, session):
             f"{PREFIX}/sessions/{sid}/file", params={"path": path}, headers=headers
         )
         assert response.status_code == 400, path
+
+
+# ---------------------------------------------------------------- limits
+
+
+def test_session_limit_per_user(client, monkeypatch):
+    monkeypatch.setattr("src.core.workspace.service.MAX_SESSIONS_PER_USER", 1)
+    assert client.post(f"{PREFIX}/sessions").status_code == 201
+    assert client.post(f"{PREFIX}/sessions").status_code == 429
+
+
+def test_message_too_long_rejected(client, session):
+    sid, headers, _ = session
+    response = client.post(
+        f"{PREFIX}/sessions/{sid}/messages",
+        headers=headers,
+        json={"content": "x" * 100_001},
+    )
+    assert response.status_code == 422
+
+
+def test_read_file_too_large(client, session, monkeypatch):
+    sid, headers, workspace_session = session
+    monkeypatch.setattr(workspace_router, "MAX_PREVIEW_BYTES", 10)
+    (workspace_session.workspace / "big.txt").write_text("x" * 11)
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}/file", headers=headers, params={"path": "big.txt"}
+    )
+    assert response.status_code == 413

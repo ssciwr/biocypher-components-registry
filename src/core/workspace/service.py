@@ -47,10 +47,17 @@ EVENT_QUEUE_SIZE = 1000
 # Close idle sessions after 24 hours
 IDLE_SESSION_SECONDS = 24 * 60 * 60  # gets overwritten in test
 IDLE_REAPER_SECONDS = 5 * 60
+# Concurrent sessions one GitHub user may hold (each owns an MCP connection
+# and a workspace directory).
+MAX_SESSIONS_PER_USER = int(os.getenv("AGENT_MAX_SESSIONS_PER_USER", "3"))
 
 
 class SessionStartupError(Exception):
     """MCP connection could not be established for a new session."""
+
+
+class SessionLimitError(Exception):
+    """The user already holds MAX_SESSIONS_PER_USER sessions."""
 
 
 ## I know these are quite obtuse but I just wanted to make the code clear without relying on Stream data classes or their defaults
@@ -99,6 +106,57 @@ def _has_tool_details(value: object) -> bool:
     return value not in (None, {}, [])
 
 
+def _exec_bin(workspace: Path) -> Path:
+    if cl.SANDBOX_USER:
+        return workspace / ".venv" / "bin"
+    return Path(sys.executable).parent
+
+
+async def _run_as_sandbox(argv: list[str], cwd: Path) -> int:
+    """Run a housekeeping command as the sandbox user; return its exit code."""
+    env = cl._exec_env(home=cwd)
+    proc = await asyncio.create_subprocess_exec(
+        *cl.sandbox_argv(argv, env, cl.SANDBOX_USER),
+        cwd=cwd,
+        env=env,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    return await proc.wait()
+
+
+async def _make_workspace(workspace: Path) -> None:
+    """Create a session directory; sandboxed, also its private venv.
+
+    The sandbox user may not write to the service's own venv (that would let
+    model commands change the running API), so pip installs go to
+    ``.venv`` inside the workspace, created as the sandbox user.
+    """
+    # mkdir is a blocking syscall; off-thread so one session's filesystem
+    # latency (or a slow/networked workspaces_root) can't stall every other
+    # session's SSE heartbeats and message dispatch on this loop.
+    await asyncio.to_thread(workspace.mkdir)
+    if not cl.SANDBOX_USER:
+        return
+    # Group-shared with the sandbox user; setgid keeps new files in the group.
+    await asyncio.to_thread(os.chmod, workspace, 0o2770)
+    if await _run_as_sandbox([sys.executable, "-m", "venv", ".venv"], workspace):
+        raise OSError(f"could not create the session venv in {workspace}")
+
+
+async def _remove_workspace(workspace: Path) -> None:
+    if cl.SANDBOX_USER:
+        # Files the sandbox user created (or chmod-ed) may not be deletable
+        # by this user, so let their owner restore access and remove them.
+        await _run_as_sandbox(
+            ["sh", "-c", 'chmod -R u+rwX "$1"; rm -rf "$1"', "sh", str(workspace)],
+            workspace.parent,
+        )
+    # Recursive delete is a blocking syscall storm on a large/full workspace;
+    # off-thread for the same reason as the mkdir in _make_workspace.
+    await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+
+
 class Session:
     def __init__(
         self,
@@ -133,9 +191,9 @@ class Session:
         self.mcp_connect = connect_mcp
         self.file_tools = cl.make_file_tools(
             get_root=lambda: self.workspace,
-            # The service runs inside one Python environment (the container
-            # venv); there is no interactive env prompt like in the CLI.
-            get_exec_bin=lambda: Path(sys.executable).parent,
+            # No interactive env prompt like in the CLI: sandboxed sessions
+            # get their own venv, unsandboxed ones share the service's.
+            get_exec_bin=lambda: _exec_bin(self.workspace),
             on_fs_change=self._on_fs_change,
         )
 
@@ -397,9 +455,12 @@ class SessionManager:
         self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
-        # mkdir is a blocking syscall; off-thread so one session's filesystem
-        # latency (or a slow/networked workspaces_root) can't stall every
-        # other session's SSE heartbeats and message dispatch on this loop.
+        owned = sum(
+            s.owner_github_user_id == owner_github_user_id
+            for s in self.sessions.values()
+        )
+        if owned >= MAX_SESSIONS_PER_USER:
+            raise SessionLimitError
         try:
             await asyncio.to_thread(
                 self.workspaces_root.mkdir, parents=True, exist_ok=True
@@ -410,16 +471,17 @@ class SessionManager:
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
         try:
-            await asyncio.to_thread(workspace.mkdir)
-        except OSError as e:
-            logger.exception("Could not create workspace directory")
-            raise WorkspaceStorageError from e
-        except BaseException:
-            # to_thread's worker thread runs mkdir to completion even if this
-            # await is cancelled (e.g. task killed on shutdown), so the dir
-            # can land on disk with nothing left to track/clean it. Nothing
-            # references `session` yet, so clean up here before propagating.
-            await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+            await _make_workspace(workspace)
+        except BaseException as e:
+            # Also on cancellation: to_thread's worker thread runs mkdir to
+            # completion even if this await is cancelled (e.g. task killed on
+            # shutdown), so the dir can land on disk with nothing left to
+            # track/clean it. Nothing references `session` yet, so clean up
+            # here before propagating.
+            await _remove_workspace(workspace)
+            if isinstance(e, OSError):
+                logger.exception("Could not create workspace directory")
+                raise WorkspaceStorageError from e
             raise
         session = Session(
             session_id,
@@ -536,9 +598,7 @@ class SessionManager:
         # instead of heartbeating a dead session forever.
         session.publish("session_closed")
         session.subscribers.clear()
-        # Recursive delete is a blocking syscall storm on a large/full
-        # workspace; off-thread for the same reason as create()'s mkdir.
-        await asyncio.to_thread(shutil.rmtree, session.workspace, ignore_errors=True)
+        await _remove_workspace(session.workspace)
 
     async def shutdown(self) -> None:
         # delete() pops from self.sessions synchronously before its first

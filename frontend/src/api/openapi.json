@@ -1072,6 +1072,9 @@
           "401": {
             "description": "Unknown session or invalid session token"
           },
+          "429": {
+            "description": "Too many open workspace sessions for this user"
+          },
           "500": {
             "description": "Issue creating workspace session"
           },
@@ -1982,6 +1985,9 @@
           },
           "409": {
             "description": "Conflict: turn running, filesystem error, or nothing to interrupt"
+          },
+          "413": {
+            "description": "File too large to preview"
           },
           "415": {
             "description": "Not a text file"
@@ -3218,6 +3224,7 @@
         "properties": {
           "content": {
             "type": "string",
+            "maxLength": 100000,
             "title": "Content"
           }
         },
@@ -4774,7 +4781,8 @@
           "api_key": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 512
               },
               {
                 "type": "null"
@@ -4785,7 +4793,8 @@
           "auth_token": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 512
               },
               {
                 "type": "null"

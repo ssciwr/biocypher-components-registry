@@ -30,9 +30,11 @@ Env vars:
                               reach model context; rest stays local)
 - FILE_TOOLS_ROOT            (default: cwd — root dir the read/write/edit
                               file tools are confined to)
+- AGENT_SANDBOX_USER         (optional: run run_command as this user via
+                              sudo; set in the Docker image)
 
-Secrets are additionally stripped from the environment passed to run_command
-subprocesses, so model-generated shell commands never inherit them.
+run_command subprocesses get only an allowlisted environment (see
+EXEC_ENV_ALLOWLIST), so model-generated shell commands never inherit secrets.
 
 Run:
     python src/core/workspace/client_loop.py               # interactive chat
@@ -40,6 +42,7 @@ Run:
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
@@ -103,12 +106,15 @@ def thinking_config() -> dict | None:
     return None
 
 
-# Env vars holding secrets; never passed on to run_command subprocesses.
-SECRET_ENV_VARS = (
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "BIOCYPHER_MCP_AUTH_HEADER",
-)
+# The only env vars run_command subprocesses inherit. An allowlist rather than
+# a secret denylist: the API process also holds OAuth/session secrets and
+# DATABASE_URL, and model-generated commands must see none of them.
+EXEC_ENV_ALLOWLIST = ("PATH", "LANG", "LC_ALL", "TZ")
+# Upper bound on the model-chosen run_command timeout.
+MAX_COMMAND_SECONDS = 600
+# Unprivileged user run_command executes as (via sudo; see the Dockerfile's
+# sudoers rule). Unset = run as this process's user (local dev, tests).
+SANDBOX_USER = os.getenv("AGENT_SANDBOX_USER") or None
 
 
 def read_secret(name: str) -> str | None:
@@ -248,22 +254,68 @@ def _resolve_path(path: str) -> Path:
 EXEC_BIN: Path | None = None
 
 
-def _exec_env(exec_bin: Path | None = None) -> dict[str, str]:
-    """Environment for run_command subprocesses, with secrets removed.
+def _exec_env(exec_bin: Path | None = None, home: Path | None = None) -> dict[str, str]:
+    """Allowlisted environment for run_command subprocesses.
 
-    Secrets are already scrubbed from os.environ by read_secret at startup;
-    this strips them again (plus the _FILE path variants) in case anything
-    re-added them, so model-generated commands never see credentials.
+    Built from EXEC_ENV_ALLOWLIST only, so nothing else in this process's
+    environment (credentials, database URLs) reaches model-generated commands.
+    HOME points at the workspace so tool caches and dotfiles stay inside it.
     """
-    env = os.environ.copy()
-    for var in SECRET_ENV_VARS:
-        env.pop(var, None)
-        env.pop(f"{var}_FILE", None)
+    env = {k: os.environ[k] for k in EXEC_ENV_ALLOWLIST if k in os.environ}
+    if home is not None:
+        env["HOME"] = str(home)
     if exec_bin is None:
         exec_bin = EXEC_BIN
     if exec_bin is not None:
         env["PATH"] = f"{exec_bin}{os.pathsep}{env.get('PATH', '')}"
     return env
+
+
+def sandbox_argv(argv: list[str], env: dict[str, str], user: str | None) -> list[str]:
+    """Prefix ``argv`` so it runs as ``user`` with exactly ``env``.
+
+    sudo resets the environment, so ``env`` is re-applied through ``env -i``.
+    Without a user the argv is returned unchanged.
+    """
+    if not user:
+        return argv
+    assignments = [f"{k}={v}" for k, v in env.items()]
+    return ["sudo", "-n", "-u", user, "--", "/usr/bin/env", "-i", *assignments, *argv]
+
+
+async def _kill_group(proc) -> None:
+    """SIGKILL a command's whole process group, then reap it."""
+    if SANDBOX_USER:
+        # The group's processes belong to the sandbox user, so only that user
+        # may signal them.
+        killer = await asyncio.create_subprocess_exec(
+            *sandbox_argv(
+                ["/bin/kill", "-KILL", "--", f"-{proc.pid}"], {}, SANDBOX_USER
+            ),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await killer.wait()
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+    await proc.wait()
+
+
+async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
+    """Drain a subprocess's stdout, keeping at most ``limit`` bytes.
+
+    Unlike communicate(), memory stays bounded however much a command prints;
+    the rest is still read (and dropped) so the child never blocks on a full
+    pipe. Returns the kept bytes and the total byte count.
+    """
+    kept = bytearray()
+    total = 0
+    while chunk := await proc.stdout.read(65536):
+        total += len(chunk)
+        kept += chunk[: max(0, limit - len(kept))]
+    await proc.wait()
+    return bytes(kept), total
 
 
 def make_file_tools(
@@ -391,48 +443,46 @@ def make_file_tools(
 
         Args:
             command: Shell command to run (cwd is the workspace root).
-            timeout_seconds: Kill the command after this many seconds (default 300).
+            timeout_seconds: Kill the command after this many seconds (default
+                300, max 600).
         """
         print(f"\n[tool] run_command {command}", file=sys.stderr, flush=True)
+        timeout_seconds = max(1, min(timeout_seconds, MAX_COMMAND_SECONDS))
+        root = get_root()
+        env = _exec_env(get_exec_bin(), home=root)
         try:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                cwd=get_root(),
-                env=_exec_env(get_exec_bin()),
+            # New session: the command and all its children share one process
+            # group, killed as a whole on timeout or interrupt.
+            proc = await asyncio.create_subprocess_exec(
+                *sandbox_argv(["/bin/sh", "-c", command], env, SANDBOX_USER),
+                cwd=root,
+                env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 start_new_session=True,
             )
             try:
-                out, _ = await asyncio.wait_for(
-                    proc.communicate(), timeout=timeout_seconds
+                out, total = await asyncio.wait_for(
+                    _read_capped(proc, get_cap()), timeout=timeout_seconds
                 )
             except TimeoutError:
-                # Ensure killing all child processes of the process too for extra reliance/security
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+                await _kill_group(proc)
                 return f"[tool error] command timed out after {timeout_seconds}s"
             except asyncio.CancelledError:
-                # Ensure killing all child processes of the process too
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+                await _kill_group(proc)
                 raise
         except OSError as e:
             return f"[tool error] {e}"
         text = out.decode(errors="replace")
+        if total > len(out):
+            text += f"\n[truncated: {total - len(out)} bytes omitted]"
         print(
             f"[tool done] run_command (exit {proc.returncode})",
             file=sys.stderr,
             flush=True,
         )
         notify("")
-        return f"[exit {proc.returncode}]\n{_truncate(text)}"
+        return f"[exit {proc.returncode}]\n{text}"
 
     return [list_dir, read_file, write_file, edit_file, run_command]
 
@@ -571,7 +621,7 @@ async def chat(tools, api_key: str | None, auth_token: str | None) -> None:
 
 async def main() -> None:
     # Read (and thereby scrub from os.environ) every secret we know about,
-    # whether or not this run uses it — see SECRET_ENV_VARS.
+    # whether or not this run uses it.
     api_key = read_secret("ANTHROPIC_API_KEY")
     auth_token = read_secret("ANTHROPIC_AUTH_TOKEN")
     if "--list-tools" not in sys.argv and not api_key and not auth_token:

@@ -235,6 +235,10 @@ export type CreateSessionAgentApiV1SessionsPostErrors = {
      */
     422: HttpValidationError;
     /**
+     * Too many open workspace sessions for this user
+     */
+    429: unknown;
+    /**
      * Issue creating workspace session
      */
     500: unknown;
@@ -699,6 +703,10 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetErrors = {
      * Conflict: turn running, filesystem error, or nothing to interrupt
      */
     409: unknown;
+    /**
+     * File too large to preview
+     */
+    413: unknown;
     /**
      * Not a text file
      */

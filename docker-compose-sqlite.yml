@@ -32,6 +32,8 @@ services:
       dockerfile: Dockerfile
     container_name: biocypher-registry-backend
     user: apiuser
+    # Reaps processes orphaned by killed run_command process groups.
+    init: true
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
       # Agentic workspace API (src/api/routers/workspace.py): per-session

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.workspace import client_loop as cl
 from src.core.workspace.service import Session
@@ -17,14 +17,14 @@ from src.core.workspace.service import Session
 class SessionKeyRequest(BaseModel):
     """BYOK credential upload for one session; provide exactly one field."""
 
-    api_key: str | None = None
-    auth_token: str | None = None
+    api_key: str | None = Field(default=None, max_length=512)
+    auth_token: str | None = Field(default=None, max_length=512)
 
 
 class MessageCreateRequest(BaseModel):
     """A chat turn submitted to a session."""
 
-    content: str
+    content: str = Field(max_length=100_000)
 
 
 # ===========================================================
@@ -124,8 +124,10 @@ WORKSPACE_ERROR_DESCRIPTIONS: dict[int, str] = {
     401: "Unknown session or invalid session token",
     404: "No such file or directory",
     409: "Conflict: turn running, filesystem error, or nothing to interrupt",
+    413: "File too large to preview",
     415: "Not a text file",
     428: "No API key set for this session yet",
+    429: "Too many open workspace sessions for this user",
     500: "Issue creating workspace session",
     502: "MCP server unreachable or the session's MCP connection died",
 }
