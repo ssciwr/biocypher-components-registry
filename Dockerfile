@@ -34,8 +34,8 @@ RUN apt-get update \
     && chmod 440 /etc/sudoers.d/workspace-sandbox \
     && mkdir -p /app/data /app/data/workspaces \
     && chown -R apiuser:apiuser /app \
-    && chgrp workspace /app/data/workspaces \
-    && chmod 751 /app/data \
+    && chgrp workspace /app/data /app/data/workspaces \
+    && chmod 710 /app/data \
     && chmod 2770 /app/data/workspaces
 
 ENV AGENT_SANDBOX_USER=sandbox

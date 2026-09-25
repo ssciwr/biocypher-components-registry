@@ -38,6 +38,8 @@ describe('MCP workspace page tests', () => {
     cy.intercept('GET', '**/agent/api/v1/sessions/session-1/files*', (request) => {
       listed += 1
       request.reply({
+        // Slow responses, so the burst arrives while a reload is in flight.
+        delay: 300,
         body: {
           path: '',
           entries: listed === 1 ? [] : [{ name: 'adapter.py', path: 'adapter.py', is_dir: false }],
@@ -47,8 +49,10 @@ describe('MCP workspace page tests', () => {
 
     cy.visit('/workspace').then(() => cy.contains('button', 'Start workspace').click())
 
+    // Initial load, one reload for the burst, one coalesced follow-up; one
+    // reload per event would make it four.
+    cy.wait(['@files', '@files', '@files'])
     cy.contains('adapter.py').should('be.visible')
-    // Initial load plus reloads; the three events collapse to at most two.
-    cy.wait(500).then(() => expect(listed).to.be.within(2, 3))
+    cy.get('@files.all').should('have.length', 3)
   })
 })

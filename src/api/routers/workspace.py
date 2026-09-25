@@ -239,6 +239,55 @@ async def interrupt(session_id: str, session: WorkspaceSessionDep) -> InterruptR
     return InterruptResponse(status="interrupting")
 
 
+def _parse_last_event_id(header: str | None) -> int | None:
+    """Last-Event-ID as an event seq; anything unparsable means no replay."""
+    try:
+        return int(header) if header is not None else None
+    except ValueError:
+        return None
+
+
+async def _event_stream(
+    manager: SessionManager,
+    session: Session,
+    queue: asyncio.Queue,
+    backlog: list[dict],
+):
+    """SSE body: state snapshot, replayed backlog, then live events."""
+    try:
+        # The session can be deleted between auth and the generator starting;
+        # its teardown already published session_closed to the subscribers it
+        # knew about, which excludes this one.
+        if manager.get(session.id) is not session:
+            yield "event: session_closed\ndata: {}\n\n"
+            return
+        snapshot = {
+            "has_key": session.has_key,
+            "busy": session.busy,
+            "error": session.error,
+        }
+        yield f"event: session_state\ndata: {json.dumps(snapshot)}\n\n"
+        for event in backlog:
+            yield _sse_frame(event)
+        while True:
+            # asyncio.timeout rather than wait_for: wait_for's cancel of
+            # Queue.get can drop a just-delivered event.
+            try:
+                async with asyncio.timeout(HEARTBEAT_SECONDS):
+                    event = await queue.get()
+            except TimeoutError:
+                yield ": heartbeat\n\n"
+                continue
+            if event is None:
+                # Replaced by a newer stream for this session.
+                return
+            yield _sse_frame(event)
+            if event["type"] == "session_closed":
+                return
+    finally:
+        manager.close_event_stream(session, queue)
+
+
 @router.get(
     "/sessions/{session_id}/events",
     summary="Stream session events",
@@ -261,48 +310,11 @@ async def events(
     last_event_id: Annotated[str | None, Header()] = None,
 ):
     """Stream one session's events as text/event-stream."""
-    try:
-        after = int(last_event_id) if last_event_id is not None else None
-    except ValueError:
-        after = None
-    queue, backlog = manager.open_event_stream(session, after)
-
-    async def stream():
-        try:
-            # The session can be deleted between auth and the generator
-            # starting; its teardown already published session_closed to
-            # the subscribers it knew about, which excludes this one.
-            if manager.get(session.id) is not session:
-                yield "event: session_closed\ndata: {}\n\n"
-                return
-            snapshot = {
-                "has_key": session.has_key,
-                "busy": session.busy,
-                "error": session.error,
-            }
-            yield f"event: session_state\ndata: {json.dumps(snapshot)}\n\n"
-            for event in backlog:
-                yield _sse_frame(event)
-            while True:
-                # asyncio.timeout rather than wait_for: wait_for's cancel of
-                # Queue.get can drop a just-delivered event.
-                try:
-                    async with asyncio.timeout(HEARTBEAT_SECONDS):
-                        event = await queue.get()
-                except TimeoutError:
-                    yield ": heartbeat\n\n"
-                    continue
-                if event is None:
-                    # Replaced by a newer stream for this session.
-                    return
-                yield _sse_frame(event)
-                if event["type"] == "session_closed":
-                    return
-        finally:
-            manager.close_event_stream(session, queue)
-
+    queue, backlog = manager.open_event_stream(
+        session, _parse_last_event_id(last_event_id)
+    )
     return StreamingResponse(
-        stream(),
+        _event_stream(manager, session, queue, backlog),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
@@ -398,6 +410,8 @@ async def read_file(
         raise HTTPException(415, f"not a text file: {path}")
     except OSError:
         # The OSError text carries the absolute server path.
-        logger.exception("Could not read workspace file %r", path)
+        # Session id, not the user-supplied path: keeps request input out of
+        # the log (the exception itself names the file).
+        logger.exception("Could not read workspace file: session_id=%s", session.id)
         raise HTTPException(409, f"filesystem error reading {path}")
     return FileContentResponse(path=path, content=content)
