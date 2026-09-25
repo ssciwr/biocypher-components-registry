@@ -20,6 +20,7 @@ see ``docs/API.md`` for the route-level contract.
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import logging
 import os
@@ -44,6 +45,10 @@ READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
 EVENT_PREVIEW_CHARS = 5000
 # Max events buffered per SSE subscriber; oldest are dropped beyond this.
 EVENT_QUEUE_SIZE = 1000
+# Recent events kept per session for replay to a reconnecting stream
+# (Last-Event-ID). A streamed answer is mostly text_delta events, so this
+# covers a disconnect of some thousand deltas; older events are lost.
+EVENT_REPLAY_SIZE = 5000
 # Close idle sessions after 24 hours
 IDLE_SESSION_SECONDS = 24 * 60 * 60  # gets overwritten in test
 IDLE_REAPER_SECONDS = 5 * 60
@@ -68,10 +73,6 @@ class TurnInFlightError(Exception):
 class WorkspaceStorageError(Exception):
     """Workspace session directory could not be created. Specifically to capture this issue instead of erroring -->
     returning SSE disconnect on error, which I hypothesize to displayed as Network Error"""
-
-
-class EventStreamAlreadyActive(Exception):
-    """A workspace session already has an active event stream."""
 
 
 # Default MCP connector; tests inject a fake with the same shape via
@@ -161,6 +162,19 @@ async def _remove_workspace(workspace: Path) -> None:
     await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
 
 
+def _put_dropping_oldest(queue: asyncio.Queue, item) -> None:
+    # Bounded queue: a stalled SSE consumer must not grow memory for the
+    # session's lifetime; the oldest event is the cheapest one to drop (a
+    # reconnecting stream gets it back from the replay buffer).
+    while True:
+        try:
+            queue.put_nowait(item)
+            return
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+
+
 class Session:
     def __init__(
         self,
@@ -182,6 +196,9 @@ class Session:
         self.tools: list = []
         self.tool_defs: list[dict] = []
         self.subscribers: set[asyncio.Queue] = set()
+        self.recent_events: collections.deque[dict] = collections.deque(
+            maxlen=EVENT_REPLAY_SIZE
+        )
         self.ready = asyncio.Event()
         # Set to make the actor leave the MCP context and finish.
         self.closed = asyncio.Event()
@@ -223,22 +240,20 @@ class Session:
         self.mark_active()
         self._seq += 1
         event = {"seq": self._seq, "type": event_type, "data": data}
+        self.recent_events.append(event)
         for queue in tuple(self.subscribers):
-            # Bounded queue: a stalled SSE consumer must not grow memory for
-            # the session's lifetime. SSE has no replay anyway, so the oldest
-            # event is the cheapest one to drop.
-            while True:
-                try:
-                    queue.put_nowait(event)
-                    break
-                except asyncio.QueueFull:
-                    with contextlib.suppress(asyncio.QueueEmpty):
-                        queue.get_nowait()
+            _put_dropping_oldest(queue, event)
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue(maxsize=EVENT_QUEUE_SIZE)
         self.subscribers.add(queue)
         return queue
+
+    def events_after(self, seq: int) -> list[dict]:
+        """Buffered events newer than ``seq`` (oldest first)."""
+        if seq >= self._seq:
+            return []
+        return [e for e in self.recent_events if e["seq"] > seq]
 
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self.subscribers.discard(queue)
@@ -489,16 +504,26 @@ class SessionManager:
     def get(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
-    # Reconnection cancels the short cleanup window before subscribing again.
-    def open_event_stream(self, session: Session) -> asyncio.Queue:
+    def open_event_stream(
+        self, session: Session, last_event_id: int | None = None
+    ) -> tuple[asyncio.Queue, list[dict]]:
         """Subscribe the session's only event stream.
 
-        Raises EventStreamAlreadyActive if another stream is open.
+        Returns the live queue and, for a reconnect with ``last_event_id``,
+        the buffered events the client missed. Both are taken without an
+        await in between, so nothing is lost or delivered twice.
+
+        A still-open older stream is ended (``None`` on its queue): a client
+        reconnects before the server notices its old connection dropped, and
+        the session belongs to one browser tab anyway.
         """
-        if session.subscribers:
-            raise EventStreamAlreadyActive
+        for old in tuple(session.subscribers):
+            session.unsubscribe(old)
+            _put_dropping_oldest(old, None)
+        # Reconnection cancels the short cleanup window.
         self._cancel_sse_disconnect(session.id)
-        return session.subscribe()
+        backlog = [] if last_event_id is None else session.events_after(last_event_id)
+        return session.subscribe(), backlog
 
     def close_event_stream(self, session: Session, queue: asyncio.Queue) -> None:
         session.unsubscribe(queue)

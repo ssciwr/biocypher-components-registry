@@ -22,7 +22,7 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
@@ -46,7 +46,6 @@ from src.api.schemas.workspace import (
 from src.core.auth.models import AuthSession
 from src.core.workspace import client_loop as cl
 from src.core.workspace.service import (
-    EventStreamAlreadyActive,
     Session,
     SessionLimitError,
     SessionManager,
@@ -66,6 +65,15 @@ ARCHIVE_EXCLUDED = {".venv", ".cache"}
 MAX_PREVIEW_BYTES = 1_000_000
 
 router = APIRouter()
+
+
+def _sse_frame(event: dict) -> str:
+    return (
+        f"event: {event['type']}\n"
+        f"id: {event['seq']}\n"
+        f"data: {json.dumps(event['data'])}\n\n"
+    )
+
 
 SessionManagerDep = Annotated[SessionManager, Depends(get_session_manager)]
 WorkspaceSessionDep = Annotated[Session, Depends(get_workspace_session)]
@@ -234,25 +242,27 @@ async def interrupt(session_id: str, session: WorkspaceSessionDep) -> InterruptR
     description=(
         "Server-sent events for one session: turn lifecycle, streamed text, "
         "tool calls/results, usage, and filesystem changes. See docs/API.md "
-        "for the full event catalog."
+        "for the full event catalog. On reconnect, send Last-Event-ID to "
+        "replay missed events; a new stream replaces an open one."
     ),
     response_class=StreamingResponse,
     responses={
         200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}},
-        409: {"description": "An event stream is already active for this session."},
         **workspace_error_responses(401),
     },
 )
 async def events(
-    session_id: str, session: WorkspaceSessionDep, manager: SessionManagerDep
+    session_id: str,
+    session: WorkspaceSessionDep,
+    manager: SessionManagerDep,
+    last_event_id: Annotated[str | None, Header()] = None,
 ):
     """Stream one session's events as text/event-stream."""
     try:
-        queue = manager.open_event_stream(session)
-    except EventStreamAlreadyActive:
-        raise HTTPException(
-            409, "workspace session already has an event stream"
-        ) from None
+        after = int(last_event_id) if last_event_id is not None else None
+    except ValueError:
+        after = None
+    queue, backlog = manager.open_event_stream(session, after)
 
     async def stream():
         try:
@@ -268,6 +278,8 @@ async def events(
                 "error": session.error,
             }
             yield f"event: session_state\ndata: {json.dumps(snapshot)}\n\n"
+            for event in backlog:
+                yield _sse_frame(event)
             while True:
                 # asyncio.timeout rather than wait_for: wait_for's cancel of
                 # Queue.get can drop a just-delivered event.
@@ -277,11 +289,10 @@ async def events(
                 except TimeoutError:
                     yield ": heartbeat\n\n"
                     continue
-                yield (
-                    f"event: {event['type']}\n"
-                    f"id: {event['seq']}\n"
-                    f"data: {json.dumps(event['data'])}\n\n"
-                )
+                if event is None:
+                    # Replaced by a newer stream for this session.
+                    return
+                yield _sse_frame(event)
                 if event["type"] == "session_closed":
                     return
         finally:

@@ -91,7 +91,7 @@ answer. Turns are serialized per session — one at a time.
 
 The model only ever sees truncated tool results (`MCP_RESULT_MAX_CHARS`,
 default 20000); full results stay in the backend. SSE events carry at most a
-500-char preview of each tool result.
+5000-char preview of each tool result.
 
 Two knowable limits: conversation history grows unbounded with the session
 (memory server-side, input tokens per turn — prompt caching softens the cost
@@ -259,10 +259,17 @@ from closing the stream.
 | `session_error` | `{message}` | MCP connection died; session is unusable |
 | `session_closed` | `{}` | session was deleted; the stream ends after this event |
 
-Each session accepts one event stream. A disconnected stream leaves its session
-and workspace available for 60 seconds so the client can reconnect. There is
-no replay — connect before sending messages — and the `id:` field is
-informational only (`Last-Event-ID` is not honored).
+Each session has one event stream: opening a new one ends the previous
+stream, so a client that reconnects before the server has noticed its old
+connection dropped is not locked out. A disconnected stream leaves its session
+and workspace available for 60 seconds so the client can reconnect.
+
+Reconnect with a `Last-Event-ID: <id>` header (the generated SSE client does
+this automatically on retry) to have the events after `<id>` replayed right
+after the `session_state` snapshot. The server keeps the last 5000 events per
+session; events older than that are lost, and the snapshot is then the only
+reliable state. Without the header, or on the first connect, nothing is
+replayed — connect before sending messages.
 
 ### Files (directory pane + preview)
 

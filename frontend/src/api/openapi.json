@@ -1592,7 +1592,7 @@
           "workspace"
         ],
         "summary": "Stream session events",
-        "description": "Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog.",
+        "description": "Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog. On reconnect, send Last-Event-ID to replay missed events; a new stream replaces an open one.",
         "operationId": "events_agent_api_v1_sessions__session_id__events_get",
         "parameters": [
           {
@@ -1618,6 +1618,22 @@
                 }
               ],
               "title": "Token"
+            }
+          },
+          {
+            "name": "last-event-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
             }
           },
           {
@@ -1663,9 +1679,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "An event stream is already active for this session."
           },
           "401": {
             "description": "Unknown session or invalid session token"

@@ -10,7 +10,6 @@ import pytest
 
 from src.core.workspace import client_loop, service
 from src.core.workspace.service import (
-    EventStreamAlreadyActive,
     SessionManager,
     SessionStartupError,
     TurnInFlightError,
@@ -405,18 +404,47 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
     asyncio.run(scenario())
 
 
-def test_open_event_stream_rejects_duplicate(tmp_path):
+def test_open_event_stream_replaces_older_stream(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
-        first_stream = manager.open_event_stream(session)
-        with pytest.raises(EventStreamAlreadyActive):
-            manager.open_event_stream(session)
-        assert isinstance(first_stream, asyncio.Queue)
-        assert session.subscribers == {first_stream}
+        first, _ = manager.open_event_stream(session)
+        second, backlog = manager.open_event_stream(session)
+        # The older stream is told to end and no longer receives events.
+        assert first.get_nowait() is None
+        assert session.subscribers == {second}
+        assert backlog == []
+        manager.close_event_stream(session, first)
+        assert session.id not in manager._sse_disconnect_tasks
         await manager.shutdown()
 
     asyncio.run(scenario())
+
+
+def test_open_event_stream_replays_events_after_last_event_id(tmp_path):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        for n in range(3):
+            session.publish("fs_changed", paths=[f"f{n}"])
+        _, backlog = manager.open_event_stream(session, last_event_id=1)
+        assert [e["seq"] for e in backlog] == [2, 3]
+        # Up to date, unknown (e.g. from before a restart) or no id: no replay.
+        assert manager.open_event_stream(session, last_event_id=3)[1] == []
+        assert manager.open_event_stream(session, last_event_id=99)[1] == []
+        assert manager.open_event_stream(session)[1] == []
+        await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
+def test_replay_buffer_is_bounded(tmp_path, monkeypatch):
+    monkeypatch.setattr(service, "EVENT_REPLAY_SIZE", 2)
+    session = service.Session("sid", "12345", tmp_path, "url", {})
+    for n in range(4):
+        session.publish("fs_changed", paths=[f"f{n}"])
+    # Events 1-2 fell out of the buffer; only what is left is replayed.
+    assert [e["seq"] for e in session.events_after(0)] == [3, 4]
 
 
 # Ideally this basically gives us more protection about the "Network" erros we saw.
@@ -426,9 +454,9 @@ def test_reconnect_then_61_second_timeout_deletes_session(tmp_path, monkeypatch)
         monkeypatch.setattr(service.asyncio, "sleep", sleep)
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
-        original_stream = manager.open_event_stream(session)
+        original_stream, _ = manager.open_event_stream(session)
         manager.close_event_stream(session, original_stream)
-        reconnected_stream = manager.open_event_stream(session)
+        reconnected_stream, _ = manager.open_event_stream(session)
         retained = manager.get(session.id) is session
         manager.close_event_stream(session, reconnected_stream)
         await manager._sse_disconnect_tasks[session.id]

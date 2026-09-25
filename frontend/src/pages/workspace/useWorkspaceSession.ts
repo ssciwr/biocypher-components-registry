@@ -304,19 +304,6 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     return () => controller.abort()
   }, [handleWorkspaceEvent, sessionId, sessionToken, syncSessionState])
 
-  useEffect(() => {
-    if (!sessionId || !sessionToken || !session?.busy) return undefined
-
-    const activeSession = { id: sessionId, token: sessionToken }
-    const intervalId = globalThis.setInterval(() => {
-      void syncSessionState(activeSession).catch((syncError: unknown) => {
-        setError(workspaceErrorMessage(syncError))
-      })
-    }, 5000)
-
-    return () => globalThis.clearInterval(intervalId)
-  }, [session?.busy, sessionId, sessionToken, syncSessionState])
-
   useEffect(() => () => {
     const activeSession = sessionRef.current
     if (!activeSession) return

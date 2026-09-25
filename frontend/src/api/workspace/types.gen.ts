@@ -512,6 +512,10 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetData = {
     body?: never;
     headers?: {
         /**
+         * Last-Event-Id
+         */
+        'last-event-id'?: string | null;
+        /**
          * Authorization
          */
         authorization?: string | null;
@@ -536,10 +540,6 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetErrors = {
      * Unknown session or invalid session token
      */
     401: unknown;
-    /**
-     * An event stream is already active for this session.
-     */
-    409: unknown;
     /**
      * Validation Error
      */

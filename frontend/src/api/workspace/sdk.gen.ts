@@ -77,7 +77,7 @@ export const interruptAgentApiV1SessionsSessionIdInterruptPost = <ThrowOnError e
 /**
  * Stream session events
  *
- * Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog.
+ * Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog. On reconnect, send Last-Event-ID to replay missed events; a new stream replaces an open one.
  */
 export const eventsAgentApiV1SessionsSessionIdEventsGet = <ThrowOnError extends boolean = false>(options: Options<EventsAgentApiV1SessionsSessionIdEventsGetData, ThrowOnError, EventsAgentApiV1SessionsSessionIdEventsGetResponse>): Promise<ServerSentEventsResult<EventsAgentApiV1SessionsSessionIdEventsGetResponses>> => (options.client ?? client).sse.get<EventsAgentApiV1SessionsSessionIdEventsGetResponses, EventsAgentApiV1SessionsSessionIdEventsGetErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/events', ...options });
 

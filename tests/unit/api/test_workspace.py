@@ -1,5 +1,6 @@
 """API tests for the workspace routes — TestClient over fake MCP and Anthropic."""
 
+import functools
 import time
 from functools import partial
 from io import BytesIO
@@ -202,14 +203,6 @@ def test_interrupt_without_turn(client, session):
     assert response.status_code == 409
 
 
-def test_events_rejects_second_stream(client, session):
-    sid, headers, session_obj = session
-    queue = session_obj.subscribe()
-    response = client.get(f"{PREFIX}/sessions/{sid}/events", headers=headers)
-    assert response.status_code == 409
-    session_obj.unsubscribe(queue)
-
-
 def test_events_stream_snapshot_and_token_query(manager):
     # TestClient cannot cancel an infinite SSE response, so this test runs a
     # real uvicorn server in a thread and closes a real TCP connection.
@@ -247,22 +240,53 @@ def test_events_stream_snapshot_and_token_query(manager):
         base = f"http://127.0.0.1:{port}{PREFIX}"
         created = httpx.post(f"{base}/sessions", timeout=10).json()
         url = f"{base}/sessions/{created['session_id']}/events"
-        lines = []
-        with httpx.stream(
-            "GET", url, params={"token": created["session_token"]}, timeout=10
-        ) as response:
-            assert response.status_code == 200
-            assert response.headers["content-type"].startswith("text/event-stream")
-            second_stream = httpx.get(
-                url, params={"token": created["session_token"]}, timeout=10
+        params = {"token": created["session_token"]}
+        session = manager.get(created["session_id"])
+        loop = session.actor.get_loop()
+
+        def publish(path):
+            # The session lives on the server's loop, not this thread.
+            loop.call_soon_threadsafe(
+                functools.partial(session.publish, "fs_changed", paths=[path])
             )
-            assert second_stream.status_code == 409
-            for line in response.iter_lines():
-                lines.append(line)
-                if len(lines) >= 2:
-                    break
-        assert lines[0] == "event: session_state"
-        assert '"has_key": false' in lines[1]
+
+        def read_until(lines_iter, marker):
+            seen = []
+            for line in lines_iter:
+                seen.append(line)
+                if line == marker:
+                    return seen
+            raise AssertionError(f"stream ended before {marker!r}: {seen}")
+
+        with httpx.stream("GET", url, params=params, timeout=10) as first:
+            assert first.status_code == 200
+            assert first.headers["content-type"].startswith("text/event-stream")
+            first_lines = first.iter_lines()
+            read_until(first_lines, "event: session_state")
+            assert '"has_key": false' in next(first_lines)
+            publish("a.txt")
+            read_until(first_lines, "id: 1")
+            publish("b.txt")
+            read_until(first_lines, "id: 2")
+            # Reconnect as the generated client does after a drop, while the
+            # server still holds the first stream open.
+            with httpx.stream(
+                "GET",
+                url,
+                params=params,
+                headers={"Last-Event-ID": "1"},
+                timeout=10,
+            ) as second:
+                assert second.status_code == 200
+                second_lines = second.iter_lines()
+                read_until(second_lines, "event: session_state")
+                replayed = read_until(second_lines, "id: 2")
+                assert "event: fs_changed" in replayed
+                assert "id: 1" not in replayed
+                # The replaced first stream ends instead of lingering:
+                # draining it returns (a lingering one would hit ReadTimeout)
+                # and yields no further events.
+                assert not any(line.startswith("id:") for line in first_lines)
         assert manager.get(created["session_id"]) is not None
         deleted = httpx.delete(
             f"{base}/sessions/{created['session_id']}",
