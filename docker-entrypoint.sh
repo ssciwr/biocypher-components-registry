@@ -20,7 +20,7 @@ if [ -n "${AGENT_SANDBOX_USER:-}" ]; then
     chgrp workspace "$data_dir"
     chmod 710 "$data_dir"
     chgrp workspace "$workspaces"
-    chmod 2770 "$workspaces"
+    chmod u=rwx,g=rwxs,o= "$workspaces"
 fi
 
 exec "$@"

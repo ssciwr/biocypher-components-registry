@@ -36,7 +36,7 @@ RUN apt-get update \
     && chown -R apiuser:apiuser /app \
     && chgrp workspace /app/data /app/data/workspaces \
     && chmod 710 /app/data \
-    && chmod 2770 /app/data/workspaces
+    && chmod u=rwx,g=rwxs,o= /app/data/workspaces
 
 ENV AGENT_SANDBOX_USER=sandbox
 # ====
