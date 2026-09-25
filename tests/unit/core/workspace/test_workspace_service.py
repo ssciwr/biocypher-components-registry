@@ -10,9 +10,9 @@ import pytest
 
 from src.core.workspace import client_loop, service
 from src.core.workspace.service import (
-    EventStreamAlreadyActive,
     SessionManager,
     SessionStartupError,
+    TurnInFlightError,
 )
 from tests.support.workspace_fakes import (
     FakeRunner,
@@ -43,8 +43,7 @@ async def collect_until_done(queue, timeout=5.0):
 
 async def run_turn(session, content):
     queue = session.subscribe()
-    session.busy = True
-    session.inbox.put_nowait(("turn-1", content))
+    session.submit(content)
     events = await collect_until_done(queue)
     session.unsubscribe(queue)
     return events
@@ -72,7 +71,7 @@ def test_create_and_delete_session(tmp_path):
     asyncio.run(scenario())
 
 
-def test_create_session_mcp_failure(tmp_path):
+def test_create_session_mcp_failure(tmp_path, caplog):
     from contextlib import asynccontextmanager
 
     @asynccontextmanager
@@ -82,9 +81,12 @@ def test_create_session_mcp_failure(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=broken)
-        with pytest.raises(SessionStartupError, match="no route to MCP"):
+        with pytest.raises(
+            SessionStartupError, match="^could not connect to MCP server$"
+        ):
             await manager.create(owner_github_user_id="12345")
         assert not manager.sessions
+        assert "no route to MCP" in caplog.text
 
     asyncio.run(scenario())
 
@@ -106,7 +108,7 @@ def test_create_reports_workspace_directory_storage_error(tmp_path, monkeypatch)
     """
     manager = make_manager(tmp_path)
     monkeypatch.setattr(
-        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError])
+        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError, None])
     )
     create_session = manager.create(owner_github_user_id="12345")
     with pytest.raises(service.WorkspaceStorageError):
@@ -339,36 +341,52 @@ def test_turn_cancellation_rolls_back_history(tmp_path):
     assert busy is False
 
 
-def test_actor_death_unbricks_session(tmp_path):
+def test_actor_death_unbricks_session(tmp_path, caplog):
     from contextlib import asynccontextmanager
 
     class DyingMcp:
         async def list_tools(self):
-            from types import SimpleNamespace
-
             return SimpleNamespace(tools=[])
 
         async def call_tool(self, name, arguments):  # pragma: no cover
             raise AssertionError("not used")
 
+    connections = []
+
     @asynccontextmanager
     async def dying_mcp_connect(url, headers):
+        # Mimic the streamable-HTTP transport: a failure in its background
+        # task cancels the owning task and surfaces as an error on exit.
         mcp = DyingMcp()
-        yield mcp
-        # context exit is fine; death is simulated via the queue poison below
+        mcp.die = asyncio.current_task().cancel
+        connections.append(mcp)
+        try:
+            yield mcp
+        except asyncio.CancelledError:
+            raise ConnectionError("transport lost") from None
 
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=dying_mcp_connect)
         session = await manager.create(owner_github_user_id="12345")
-        # Make the next inbox item explode inside the actor itself (not the
-        # turn task) by poisoning turn-task creation.
-        session._run_turn = None  # type: ignore[assignment]
-        session.busy = True
-        session.inbox.put_nowait(("turn-x", "boom"))
+        queue = session.subscribe()
+        turn_started = asyncio.Event()
+
+        async def hanging_turn(turn_id, content):
+            turn_started.set()
+            await asyncio.Event().wait()
+
+        session._run_turn = hanging_turn  # type: ignore[method-assign]
+        session.submit("hello")
+        await turn_started.wait()
+        connections[-1].die()
         await asyncio.wait_for(session.actor, timeout=5)
-        assert session.error is not None
+        await asyncio.wait({session.turn_task}, timeout=5)
+        # Clients get a generic reason; the details only go to the log.
+        assert session.error == "MCP connection lost"
+        assert "transport lost" in caplog.text
+        assert session.turn_task.cancelled()
         assert session.busy is False
-        assert session.inbox.empty()
+        assert queue.get_nowait()["type"] == "session_error"
         await manager.shutdown()
 
     asyncio.run(scenario())
@@ -391,24 +409,47 @@ def test_subscriber_queue_drops_oldest_when_full(tmp_path):
     asyncio.run(scenario())
 
 
-def test_open_event_stream_returns_already_active_for_duplicate(tmp_path):
+def test_open_event_stream_replaces_older_stream(tmp_path):
     async def scenario():
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
-        first_stream = manager.open_event_stream(session)
-        duplicate_result = manager.open_event_stream(session)
-        result = (
-            isinstance(first_stream, asyncio.Queue),
-            isinstance(duplicate_result, EventStreamAlreadyActive),
-            first_stream in session.subscribers,
-        )
+        first, _ = manager.open_event_stream(session)
+        second, backlog = manager.open_event_stream(session)
+        # The older stream is told to end and no longer receives events.
+        assert first.get_nowait() is None
+        assert session.subscribers == {second}
+        assert backlog == []
+        manager.close_event_stream(session, first)
+        assert session.id not in manager._sse_disconnect_tasks
         await manager.shutdown()
-        return result
 
-    opened, duplicate_rejected, subscribed = asyncio.run(scenario())
-    assert opened
-    assert duplicate_rejected
-    assert subscribed
+    asyncio.run(scenario())
+
+
+def test_open_event_stream_replays_events_after_last_event_id(tmp_path):
+    async def scenario():
+        manager = make_manager(tmp_path)
+        session = await manager.create(owner_github_user_id="12345")
+        for n in range(3):
+            session.publish("fs_changed", paths=[f"f{n}"])
+        _, backlog = manager.open_event_stream(session, last_event_id=1)
+        assert [e["seq"] for e in backlog] == [2, 3]
+        # Up to date, unknown (e.g. from before a restart) or no id: no replay.
+        assert manager.open_event_stream(session, last_event_id=3)[1] == []
+        assert manager.open_event_stream(session, last_event_id=99)[1] == []
+        assert manager.open_event_stream(session)[1] == []
+        await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
+def test_replay_buffer_is_bounded(tmp_path, monkeypatch):
+    monkeypatch.setattr(service, "EVENT_REPLAY_SIZE", 2)
+    session = service.Session("sid", "12345", tmp_path, "url", {})
+    for n in range(4):
+        session.publish("fs_changed", paths=[f"f{n}"])
+    # Events 1-2 fell out of the buffer; only what is left is replayed.
+    assert [e["seq"] for e in session.events_after(0)] == [3, 4]
 
 
 # Ideally this basically gives us more protection about the "Network" erros we saw.
@@ -418,9 +459,9 @@ def test_reconnect_then_61_second_timeout_deletes_session(tmp_path, monkeypatch)
         monkeypatch.setattr(service.asyncio, "sleep", sleep)
         manager = make_manager(tmp_path)
         session = await manager.create(owner_github_user_id="12345")
-        original_stream = manager.open_event_stream(session)
+        original_stream, _ = manager.open_event_stream(session)
         manager.close_event_stream(session, original_stream)
-        reconnected_stream = manager.open_event_stream(session)
+        reconnected_stream, _ = manager.open_event_stream(session)
         retained = manager.get(session.id) is session
         manager.close_event_stream(session, reconnected_stream)
         await manager._sse_disconnect_tasks[session.id]
@@ -525,26 +566,29 @@ def test_idle_reaper_logs_cleanup_failure(tmp_path, monkeypatch, caplog):
     # repeat should still be working.
 
 
-def test_interrupt_cancels_queued_turn(tmp_path):
-    from pathlib import Path
-
-    from src.core.workspace.service import Session
-
+def test_submit_rejects_second_turn_and_interrupt_frees_slot(tmp_path):
     async def scenario():
-        # Session without a running actor: the turn stays queued, exactly the
-        # window where interrupt() used to report "nothing to interrupt".
-        session = Session("sid", "12345", Path(tmp_path), "url", {})
-        queue = session.subscribe()
-        session.busy = True
-        session.inbox.put_nowait(("turn-9", "hello"))
-        assert session.interrupt() is True
-        assert session.busy is False
-        assert session.inbox.empty()
-        event = queue.get_nowait()
-        assert event["type"] == "turn_error"
-        assert event["data"] == {"turn_id": "turn-9", "message": "interrupted"}
-        # nothing queued, nothing running -> nothing to interrupt
+        session = service.Session("sid", "12345", tmp_path, "url", {})
+        release = asyncio.Event()
+
+        async def slow_turn(turn_id, content):
+            await release.wait()
+
+        session._run_turn = slow_turn  # type: ignore[method-assign]
         assert session.interrupt() is False
+        session.submit("first")
+        # busy from submission on, before the turn task has even started
+        assert session.busy is True
+        with pytest.raises(TurnInFlightError):
+            session.submit("second")
+        assert session.interrupt() is True
+        await asyncio.wait({session.turn_task})
+        assert session.busy is False
+        assert session.interrupt() is False
+        session.submit("third")
+        release.set()
+        await session.turn_task
+        assert session.busy is False
 
     asyncio.run(scenario())
 

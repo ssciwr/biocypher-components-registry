@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: BioCypher Components Registry
+abstract: >-
+  Registry system for BioCypher adapters with metadata validation and
+  registration workflows.
+type: software
+authors:
+  - name: Scientific Software Center, Heidelberg University
+version: 0.1.9
+date-released: 2026-09-02
+repository-code: https://github.com/ssciwr/biocypher-components-registry
+license: MIT
+keywords:
+  - BioCypher
+  - knowledge graphs
+  - metadata
+  - registry

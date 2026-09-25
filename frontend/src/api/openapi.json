@@ -1072,6 +1072,9 @@
           "401": {
             "description": "Unknown session or invalid session token"
           },
+          "429": {
+            "description": "Too many open workspace sessions for this user"
+          },
           "500": {
             "description": "Issue creating workspace session"
           },
@@ -1107,22 +1110,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1202,22 +1189,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1286,22 +1257,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1386,22 +1341,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1492,7 +1431,7 @@
           "workspace"
         ],
         "summary": "Interrupt the running turn",
-        "description": "Cancel the running turn, or a turn that was accepted but has not started yet. History rolls back to the pre-turn snapshot.",
+        "description": "Cancel the running turn. History rolls back to the pre-turn snapshot.",
         "operationId": "interrupt_agent_api_v1_sessions__session_id__interrupt_post",
         "parameters": [
           {
@@ -1502,22 +1441,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1589,7 +1512,7 @@
           "workspace"
         ],
         "summary": "Stream session events",
-        "description": "Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog.",
+        "description": "Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog. On reconnect, send Last-Event-ID to replay missed events; a new stream replaces an open one.",
         "operationId": "events_agent_api_v1_sessions__session_id__events_get",
         "parameters": [
           {
@@ -1602,8 +1525,8 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
+            "name": "last-event-id",
+            "in": "header",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1614,7 +1537,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Token"
+              "title": "Last-Event-Id"
             }
           },
           {
@@ -1661,9 +1584,6 @@
               }
             }
           },
-          "409": {
-            "description": "An event stream is already active for this session."
-          },
           "401": {
             "description": "Unknown session or invalid session token"
           },
@@ -1706,22 +1626,6 @@
               "type": "string",
               "default": "",
               "title": "Path"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1805,22 +1709,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1912,22 +1800,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1982,6 +1854,9 @@
           },
           "409": {
             "description": "Conflict: turn running, filesystem error, or nothing to interrupt"
+          },
+          "413": {
+            "description": "File too large to preview"
           },
           "415": {
             "description": "Not a text file"
@@ -3212,12 +3087,13 @@
           "status"
         ],
         "title": "InterruptResponse",
-        "description": "Response returned when a running or queued turn is interrupted."
+        "description": "Response returned when a running turn is interrupted."
       },
       "MessageCreateRequest": {
         "properties": {
           "content": {
             "type": "string",
+            "maxLength": 100000,
             "title": "Content"
           }
         },
@@ -4774,7 +4650,8 @@
           "api_key": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 512
               },
               {
                 "type": "null"
@@ -4785,7 +4662,8 @@
           "auth_token": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 512
               },
               {
                 "type": "null"
