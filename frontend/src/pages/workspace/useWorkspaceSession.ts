@@ -214,7 +214,7 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
       }
       case 'fs_changed': {
         const activeSession = sessionRef.current
-        if (activeSession) reloadCurrentDir(activeSession)
+        if (activeSession) void reloadCurrentDir(activeSession)
         return
       }
       case 'turn_started':
