@@ -1113,22 +1113,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1205,22 +1189,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1289,22 +1257,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1389,22 +1341,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1508,22 +1444,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1602,22 +1522,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1725,22 +1629,6 @@
             }
           },
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1821,22 +1709,6 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {
@@ -1925,22 +1797,6 @@
             "schema": {
               "type": "string",
               "title": "Path"
-            }
-          },
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
             }
           },
           {

@@ -7,15 +7,15 @@ route-level contract (auth, SSE event shapes, error codes).
 
 Auth: all routes require the registry GitHub auth session. Every
 ``/sessions/{id}/...`` route also requires the session token returned by
-``POST /sessions``, either as ``Authorization: Bearer <token>`` or as a
-``?token=`` query parameter (the query form exists for browser-native
-EventSource, which cannot set headers; prefer the header).
+``POST /sessions`` as ``Authorization: Bearer <token>``. There is no query
+parameter form: tokens in URLs end up in proxy access logs.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -63,6 +63,8 @@ HEARTBEAT_SECONDS = 5  # specifically this amount due to this report: https://gi
 ARCHIVE_EXCLUDED = {".venv", ".cache"}
 # Largest file the preview pane will load.
 MAX_PREVIEW_BYTES = 1_000_000
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -134,8 +136,9 @@ async def create_session(
     except WorkspaceStorageError:
         # Yes it is more specific but is to prevent server crash just ending SSE causing very vague "Network error"
         raise HTTPException(500, "Issue creating workspace session.")
-    except SessionStartupError as e:
-        raise HTTPException(502, f"could not connect to MCP server: {e}")
+    except SessionStartupError:
+        # Details are logged by the session actor.
+        raise HTTPException(502, "could not connect to MCP server")
     return SessionCreateResponse.from_session(session)
 
 
@@ -393,6 +396,8 @@ async def read_file(
         content = target.read_text()
     except UnicodeDecodeError:
         raise HTTPException(415, f"not a text file: {path}")
-    except OSError as e:
-        raise HTTPException(409, f"filesystem error: {e}")
+    except OSError:
+        # The OSError text carries the absolute server path.
+        logger.exception("Could not read workspace file %r", path)
+        raise HTTPException(409, f"filesystem error reading {path}")
     return FileContentResponse(path=path, content=content)

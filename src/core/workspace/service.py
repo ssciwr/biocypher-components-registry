@@ -282,9 +282,16 @@ class Session:
                 ]
                 self.ready.set()
                 await self.closed.wait()
-        except Exception as e:  # noqa: BLE001
-            # Broad by design: the session becomes unusable, record why.
-            self.error = f"{type(e).__name__}: {e}"
+        except Exception:
+            # Broad by design: the session becomes unusable. The details
+            # (URLs, internal host names) go to the log only; clients see a
+            # generic reason.
+            logger.exception("MCP connection failed: session_id=%s", self.id)
+            self.error = (
+                "MCP connection lost"
+                if self.ready.is_set()
+                else "could not connect to MCP server"
+            )
             self.ready.set()
             # A running turn would only fail on the dead MCP connection.
             self.interrupt()

@@ -74,9 +74,9 @@ Consequences of the current single-process design:
   set `client_max_body_size`, and monitor disk usage before wider deployment.
 - **TLS is a deployment requirement, not built in.** The BYOK key travels in
   a request body and the session token in a header; both need HTTPS
-  termination (nginx) on anything but localhost. The `?token=` query form
-  additionally lands in access logs — prefer the `Authorization` header via
-  a `fetch()`-based SSE reader; reserve `?token=` for quick local debugging.
+  termination (nginx) on anything but localhost. The token is accepted only
+  in the `Authorization` header, never as a query parameter, so it does not
+  land in access logs.
 
 ## Concepts
 
@@ -95,23 +95,25 @@ default 20000); full results stay in the backend. SSE events carry at most a
 
 Two knowable limits: conversation history grows unbounded with the session
 (memory server-side, input tokens per turn — prompt caching softens the cost
-but not the growth), so prefer fresh sessions over very long ones. And
-`turn_error`/`session_error` messages contain raw exception text; they are
-only delivered to the session's own event stream.
+but not the growth), so prefer fresh sessions over very long ones.
+
+Error messages sent to clients are generic (`turn_error`, `session_error`,
+the 502s, file-route errors) and never contain server paths or raw exception
+text; the details are logged server-side.
 
 ## Authentication
 
 `POST /sessions` requires the registry GitHub auth cookie and returns a
 `session_token`. Every `/sessions/{id}/...` request requires that same GitHub
-user plus the workspace token, either as
+user plus the workspace token as
 
 ```
 Authorization: Bearer <session_token>
 ```
 
-or as a `?token=<session_token>` query parameter. The query form exists for
-browser-native `EventSource`, which cannot set headers; prefer the header (a
-`fetch()`-based SSE reader can set it).
+There is no query-parameter form, so browser-native `EventSource` (which
+cannot set headers) is not supported; use a `fetch()`-based SSE reader, as
+the frontend does.
 
 Unknown session ids, wrong users, and wrong tokens all return **401** with the
 same body, so session ids and ownership cannot be enumerated.
@@ -350,7 +352,7 @@ TOK=$(echo "$CREATED" | jq -r .session_token)
 AUTH="Authorization: Bearer $TOK"
 
 # 2. watch events (separate terminal)
-curl -sN "$B/sessions/$SID/events?token=$TOK"
+curl -sN "$B/sessions/$SID/events" -H "$AUTH"
 
 # 3. upload the key, then chat
 curl -s -X POST $B/sessions/$SID/key -H "$AUTH" -H "Content-Type: application/json" \

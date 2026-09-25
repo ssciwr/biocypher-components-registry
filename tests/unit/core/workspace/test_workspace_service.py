@@ -71,7 +71,7 @@ def test_create_and_delete_session(tmp_path):
     asyncio.run(scenario())
 
 
-def test_create_session_mcp_failure(tmp_path):
+def test_create_session_mcp_failure(tmp_path, caplog):
     from contextlib import asynccontextmanager
 
     @asynccontextmanager
@@ -81,9 +81,12 @@ def test_create_session_mcp_failure(tmp_path):
 
     async def scenario():
         manager = make_manager(tmp_path, mcp_connect=broken)
-        with pytest.raises(SessionStartupError, match="no route to MCP"):
+        with pytest.raises(
+            SessionStartupError, match="^could not connect to MCP server$"
+        ):
             await manager.create(owner_github_user_id="12345")
         assert not manager.sessions
+        assert "no route to MCP" in caplog.text
 
     asyncio.run(scenario())
 
@@ -338,7 +341,7 @@ def test_turn_cancellation_rolls_back_history(tmp_path):
     assert busy is False
 
 
-def test_actor_death_unbricks_session(tmp_path):
+def test_actor_death_unbricks_session(tmp_path, caplog):
     from contextlib import asynccontextmanager
 
     class DyingMcp:
@@ -378,7 +381,9 @@ def test_actor_death_unbricks_session(tmp_path):
         connections[-1].die()
         await asyncio.wait_for(session.actor, timeout=5)
         await asyncio.wait({session.turn_task}, timeout=5)
-        assert session.error == "ConnectionError: transport lost"
+        # Clients get a generic reason; the details only go to the log.
+        assert session.error == "MCP connection lost"
+        assert "transport lost" in caplog.text
         assert session.turn_task.cancelled()
         assert session.busy is False
         assert queue.get_nowait()["type"] == "session_error"

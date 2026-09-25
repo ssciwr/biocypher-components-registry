@@ -44,6 +44,7 @@ Run:
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import signal
 import sys
@@ -62,6 +63,10 @@ MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
 MCP_URL = os.getenv("BIOCYPHER_MCP_URL", "https://mcp.biocypher.org/mcp")
 RESULT_MAX_CHARS = int(os.getenv("MCP_RESULT_MAX_CHARS", "20000"))
 FILE_ROOT = Path(os.getenv("FILE_TOOLS_ROOT", ".")).resolve()
+
+# Tool activity is logged at DEBUG: silent in the API service unless enabled,
+# printed to stderr by the CLI (see main()).
+logger = logging.getLogger(__name__)
 
 
 def build_system_prompt(root: Path, result_max_chars: int) -> str:
@@ -136,10 +141,11 @@ def read_secret(name: str) -> str | None:
         try:
             secret = Path(path).read_text().strip()
         except OSError as exc:
-            print(
-                f"[warn] could not read {name}_FILE ({exc}); "
-                f"falling back to {name} env var",
-                file=sys.stderr,
+            logger.warning(
+                "could not read %s_FILE (%s); falling back to %s env var",
+                name,
+                exc,
+                name,
             )
             return env_secret or None
         try:
@@ -197,7 +203,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
     tool_name = mcp_tool_def.name
 
     async def call(**kwargs):
-        print(f"\n[tool] {tool_name} {json.dumps(kwargs)}", file=sys.stderr, flush=True)
+        logger.debug("[tool] %s %s", tool_name, json.dumps(kwargs))
         result = await session.call_tool(name=tool_name, arguments=kwargs)
         text = render_tool_result(result)
         if len(text) > RESULT_MAX_CHARS:
@@ -206,11 +212,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
                 text[:RESULT_MAX_CHARS]
                 + f"\n[truncated: {omitted} chars omitted before model context]"
             )
-        print(
-            f"[tool done] {tool_name} ({len(text)} chars to context)",
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.debug("[tool done] %s (%d chars to context)", tool_name, len(text))
         return text
 
     return beta_async_tool(
@@ -238,10 +240,10 @@ def resolve_in_root(path: str, root: Path) -> Path:
     root_str = str(root)
     normalized = os.path.normpath(os.path.join(root_str, path))
     if normalized != root_str and not normalized.startswith(root_str + os.sep):
-        raise ValueError(f"path escapes workspace root {root}: {path}")
+        raise ValueError(f"path escapes workspace root: {path}")
     resolved = Path(normalized).resolve()
     if resolved != root and not resolved.is_relative_to(root):
-        raise ValueError(f"path escapes workspace root {root}: {path}")
+        raise ValueError(f"path escapes workspace root: {path}")
     return resolved
 
 
@@ -355,7 +357,7 @@ def make_file_tools(
             path: Directory path, relative to the workspace root. Defaults to
                 the workspace root itself.
         """
-        print(f"\n[tool] list_dir {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] list_dir %s", path)
         try:
             entries = sorted(
                 _resolve(path).iterdir(),
@@ -375,7 +377,7 @@ def make_file_tools(
         Args:
             path: File path, relative to the workspace root.
         """
-        print(f"\n[tool] read_file {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] read_file %s", path)
         try:
             text = _resolve(path).read_text()
         except (OSError, ValueError) as e:
@@ -391,11 +393,7 @@ def make_file_tools(
                 are created as needed.
             content: Full content to write.
         """
-        print(
-            f"\n[tool] write_file {path} ({len(content)} chars)",
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.debug("[tool] write_file %s (%d chars)", path, len(content))
         try:
             target = _resolve(path)
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -415,7 +413,7 @@ def make_file_tools(
                 surrounding lines to make it unique.
             new_string: Replacement text.
         """
-        print(f"\n[tool] edit_file {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] edit_file %s", path)
         try:
             target = _resolve(path)
             text = target.read_text()
@@ -446,7 +444,7 @@ def make_file_tools(
             timeout_seconds: Kill the command after this many seconds (default
                 300, max 600).
         """
-        print(f"\n[tool] run_command {command}", file=sys.stderr, flush=True)
+        logger.debug("[tool] run_command %s", command)
         timeout_seconds = max(1, min(timeout_seconds, MAX_COMMAND_SECONDS))
         root = get_root()
         env = _exec_env(get_exec_bin(), home=root)
@@ -476,11 +474,7 @@ def make_file_tools(
         text = out.decode(errors="replace")
         if total > len(out):
             text += f"\n[truncated: {total - len(out)} bytes omitted]"
-        print(
-            f"[tool done] run_command (exit {proc.returncode})",
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.debug("[tool done] run_command (exit %s)", proc.returncode)
         notify("")
         return f"[exit {proc.returncode}]\n{text}"
 
@@ -620,6 +614,11 @@ async def chat(tools, api_key: str | None, auth_token: str | None) -> None:
 
 
 async def main() -> None:
+    # Interactive use: show tool activity on stderr as before.
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
     # Read (and thereby scrub from os.environ) every secret we know about,
     # whether or not this run uses it.
     api_key = read_secret("ANTHROPIC_API_KEY")

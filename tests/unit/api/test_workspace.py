@@ -1,6 +1,5 @@
 """API tests for the workspace routes — TestClient over fake MCP and Anthropic."""
 
-import functools
 import time
 from functools import partial
 from io import BytesIO
@@ -16,7 +15,11 @@ from src.api.app import create_app
 from src.api.dependencies import get_current_auth_session
 from src.api.routers import workspace as workspace_router
 from src.core.auth.models import AuthSession
-from src.core.workspace.service import SessionManager, WorkspaceStorageError
+from src.core.workspace.service import (
+    SessionManager,
+    SessionStartupError,
+    WorkspaceStorageError,
+)
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -95,6 +98,32 @@ def test_create_session_hides_storage_error(client, manager, monkeypatch):
     assert response.status_code == 500
     assert response.json() == {"detail": "Issue creating workspace session."}
     create.assert_awaited_once_with(owner_github_user_id="12345")
+
+
+def test_create_session_hides_mcp_error_details(client, manager, monkeypatch):
+    create = AsyncMock(side_effect=SessionStartupError("mcp.internal:8080 refused"))
+    monkeypatch.setattr(manager, "create", create)
+    response = client.post(f"{PREFIX}/sessions")
+    assert response.status_code == 502
+    assert response.json() == {"detail": "could not connect to MCP server"}
+
+
+def test_session_token_query_parameter_is_rejected(client, session):
+    sid, headers, session_obj = session
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}", params={"token": session_obj.token}
+    )
+    assert response.status_code == 401
+    assert client.get(f"{PREFIX}/sessions/{sid}", headers=headers).status_code == 200
+
+
+def test_path_escape_error_hides_workspace_root(client, session):
+    sid, headers, session_obj = session
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}/file", headers=headers, params={"path": "../x"}
+    )
+    assert response.status_code == 400
+    assert str(session_obj.workspace) not in response.json()["detail"]
 
 
 def test_create_session_requires_github_auth(manager):
@@ -203,7 +232,7 @@ def test_interrupt_without_turn(client, session):
     assert response.status_code == 409
 
 
-def test_events_stream_snapshot_and_token_query(manager):
+def test_events_stream_snapshot_and_replay(manager):
     # TestClient cannot cancel an infinite SSE response, so this test runs a
     # real uvicorn server in a thread and closes a real TCP connection.
     import socket
@@ -240,14 +269,14 @@ def test_events_stream_snapshot_and_token_query(manager):
         base = f"http://127.0.0.1:{port}{PREFIX}"
         created = httpx.post(f"{base}/sessions", timeout=10).json()
         url = f"{base}/sessions/{created['session_id']}/events"
-        params = {"token": created["session_token"]}
+        auth = {"Authorization": f"Bearer {created['session_token']}"}
         session = manager.get(created["session_id"])
         loop = session.actor.get_loop()
 
         def publish(path):
             # The session lives on the server's loop, not this thread.
             loop.call_soon_threadsafe(
-                functools.partial(session.publish, "fs_changed", paths=[path])
+                partial(session.publish, "fs_changed", paths=[path])
             )
 
         def read_until(lines_iter, marker):
@@ -258,7 +287,7 @@ def test_events_stream_snapshot_and_token_query(manager):
                     return seen
             raise AssertionError(f"stream ended before {marker!r}: {seen}")
 
-        with httpx.stream("GET", url, params=params, timeout=10) as first:
+        with httpx.stream("GET", url, headers=auth, timeout=10) as first:
             assert first.status_code == 200
             assert first.headers["content-type"].startswith("text/event-stream")
             first_lines = first.iter_lines()
@@ -273,8 +302,7 @@ def test_events_stream_snapshot_and_token_query(manager):
             with httpx.stream(
                 "GET",
                 url,
-                params=params,
-                headers={"Last-Event-ID": "1"},
+                headers={**auth, "Last-Event-ID": "1"},
                 timeout=10,
             ) as second:
                 assert second.status_code == 200
@@ -290,7 +318,7 @@ def test_events_stream_snapshot_and_token_query(manager):
         assert manager.get(created["session_id"]) is not None
         deleted = httpx.delete(
             f"{base}/sessions/{created['session_id']}",
-            params={"token": created["session_token"]},
+            headers=auth,
             timeout=10,
         )
         assert deleted.status_code == 204

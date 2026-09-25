@@ -273,12 +273,7 @@ export type DeleteSessionAgentApiV1SessionsSessionIdDeleteData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}';
 };
 
@@ -318,12 +313,7 @@ export type GetSessionAgentApiV1SessionsSessionIdGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}';
 };
 
@@ -363,12 +353,7 @@ export type SetKeyAgentApiV1SessionsSessionIdKeyPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/key';
 };
 
@@ -412,12 +397,7 @@ export type PostMessageAgentApiV1SessionsSessionIdMessagesPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/messages';
 };
 
@@ -473,12 +453,7 @@ export type InterruptAgentApiV1SessionsSessionIdInterruptPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/interrupt';
 };
 
@@ -526,12 +501,7 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/events';
 };
 
@@ -576,10 +546,6 @@ export type ListFilesAgentApiV1SessionsSessionIdFilesGetData = {
          * Path
          */
         path?: string;
-        /**
-         * Token
-         */
-        token?: string | null;
     };
     url: '/agent/api/v1/sessions/{session_id}/files';
 };
@@ -628,12 +594,7 @@ export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/download';
 };
 
@@ -678,10 +639,6 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetData = {
          * Path
          */
         path: string;
-        /**
-         * Token
-         */
-        token?: string | null;
     };
     url: '/agent/api/v1/sessions/{session_id}/file';
 };
