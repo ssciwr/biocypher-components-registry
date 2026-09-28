@@ -1,0 +1,79 @@
+You don't need all of this at once. The layers below go roughly from most to least central, each with where it shows up in this codebase.
+
+## Core (needed to follow almost any change)
+
+**Python asyncio.** This matters most, because the backend is built around it.
+- Tasks, `create_task`, cancellation (`CancelledError`, `task.cancel()`, `cancelling()`).
+- `asyncio.Event`, `asyncio.Queue` (bounded queues, `put_nowait`), `asyncio.timeout`.
+- Why async context managers must be entered and exited by the same task. This is the whole reason the actor task exists in `service.py`.
+- `asyncio.to_thread` for blocking file I/O.
+
+**FastAPI basics.**
+- Routers, dependencies (`Depends`, `Annotated`, `Header()`), `HTTPException` status codes.
+- Pydantic models with `Field` limits.
+- `StreamingResponse` for SSE, and the app lifespan (`src/api/app.py`), which creates the `SessionManager` and the idle reaper.
+
+**HTTP and Server-Sent Events.**
+- Status codes as used here: 401, 409, 413, 415, 428, 429, 502.
+- Bearer tokens in the `Authorization` header.
+- The SSE wire format (`event:`, `id:`, `data:`, blank-line separators), `Last-Event-ID` on reconnect, heartbeats to keep proxies from closing the stream.
+
+## The AI/agent part
+
+**Claude API tool use.**
+- Messages, `tool_use` / `tool_result` blocks, and streaming.
+- The SDK's `tool_runner`, which drives the loop: model asks for a tool, the backend runs it, the result goes back to the model.
+- Why a partial turn must be rolled back: a `tool_use` without its `tool_result` makes every later request fail.
+- Prompt caching and adaptive thinking are nice to know but not essential.
+
+**MCP (Model Context Protocol).**
+- An MCP server exposes tools; this backend is the *client*.
+- It connects over streamable HTTP, lists the tools and wraps them for the model (`client_loop.py`: `open_mcp_session`, `make_tool`).
+- You need to know it's a separate server (BioCypher MCP) holding its own credentials. Protocol internals aren't required.
+
+## Security and operations
+
+**Linux users and permissions.**
+- Octal and symbolic modes (`710`, `2770`, `u=rwx,g=rwxs,o=`), setgid on directories, groups, `umask`.
+- `sudo -u` with a restricted sudoers rule.
+- Process groups and `kill` of a whole group.
+- `/proc` as the place where cross-session leaks happen.
+
+This is essential for items 1a/1b and the Dockerfile/entrypoint.
+
+**Docker and Docker Compose.**
+- Image build, `USER`, entrypoint scripts, named volumes, `init: true`.
+- Why sandboxing only exists inside the image, and why the local `uvicorn` run has none.
+
+**Basic web security concepts.**
+- BYOK (bring your own key) and keeping the key out of storage, URLs, logs and subprocess environments.
+- Why tokens don't go in URLs, log injection, leaking server paths in errors, prompt injection as the threat model for the shared sandbox user.
+
+## Frontend
+
+**React with TypeScript.**
+- Hooks: `useState`, `useEffect`, `useCallback`, and especially `useRef` for values that must be current without re-rendering. The coalesced file refresh relies on this.
+- `fetch` streaming, since the SSE reader is `fetch`-based rather than `EventSource`.
+- `sessionStorage` vs `localStorage` (relevant for item 9).
+
+**Tooling.**
+- Vite dev server and its proxy for `/api` and `/agent/api`.
+- The OpenAPI-generated client (`@hey-api/openapi-ts`), including the gotcha that regeneration drops workspace routes while `agentic_api_active = False`.
+- Cypress with mocked (`cy.intercept`) responses.
+
+## Testing and quality tooling
+
+- pytest, including `asyncio.run(scenario())` tests, fakes/mocks (`AsyncMock`), `caplog`, `monkeypatch`.
+- ruff for lint and format.
+- SonarCloud rules, enough to judge real findings vs false positives.
+
+## Suggested starting points in the repo
+
+1. `docs/API.md` for the contract: routes, events, error codes.
+2. `docs/workspace-data-flow.svg` for what data goes where.
+3. `src/core/workspace/service.py` (`Session`, `SessionManager`) for the core logic.
+4. `src/api/routers/workspace.py` for the HTTP layer.
+5. `frontend/src/pages/workspace/useWorkspaceSession.ts` for the client side.
+6. `Dockerfile` and `docker-entrypoint.sh` for the sandbox.
+
+A developer comfortable with Python async and FastAPI can work on most backend items. The sandbox work (1a/1b) additionally needs solid Linux permissions and Docker knowledge. The session-resume work (item 9) is mostly React and browser storage.

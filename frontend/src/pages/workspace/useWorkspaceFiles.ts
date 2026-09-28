@@ -49,9 +49,33 @@ export function useWorkspaceFiles({
     })
   }, [runPending])
 
-  const reloadCurrentDir = useCallback((activeSession: WorkspaceViewSession) => {
-    void loadFiles(activeSession, currentDirRef.current)
-  }, [loadFiles])
+  // Background refresh on fs_changed. Kept off runPending so agent writes do
+  // not clear the error banner or disable buttons. A burst of events (e.g.
+  // replayed after a reconnect) collapses into one follow-up reload.
+  const reloadInFlightRef = useRef(false)
+  const reloadAgainRef = useRef(false)
+  const reloadCurrentDir = useCallback(async (activeSession: WorkspaceViewSession) => {
+    if (reloadInFlightRef.current) {
+      reloadAgainRef.current = true
+      return
+    }
+    reloadInFlightRef.current = true
+    try {
+      do {
+        reloadAgainRef.current = false
+        const path = currentDirRef.current
+        try {
+          const list = await listWorkspaceFiles(activeSession, path)
+          // The user may have opened another directory meanwhile.
+          if (currentDirRef.current === path) setFiles(list.entries)
+        } catch (reloadError) {
+          console.error('Could not refresh workspace files.', reloadError)
+        }
+      } while (reloadAgainRef.current)
+    } finally {
+      reloadInFlightRef.current = false
+    }
+  }, [])
 
 
   function openDirectory(path: string) {

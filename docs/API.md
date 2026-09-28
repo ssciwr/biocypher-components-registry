@@ -74,9 +74,9 @@ Consequences of the current single-process design:
   set `client_max_body_size`, and monitor disk usage before wider deployment.
 - **TLS is a deployment requirement, not built in.** The BYOK key travels in
   a request body and the session token in a header; both need HTTPS
-  termination (nginx) on anything but localhost. The `?token=` query form
-  additionally lands in access logs — prefer the `Authorization` header via
-  a `fetch()`-based SSE reader; reserve `?token=` for quick local debugging.
+  termination (nginx) on anything but localhost. The token is accepted only
+  in the `Authorization` header, never as a query parameter, so it does not
+  land in access logs.
 
 ## Concepts
 
@@ -91,27 +91,29 @@ answer. Turns are serialized per session — one at a time.
 
 The model only ever sees truncated tool results (`MCP_RESULT_MAX_CHARS`,
 default 20000); full results stay in the backend. SSE events carry at most a
-500-char preview of each tool result.
+5000-char preview of each tool result.
 
 Two knowable limits: conversation history grows unbounded with the session
 (memory server-side, input tokens per turn — prompt caching softens the cost
-but not the growth), so prefer fresh sessions over very long ones. And
-`turn_error`/`session_error` messages contain raw exception text; they are
-only delivered to the session's own event stream.
+but not the growth), so prefer fresh sessions over very long ones.
+
+Error messages sent to clients are generic (`turn_error`, `session_error`,
+the 502s, file-route errors) and never contain server paths or raw exception
+text; the details are logged server-side.
 
 ## Authentication
 
 `POST /sessions` requires the registry GitHub auth cookie and returns a
 `session_token`. Every `/sessions/{id}/...` request requires that same GitHub
-user plus the workspace token, either as
+user plus the workspace token as
 
 ```
 Authorization: Bearer <session_token>
 ```
 
-or as a `?token=<session_token>` query parameter. The query form exists for
-browser-native `EventSource`, which cannot set headers; prefer the header (a
-`fetch()`-based SSE reader can set it).
+There is no query-parameter form, so browser-native `EventSource` (which
+cannot set headers) is not supported; use a `fetch()`-based SSE reader, as
+the frontend does.
 
 Unknown session ids, wrong users, and wrong tokens all return **401** with the
 same body, so session ids and ownership cannot be enumerated.
@@ -217,12 +219,11 @@ is rolled back from history — the user simply retries.
 
 #### `POST /sessions/{id}/interrupt`
 
-Cancel the running turn (or a turn that was accepted but has not started
-yet). History rolls back to the pre-turn snapshot and a `turn_error` event
+Cancel the running turn. History rolls back to the pre-turn snapshot and a `turn_error` event
 with message `"interrupted"` is emitted.
 
 - **202** — `{"status": "interrupting"}`
-- **409** — no turn is running or queued.
+- **409** — no turn is running.
 
 #### `GET /sessions/{id}/events`
 
@@ -260,10 +261,17 @@ from closing the stream.
 | `session_error` | `{message}` | MCP connection died; session is unusable |
 | `session_closed` | `{}` | session was deleted; the stream ends after this event |
 
-Each session accepts one event stream. A disconnected stream leaves its session
-and workspace available for 60 seconds so the client can reconnect. There is
-no replay — connect before sending messages — and the `id:` field is
-informational only (`Last-Event-ID` is not honored).
+Each session has one event stream: opening a new one ends the previous
+stream, so a client that reconnects before the server has noticed its old
+connection dropped is not locked out. A disconnected stream leaves its session
+and workspace available for 60 seconds so the client can reconnect.
+
+Reconnect with a `Last-Event-ID: <id>` header (the generated SSE client does
+this automatically on retry) to have the events after `<id>` replayed right
+after the `session_state` snapshot. The server keeps the last 5000 events per
+session; events older than that are lost, and the snapshot is then the only
+reliable state. Without the header, or on the first connect, nothing is
+replayed — connect before sending messages.
 
 ### Files (directory pane + preview)
 
@@ -293,6 +301,7 @@ Build the tree by fetching levels lazily as the user expands them.
 
 - **200** — `{"path": "a.txt", "content": "..."}`
 - **404** — no such file.
+- **413** — file larger than 1 MB.
 - **415** — not a text file.
 
 The workspace API is read-only: ask the assistant in chat to create, change,
@@ -305,8 +314,10 @@ or delete files.
 | 400 | invalid input: bad path, empty message, key body without a key                                           |
 | 401 | missing/wrong workspace session token, or unknown session id                                             |
 | 409 | conflict: turn already running, no turn to interrupt, or filesystem error on a file route |
+| 413 | file too large to preview (> 1 MB)                                                                       |
 | 415 | binary file requested as text                                                                            |
 | 428 | no API key set for the session yet                                                                       |
+| 429 | user already holds `AGENT_MAX_SESSIONS_PER_USER` sessions                                                |
 | 500 | workspace session could not be created                                                                    |
 | 502 | MCP server unreachable / session's MCP connection died                                                   |
 
@@ -317,6 +328,8 @@ or delete files.
 | `AGENT_API_PREFIX` | `/agent/api/v1` | route prefix (registry nginx convention) |
 | `AGENT_WORKSPACES_ROOT` | `./workspaces` | parent dir of per-session workspaces (`/app/data/workspaces` in the compose stacks) |
 | `AGENT_SESSION_READY_TIMEOUT` | `30` | seconds to wait for MCP on session create |
+| `AGENT_MAX_SESSIONS_PER_USER` | `3` | concurrent sessions per GitHub user |
+| `AGENT_SANDBOX_USER` | unset (`sandbox` in the Docker image) | user `run_command` runs as via sudo; unset runs as the API user |
 | `BIOCYPHER_MCP_URL` | `https://mcp.biocypher.org/mcp` | MCP server |
 | `BIOCYPHER_MCP_AUTH_HEADER[_FILE]` | — | MCP auth header, read once at service start |
 | `CLAUDE_MODEL` | `claude-opus-4-8` | model for all sessions |
@@ -339,7 +352,7 @@ TOK=$(echo "$CREATED" | jq -r .session_token)
 AUTH="Authorization: Bearer $TOK"
 
 # 2. watch events (separate terminal)
-curl -sN "$B/sessions/$SID/events?token=$TOK"
+curl -sN "$B/sessions/$SID/events" -H "$AUTH"
 
 # 3. upload the key, then chat
 curl -s -X POST $B/sessions/$SID/key -H "$AUTH" -H "Content-Type: application/json" \

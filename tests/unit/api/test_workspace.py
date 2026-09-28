@@ -15,7 +15,11 @@ from src.api.app import create_app
 from src.api.dependencies import get_current_auth_session
 from src.api.routers import workspace as workspace_router
 from src.core.auth.models import AuthSession
-from src.core.workspace.service import SessionManager, WorkspaceStorageError
+from src.core.workspace.service import (
+    SessionManager,
+    SessionStartupError,
+    WorkspaceStorageError,
+)
 from tests.support.workspace_fakes import (
     FakeRunner,
     FakeStream,
@@ -94,6 +98,32 @@ def test_create_session_hides_storage_error(client, manager, monkeypatch):
     assert response.status_code == 500
     assert response.json() == {"detail": "Issue creating workspace session."}
     create.assert_awaited_once_with(owner_github_user_id="12345")
+
+
+def test_create_session_hides_mcp_error_details(client, manager, monkeypatch):
+    create = AsyncMock(side_effect=SessionStartupError("mcp.internal:8080 refused"))
+    monkeypatch.setattr(manager, "create", create)
+    response = client.post(f"{PREFIX}/sessions")
+    assert response.status_code == 502
+    assert response.json() == {"detail": "could not connect to MCP server"}
+
+
+def test_session_token_query_parameter_is_rejected(client, session):
+    sid, headers, session_obj = session
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}", params={"token": session_obj.token}
+    )
+    assert response.status_code == 401
+    assert client.get(f"{PREFIX}/sessions/{sid}", headers=headers).status_code == 200
+
+
+def test_path_escape_error_hides_workspace_root(client, session):
+    sid, headers, session_obj = session
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}/file", headers=headers, params={"path": "../x"}
+    )
+    assert response.status_code == 400
+    assert str(session_obj.workspace) not in response.json()["detail"]
 
 
 def test_create_session_requires_github_auth(manager):
@@ -188,12 +218,12 @@ def test_message_requires_key_then_runs(client, session):
 def test_message_conflict_while_busy(client, session):
     sid, headers, session_obj = session
     session_obj.set_key("sk-test", None)
-    session_obj.busy = True
+    session_obj.turn_task = Mock(done=Mock(return_value=False))
     response = client.post(
         f"{PREFIX}/sessions/{sid}/messages", headers=headers, json={"content": "hi"}
     )
     assert response.status_code == 409
-    session_obj.busy = False
+    session_obj.turn_task = None
 
 
 def test_interrupt_without_turn(client, session):
@@ -202,7 +232,7 @@ def test_interrupt_without_turn(client, session):
     assert response.status_code == 409
 
 
-def test_events_stream_snapshot_and_token_query(manager):
+def test_events_stream_snapshot_and_replay(manager):
     # TestClient cannot cancel an infinite SSE response, so this test runs a
     # real uvicorn server in a thread and closes a real TCP connection.
     import socket
@@ -239,26 +269,56 @@ def test_events_stream_snapshot_and_token_query(manager):
         base = f"http://127.0.0.1:{port}{PREFIX}"
         created = httpx.post(f"{base}/sessions", timeout=10).json()
         url = f"{base}/sessions/{created['session_id']}/events"
-        lines = []
-        with httpx.stream(
-            "GET", url, params={"token": created["session_token"]}, timeout=10
-        ) as response:
-            assert response.status_code == 200
-            assert response.headers["content-type"].startswith("text/event-stream")
-            second_stream = httpx.get(
-                url, params={"token": created["session_token"]}, timeout=10
+        auth = {"Authorization": f"Bearer {created['session_token']}"}
+        session = manager.get(created["session_id"])
+        loop = session.actor.get_loop()
+
+        def publish(path):
+            # The session lives on the server's loop, not this thread.
+            loop.call_soon_threadsafe(
+                partial(session.publish, "fs_changed", paths=[path])
             )
-            assert second_stream.status_code == 409
-            for line in response.iter_lines():
-                lines.append(line)
-                if len(lines) >= 2:
-                    break
-        assert lines[0] == "event: session_state"
-        assert '"has_key": false' in lines[1]
+
+        def read_until(lines_iter, marker):
+            seen = []
+            for line in lines_iter:
+                seen.append(line)
+                if line == marker:
+                    return seen
+            raise AssertionError(f"stream ended before {marker!r}: {seen}")
+
+        with httpx.stream("GET", url, headers=auth, timeout=10) as first:
+            assert first.status_code == 200
+            assert first.headers["content-type"].startswith("text/event-stream")
+            first_lines = first.iter_lines()
+            read_until(first_lines, "event: session_state")
+            assert '"has_key": false' in next(first_lines)
+            publish("a.txt")
+            read_until(first_lines, "id: 1")
+            publish("b.txt")
+            read_until(first_lines, "id: 2")
+            # Reconnect as the generated client does after a drop, while the
+            # server still holds the first stream open.
+            with httpx.stream(
+                "GET",
+                url,
+                headers={**auth, "Last-Event-ID": "1"},
+                timeout=10,
+            ) as second:
+                assert second.status_code == 200
+                second_lines = second.iter_lines()
+                read_until(second_lines, "event: session_state")
+                replayed = read_until(second_lines, "id: 2")
+                assert "event: fs_changed" in replayed
+                assert "id: 1" not in replayed
+                # The replaced first stream ends instead of lingering:
+                # draining it returns (a lingering one would hit ReadTimeout)
+                # and yields no further events.
+                assert not any(line.startswith("id:") for line in first_lines)
         assert manager.get(created["session_id"]) is not None
         deleted = httpx.delete(
             f"{base}/sessions/{created['session_id']}",
-            params={"token": created["session_token"]},
+            headers=auth,
             timeout=10,
         )
         assert deleted.status_code == 204
@@ -323,3 +383,32 @@ def test_file_path_confinement(client, session):
             f"{PREFIX}/sessions/{sid}/file", params={"path": path}, headers=headers
         )
         assert response.status_code == 400, path
+
+
+# ---------------------------------------------------------------- limits
+
+
+def test_session_limit_per_user(client, monkeypatch):
+    monkeypatch.setattr("src.core.workspace.service.MAX_SESSIONS_PER_USER", 1)
+    assert client.post(f"{PREFIX}/sessions").status_code == 201
+    assert client.post(f"{PREFIX}/sessions").status_code == 429
+
+
+def test_message_too_long_rejected(client, session):
+    sid, headers, _ = session
+    response = client.post(
+        f"{PREFIX}/sessions/{sid}/messages",
+        headers=headers,
+        json={"content": "x" * 100_001},
+    )
+    assert response.status_code == 422
+
+
+def test_read_file_too_large(client, session, monkeypatch):
+    sid, headers, workspace_session = session
+    monkeypatch.setattr(workspace_router, "MAX_PREVIEW_BYTES", 10)
+    (workspace_session.workspace / "big.txt").write_text("x" * 11)
+    response = client.get(
+        f"{PREFIX}/sessions/{sid}/file", headers=headers, params={"path": "big.txt"}
+    )
+    assert response.status_code == 413

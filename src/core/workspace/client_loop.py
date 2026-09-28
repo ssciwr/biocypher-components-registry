@@ -30,9 +30,11 @@ Env vars:
                               reach model context; rest stays local)
 - FILE_TOOLS_ROOT            (default: cwd — root dir the read/write/edit
                               file tools are confined to)
+- AGENT_SANDBOX_USER         (optional: run run_command as this user via
+                              sudo; set in the Docker image)
 
-Secrets are additionally stripped from the environment passed to run_command
-subprocesses, so model-generated shell commands never inherit them.
+run_command subprocesses get only an allowlisted environment (see
+EXEC_ENV_ALLOWLIST), so model-generated shell commands never inherit secrets.
 
 Run:
     python src/core/workspace/client_loop.py               # interactive chat
@@ -40,7 +42,9 @@ Run:
 """
 
 import asyncio
+import contextlib
 import json
+import logging
 import os
 import signal
 import sys
@@ -59,6 +63,10 @@ MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
 MCP_URL = os.getenv("BIOCYPHER_MCP_URL", "https://mcp.biocypher.org/mcp")
 RESULT_MAX_CHARS = int(os.getenv("MCP_RESULT_MAX_CHARS", "20000"))
 FILE_ROOT = Path(os.getenv("FILE_TOOLS_ROOT", ".")).resolve()
+
+# Tool activity is logged at DEBUG: silent in the API service unless enabled,
+# printed to stderr by the CLI (see main()).
+logger = logging.getLogger(__name__)
 
 
 def build_system_prompt(root: Path, result_max_chars: int) -> str:
@@ -103,12 +111,15 @@ def thinking_config() -> dict | None:
     return None
 
 
-# Env vars holding secrets; never passed on to run_command subprocesses.
-SECRET_ENV_VARS = (
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "BIOCYPHER_MCP_AUTH_HEADER",
-)
+# The only env vars run_command subprocesses inherit. An allowlist rather than
+# a secret denylist: the API process also holds OAuth/session secrets and
+# DATABASE_URL, and model-generated commands must see none of them.
+EXEC_ENV_ALLOWLIST = ("PATH", "LANG", "LC_ALL", "TZ")
+# Upper bound on the model-chosen run_command timeout.
+MAX_COMMAND_SECONDS = 600
+# Unprivileged user run_command executes as (via sudo; see the Dockerfile's
+# sudoers rule). Unset = run as this process's user (local dev, tests).
+SANDBOX_USER = os.getenv("AGENT_SANDBOX_USER") or None
 
 
 def read_secret(name: str) -> str | None:
@@ -130,10 +141,11 @@ def read_secret(name: str) -> str | None:
         try:
             secret = Path(path).read_text().strip()
         except OSError as exc:
-            print(
-                f"[warn] could not read {name}_FILE ({exc}); "
-                f"falling back to {name} env var",
-                file=sys.stderr,
+            logger.warning(
+                "could not read %s_FILE (%s); falling back to %s env var",
+                name,
+                exc,
+                name,
             )
             return env_secret or None
         try:
@@ -191,7 +203,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
     tool_name = mcp_tool_def.name
 
     async def call(**kwargs):
-        print(f"\n[tool] {tool_name} {json.dumps(kwargs)}", file=sys.stderr, flush=True)
+        logger.debug("[tool] %s %s", tool_name, json.dumps(kwargs))
         result = await session.call_tool(name=tool_name, arguments=kwargs)
         text = render_tool_result(result)
         if len(text) > RESULT_MAX_CHARS:
@@ -200,11 +212,7 @@ def make_tool(mcp_tool_def, session: ClientSession):
                 text[:RESULT_MAX_CHARS]
                 + f"\n[truncated: {omitted} chars omitted before model context]"
             )
-        print(
-            f"[tool done] {tool_name} ({len(text)} chars to context)",
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.debug("[tool done] %s (%d chars to context)", tool_name, len(text))
         return text
 
     return beta_async_tool(
@@ -232,10 +240,10 @@ def resolve_in_root(path: str, root: Path) -> Path:
     root_str = str(root)
     normalized = os.path.normpath(os.path.join(root_str, path))
     if normalized != root_str and not normalized.startswith(root_str + os.sep):
-        raise ValueError(f"path escapes workspace root {root}: {path}")
+        raise ValueError(f"path escapes workspace root: {path}")
     resolved = Path(normalized).resolve()
     if resolved != root and not resolved.is_relative_to(root):
-        raise ValueError(f"path escapes workspace root {root}: {path}")
+        raise ValueError(f"path escapes workspace root: {path}")
     return resolved
 
 
@@ -248,22 +256,68 @@ def _resolve_path(path: str) -> Path:
 EXEC_BIN: Path | None = None
 
 
-def _exec_env(exec_bin: Path | None = None) -> dict[str, str]:
-    """Environment for run_command subprocesses, with secrets removed.
+def _exec_env(exec_bin: Path | None = None, home: Path | None = None) -> dict[str, str]:
+    """Allowlisted environment for run_command subprocesses.
 
-    Secrets are already scrubbed from os.environ by read_secret at startup;
-    this strips them again (plus the _FILE path variants) in case anything
-    re-added them, so model-generated commands never see credentials.
+    Built from EXEC_ENV_ALLOWLIST only, so nothing else in this process's
+    environment (credentials, database URLs) reaches model-generated commands.
+    HOME points at the workspace so tool caches and dotfiles stay inside it.
     """
-    env = os.environ.copy()
-    for var in SECRET_ENV_VARS:
-        env.pop(var, None)
-        env.pop(f"{var}_FILE", None)
+    env = {k: os.environ[k] for k in EXEC_ENV_ALLOWLIST if k in os.environ}
+    if home is not None:
+        env["HOME"] = str(home)
     if exec_bin is None:
         exec_bin = EXEC_BIN
     if exec_bin is not None:
         env["PATH"] = f"{exec_bin}{os.pathsep}{env.get('PATH', '')}"
     return env
+
+
+def sandbox_argv(argv: list[str], env: dict[str, str], user: str | None) -> list[str]:
+    """Prefix ``argv`` so it runs as ``user`` with exactly ``env``.
+
+    sudo resets the environment, so ``env`` is re-applied through ``env -i``.
+    Without a user the argv is returned unchanged.
+    """
+    if not user:
+        return argv
+    assignments = [f"{k}={v}" for k, v in env.items()]
+    return ["sudo", "-n", "-u", user, "--", "/usr/bin/env", "-i", *assignments, *argv]
+
+
+async def _kill_group(proc) -> None:
+    """SIGKILL a command's whole process group, then reap it."""
+    if SANDBOX_USER:
+        # The group's processes belong to the sandbox user, so only that user
+        # may signal them.
+        killer = await asyncio.create_subprocess_exec(
+            *sandbox_argv(
+                ["/bin/kill", "-KILL", "--", f"-{proc.pid}"], {}, SANDBOX_USER
+            ),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await killer.wait()
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+    await proc.wait()
+
+
+async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
+    """Drain a subprocess's stdout, keeping at most ``limit`` bytes.
+
+    Unlike communicate(), memory stays bounded however much a command prints;
+    the rest is still read (and dropped) so the child never blocks on a full
+    pipe. Returns the kept bytes and the total byte count.
+    """
+    kept = bytearray()
+    total = 0
+    while chunk := await proc.stdout.read(65536):
+        total += len(chunk)
+        kept += chunk[: max(0, limit - len(kept))]
+    await proc.wait()
+    return bytes(kept), total
 
 
 def make_file_tools(
@@ -303,7 +357,7 @@ def make_file_tools(
             path: Directory path, relative to the workspace root. Defaults to
                 the workspace root itself.
         """
-        print(f"\n[tool] list_dir {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] list_dir %s", path)
         try:
             entries = sorted(
                 _resolve(path).iterdir(),
@@ -323,7 +377,7 @@ def make_file_tools(
         Args:
             path: File path, relative to the workspace root.
         """
-        print(f"\n[tool] read_file {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] read_file %s", path)
         try:
             text = _resolve(path).read_text()
         except (OSError, ValueError) as e:
@@ -339,11 +393,7 @@ def make_file_tools(
                 are created as needed.
             content: Full content to write.
         """
-        print(
-            f"\n[tool] write_file {path} ({len(content)} chars)",
-            file=sys.stderr,
-            flush=True,
-        )
+        logger.debug("[tool] write_file %s (%d chars)", path, len(content))
         try:
             target = _resolve(path)
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -363,7 +413,7 @@ def make_file_tools(
                 surrounding lines to make it unique.
             new_string: Replacement text.
         """
-        print(f"\n[tool] edit_file {path}", file=sys.stderr, flush=True)
+        logger.debug("[tool] edit_file %s", path)
         try:
             target = _resolve(path)
             text = target.read_text()
@@ -391,48 +441,42 @@ def make_file_tools(
 
         Args:
             command: Shell command to run (cwd is the workspace root).
-            timeout_seconds: Kill the command after this many seconds (default 300).
+            timeout_seconds: Kill the command after this many seconds (default
+                300, max 600).
         """
-        print(f"\n[tool] run_command {command}", file=sys.stderr, flush=True)
+        logger.debug("[tool] run_command %s", command)
+        timeout_seconds = max(1, min(timeout_seconds, MAX_COMMAND_SECONDS))
+        root = get_root()
+        env = _exec_env(get_exec_bin(), home=root)
         try:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                cwd=get_root(),
-                env=_exec_env(get_exec_bin()),
+            # New session: the command and all its children share one process
+            # group, killed as a whole on timeout or interrupt.
+            proc = await asyncio.create_subprocess_exec(
+                *sandbox_argv(["/bin/sh", "-c", command], env, SANDBOX_USER),
+                cwd=root,
+                env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 start_new_session=True,
             )
             try:
-                out, _ = await asyncio.wait_for(
-                    proc.communicate(), timeout=timeout_seconds
+                out, total = await asyncio.wait_for(
+                    _read_capped(proc, get_cap()), timeout=timeout_seconds
                 )
             except TimeoutError:
-                # Ensure killing all child processes of the process too for extra reliance/security
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+                await _kill_group(proc)
                 return f"[tool error] command timed out after {timeout_seconds}s"
             except asyncio.CancelledError:
-                # Ensure killing all child processes of the process too
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+                await _kill_group(proc)
                 raise
         except OSError as e:
             return f"[tool error] {e}"
         text = out.decode(errors="replace")
-        print(
-            f"[tool done] run_command (exit {proc.returncode})",
-            file=sys.stderr,
-            flush=True,
-        )
+        if total > len(out):
+            text += f"\n[truncated: {total - len(out)} bytes omitted]"
+        logger.debug("[tool done] run_command (exit %s)", proc.returncode)
         notify("")
-        return f"[exit {proc.returncode}]\n{_truncate(text)}"
+        return f"[exit {proc.returncode}]\n{text}"
 
     return [list_dir, read_file, write_file, edit_file, run_command]
 
@@ -570,8 +614,13 @@ async def chat(tools, api_key: str | None, auth_token: str | None) -> None:
 
 
 async def main() -> None:
+    # Interactive use: show tool activity on stderr as before.
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
     # Read (and thereby scrub from os.environ) every secret we know about,
-    # whether or not this run uses it — see SECRET_ENV_VARS.
+    # whether or not this run uses it.
     api_key = read_secret("ANTHROPIC_API_KEY")
     auth_token = read_secret("ANTHROPIC_AUTH_TOKEN")
     if "--list-tools" not in sys.argv and not api_key and not auth_token:

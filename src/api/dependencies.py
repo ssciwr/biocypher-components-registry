@@ -6,7 +6,7 @@ import secrets as pysecrets
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, Query, Request, status
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
 from src.api.settings import settings
 from src.core.auth.models import AuthSession
@@ -74,7 +74,6 @@ def get_workspace_session(
     manager: Annotated[SessionManager, Depends(get_session_manager)],
     auth_session: Annotated[AuthSession, Depends(get_current_auth_session)],
     authorization: Annotated[str | None, Header()] = None,
-    token: Annotated[str | None, Query()] = None,
 ) -> Session:
     """Resolve a workspace session for the current GitHub user.
 
@@ -82,8 +81,8 @@ def get_workspace_session(
     401 response.
     """
     session = manager.get(session_id)
-    supplied = token or ""
-    if not supplied and authorization and authorization.startswith("Bearer "):
+    supplied = ""
+    if authorization and authorization.startswith("Bearer "):
         supplied = authorization[len("Bearer ") :].strip()
     if session is None or not supplied:
         raise HTTPException(401, "unknown session or invalid session token")

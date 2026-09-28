@@ -8,8 +8,8 @@ Each workspace session owns:
   managers must be entered and exited by the same task),
 - optionally a user-supplied Anthropic key/token (BYOK, held in memory only).
 
-Turns are serialized per session: the actor consumes one message at a time
-from the session inbox. Progress is fanned out to SSE subscribers as events;
+Turns are serialized per session: :meth:`Session.submit` starts at most one
+turn task at a time; the actor task only owns the MCP connection. Progress is fanned out to SSE subscribers as events;
 full tool results never leave this process (only truncated text enters model
 context, and events carry a short preview).
 
@@ -20,6 +20,7 @@ see ``docs/API.md`` for the route-level contract.
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import logging
 import os
@@ -44,23 +45,34 @@ READY_TIMEOUT = float(os.getenv("AGENT_SESSION_READY_TIMEOUT", "30"))
 EVENT_PREVIEW_CHARS = 5000
 # Max events buffered per SSE subscriber; oldest are dropped beyond this.
 EVENT_QUEUE_SIZE = 1000
+# Recent events kept per session for replay to a reconnecting stream
+# (Last-Event-ID). A streamed answer is mostly text_delta events, so this
+# covers a disconnect of some thousand deltas; older events are lost.
+EVENT_REPLAY_SIZE = 5000
 # Close idle sessions after 24 hours
 IDLE_SESSION_SECONDS = 24 * 60 * 60  # gets overwritten in test
 IDLE_REAPER_SECONDS = 5 * 60
+# Concurrent sessions one GitHub user may hold (each owns an MCP connection
+# and a workspace directory).
+MAX_SESSIONS_PER_USER = int(os.getenv("AGENT_MAX_SESSIONS_PER_USER", "3"))
 
 
 class SessionStartupError(Exception):
     """MCP connection could not be established for a new session."""
 
 
+class SessionLimitError(Exception):
+    """The user already holds MAX_SESSIONS_PER_USER sessions."""
+
+
+class TurnInFlightError(Exception):
+    """A turn is already running on this session."""
+
+
 ## I know these are quite obtuse but I just wanted to make the code clear without relying on Stream data classes or their defaults
 class WorkspaceStorageError(Exception):
     """Workspace session directory could not be created. Specifically to capture this issue instead of erroring -->
     returning SSE disconnect on error, which I hypothesize to displayed as Network Error"""
-
-
-class EventStreamAlreadyActive:
-    """A workspace session already has an active event stream."""
 
 
 # Default MCP connector; tests inject a fake with the same shape via
@@ -99,6 +111,70 @@ def _has_tool_details(value: object) -> bool:
     return value not in (None, {}, [])
 
 
+def _exec_bin(workspace: Path) -> Path:
+    if cl.SANDBOX_USER:
+        return workspace / ".venv" / "bin"
+    return Path(sys.executable).parent
+
+
+async def _run_as_sandbox(argv: list[str], cwd: Path) -> int:
+    """Run a housekeeping command as the sandbox user; return its exit code."""
+    env = cl._exec_env(home=cwd)
+    proc = await asyncio.create_subprocess_exec(
+        *cl.sandbox_argv(argv, env, cl.SANDBOX_USER),
+        cwd=cwd,
+        env=env,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    return await proc.wait()
+
+
+async def _make_workspace(workspace: Path) -> None:
+    """Create a session directory; sandboxed, also its private venv.
+
+    The sandbox user may not write to the service's own venv (that would let
+    model commands change the running API), so pip installs go to
+    ``.venv`` inside the workspace, created as the sandbox user.
+    """
+    # mkdir is a blocking syscall; off-thread so one session's filesystem
+    # latency (or a slow/networked workspaces_root) can't stall every other
+    # session's SSE heartbeats and message dispatch on this loop.
+    await asyncio.to_thread(workspace.mkdir)
+    if not cl.SANDBOX_USER:
+        return
+    # Group-shared with the sandbox user; setgid keeps new files in the group.
+    await asyncio.to_thread(os.chmod, workspace, 0o2770)
+    if await _run_as_sandbox([sys.executable, "-m", "venv", ".venv"], workspace):
+        raise OSError(f"could not create the session venv in {workspace}")
+
+
+async def _remove_workspace(workspace: Path) -> None:
+    if cl.SANDBOX_USER:
+        # Files the sandbox user created (or chmod-ed) may not be deletable
+        # by this user, so let their owner restore access and remove them.
+        await _run_as_sandbox(
+            ["sh", "-c", 'chmod -R u+rwX "$1"; rm -rf "$1"', "sh", str(workspace)],
+            workspace.parent,
+        )
+    # Recursive delete is a blocking syscall storm on a large/full workspace;
+    # off-thread for the same reason as the mkdir in _make_workspace.
+    await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+
+
+def _put_dropping_oldest(queue: asyncio.Queue, item) -> None:
+    # Bounded queue: a stalled SSE consumer must not grow memory for the
+    # session's lifetime; the oldest event is the cheapest one to drop (a
+    # reconnecting stream gets it back from the replay buffer).
+    while True:
+        try:
+            queue.put_nowait(item)
+            return
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+
+
 class Session:
     def __init__(
         self,
@@ -119,11 +195,14 @@ class Session:
         self.auth_token: str | None = None
         self.tools: list = []
         self.tool_defs: list[dict] = []
-        self.inbox: asyncio.Queue = asyncio.Queue()
         self.subscribers: set[asyncio.Queue] = set()
+        self.recent_events: collections.deque[dict] = collections.deque(
+            maxlen=EVENT_REPLAY_SIZE
+        )
         self.ready = asyncio.Event()
+        # Set to make the actor leave the MCP context and finish.
+        self.closed = asyncio.Event()
         self.error: str | None = None
-        self.busy = False
         self.turn_task: asyncio.Task | None = None
         self.actor: asyncio.Task | None = None
         self.last_activity = time.monotonic()
@@ -133,11 +212,15 @@ class Session:
         self.mcp_connect = connect_mcp
         self.file_tools = cl.make_file_tools(
             get_root=lambda: self.workspace,
-            # The service runs inside one Python environment (the container
-            # venv); there is no interactive env prompt like in the CLI.
-            get_exec_bin=lambda: Path(sys.executable).parent,
+            # No interactive env prompt like in the CLI: sandboxed sessions
+            # get their own venv, unsandboxed ones share the service's.
+            get_exec_bin=lambda: _exec_bin(self.workspace),
             on_fs_change=self._on_fs_change,
         )
+
+    @property
+    def busy(self) -> bool:
+        return self.turn_task is not None and not self.turn_task.done()
 
     @property
     def has_key(self) -> bool:
@@ -157,22 +240,20 @@ class Session:
         self.mark_active()
         self._seq += 1
         event = {"seq": self._seq, "type": event_type, "data": data}
+        self.recent_events.append(event)
         for queue in tuple(self.subscribers):
-            # Bounded queue: a stalled SSE consumer must not grow memory for
-            # the session's lifetime. SSE has no replay anyway, so the oldest
-            # event is the cheapest one to drop.
-            while True:
-                try:
-                    queue.put_nowait(event)
-                    break
-                except asyncio.QueueFull:
-                    with contextlib.suppress(asyncio.QueueEmpty):
-                        queue.get_nowait()
+            _put_dropping_oldest(queue, event)
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue(maxsize=EVENT_QUEUE_SIZE)
         self.subscribers.add(queue)
         return queue
+
+    def events_after(self, seq: int) -> list[dict]:
+        """Buffered events newer than ``seq`` (oldest first)."""
+        if seq >= self._seq:
+            return []
+        return [e for e in self.recent_events if e["seq"] > seq]
 
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self.subscribers.discard(queue)
@@ -183,7 +264,12 @@ class Session:
     # ----------------------------------------------------------- actor
 
     async def run_actor(self) -> None:
-        """Own the MCP connection and consume the inbox, one turn at a time."""
+        """Own the MCP connection until the session is closed.
+
+        The streamable-HTTP context managers must be entered and exited by
+        the same task; ``call_tool`` itself works from any task, so turns run
+        in their own tasks (see :meth:`submit`).
+        """
         try:
             async with self.mcp_connect(self.mcp_url, self.mcp_headers) as mcp:
                 listed = await mcp.list_tools()
@@ -195,37 +281,29 @@ class Session:
                     for t in list(listed.tools) + self.file_tools
                 ]
                 self.ready.set()
-                while True:
-                    item = await self.inbox.get()
-                    if item is None:
-                        return
-                    turn_id, content = item
-                    self.turn_task = asyncio.create_task(
-                        self._run_turn(turn_id, content)
-                    )
-                    try:
-                        await self.turn_task
-                    except asyncio.CancelledError:
-                        # Swallow only a turn interrupt (the turn already
-                        # rolled back and emitted turn_error). If the actor
-                        # itself is being cancelled, the cancellation must
-                        # propagate.
-                        task = asyncio.current_task()
-                        if task is not None and task.cancelling():
-                            raise
-                    finally:
-                        self.turn_task = None
-                        self.busy = False
-        except Exception as e:  # noqa: BLE001
-            # Broad by design: the session becomes unusable, record why.
-            self.error = f"{type(e).__name__}: {e}"
+                await self.closed.wait()
+        except Exception:
+            # Broad by design: the session becomes unusable. The details
+            # (URLs, internal host names) go to the log only; clients see a
+            # generic reason.
+            logger.exception("MCP connection failed: session_id=%s", self.id)
+            self.error = (
+                "MCP connection lost"
+                if self.ready.is_set()
+                else "could not connect to MCP server"
+            )
             self.ready.set()
-            # Unbrick clients: no turn will ever run again, so nothing may
-            # stay queued or claim the busy slot.
-            self.busy = False
-            while not self.inbox.empty():
-                self.inbox.get_nowait()
+            # A running turn would only fail on the dead MCP connection.
+            self.interrupt()
             self.publish("session_error", message=self.error)
+
+    def submit(self, content: str) -> str:
+        """Start a turn and return its id; raise TurnInFlightError if busy."""
+        if self.busy:
+            raise TurnInFlightError
+        turn_id = uuid.uuid4().hex
+        self.turn_task = asyncio.create_task(self._run_turn(turn_id, content))
+        return turn_id
 
     async def _run_turn(self, turn_id: str, content: str) -> None:
         self.publish("turn_started", turn_id=turn_id)
@@ -261,9 +339,8 @@ class Session:
                 if tool_response is not None:
                     self.history.append(tool_response)
                     self._publish_tool_results(tool_response, names_by_id)
-            # busy flips before the terminal event so that a client reacting
-            # to turn_done can immediately POST the next message without 409.
-            self.busy = False
+            # No await after the terminal event: the task is done (busy is
+            # False) before any client can react to turn_done.
             self.publish("turn_done", turn_id=turn_id)
         except asyncio.CancelledError:
             self._fail_turn(snapshot, turn_id, "interrupted")
@@ -297,7 +374,6 @@ class Session:
     def _fail_turn(self, snapshot: int, turn_id: str, message: str) -> None:
         """Roll the partial turn back and report it; the session stays usable."""
         del self.history[snapshot:]
-        self.busy = False
         self.publish("turn_error", turn_id=turn_id, message=message)
 
     def _publish_usage(self, usage) -> None:
@@ -353,27 +429,9 @@ class Session:
                 thinking_marked = True
 
     def interrupt(self) -> bool:
-        if self.turn_task is not None and not self.turn_task.done():
+        if self.busy:
             self.turn_task.cancel()
             return True
-        if self.busy:
-            # Turn accepted but not yet dequeued by the actor: pull it back
-            # out of the inbox so it never starts. The poison pill (None)
-            # must survive draining — put it back.
-            interrupted = False
-            requeue = []
-            while not self.inbox.empty():
-                item = self.inbox.get_nowait()
-                if item is None:
-                    requeue.append(item)
-                else:
-                    interrupted = True
-                    self.publish("turn_error", turn_id=item[0], message="interrupted")
-            for item in requeue:
-                self.inbox.put_nowait(item)
-            if interrupted:
-                self.busy = False
-                return True
         return False
 
 
@@ -397,9 +455,12 @@ class SessionManager:
         self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
-        # mkdir is a blocking syscall; off-thread so one session's filesystem
-        # latency (or a slow/networked workspaces_root) can't stall every
-        # other session's SSE heartbeats and message dispatch on this loop.
+        owned = sum(
+            s.owner_github_user_id == owner_github_user_id
+            for s in self.sessions.values()
+        )
+        if owned >= MAX_SESSIONS_PER_USER:
+            raise SessionLimitError
         try:
             await asyncio.to_thread(
                 self.workspaces_root.mkdir, parents=True, exist_ok=True
@@ -410,16 +471,17 @@ class SessionManager:
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
         try:
-            await asyncio.to_thread(workspace.mkdir)
-        except OSError as e:
-            logger.exception("Could not create workspace directory")
-            raise WorkspaceStorageError from e
-        except BaseException:
-            # to_thread's worker thread runs mkdir to completion even if this
-            # await is cancelled (e.g. task killed on shutdown), so the dir
-            # can land on disk with nothing left to track/clean it. Nothing
-            # references `session` yet, so clean up here before propagating.
-            await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+            await _make_workspace(workspace)
+        except BaseException as e:
+            # Also on cancellation: to_thread's worker thread runs mkdir to
+            # completion even if this await is cancelled (e.g. task killed on
+            # shutdown), so the dir can land on disk with nothing left to
+            # track/clean it. Nothing references `session` yet, so clean up
+            # here before propagating.
+            await _remove_workspace(workspace)
+            if isinstance(e, OSError):
+                logger.exception("Could not create workspace directory")
+                raise WorkspaceStorageError from e
             raise
         session = Session(
             session_id,
@@ -449,14 +511,26 @@ class SessionManager:
     def get(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
-    # Reconnection cancels the short cleanup window before subscribing again.
     def open_event_stream(
-        self, session: Session
-    ) -> asyncio.Queue | EventStreamAlreadyActive:
-        if session.subscribers:
-            return EventStreamAlreadyActive()
+        self, session: Session, last_event_id: int | None = None
+    ) -> tuple[asyncio.Queue, list[dict]]:
+        """Subscribe the session's only event stream.
+
+        Returns the live queue and, for a reconnect with ``last_event_id``,
+        the buffered events the client missed. Both are taken without an
+        await in between, so nothing is lost or delivered twice.
+
+        A still-open older stream is ended (``None`` on its queue): a client
+        reconnects before the server notices its old connection dropped, and
+        the session belongs to one browser tab anyway.
+        """
+        for old in tuple(session.subscribers):
+            session.unsubscribe(old)
+            _put_dropping_oldest(old, None)
+        # Reconnection cancels the short cleanup window.
         self._cancel_sse_disconnect(session.id)
-        return session.subscribe()
+        backlog = [] if last_event_id is None else session.events_after(last_event_id)
+        return session.subscribe(), backlog
 
     def close_event_stream(self, session: Session, queue: asyncio.Queue) -> None:
         session.unsubscribe(queue)
@@ -522,9 +596,11 @@ class SessionManager:
 
     async def _teardown(self, session: Session) -> None:
         session.set_key(None, None)
-        session.interrupt()
+        if session.interrupt():
+            # Let the turn roll back before its workspace disappears.
+            await asyncio.wait({session.turn_task}, timeout=10)
+        session.closed.set()
         if session.actor is not None and not session.actor.done():
-            session.inbox.put_nowait(None)
             try:
                 await asyncio.wait_for(session.actor, timeout=10)
             except Exception:  # noqa: BLE001 - best-effort teardown; any actor
@@ -536,9 +612,7 @@ class SessionManager:
         # instead of heartbeating a dead session forever.
         session.publish("session_closed")
         session.subscribers.clear()
-        # Recursive delete is a blocking syscall storm on a large/full
-        # workspace; off-thread for the same reason as create()'s mkdir.
-        await asyncio.to_thread(shutil.rmtree, session.workspace, ignore_errors=True)
+        await _remove_workspace(session.workspace)
 
     async def shutdown(self) -> None:
         # delete() pops from self.sessions synchronously before its first

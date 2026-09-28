@@ -69,7 +69,7 @@ export type HttpValidationError = {
 /**
  * InterruptResponse
  *
- * Response returned when a running or queued turn is interrupted.
+ * Response returned when a running turn is interrupted.
  */
 export type InterruptResponse = {
     /**
@@ -235,6 +235,10 @@ export type CreateSessionAgentApiV1SessionsPostErrors = {
      */
     422: HttpValidationError;
     /**
+     * Too many open workspace sessions for this user
+     */
+    429: unknown;
+    /**
      * Issue creating workspace session
      */
     500: unknown;
@@ -269,12 +273,7 @@ export type DeleteSessionAgentApiV1SessionsSessionIdDeleteData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}';
 };
 
@@ -314,12 +313,7 @@ export type GetSessionAgentApiV1SessionsSessionIdGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}';
 };
 
@@ -359,12 +353,7 @@ export type SetKeyAgentApiV1SessionsSessionIdKeyPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/key';
 };
 
@@ -408,12 +397,7 @@ export type PostMessageAgentApiV1SessionsSessionIdMessagesPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/messages';
 };
 
@@ -469,12 +453,7 @@ export type InterruptAgentApiV1SessionsSessionIdInterruptPostData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/interrupt';
 };
 
@@ -508,6 +487,10 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetData = {
     body?: never;
     headers?: {
         /**
+         * Last-Event-Id
+         */
+        'last-event-id'?: string | null;
+        /**
          * Authorization
          */
         authorization?: string | null;
@@ -518,12 +501,7 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/events';
 };
 
@@ -532,10 +510,6 @@ export type EventsAgentApiV1SessionsSessionIdEventsGetErrors = {
      * Unknown session or invalid session token
      */
     401: unknown;
-    /**
-     * An event stream is already active for this session.
-     */
-    409: unknown;
     /**
      * Validation Error
      */
@@ -572,10 +546,6 @@ export type ListFilesAgentApiV1SessionsSessionIdFilesGetData = {
          * Path
          */
         path?: string;
-        /**
-         * Token
-         */
-        token?: string | null;
     };
     url: '/agent/api/v1/sessions/{session_id}/files';
 };
@@ -624,12 +594,7 @@ export type DownloadFilesAgentApiV1SessionsSessionIdDownloadGetData = {
          */
         session_id: string;
     };
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
+    query?: never;
     url: '/agent/api/v1/sessions/{session_id}/download';
 };
 
@@ -674,10 +639,6 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetData = {
          * Path
          */
         path: string;
-        /**
-         * Token
-         */
-        token?: string | null;
     };
     url: '/agent/api/v1/sessions/{session_id}/file';
 };
@@ -699,6 +660,10 @@ export type ReadFileAgentApiV1SessionsSessionIdFileGetErrors = {
      * Conflict: turn running, filesystem error, or nothing to interrupt
      */
     409: unknown;
+    /**
+     * File too large to preview
+     */
+    413: unknown;
     /**
      * Not a text file
      */

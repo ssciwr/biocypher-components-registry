@@ -70,14 +70,14 @@ export const postMessageAgentApiV1SessionsSessionIdMessagesPost = <ThrowOnError 
 /**
  * Interrupt the running turn
  *
- * Cancel the running turn, or a turn that was accepted but has not started yet. History rolls back to the pre-turn snapshot.
+ * Cancel the running turn. History rolls back to the pre-turn snapshot.
  */
 export const interruptAgentApiV1SessionsSessionIdInterruptPost = <ThrowOnError extends boolean = false>(options: Options<InterruptAgentApiV1SessionsSessionIdInterruptPostData, ThrowOnError>): RequestResult<InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, ThrowOnError> => (options.client ?? client).post<InterruptAgentApiV1SessionsSessionIdInterruptPostResponses, InterruptAgentApiV1SessionsSessionIdInterruptPostErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/interrupt', ...options });
 
 /**
  * Stream session events
  *
- * Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog.
+ * Server-sent events for one session: turn lifecycle, streamed text, tool calls/results, usage, and filesystem changes. See docs/API.md for the full event catalog. On reconnect, send Last-Event-ID to replay missed events; a new stream replaces an open one.
  */
 export const eventsAgentApiV1SessionsSessionIdEventsGet = <ThrowOnError extends boolean = false>(options: Options<EventsAgentApiV1SessionsSessionIdEventsGetData, ThrowOnError, EventsAgentApiV1SessionsSessionIdEventsGetResponse>): Promise<ServerSentEventsResult<EventsAgentApiV1SessionsSessionIdEventsGetResponses>> => (options.client ?? client).sse.get<EventsAgentApiV1SessionsSessionIdEventsGetResponses, EventsAgentApiV1SessionsSessionIdEventsGetErrors, ThrowOnError>({ url: '/agent/api/v1/sessions/{session_id}/events', ...options });
 
