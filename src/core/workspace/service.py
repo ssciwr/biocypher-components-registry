@@ -452,6 +452,7 @@ class SessionManager:
         self.mcp_headers = cl.mcp_headers() if mcp_headers is None else mcp_headers
         self.mcp_connect = mcp_connect
         self.sessions: dict[str, Session] = {}
+        self._pending_creates: collections.Counter[str] = collections.Counter()
         self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
@@ -459,8 +460,21 @@ class SessionManager:
             s.owner_github_user_id == owner_github_user_id
             for s in self.sessions.values()
         )
-        if owned >= MAX_SESSIONS_PER_USER:
+        if owned + self._pending_creates[owner_github_user_id] >= MAX_SESSIONS_PER_USER:
             raise SessionLimitError
+        # Increment immediately/Reserve before the await on line 468 so simultaneous invocations of session creation cannot be made at the same time
+        self._pending_creates[owner_github_user_id] += 1
+        try:
+            return await self._create_session(owner_github_user_id=owner_github_user_id)
+        finally:
+            self._pending_creates[owner_github_user_id] -= (
+                1  # on error or normal successful end, reset the users count
+            )
+            if not self._pending_creates[owner_github_user_id]:
+                del self._pending_creates[owner_github_user_id]
+
+    async def _create_session(self, *, owner_github_user_id: str) -> Session:
+        """Originally this was in the create function above, separated otu so we can prevent concurrent creates"""
         try:
             await asyncio.to_thread(
                 self.workspaces_root.mkdir, parents=True, exist_ok=True
