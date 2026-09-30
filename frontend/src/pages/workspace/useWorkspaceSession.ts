@@ -357,10 +357,12 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     appendMessage('user', content)
     setRetryAvailable(false)
     await runPending('message', async () => {
-      await sendWorkspaceMessage(session, content)
       setAgentActivity('Thinking')
       setSession((current) => current ? { ...current, busy: true, error: null } : current)
+      await sendWorkspaceMessage(session, content)
     }, (message) => {
+      setAgentActivity(null)
+      setSession((current) => current?.id === session.id ? { ...current, busy: false } : current)
       appendMessage('error', message)
     })
   }
