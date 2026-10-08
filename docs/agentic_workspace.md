@@ -69,9 +69,31 @@ Four numbers are printed per LLM round-trip: `input_tokens`, `cache_read_input_t
 - Prompt caching fights that. `cache_control={"type": "ephemeral"}` sets the auto-cache prefix. Turn N writes prefix to cache (`cache_write`), turn N+1 reads it (`cache_read`). Cache reads are billed at ~10% of normal input rate, writes at ~125%. So in a steady chat: most tokens show up as cheap cache_read, only new turn as full-price input.
     - One user message can mean many LLM calls. Each tool call = extra round trip (assistant `tool_use` → `tool_result` → next request). 5 tool calls = 6 API requests, each re-reading whole context. Cache makes that survivable.
     - `RESULT_MAX_CHARS` = biggest token lever. MCP results can be huge; truncation caps what enters context at 20k chars (~5k tokens). System prompt tells model: result cut off → narrow arguments, don't repeat call.
-    - Output capped `max_tokens=16000` per response. Thinking tokens count as output when adaptive thinking on.
+    - Output capped at `CLAUDE_MAX_TOKENS` (default 16000) per response. Thinking tokens count as output when adaptive thinking is on.
 
-One caveat: `cache_control={"type": "ephemeral"}` as top-level kwarg — that is the SDK's auto-prefix-caching convenience on the tool runner. Works with real Anthropic; local endpoints (LiteLLM/llama.cpp) may ignore or reject it, same class of issue as thinking param but no env toggle guards it here.
+`cache_control={"type": "ephemeral"}` is a top-level kwarg — the SDK's auto-prefix-caching convenience on the tool runner. Works with real Anthropic; proxies and local endpoints (LiteLLM/llama.cpp) may reject it, so like thinking it is sent only when `ANTHROPIC_BASE_URL` is unset. Override with `CLAUDE_PROMPT_CACHE=on|off`.
+
+## Testing other models (OpenAI etc.) via LiteLLM
+
+The backend only speaks the Anthropic Messages API. Other providers are reached through a [LiteLLM](https://docs.litellm.ai/docs/anthropic_unified) proxy that translates `/v1/messages` to the provider's API — no backend code changes.
+
+1. Add `OPENAI_API_KEY` and `LITELLM_MASTER_KEY` to `.env` (see `.envsample`). Edit the model aliases in `deploy/litellm/config.yaml` as needed.
+2. Start with the overlay:
+
+        docker compose -f docker-compose-sqlite.yml -f docker-compose.litellm.yml up
+
+3. In the workspace UI, paste the `LITELLM_MASTER_KEY` as API key. The OpenAI key stays inside the proxy container.
+4. Switch models: set `CLAUDE_MODEL` to another alias from the config and recreate the backend (`docker compose ... up -d backend`). The model is read once at startup.
+
+CLI alternative (proxy port is bound to `127.0.0.1:4000`):
+
+    ANTHROPIC_BASE_URL=http://localhost:4000 ANTHROPIC_API_KEY=$LITELLM_MASTER_KEY CLAUDE_MODEL=gpt-4.1 \
+      python src/core/workspace/client_loop.py
+
+Relevant knobs:
+- `CLAUDE_MAX_TOKENS` (default 16000) — lower it for models with a smaller output limit.
+- Thinking and prompt caching are off automatically behind the proxy (`CLAUDE_THINKING`, `CLAUDE_PROMPT_CACHE` to override); the `cache_*` usage numbers will read 0.
+- Smaller models handle the large tool set (MCP + file tools + `run_command`) noticeably worse; differences in scaffolding/test success are model capability, not backend bugs.
 
 # Still missing at this point
 - Frontend integration. Will happen after deployment integration and then lead to iterations over backend, API, and deployment. The API side is done: `src/api/routers/workspace.py` (routes) + `src/core/workspace/service.py` (per-session actors), merged from the [agentic-workspace](https://github.com/iulusoy/agentic-workspace) repo and mounted on the main app under `/agent/api/v1` — see [API.md](./API.md) for the full route/event contract.
@@ -83,5 +105,5 @@ One caveat: `cache_control={"type": "ephemeral"}` as top-level kwarg — that is
 - Integration of neo4j graphs into the registry, to show the built graph or at least metagraph for the adapter. Requires the metagraph backend of BioCypher.
 - Creation of croissant files for the adapter. Requires adapting the cookiecutter repo.
 - Multiple MCPs. We also want at least OntoWeaver MCP to run as well.
-- Problem with Anthropic API keys and testing the performance of local models.
+- Testing the performance of local models (OpenAI etc. can be tested via the LiteLLM overlay, see above).
 - Integration with GitHub: Creating repos on GitHub with the folders created in a session.

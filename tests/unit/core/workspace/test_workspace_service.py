@@ -240,12 +240,21 @@ def test_turn_with_tool_call(tmp_path):
         (
             "provider",
             "Your credit balance is too low to access the Anthropic API.",
-            "Your Anthropic API key is out of credit. Add credit or use another key.",
+            "Your API key is out of credit. Add credit or use another key.",
+        ),
+        (
+            # OpenAI quota error as passed through by the LiteLLM proxy.
+            "provider",
+            (
+                "OpenAIException - You exceeded your current quota. "
+                "{'code': 'insufficient_quota'}"
+            ),
+            "Your API key is out of credit. Add credit or use another key.",
         ),
         (
             "authentication",
             "invalid x-api-key",
-            "Your Anthropic API key was rejected. Check it or use another key.",
+            "Your API key was rejected. Check it or use another key.",
         ),
     ],
 )

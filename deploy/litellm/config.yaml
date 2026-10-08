@@ -1,0 +1,32 @@
+# LiteLLM proxy config: exposes OpenAI (and other) models behind the
+# Anthropic Messages API (/v1/messages) that the workspace backend speaks.
+# Used by docker-compose.litellm.yml; see docs/agentic_workspace.md.
+#
+# model_name = alias the backend sends as CLAUDE_MODEL.
+# Add entries per model you want to compare; provider keys come from the
+# litellm container's environment, never from this file.
+model_list:
+  - model_name: gpt-4.1
+    litellm_params:
+      model: openai/gpt-4.1
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4.1-mini
+    litellm_params:
+      model: openai/gpt-4.1-mini
+      api_key: os.environ/OPENAI_API_KEY
+  # Any OpenAI-compatible server (vLLM, Ollama, ...):
+  # - model_name: local-qwen
+  #   litellm_params:
+  #     model: openai/qwen2.5-coder
+  #     api_base: http://host.docker.internal:11434/v1
+  #     api_key: dummy
+
+litellm_settings:
+  # Drop Anthropic-only params the target model does not support instead of
+  # failing the request.
+  drop_params: true
+
+general_settings:
+  # Clients (the workspace backend) authenticate with this key; it is what
+  # users paste as "API key" in the workspace UI.
+  master_key: os.environ/LITELLM_MASTER_KEY

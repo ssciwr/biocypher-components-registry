@@ -3,3 +3,10 @@ GITHUB_OAUTH_CLIENT_SECRET="From GITHUB"
 AUTH_SESSION_SECRET="a-random-long-string"
 FRONTEND_BASE_URL="http://127.0.0.1:5173"
 VITE_API_BASE_URL="http://127.0.0.1:8000"
+
+# Optional: test non-Anthropic models via the LiteLLM proxy
+# (docker-compose.litellm.yml, deploy/litellm/config.yaml).
+# OPENAI_API_KEY="sk-..."
+# LITELLM_MASTER_KEY="sk-a-random-long-string"  # paste this as API key in the workspace UI
+# CLAUDE_MODEL="gpt-4.1"                        # alias from deploy/litellm/config.yaml
+# CLAUDE_MAX_TOKENS="16000"
