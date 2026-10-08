@@ -1,0 +1,33 @@
+# Overlay: route the agentic workspace through a LiteLLM proxy to test
+# OpenAI (or other non-Anthropic) models. Use together with a base file:
+#   docker compose -f docker-compose-sqlite.yml -f docker-compose.litellm.yml up
+# Switch models by changing CLAUDE_MODEL (an alias from
+# deploy/litellm/config.yaml) and recreating the backend.
+
+services:
+  litellm:
+    # Pin a version tag or digest for anything beyond local testing.
+    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:latest}
+    container_name: biocypher-registry-litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    # Only the provider key and the proxy key; deliberately no env_file, so
+    # the backend's OAuth/session secrets never reach this container.
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
+    volumes:
+      - ./deploy/litellm/config.yaml:/app/config.yaml:ro
+    # Loopback only: lets the CLI (client_loop.py) on the host use the proxy
+    # without exposing it to the network.
+    ports:
+      - "127.0.0.1:4000:4000"
+    networks:
+      - biocypher-network
+
+  backend:
+    environment:
+      ANTHROPIC_BASE_URL: http://litellm:4000
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-gpt-4.1}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-16000}
+    depends_on:
+      - litellm

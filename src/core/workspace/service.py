@@ -55,6 +55,9 @@ IDLE_REAPER_SECONDS = 5 * 60
 # Concurrent sessions one GitHub user may hold (each owns an MCP connection
 # and a workspace directory).
 MAX_SESSIONS_PER_USER = int(os.getenv("AGENT_MAX_SESSIONS_PER_USER", "3"))
+# Lower-cased error substrings meaning "key valid but out of money": Anthropic
+# ("credit balance is too low") and OpenAI via LiteLLM ("insufficient_quota").
+OUT_OF_CREDIT_MARKERS = ("credit balance is too low", "insufficient_quota")
 
 
 class SessionStartupError(Exception):
@@ -316,16 +319,14 @@ class Session:
                 timeout=600, connect=60
             ),  # Connect default is 5s and could be a cause of disconnects
         )
-        thinking = cl.thinking_config()
         runner = client.beta.messages.tool_runner(
             model=cl.MODEL,
-            max_tokens=16000,
+            max_tokens=cl.MAX_TOKENS,
             system=cl.build_system_prompt(self.workspace, cl.RESULT_MAX_CHARS),
             tools=self.tools,
             messages=self.history,
             stream=True,
-            cache_control={"type": "ephemeral"},
-            **({"thinking": thinking} if thinking else {}),
+            **cl.optional_request_params(),
         )
         try:
             async for stream in runner:
@@ -352,13 +353,10 @@ class Session:
             logger.exception("Workspace provider stream failed for turn %s", turn_id)
             message = "Error from AI model stream. Please try again."
             if isinstance(error, anthropic.AuthenticationError):
+                message = "Your API key was rejected. Check it or use another key."
+            elif any(marker in str(error).lower() for marker in OUT_OF_CREDIT_MARKERS):
                 message = (
-                    "Your Anthropic API key was rejected. Check it or use another key."
-                )
-            elif "credit balance is too low" in str(error).lower():
-                message = (
-                    "Your Anthropic API key is out of credit. Add credit or use "
-                    "another key."
+                    "Your API key is out of credit. Add credit or use another key."
                 )
             self._fail_turn(snapshot, turn_id, message)
         except Exception:
