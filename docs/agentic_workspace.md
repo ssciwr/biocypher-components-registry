@@ -75,6 +75,8 @@ Four numbers are printed per LLM round-trip: `input_tokens`, `cache_read_input_t
 
 ## Testing other models (OpenAI etc.) via LiteLLM
 
+Step-by-step manual test for both Anthropic and LiteLLM: [testing_agentic_workspace.md](./testing_agentic_workspace.md).
+
 The backend only speaks the Anthropic Messages API. Other providers are reached through a [LiteLLM](https://docs.litellm.ai/docs/anthropic_unified) proxy that translates `/v1/messages` to the provider's API — no backend code changes.
 
 1. Add `OPENAI_API_KEY` and `LITELLM_MASTER_KEY` to `.env` (see `.envsample`). Edit the model aliases in `deploy/litellm/config.yaml` as needed.
