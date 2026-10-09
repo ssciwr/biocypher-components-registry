@@ -126,7 +126,7 @@ Run the same prompts in each setup so results are comparable.
 5. **Wrong key:** start a new session with an invalid key and send a message (the key is only checked on the first turn) — expect "Your API key was rejected. Check it or use another key."
 6. **Unknown model** (LiteLLM only): set `CLAUDE_MODEL` to an alias not in the config — expect a generic "Error from AI model stream" in the UI and the LiteLLM error in the backend log.
 
-For a model comparison, record per model: did steps 1–3 succeed, number of turns/tool calls, whether tests passed, input/output tokens from the `[usage]` lines, and notable failures.
+For a quantitative comparison across models (task ladder, grading, metrics) see [evaluating_models_workspace.md](./evaluating_models_workspace.md). For a quick comparison, record per model: did steps 1–3 succeed, number of turns/tool calls, whether tests passed, input/output tokens from the `[usage]` lines, and notable failures.
 
 ## Troubleshooting
 
