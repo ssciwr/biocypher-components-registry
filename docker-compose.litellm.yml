@@ -21,13 +21,16 @@ services:
     # without exposing it to the network.
     ports:
       - "127.0.0.1:4000:4000"
+    # Lets config.yaml reach model servers on the host (e.g. Ollama).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - biocypher-network
 
   backend:
     environment:
       ANTHROPIC_BASE_URL: http://litellm:4000
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-gpt-4.1}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-Qwen3.5-int4}
       CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-16000}
     depends_on:
       - litellm
