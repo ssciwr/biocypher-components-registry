@@ -93,7 +93,7 @@ const fieldDataTypeOptions: ReadonlyArray<SelectOption<string>> = [
 export const datasetMetadataSectionId = 'dataset-metadata-section'
 
 
-/** todo note:
+/** Design note:
  *  Should review whether we should actually use a UI library like shadcn because the custom coding is extra code
  *  and is beginning not to make sense.
  */

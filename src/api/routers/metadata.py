@@ -8,13 +8,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, status
 
 from src.api.schemas.metadata import (
     AdapterCreatorGenerateRequest,
     AdapterEmbeddedDatasetGenerateRequest,
     AdapterMetadataGenerateRequest,
     AdapterMetadataGenerateResponse,
+    DatasetMetadataGenerateForm,
     DatasetMetadataGeneratePayload,
     DatasetMetadataGenerateResponse,
     MetadataValidationRequest,
@@ -68,45 +69,34 @@ def validate_metadata(
 )
 # modified lightly using AI to support data flow
 def generate_dataset_metadata(
-    file: Annotated[UploadFile, File(...)],
-    generator: Annotated[Literal["auto", "croissant-baker", "native"], Form()] = "auto",
-    run_validation: Annotated[bool, Form(alias="validate")] = True,
-    name: Annotated[str | None, Form()] = None,
-    description: Annotated[str | None, Form()] = None,
-    url: Annotated[str | None, Form()] = None,
-    license_value: Annotated[str | None, Form(alias="license")] = None,
-    citation: Annotated[str | None, Form()] = None,
-    content_url: Annotated[str | None, Form()] = None,
-    dataset_version: Annotated[str | None, Form()] = None,
-    date_published: Annotated[str | None, Form()] = None,
-    encoding_format: Annotated[str | None, Form()] = None,
-    filename: Annotated[str | None, Form()] = None,
-    sha256: Annotated[str | None, Form()] = None,
-    creators_json: Annotated[str, Form()] = "[]",
+    form: Annotated[
+        DatasetMetadataGenerateForm, Form(media_type="multipart/form-data")
+    ],
 ) -> DatasetMetadataGenerateResponse:
     """Generate dataset metadata from an uploaded source file."""
     with TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
-        input_path = temporary_path / Path(file.filename or "dataset-upload").name
+        upload = form.file
+        input_path = temporary_path / Path(upload.filename or "dataset-upload").name
         with input_path.open("wb") as handle:
-            shutil.copyfileobj(file.file, handle)
+            shutil.copyfileobj(upload.file, handle)
 
         payload = DatasetMetadataGeneratePayload(
             input_path=str(input_path),
-            generator=generator,
-            validate=run_validation,
-            name=name,
-            description=description,
-            url=url,
-            license_value=license_value,
-            citation=citation,
-            content_url=content_url,
-            dataset_version=dataset_version,
-            date_published=date_published,
-            encoding_format=encoding_format,
-            filename=filename,
-            sha256=sha256,
-            creators=_parse_creators_json(creators_json),
+            generator=form.generator,
+            validate=form.run_validation,
+            name=form.name,
+            description=form.description,
+            url=form.url,
+            license_value=form.license_value,
+            citation=form.citation,
+            content_url=form.content_url,
+            dataset_version=form.dataset_version,
+            date_published=form.date_published,
+            encoding_format=form.encoding_format,
+            filename=form.filename,
+            sha256=form.sha256,
+            creators=_parse_creators_json(form.creators_json),
             extra_args=[],
         )
         return _execute_dataset_metadata_generation(

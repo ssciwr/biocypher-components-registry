@@ -473,7 +473,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post"
+                "$ref": "#/components/schemas/DatasetMetadataGenerateForm"
               }
             }
           },
@@ -2771,7 +2771,7 @@
         "title": "AuthMeResponse",
         "description": "Browser-safe signed-in state."
       },
-      "Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post": {
+      "DatasetMetadataGenerateForm": {
         "properties": {
           "file": {
             "type": "string",
@@ -2924,7 +2924,8 @@
         "required": [
           "file"
         ],
-        "title": "Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post"
+        "title": "DatasetMetadataGenerateForm",
+        "description": "Multipart form for generating dataset metadata from an uploaded file."
       },
       "DatasetMetadataGenerateResponse": {
         "properties": {

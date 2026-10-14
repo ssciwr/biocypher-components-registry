@@ -468,9 +468,11 @@ export type AuthMeResponse = {
 };
 
 /**
- * Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post
+ * DatasetMetadataGenerateForm
+ *
+ * Multipart form for generating dataset metadata from an uploaded file.
  */
-export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
+export type DatasetMetadataGenerateForm = {
     /**
      * File
      */
@@ -1641,7 +1643,7 @@ export type ValidateMetadataApiV1MetadataValidatePostResponses = {
 export type ValidateMetadataApiV1MetadataValidatePostResponse = ValidateMetadataApiV1MetadataValidatePostResponses[keyof ValidateMetadataApiV1MetadataValidatePostResponses];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData = {
-    body: BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost;
+    body: DatasetMetadataGenerateForm;
     path?: never;
     query?: never;
     url: '/api/v1/metadata/datasets/generate';

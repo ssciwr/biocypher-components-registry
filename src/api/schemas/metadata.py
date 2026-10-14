@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Literal
 
+from fastapi import UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.core.shared.constants import CROISSANT_CONFORMS_TO_URL, STANDARD_CONTEXT
@@ -237,6 +238,28 @@ class DatasetMetadataGeneratePayload(_GeneratedDatasetFields):
     def _require_input_path(cls, value: str | None) -> str:
         """Keep the temporary input path explicit."""
         return _required_text(value, field_name="Input path")
+
+
+class DatasetMetadataGenerateForm(BaseModel):
+    """Multipart form for generating dataset metadata from an uploaded file."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    file: UploadFile
+    generator: Literal["auto", "croissant-baker", "native"] = "auto"
+    run_validation: bool = Field(default=True, alias="validate")
+    name: str | None = None
+    description: str | None = None
+    url: str | None = None
+    license_value: str | None = Field(default=None, alias="license")
+    citation: str | None = None
+    content_url: str | None = None
+    dataset_version: str | None = None
+    date_published: str | None = None
+    encoding_format: str | None = None
+    filename: str | None = None
+    sha256: str | None = None
+    creators_json: str = "[]"
 
 
 class AdapterEmbeddedDatasetGenerateRequest(_GeneratedDatasetFields):

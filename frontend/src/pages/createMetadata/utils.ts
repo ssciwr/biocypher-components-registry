@@ -1,6 +1,6 @@
 import type {
   AdapterCreatorGenerateRequest,
-  BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost,
+  DatasetMetadataGenerateForm,
 } from '../../api/client'
 import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField } from './types'
 
@@ -79,7 +79,7 @@ function dateAtUtcMidnight(value: string) {
  */
 export function datasetDraftToCroissantGenerateUploadForm(
   dataset: DatasetDraft,
-): BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost {
+): DatasetMetadataGenerateForm {
   if (!dataset.sourceFile) {
     throw new Error('Upload a source dataset file first.')
   }
@@ -248,7 +248,7 @@ function buildDistribution(dataset: DatasetDraft, existing?: Record<string, unkn
   }
 
   const distribution = {
-    ...(existing ?? {}),
+    ...existing,
     '@type': existing?.['@type'] ?? 'cr:FileObject',
   }
   setOptional(distribution, '@id', textValue(existing?.['@id']) || name)
