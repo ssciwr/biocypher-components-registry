@@ -175,8 +175,9 @@ def test_resolve_path_rejects_absolute(workspace, cl, path):
         cl._resolve_path(path)
 
 
-def test_resolve_path_rejects_symlink_escape(workspace, tmp_path_factory, cl):
-    outside = tmp_path_factory.mktemp("outside")
+def test_resolve_path_rejects_symlink_escape(workspace, tmp_path, cl):
+    outside = tmp_path / "outside"
+    outside.mkdir()
     (workspace / "link").symlink_to(outside)
     with pytest.raises(ValueError, match="escapes workspace root"):
         cl._resolve_path("link/x.txt")
@@ -327,8 +328,9 @@ def test_run_command_success_and_exit_code(workspace, cl):
     assert out.startswith("[exit 3]")
 
 
-def test_run_command_uses_exec_bin_path(workspace, tmp_path_factory, monkeypatch, cl):
-    fake_bin = tmp_path_factory.mktemp("bin")
+def test_run_command_uses_exec_bin_path(workspace, tmp_path, monkeypatch, cl):
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
     marker = fake_bin / "markertool"
     marker.write_text("#!/bin/sh\necho from-fake-env\n")
     marker.chmod(0o755)
