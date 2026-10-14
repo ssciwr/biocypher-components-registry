@@ -58,7 +58,7 @@ RUN uv sync --frozen --no-dev
 # ====
 
 # ==== Container entrypoint ====
-COPY --chown=apiuser:apiuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 555 /usr/local/bin/docker-entrypoint.sh
 
 USER apiuser
