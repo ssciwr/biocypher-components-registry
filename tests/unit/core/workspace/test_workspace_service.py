@@ -118,6 +118,42 @@ def test_create_reports_workspace_directory_storage_error(tmp_path, monkeypatch)
     assert not manager.workspaces_root.exists()
 
 
+def test_concurrent_creates_respect_session_limit(tmp_path, monkeypatch):
+    # Both calls pass the limit check before either session is registered
+    # unless the slot is reserved before the first await.
+    monkeypatch.setattr(service, "MAX_SESSIONS_PER_USER", 1)
+    manager = make_manager(tmp_path)
+
+    async def scenario():
+        return await asyncio.gather(
+            manager.create(owner_github_user_id="12345"),
+            manager.create(owner_github_user_id="12345"),
+            return_exceptions=True,
+        )
+
+    results = asyncio.run(scenario())
+    assert sum(isinstance(r, service.Session) for r in results) == 1
+    assert sum(isinstance(r, service.SessionLimitError) for r in results) == 1
+    assert len(manager.sessions) == 1
+    assert manager._pending_creates == {}
+
+
+def test_failed_create_releases_reserved_slot(tmp_path, monkeypatch):
+    monkeypatch.setattr(service, "MAX_SESSIONS_PER_USER", 1)
+    manager = make_manager(tmp_path)
+    to_thread = AsyncMock(side_effect=OSError)
+    monkeypatch.setattr(service.asyncio, "to_thread", to_thread)
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(manager.create(owner_github_user_id="12345"))
+    assert manager._pending_creates == {}
+
+    monkeypatch.undo()
+    monkeypatch.setattr(service, "MAX_SESSIONS_PER_USER", 1)
+    session = asyncio.run(manager.create(owner_github_user_id="12345"))
+    assert manager.get(session.id) is session
+    assert manager._pending_creates == {}
+
+
 def test_create_can_lead_to_mcp_startup_timeout(tmp_path, monkeypatch):
     # Workspaces are removed, when their MCP connection does not become ready in time.
     manager = make_manager(tmp_path)
