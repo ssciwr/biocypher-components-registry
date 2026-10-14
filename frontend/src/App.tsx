@@ -203,7 +203,7 @@ function App() {
   )
 }
 
-function HomePage({ backendOnline }: { backendOnline: boolean }) {
+function HomePage({ backendOnline }: Readonly<{ backendOnline: boolean }>) {
   return (
     <>
       <section className="bg-blue-50">
