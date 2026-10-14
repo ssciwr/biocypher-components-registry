@@ -104,11 +104,6 @@ export function useWorkspaceSession({ signedIn }: UseWorkspaceSessionOptions) {
     sessionRef.current = session
   }, [session])
 
-  // Earlier versions persisted the BYOK key here; remove any leftover copy.
-  useEffect(() => {
-    globalThis.localStorage.removeItem('apiKey')
-  }, [])
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: 'end' })
   }, [messages])
