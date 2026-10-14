@@ -8,14 +8,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Form, HTTPException, status
+from fastapi import APIRouter, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
 
 from src.api.schemas.metadata import (
     AdapterCreatorGenerateRequest,
     AdapterEmbeddedDatasetGenerateRequest,
     AdapterMetadataGenerateRequest,
     AdapterMetadataGenerateResponse,
-    DatasetMetadataGenerateForm,
     DatasetMetadataGeneratePayload,
     DatasetMetadataGenerateResponse,
     MetadataValidationRequest,
@@ -32,6 +32,27 @@ from src.core.validation import (
 from src.core.validation.results import ValidationResult
 
 router = APIRouter()
+
+
+# Lives here rather than in src.api.schemas because it depends on FastAPI's UploadFile.
+class DatasetMetadataGenerateForm(BaseModel):
+    """Multipart form for generating dataset metadata from an uploaded file."""
+
+    file: UploadFile
+    generator: Literal["auto", "croissant-baker", "native"] = "auto"
+    run_validation: bool = Field(default=True, alias="validate")
+    name: str | None = None
+    description: str | None = None
+    url: str | None = None
+    license_value: str | None = Field(default=None, alias="license")
+    citation: str | None = None
+    content_url: str | None = None
+    dataset_version: str | None = None
+    date_published: str | None = None
+    encoding_format: str | None = None
+    filename: str | None = None
+    sha256: str | None = None
+    creators_json: str = "[]"
 
 
 # ===========================================================

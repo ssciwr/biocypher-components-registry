@@ -81,9 +81,15 @@ export async function consumeWorkspaceEvents(
     signal: options.signal,
   })
 
-  // This looks odd, but the openapi-ts SSE client is a "lazy" generated. Consuming the stream events makes onSseEvent fire as expected.
-  for await (const event of stream) {
-    void event // handled by onSseEvent; the loop only drains the stream
+  await drainStream(stream)
+}
+
+// The openapi-ts SSE client is lazy: onSseEvent only fires while the stream is being consumed,
+// so read it to the end and discard the values.
+async function drainStream(stream: AsyncIterable<unknown>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- values are handled by onSseEvent
+  for await (const _ of stream) {
+    // nothing to do per value
   }
 }
 

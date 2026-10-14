@@ -476,7 +476,11 @@ function CreateAdapterMetadataPage() {
     setError(null)
     setIsPreparingDatasets(true)
     try {
-      const datasets = await Promise.all(datasetsToPrepare.map(prepareDataset))
+      // One generation request at a time; a failure stops the remaining datasets from being sent
+      const datasets = await datasetsToPrepare.reduce<Promise<DatasetDraft[]>>(
+        async (prepared, dataset) => [...(await prepared), await prepareDataset(dataset)],
+        Promise.resolve([]),
+      )
 
       setForm((current) => ({ ...current, datasets }))
       setDatasetDraft(emptyDataset)
@@ -868,7 +872,7 @@ function MetadataFormActions(props: MetadataFormActionsProps) {
   )
 }
 
-// Editing a dataset is only reachable from step 2 onwards, so the checks below are mutually exclusive
+// Shows the primary action for the current state. An open dataset edit takes priority so its save action is never hidden
 function MetadataPrimaryActions({
   datasetMode,
   hasSelectedDataset,
@@ -880,17 +884,6 @@ function MetadataPrimaryActions({
   onSaveSelectedDataset,
   step,
 }: MetadataFormActionsProps) {
-  if (step === 1) {
-    return (
-      <button
-        className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
-        type="submit"
-      >
-        Continue
-      </button>
-    )
-  }
-
   if (isEditingDataset) {
     return (
       <div className="flex flex-wrap justify-end gap-3">
@@ -903,6 +896,17 @@ function MetadataPrimaryActions({
           {isPreparingDatasets ? 'Saving dataset...' : 'Save this dataset'}
         </button>
       </div>
+    )
+  }
+
+  if (step === 1) {
+    return (
+      <button
+        className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+        type="submit"
+      >
+        Continue
+      </button>
     )
   }
 
