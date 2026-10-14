@@ -82,11 +82,8 @@ export async function consumeWorkspaceEvents(
   })
 
   // This looks odd, but the openapi-ts SSE client is a "lazy" generated. Consuming the stream events makes onSseEvent fire as expected.
-  const streamIterator = stream[Symbol.asyncIterator]()
-  let streamResult = await streamIterator.next()
-
-  while (!streamResult.done) {
-    streamResult = await streamIterator.next()
+  for await (const event of stream) {
+    void event // handled by onSseEvent; the loop only drains the stream
   }
 }
 
