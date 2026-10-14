@@ -71,7 +71,7 @@ def test_native_generator_builds_dataset_from_csv_and_tsv_gz(tmp_path: Path) -> 
     record_sets = {
         record_set["@id"]: record_set for record_set in document["recordSet"]
     }
-    assert {"people", "scores"} == set(record_sets)
+    assert set(record_sets) == {"people", "scores"}
     assert record_sets["people"]["field"][0]["dataType"] == "cr:Int64"
     assert record_sets["people"]["field"][0]["@id"].startswith(
         record_sets["people"]["@id"]
