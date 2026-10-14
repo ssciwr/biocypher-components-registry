@@ -29,6 +29,8 @@ services:
       dockerfile: Dockerfile
     container_name: biocypher-registry-backend
     user: apiuser
+    # Reaps processes orphaned by killed run_command process groups.
+    init: true
     environment:
       # PostgreSQL connection string
       DATABASE_URL: "postgresql://${POSTGRES_USER:-biocypher}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@database:5432/${POSTGRES_DB:-biocypher_registry}"

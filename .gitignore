@@ -154,3 +154,13 @@ AGENTS.md
 
 # VS Code settings
 .vscode/settings.json
+
+secrets/
+
+# AI agent working files and session records
+.claude/
+.agents/
+.cursor/
+.gemini/
+.rseng-agent-skills-*
+.rseng-backup-*/

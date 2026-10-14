@@ -1,0 +1,291 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1500" viewBox="0 0 1400 1500" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title>Agentic workspace: data handling</title>
+  <desc>Where the API key, session token, chat messages, model output, tool calls, files and logs travel in the agentic workspace, and how long each is kept.</desc>
+
+  <defs>
+    <marker id="a-key" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+    <marker id="a-tok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <marker id="a-chat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="a-evt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488"/></marker>
+    <marker id="a-mcp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="a-file" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+    <marker id="a-log" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+    <marker id="a-gh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker>
+  </defs>
+
+  <rect width="1400" height="1500" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="30" y="44" font-size="24" font-weight="700" fill="#0f172a">Agentic workspace — data handling</text>
+  <text x="30" y="70" font-size="14" fill="#475569">What each kind of data is, where it travels, and how long it is kept. Numbers match the table below.</text>
+
+  <!-- ============ Zones ============ -->
+
+  <!-- Browser -->
+  <rect x="30" y="96" width="270" height="520" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="46" y="124" font-size="16" font-weight="700" fill="#0f172a">User's browser</text>
+  <text x="46" y="142" font-size="12" fill="#64748b">React workspace page</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="46" y="160" width="238" height="58" rx="8" fill="#fff" stroke="#ea580c" stroke-width="1.5"/>
+    <text x="58" y="184" font-weight="600">API key field</text>
+    <text x="58" y="203" font-size="11.5" fill="#475569">cleared after attach · not stored</text>
+
+    <rect x="46" y="236" width="238" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="260" font-weight="600">Session id + token</text>
+    <text x="58" y="279" font-size="11.5" fill="#475569">page state only · never in a URL</text>
+
+    <rect x="46" y="312" width="238" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="336" font-weight="600">Chat pane</text>
+    <text x="58" y="355" font-size="11.5" fill="#475569">messages typed, answers streamed in</text>
+
+    <rect x="46" y="388" width="238" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="412" font-weight="600">File tree + preview</text>
+    <text x="58" y="431" font-size="11.5" fill="#475569">refreshed on fs_changed events</text>
+
+    <rect x="46" y="464" width="238" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="488" font-weight="600">Event stream reader</text>
+    <text x="58" y="507" font-size="11.5" fill="#475569">sends Last-Event-ID on reconnect</text>
+  </g>
+
+  <!-- API -->
+  <rect x="510" y="96" width="400" height="520" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="526" y="124" font-size="16" font-weight="700" fill="#0f172a">Workspace API — one session, in memory</text>
+  <text x="526" y="142" font-size="12" fill="#64748b">FastAPI process · max 3 sessions per GitHub user</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="530" y="160" width="360" height="58" rx="8" fill="#fff" stroke="#ea580c" stroke-width="1.5"/>
+    <text x="542" y="184" font-weight="600">BYOK key</text>
+    <text x="542" y="203" font-size="11.5" fill="#475569">memory only · never returned, logged or given to commands</text>
+
+    <rect x="530" y="236" width="360" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="542" y="260" font-weight="600">Session token + owner</text>
+    <text x="542" y="279" font-size="11.5" fill="#475569">checked on every request · Authorization header only</text>
+
+    <rect x="530" y="312" width="360" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="542" y="336" font-weight="600">Conversation history</text>
+    <text x="542" y="355" font-size="11.5" fill="#475569">full transcript · rolled back if a turn fails</text>
+
+    <rect x="530" y="388" width="360" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="542" y="412" font-weight="600">Tool loop</text>
+    <text x="542" y="431" font-size="11.5" fill="#475569">runs every tool call the model makes</text>
+
+    <rect x="530" y="464" width="360" height="58" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="542" y="488" font-weight="600">Event replay buffer</text>
+    <text x="542" y="507" font-size="11.5" fill="#475569">last 5,000 events · replayed after Last-Event-ID</text>
+  </g>
+
+  <!-- Anthropic -->
+  <rect x="1080" y="96" width="290" height="230" rx="14" fill="#fffbeb" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="1096" y="124" font-size="16" font-weight="700" fill="#0f172a">Anthropic API</text>
+  <text x="1096" y="142" font-size="12" fill="#92400e">third party · the user's own account</text>
+  <g font-size="12" fill="#334155">
+    <text x="1096" y="176" font-weight="600">receives</text>
+    <text x="1096" y="194">the key (auth header), the full</text>
+    <text x="1096" y="210">history, system prompt, tool</text>
+    <text x="1096" y="226">schemas and tool results</text>
+    <text x="1096" y="256" font-weight="600">returns</text>
+    <text x="1096" y="274">streamed text and tool calls</text>
+  </g>
+
+  <!-- MCP -->
+  <rect x="1080" y="386" width="290" height="230" rx="14" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="1096" y="414" font-size="16" font-weight="700" fill="#0f172a">BioCypher MCP server</text>
+  <text x="1096" y="432" font-size="12" fill="#6b21a8">service credentials, not the user's</text>
+  <g font-size="12" fill="#334155">
+    <text x="1096" y="466" font-weight="600">receives</text>
+    <text x="1096" y="484">tool name + arguments chosen</text>
+    <text x="1096" y="500">by the model (never the key)</text>
+    <text x="1096" y="530" font-weight="600">returns</text>
+    <text x="1096" y="548">tool results, cut to 20,000</text>
+    <text x="1096" y="564">chars before the model sees them</text>
+  </g>
+
+  <!-- GitHub -->
+  <rect x="30" y="690" width="270" height="170" rx="14" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+  <text x="46" y="718" font-size="16" font-weight="700" fill="#0f172a">GitHub sign-in</text>
+  <g font-size="12" fill="#334155">
+    <text x="46" y="746">login cookie → GitHub user id</text>
+    <text x="46" y="766">every session is bound to that user</text>
+    <text x="46" y="786">no GitHub data is sent onward</text>
+  </g>
+
+  <!-- Workspace disk -->
+  <rect x="510" y="690" width="400" height="170" rx="14" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="526" y="718" font-size="16" font-weight="700" fill="#0f172a">Session workspace (disk)</text>
+  <text x="526" y="736" font-size="12" fill="#166534">/app/data/workspaces/&lt;session id&gt;</text>
+  <g font-size="12" fill="#334155">
+    <text x="526" y="766">files written by the agent · private .venv</text>
+    <text x="526" y="786">commands run as the sandbox user, allowlisted env (no secrets)</text>
+    <text x="526" y="806">600 s timeout · output capped</text>
+    <text x="526" y="826">deleted when the session ends</text>
+  </g>
+
+  <!-- Logs -->
+  <rect x="1080" y="690" width="290" height="170" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+  <text x="1096" y="718" font-size="16" font-weight="700" fill="#0f172a">Server logs</text>
+  <g font-size="12" fill="#334155">
+    <text x="1096" y="746">error details (exceptions, paths)</text>
+    <text x="1096" y="766">tool activity only at DEBUG level</text>
+    <text x="1096" y="786">clients get generic messages</text>
+    <text x="1096" y="806">never the key or session token</text>
+  </g>
+
+  <!-- ============ Flows ============ -->
+  <g fill="none" stroke-width="2.5">
+    <!-- 1 key: browser -> API -> Anthropic -->
+    <path d="M284,189 H528" stroke="#ea580c" marker-end="url(#a-key)"/>
+    <path d="M890,189 H990 V156 H1078" stroke="#ea580c" marker-end="url(#a-key)"/>
+    <!-- 2 token: both ways -->
+    <path d="M286,265 H528" stroke="#475569" marker-start="url(#a-tok)" marker-end="url(#a-tok)"/>
+    <!-- 3 chat: browser -> API history -> Anthropic -->
+    <path d="M284,341 H528" stroke="#2563eb" marker-end="url(#a-chat)"/>
+    <path d="M890,341 H1005 V226 H1078" stroke="#2563eb" marker-end="url(#a-chat)"/>
+    <!-- 5 reply: Anthropic -> tool loop -->
+    <path d="M1078,290 H1040 V402 H892" stroke="#2563eb" stroke-dasharray="7 4" marker-end="url(#a-chat)"/>
+    <!-- 5 MCP: tool loop <-> MCP -->
+    <path d="M890,424 H1078" stroke="#7c3aed" marker-end="url(#a-mcp)"/>
+    <path d="M1078,480 H985 V440 H892" stroke="#7c3aed" stroke-dasharray="7 4" marker-end="url(#a-mcp)"/>
+    <!-- 4 events: API -> browser -->
+    <path d="M528,493 H286" stroke="#0d9488" marker-end="url(#a-evt)"/>
+    <!-- 7 file views: API -> browser -->
+    <path d="M528,417 H286" stroke="#16a34a" marker-end="url(#a-file)"/>
+    <!-- 6 tools -> disk, 7 disk -> API -->
+    <path d="M640,616 V688" stroke="#16a34a" marker-end="url(#a-file)"/>
+    <path d="M790,688 V618" stroke="#16a34a" stroke-dasharray="7 4" marker-end="url(#a-file)"/>
+    <!-- 8 logs -->
+    <path d="M910,590 H1000 V760 H1078" stroke="#64748b" stroke-dasharray="3 4" marker-end="url(#a-log)"/>
+    <!-- 9 GitHub identity -->
+    <path d="M300,775 H420 V592 H508" stroke="#334155" marker-end="url(#a-gh)"/>
+  </g>
+
+  <!-- Flow labels -->
+  <g font-size="12" fill="#0f172a">
+    <text x="318" y="181">key · POST /key, once</text>
+    <text x="318" y="257">token ⇄ Authorization header</text>
+    <text x="318" y="333">message · POST /messages</text>
+    <text x="318" y="409">file listing, preview, zip</text>
+    <text x="318" y="485">SSE events</text>
+    <text x="996" y="174">key header</text>
+    <text x="1012" y="244">history</text>
+    <text x="1048" y="352">reply</text>
+    <text x="930" y="418">tool args</text>
+    <text x="930" y="474">results</text>
+    <text x="650" y="660">tools, commands</text>
+    <text x="800" y="660">file reads</text>
+    <text x="1008" y="620">logs</text>
+    <text x="428" y="640">user id</text>
+  </g>
+
+  <!-- Number badges -->
+  <g font-size="12" font-weight="700" text-anchor="middle" fill="#fff">
+    <circle cx="302" cy="189" r="11" fill="#ea580c"/><text x="302" y="193">1</text>
+    <circle cx="1034" cy="156" r="11" fill="#ea580c"/><text x="1034" y="160">1</text>
+    <circle cx="302" cy="265" r="11" fill="#475569"/><text x="302" y="269">2</text>
+    <circle cx="302" cy="341" r="11" fill="#2563eb"/><text x="302" y="345">3</text>
+    <circle cx="1040" cy="226" r="11" fill="#2563eb"/><text x="1040" y="230">3</text>
+    <circle cx="302" cy="493" r="11" fill="#0d9488"/><text x="302" y="497">4</text>
+    <circle cx="1040" cy="330" r="11" fill="#2563eb"/><text x="1040" y="334">5</text>
+    <circle cx="1060" cy="424" r="11" fill="#7c3aed"/><text x="1060" y="428">5</text>
+    <circle cx="640" cy="640" r="11" fill="#16a34a"/><text x="640" y="644">6</text>
+    <circle cx="302" cy="417" r="11" fill="#16a34a"/><text x="302" y="421">7</text>
+    <circle cx="790" cy="640" r="11" fill="#16a34a"/><text x="790" y="644">7</text>
+    <circle cx="1000" cy="700" r="11" fill="#64748b"/><text x="1000" y="704">8</text>
+    <circle cx="420" cy="700" r="11" fill="#334155"/><text x="420" y="704">9</text>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="12" fill="#334155">
+    <line x1="30" y1="892" x2="62" y2="892" stroke="#334155" stroke-width="2.5"/>
+    <text x="70" y="896">request / data sent</text>
+    <line x1="210" y1="892" x2="242" y2="892" stroke="#334155" stroke-width="2.5" stroke-dasharray="7 4"/>
+    <text x="250" y="896">response / data returned</text>
+    <rect x="420" y="883" width="30" height="18" rx="4" fill="#fffbeb" stroke="#b45309" stroke-dasharray="6 4"/>
+    <text x="458" y="896">dashed box = leaves our server (third party)</text>
+  </g>
+
+  <!-- ============ Table ============ -->
+  <text x="30" y="944" font-size="18" font-weight="700" fill="#0f172a">Flows</text>
+  <g font-size="12" font-weight="700" fill="#64748b">
+    <text x="44" y="972">#</text>
+    <text x="80" y="972">Data</text>
+    <text x="232" y="972">Path</text>
+    <text x="640" y="972">Kept where, for how long, limits</text>
+  </g>
+  <line x1="30" y1="980" x2="1370" y2="980" stroke="#cbd5e1"/>
+
+  <g font-size="12.5" fill="#0f172a">
+    <!-- 1 -->
+    <circle cx="48" cy="999" r="10" fill="#ea580c"/><text x="48" y="1003" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">1</text>
+    <text x="80" y="1003" font-weight="600">API key (BYOK)</text>
+    <text x="232" y="1003">Browser → API once (POST /key body);</text>
+    <text x="232" y="1020">API → Anthropic as auth header on each call</text>
+    <text x="640" y="1003">Session memory only. Never returned (the API reports has_key only), never in a URL,</text>
+    <text x="640" y="1020">log, file or command environment. Wiped at session end; entered again for each new session.</text>
+    <line x1="30" y1="1032" x2="1370" y2="1032" stroke="#e2e8f0"/>
+    <!-- 2 -->
+    <circle cx="48" cy="1051" r="10" fill="#475569"/><text x="48" y="1055" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">2</text>
+    <text x="80" y="1055" font-weight="600">Session token</text>
+    <text x="232" y="1055">API → browser when the session is created;</text>
+    <text x="232" y="1072">browser → API in the Authorization header</text>
+    <text x="640" y="1055">Browser page state and server memory. Header only (a ?token= query parameter is rejected).</text>
+    <text x="640" y="1072">Only valid together with the owner's GitHub login; useless once the session ends.</text>
+    <line x1="30" y1="1084" x2="1370" y2="1084" stroke="#e2e8f0"/>
+    <!-- 3 -->
+    <circle cx="48" cy="1103" r="10" fill="#2563eb"/><text x="48" y="1107" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">3</text>
+    <text x="80" y="1107" font-weight="600">Chat message</text>
+    <text x="232" y="1107">Browser → API (POST /messages,</text>
+    <text x="232" y="1124">≤ 100,000 chars) → Anthropic</text>
+    <text x="640" y="1107">Appended to the in-memory history; the whole history goes to Anthropic on every model call.</text>
+    <text x="640" y="1124">A failed or interrupted turn is rolled back out of the history.</text>
+    <line x1="30" y1="1136" x2="1370" y2="1136" stroke="#e2e8f0"/>
+    <!-- 4 -->
+    <circle cx="48" cy="1155" r="10" fill="#0d9488"/><text x="48" y="1159" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">4</text>
+    <text x="80" y="1159" font-weight="600">Events</text>
+    <text x="232" y="1159">API → browser over SSE: streamed text, tool</text>
+    <text x="232" y="1176">calls, result previews, fs_changed, usage</text>
+    <text x="640" y="1159">Last 5,000 events kept in memory and replayed after a reconnect (Last-Event-ID).</text>
+    <text x="640" y="1176">Tool result previews are cut to 5,000 chars; full results never reach the browser.</text>
+    <line x1="30" y1="1188" x2="1370" y2="1188" stroke="#e2e8f0"/>
+    <!-- 5 -->
+    <circle cx="48" cy="1207" r="10" fill="#7c3aed"/><text x="48" y="1211" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">5</text>
+    <text x="80" y="1211" font-weight="600">Reply + MCP calls</text>
+    <text x="232" y="1211">Anthropic → API (text, tool calls);</text>
+    <text x="232" y="1228">API → BioCypher MCP (tool args) → API</text>
+    <text x="640" y="1211">Reply appended to the history. MCP results are cut to 20,000 chars, then go into the history</text>
+    <text x="640" y="1228">and back to Anthropic. The MCP server sees the model's tool arguments, not the user's key.</text>
+    <line x1="30" y1="1240" x2="1370" y2="1240" stroke="#e2e8f0"/>
+    <!-- 6 -->
+    <circle cx="48" cy="1259" r="10" fill="#16a34a"/><text x="48" y="1263" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">6</text>
+    <text x="80" y="1263" font-weight="600">Files + commands</text>
+    <text x="232" y="1263">API → session workspace, as the</text>
+    <text x="232" y="1280">sandbox user (file tools, run_command)</text>
+    <text x="640" y="1263">Files stay on disk until the session ends. Commands get an allowlisted environment (no secrets),</text>
+    <text x="640" y="1280">a 600 s timeout and capped output; their results go into the history and to Anthropic.</text>
+    <line x1="30" y1="1292" x2="1370" y2="1292" stroke="#e2e8f0"/>
+    <!-- 7 -->
+    <circle cx="48" cy="1311" r="10" fill="#16a34a"/><text x="48" y="1315" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">7</text>
+    <text x="80" y="1315" font-weight="600">File views</text>
+    <text x="232" y="1315">Workspace → API → browser</text>
+    <text x="232" y="1332">(GET /files, /file, /download)</text>
+    <text x="640" y="1315">Preview limited to 1 MB text files; the zip download leaves out .venv and .cache.</text>
+    <line x1="30" y1="1344" x2="1370" y2="1344" stroke="#e2e8f0"/>
+    <!-- 8 -->
+    <circle cx="48" cy="1363" r="10" fill="#64748b"/><text x="48" y="1367" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">8</text>
+    <text x="80" y="1367" font-weight="600">Logs</text>
+    <text x="232" y="1367">API → server logs</text>
+    <text x="640" y="1367">Error details (exceptions, server paths) stay in the logs; clients only get generic messages.</text>
+    <text x="640" y="1384">Tool activity (arguments, commands) is logged only at DEBUG level. The key and token are never logged.</text>
+    <line x1="30" y1="1396" x2="1370" y2="1396" stroke="#e2e8f0"/>
+    <!-- 9 -->
+    <circle cx="48" cy="1415" r="10" fill="#334155"/><text x="48" y="1419" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">9</text>
+    <text x="80" y="1419" font-weight="600">GitHub identity</text>
+    <text x="232" y="1419">GitHub sign-in → API</text>
+    <text x="232" y="1436">(login cookie → GitHub user id)</text>
+    <text x="640" y="1419">Binds every session to its owner; another user gets 401 even with a valid session token.</text>
+    <text x="640" y="1436">At most 3 open sessions per user. No GitHub data is passed on to Anthropic or the MCP server.</text>
+    <line x1="30" y1="1448" x2="1370" y2="1448" stroke="#e2e8f0"/>
+  </g>
+
+  <text x="30" y="1478" font-size="12.5" fill="#0f172a"><tspan font-weight="700">Session end</tspan> (DELETE, 60 s without an event stream, or 24 h idle): key wiped, history and event buffer dropped, workspace deleted from disk.</text>
+</svg>

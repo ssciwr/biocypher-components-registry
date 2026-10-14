@@ -145,10 +145,14 @@ def test_exec_env_strips_secrets(monkeypatch, cl):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.setenv("BIOCYPHER_MCP_AUTH_HEADER", "Bearer abc")
     monkeypatch.setenv("ANTHROPIC_API_KEY_FILE", "/run/secrets/key")
+    monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "oauth-secret")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db/registry")
     env = cl._exec_env()
-    assert "ANTHROPIC_API_KEY" not in env
-    assert "BIOCYPHER_MCP_AUTH_HEADER" not in env
-    assert "ANTHROPIC_API_KEY_FILE" not in env
+    assert set(env) <= set(cl.EXEC_ENV_ALLOWLIST)
+
+
+def test_exec_env_sets_home(tmp_path, cl):
+    assert cl._exec_env(home=tmp_path)["HOME"] == str(tmp_path)
 
 
 # ------------------------------------------------------- path confinement
@@ -362,6 +366,20 @@ def test_run_command_truncates(workspace, small_cap, cl):
     out = run(cl.run_command.call({"command": "printf 'z%.0s' $(seq 1 200)"}))
     assert "[truncated:" in out
     assert out.startswith("[exit 0]\n" + "z" * small_cap)
+    assert "[truncated: 150 bytes omitted]" in out
+
+
+def test_run_command_does_not_inherit_secrets(workspace, monkeypatch, cl):
+    monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "oauth-secret")
+    out = run(cl.run_command.call({"command": "env"}))
+    assert "oauth-secret" not in out
+    assert f"HOME={workspace}" in out
+
+
+def test_run_command_clamps_timeout(workspace, monkeypatch, cl):
+    monkeypatch.setattr(cl, "MAX_COMMAND_SECONDS", 1)
+    out = run(cl.run_command.call({"command": "sleep 5", "timeout_seconds": 999}))
+    assert out == "[tool error] command timed out after 1s"
 
 
 # ------------------------------------------------------- system prompt
@@ -375,3 +393,27 @@ def test_system_prompt_mandates_cookiecutter_and_pytest(cl):
         "pytest",
     ):
         assert needle in cl.SYSTEM_PROMPT
+
+
+def test_sandbox_argv_without_user_is_unchanged(cl):
+    assert cl.sandbox_argv(["/bin/sh", "-c", "ls"], {"PATH": "/bin"}, None) == [
+        "/bin/sh",
+        "-c",
+        "ls",
+    ]
+
+
+def test_sandbox_argv_runs_as_user_with_exact_env(cl):
+    argv = cl.sandbox_argv(
+        ["/bin/sh", "-c", "ls"], {"PATH": "/bin", "HOME": "/w"}, "sandbox"
+    )
+    assert argv[:5] == ["sudo", "-n", "-u", "sandbox", "--"]
+    assert argv[5:] == [
+        "/usr/bin/env",
+        "-i",
+        "PATH=/bin",
+        "HOME=/w",
+        "/bin/sh",
+        "-c",
+        "ls",
+    ]

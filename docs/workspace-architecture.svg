@@ -1,0 +1,247 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1140" viewBox="0 0 1400 1140" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title>Agentic workspace: component architecture</title>
+  <desc>Components of the agentic workspace: the React frontend, the FastAPI backend with the workspace router and core session service, the container OS sandbox and data volume, and the external GitHub, Anthropic and BioCypher MCP services.</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker>
+    <marker id="arr-ext" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b45309"/></marker>
+  </defs>
+
+  <rect width="1400" height="1140" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="30" y="40" font-size="24" font-weight="700" fill="#0f172a">Agentic workspace — components</text>
+  <text x="30" y="64" font-size="14" fill="#475569">Frontend, backend and external services, and how they call each other. Status: workspace router disabled (agentic_api_active = False).</text>
+
+  <!-- ===================== Frontend ===================== -->
+  <rect x="30" y="100" width="300" height="600" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="46" y="128" font-size="16" font-weight="700" fill="#0f172a">Frontend · React SPA</text>
+  <text x="46" y="146" font-size="12" fill="#64748b">frontend/src/pages/workspace</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="46" y="160" width="268" height="72" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="182" font-weight="600">WorkspacePage.tsx</text>
+    <text x="58" y="200" font-size="11.5" fill="#475569">three panes: chat · file tree · preview</text>
+    <text x="58" y="217" font-size="11.5" fill="#475569">+ key form, display and file components</text>
+
+    <rect x="46" y="244" width="268" height="72" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="266" font-weight="600">useWorkspaceSession.ts</text>
+    <text x="58" y="284" font-size="11.5" fill="#475569">session lifecycle, chat state, key attach,</text>
+    <text x="58" y="301" font-size="11.5" fill="#475569">SSE event handling, interrupt / retry</text>
+
+    <rect x="46" y="328" width="268" height="72" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="350" font-weight="600">useWorkspaceFiles.ts</text>
+    <text x="58" y="368" font-size="11.5" fill="#475569">file tree, preview, zip download,</text>
+    <text x="58" y="385" font-size="11.5" fill="#475569">background refresh on fs_changed</text>
+
+    <rect x="46" y="412" width="268" height="72" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="434" font-weight="600">workspaceManageSSEProtocol.ts</text>
+    <text x="58" y="452" font-size="11.5" fill="#475569">typed wrapper for every workspace call;</text>
+    <text x="58" y="469" font-size="11.5" fill="#475569">drives the SSE stream</text>
+
+    <rect x="46" y="496" width="268" height="72" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="58" y="518" font-weight="600">src/api/workspace (generated)</text>
+    <text x="58" y="536" font-size="11.5" fill="#475569">openapi-ts client from openapi.json;</text>
+    <text x="58" y="553" font-size="11.5" fill="#475569">SSE retry sends Last-Event-ID</text>
+
+    <rect x="46" y="580" width="268" height="104" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-dasharray="4 3"/>
+    <text x="58" y="602" font-weight="600">Entry point</text>
+    <text x="58" y="620" font-size="11.5" fill="#475569">route /workspace (App.tsx)</text>
+    <text x="58" y="637" font-size="11.5" fill="#475569">header button hidden while the</text>
+    <text x="58" y="654" font-size="11.5" fill="#475569">router is disabled; landing-page</text>
+    <text x="58" y="671" font-size="11.5" fill="#475569">card still links to it</text>
+  </g>
+
+  <!-- Serving the SPA -->
+  <rect x="30" y="730" width="300" height="96" rx="12" fill="#f8fafc" stroke="#94a3b8"/>
+  <text x="46" y="756" font-size="14" font-weight="700" fill="#0f172a">Vite dev server (:5173)</text>
+  <text x="46" y="776" font-size="11.5" fill="#475569">serves the SPA in development;</text>
+  <text x="46" y="793" font-size="11.5" fill="#475569">proxies /api and /agent/api → :8000</text>
+
+  <rect x="30" y="846" width="300" height="96" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="6 4"/>
+  <text x="46" y="872" font-size="14" font-weight="700" fill="#0f172a">nginx (compose frontend, :3000)</text>
+  <text x="46" y="892" font-size="11.5" fill="#475569">placeholder page today; later serves the</text>
+  <text x="46" y="909" font-size="11.5" fill="#475569">built SPA with same-origin API routing</text>
+
+  <!-- ===================== Backend container ===================== -->
+  <rect x="400" y="100" width="630" height="960" rx="16" fill="#f8fbff" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="416" y="128" font-size="16" font-weight="700" fill="#0f172a">Backend container · Docker image</text>
+  <text x="416" y="146" font-size="12" fill="#475569">runs as apiuser · init: true (reaps orphaned processes) · entrypoint sets /app/data permissions</text>
+
+  <!-- FastAPI app -->
+  <rect x="420" y="162" width="590" height="318" rx="12" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="436" y="186" font-size="14" font-weight="700" fill="#0f172a">FastAPI app · src/api/app.py</text>
+  <text x="436" y="204" font-size="11.5" fill="#475569">lifespan creates the SessionManager + idle reaper · CORS · workspace router only if agentic_api_active</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="436" y="218" width="324" height="156" rx="8" fill="#fff" stroke="#3b82f6"/>
+    <text x="448" y="240" font-weight="600">Workspace router · /agent/api/v1</text>
+    <text x="448" y="257" font-size="11.5" fill="#64748b">src/api/routers/workspace.py</text>
+    <text x="448" y="282" font-size="11.5" fill="#334155">POST · DELETE /sessions, GET /sessions/{id}</text>
+    <text x="448" y="300" font-size="11.5" fill="#334155">POST …/key · …/messages · …/interrupt</text>
+    <text x="448" y="318" font-size="11.5" fill="#334155">GET …/events (SSE, heartbeat, replay)</text>
+    <text x="448" y="336" font-size="11.5" fill="#334155">GET …/files · …/file · …/download (zip)</text>
+    <text x="448" y="360" font-size="11.5" fill="#64748b">maps core exceptions to HTTP codes</text>
+
+    <rect x="776" y="218" width="218" height="156" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="788" y="240" font-weight="600">Registry API · /api/v1</text>
+    <text x="788" y="257" font-size="11.5" fill="#64748b">src/api/routers/*</text>
+    <text x="788" y="282" font-size="11.5" fill="#334155">auth: GitHub OAuth, cookie</text>
+    <text x="788" y="300" font-size="11.5" fill="#334155">health · adapters · metadata</text>
+    <text x="788" y="318" font-size="11.5" fill="#334155">registrations · registry</text>
+    <text x="788" y="342" font-size="11.5" fill="#64748b">registry DB: SQLite in</text>
+    <text x="788" y="359" font-size="11.5" fill="#64748b">/app/data or PostgreSQL</text>
+
+    <rect x="436" y="388" width="324" height="78" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="448" y="410" font-weight="600">src/api/dependencies.py</text>
+    <text x="448" y="428" font-size="11.5" fill="#334155">GitHub auth session from the login cookie;</text>
+    <text x="448" y="445" font-size="11.5" fill="#334155">workspace session: owner + Bearer token</text>
+    <text x="448" y="459" font-size="11.5" fill="#334155">(compare_digest, uniform 401)</text>
+
+    <rect x="776" y="388" width="218" height="78" rx="8" fill="#fff" stroke="#cbd5e1"/>
+    <text x="788" y="410" font-weight="600">schemas/workspace.py</text>
+    <text x="788" y="428" font-size="11.5" fill="#334155">request size limits (key,</text>
+    <text x="788" y="445" font-size="11.5" fill="#334155">messages) · response models</text>
+    <text x="788" y="459" font-size="11.5" fill="#334155">· error code descriptions</text>
+  </g>
+
+  <!-- Core -->
+  <rect x="420" y="500" width="590" height="320" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="436" y="524" font-size="14" font-weight="700" fill="#0f172a">Workspace core · src/core/workspace</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="436" y="538" width="558" height="140" rx="8" fill="#fff" stroke="#6366f1"/>
+    <text x="448" y="560" font-weight="600">service.py</text>
+    <text x="448" y="582" font-size="12" font-weight="600" fill="#334155">SessionManager</text>
+    <text x="448" y="600" font-size="11.5" fill="#334155">create / delete · max 3 per user</text>
+    <text x="448" y="617" font-size="11.5" fill="#334155">one event stream per session</text>
+    <text x="448" y="634" font-size="11.5" fill="#334155">60 s cleanup after stream loss</text>
+    <text x="448" y="651" font-size="11.5" fill="#334155">idle reaper (24 h) · shutdown</text>
+    <text x="700" y="582" font-size="12" font-weight="600" fill="#334155">Session (one per workspace)</text>
+    <text x="700" y="600" font-size="11.5" fill="#334155">history · BYOK key · workspace dir</text>
+    <text x="700" y="617" font-size="11.5" fill="#334155">subscribers + replay buffer (5,000 events)</text>
+    <text x="700" y="634" font-size="11.5" fill="#334155">actor task: owns the MCP connection</text>
+    <text x="700" y="651" font-size="11.5" fill="#334155">turn task: Anthropic tool_runner, streamed</text>
+    <text x="700" y="668" font-size="11.5" fill="#334155">submit() · interrupt() · busy</text>
+
+    <rect x="436" y="694" width="558" height="112" rx="8" fill="#fff" stroke="#6366f1"/>
+    <text x="448" y="716" font-weight="600">client_loop.py</text>
+    <text x="448" y="738" font-size="12" font-weight="600" fill="#334155">MCP</text>
+    <text x="448" y="756" font-size="11.5" fill="#334155">open_mcp_session (streamable HTTP)</text>
+    <text x="448" y="773" font-size="11.5" fill="#334155">make_tool: MCP tool wrappers, truncation</text>
+    <text x="448" y="790" font-size="11.5" fill="#334155">also a standalone CLI (main)</text>
+    <text x="700" y="738" font-size="12" font-weight="600" fill="#334155">Local tools</text>
+    <text x="700" y="756" font-size="11.5" fill="#334155">list_dir · read / write / edit_file · run_command</text>
+    <text x="700" y="773" font-size="11.5" fill="#334155">path confinement · sandbox_argv</text>
+    <text x="700" y="790" font-size="11.5" fill="#334155">env allowlist · output cap · group kill</text>
+  </g>
+
+  <!-- Container OS -->
+  <rect x="420" y="840" width="590" height="200" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="436" y="864" font-size="14" font-weight="700" fill="#0f172a">Container OS</text>
+
+  <g font-size="13" fill="#0f172a">
+    <rect x="436" y="878" width="260" height="148" rx="8" fill="#fff" stroke="#16a34a"/>
+    <text x="448" y="900" font-weight="600">sudo → sandbox user</text>
+    <text x="448" y="920" font-size="11.5" fill="#334155">sudoers: apiuser may run as</text>
+    <text x="448" y="937" font-size="11.5" fill="#334155">sandbox, and nothing else</text>
+    <text x="448" y="954" font-size="11.5" fill="#334155">env_reset · umask 0007</text>
+    <text x="448" y="978" font-size="11.5" fill="#334155">runs: run_command, session venv</text>
+    <text x="448" y="995" font-size="11.5" fill="#334155">creation, cleanup, process kill</text>
+    <text x="448" y="1014" font-size="11.5" fill="#64748b">one shared uid for all sessions (open)</text>
+
+    <rect x="716" y="878" width="278" height="148" rx="8" fill="#fff" stroke="#16a34a"/>
+    <text x="728" y="900" font-weight="600">Volume /app/data (710)</text>
+    <text x="728" y="920" font-size="11.5" fill="#334155">registry.sqlite3 (SQLite setup)</text>
+    <text x="728" y="944" font-size="11.5" fill="#334155">workspaces/ (2770, group workspace)</text>
+    <text x="728" y="961" font-size="11.5" fill="#334155">  &lt;session id&gt;/ agent files, .venv</text>
+    <text x="728" y="978" font-size="11.5" fill="#334155">  created and deleted with the session</text>
+    <text x="728" y="1002" font-size="11.5" fill="#64748b">no per-workspace disk quota (open)</text>
+  </g>
+
+  <!-- ===================== External ===================== -->
+  <g>
+    <rect x="1100" y="160" width="270" height="110" rx="14" fill="#fffbeb" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="1116" y="188" font-size="15" font-weight="700" fill="#0f172a">GitHub OAuth</text>
+    <text x="1116" y="210" font-size="11.5" fill="#475569">sign-in for the registry;</text>
+    <text x="1116" y="227" font-size="11.5" fill="#475569">the GitHub user id binds each</text>
+    <text x="1116" y="244" font-size="11.5" fill="#475569">workspace session to its owner</text>
+
+    <rect x="1100" y="330" width="270" height="140" rx="14" fill="#fffbeb" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="1116" y="358" font-size="15" font-weight="700" fill="#0f172a">Anthropic Messages API</text>
+    <text x="1116" y="380" font-size="11.5" fill="#475569">anthropic SDK (AsyncAnthropic),</text>
+    <text x="1116" y="397" font-size="11.5" fill="#475569">beta tool_runner, streaming,</text>
+    <text x="1116" y="414" font-size="11.5" fill="#475569">prompt caching · model from</text>
+    <text x="1116" y="431" font-size="11.5" fill="#475569">CLAUDE_MODEL · the user's</text>
+    <text x="1116" y="448" font-size="11.5" fill="#475569">own (BYOK) key</text>
+
+    <rect x="1100" y="530" width="270" height="130" rx="14" fill="#fffbeb" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="1116" y="558" font-size="15" font-weight="700" fill="#0f172a">BioCypher MCP server</text>
+    <text x="1116" y="580" font-size="11.5" fill="#475569">BIOCYPHER_MCP_URL</text>
+    <text x="1116" y="597" font-size="11.5" fill="#475569">(default mcp.biocypher.org)</text>
+    <text x="1116" y="614" font-size="11.5" fill="#475569">streamable HTTP · service auth</text>
+    <text x="1116" y="631" font-size="11.5" fill="#475569">header, one connection per session</text>
+
+    <rect x="1100" y="880" width="270" height="110" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="1116" y="908" font-size="15" font-weight="700" fill="#0f172a">PostgreSQL (optional)</text>
+    <text x="1116" y="930" font-size="11.5" fill="#475569">separate container in the</text>
+    <text x="1116" y="947" font-size="11.5" fill="#475569">PostgreSQL compose setup;</text>
+    <text x="1116" y="964" font-size="11.5" fill="#475569">registry data only, not the workspace</text>
+  </g>
+
+  <!-- ===================== Connections ===================== -->
+  <g fill="none" stroke-width="2.2">
+    <!-- SPA -> API -->
+    <path d="M330,296 H434" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- Vite / nginx proxy -->
+    <path d="M330,778 H372 V300" stroke="#334155" stroke-dasharray="6 4"/>
+    <path d="M330,894 H372 V778" stroke="#334155" stroke-dasharray="6 4"/>
+    <!-- browser sign-in redirect to GitHub -->
+    <path d="M180,100 V84 H1235 V158" stroke="#b45309" stroke-dasharray="6 4" marker-end="url(#arr-ext)"/>
+    <!-- registry auth <-> GitHub -->
+    <path d="M994,236 H1098" stroke="#b45309" marker-start="url(#arr-ext)" marker-end="url(#arr-ext)"/>
+    <!-- router -> dependencies (auth) -->
+    <path d="M600,374 V386" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- router -> service -->
+    <path d="M730,466 V536" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- service -> client_loop -->
+    <path d="M700,678 V692" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- service (turn task) -> Anthropic -->
+    <path d="M994,640 H1060 V400 H1098" stroke="#b45309" marker-end="url(#arr-ext)"/>
+    <!-- client_loop (actor) -> MCP -->
+    <path d="M994,750 H1076 V600 H1098" stroke="#b45309" marker-end="url(#arr-ext)"/>
+    <!-- client_loop -> sudo / sandbox -->
+    <path d="M560,806 V876" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- client_loop -> volume (file tools as apiuser, via group) -->
+    <path d="M860,806 V876" stroke="#334155" marker-end="url(#arr)"/>
+    <!-- sandbox -> volume -->
+    <path d="M696,952 H714" stroke="#334155" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- Connection labels -->
+  <g font-size="11.5" fill="#0f172a">
+    <text x="338" y="286">REST + SSE</text>
+    <text x="338" y="314" fill="#475569">fetch()</text>
+    <text x="340" y="770" fill="#475569">proxy</text>
+    <text x="560" y="80" fill="#92400e">browser redirect for GitHub sign-in</text>
+    <text x="1030" y="228" fill="#92400e">OAuth</text>
+    <text x="738" y="494" fill="#475569" font-size="11">SessionManager calls</text>
+    <text x="1070" y="492" fill="#92400e" transform="rotate(-90 1070 492)">turn task · BYOK key</text>
+    <text x="1088" y="720" fill="#92400e" transform="rotate(-90 1088 720)">actor task · MCP</text>
+    <text x="568" y="834" fill="#475569">run_command</text>
+    <text x="868" y="834" fill="#475569">file tools, file routes</text>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="12" fill="#334155">
+    <line x1="30" y1="1092" x2="62" y2="1092" stroke="#334155" stroke-width="2.2"/>
+    <text x="70" y="1096">call at runtime</text>
+    <line x1="190" y1="1092" x2="222" y2="1092" stroke="#334155" stroke-width="2.2" stroke-dasharray="6 4"/>
+    <text x="230" y="1096">proxy / redirect / optional</text>
+    <line x1="410" y1="1092" x2="442" y2="1092" stroke="#b45309" stroke-width="2.2"/>
+    <text x="450" y="1096">call to an external service</text>
+    <rect x="640" y="1083" width="30" height="18" rx="4" fill="#fffbeb" stroke="#b45309" stroke-dasharray="6 4"/>
+    <text x="678" y="1096">outside our deployment</text>
+    <text x="30" y="1122" fill="#64748b">"(open)" marks known gaps tracked in the review: one sandbox uid for all sessions, no disk quota. See docs/workspace-data-flow.svg for what data moves where.</text>
+  </g>
+</svg>
