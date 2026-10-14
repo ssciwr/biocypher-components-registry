@@ -109,48 +109,54 @@ def _result_document(result: GenerationResult) -> dict[str, Any] | None:
     return json.loads(output_path.read_text(encoding="utf-8"))
 
 
+_TYPE_KEY = "@type"
+_CROISSANT_FILE_OBJECT = "cr:FileObject"
+_FILE_OBJECT_TYPES = (_CROISSANT_FILE_OBJECT, "FileObject")
+
+
 # AI-Generated.
 # Returns the editable FileObject, creating one only if the generator omitted it.
 def _first_distribution(document: dict[str, Any], input_path: str) -> dict[str, Any]:
     distribution = document.get("distribution")
-    if isinstance(distribution, list):
-        fallback: dict[str, Any] | None = None
-        file_object: dict[str, Any] | None = None
-        input_name = Path(input_path).expanduser().name
-        for item in distribution:
-            if not isinstance(item, dict):
-                continue
-            if fallback is None:
-                fallback = item
-            item_type = item.get("@type")
-            is_file_object = item_type in ("cr:FileObject", "FileObject")
-            if isinstance(item_type, list):
-                is_file_object = any(
-                    value in ("cr:FileObject", "FileObject") for value in item_type
-                )
-            if not is_file_object:
-                continue
-            if item.get("name") == input_name:
-                return item
-            content_url = str(item.get("contentUrl") or "")
-            if Path(urlparse(content_url).path).name == input_name:
-                return item
-            if file_object is None:
-                file_object = item
-        if file_object is not None:
-            return file_object
-        if fallback is not None:
-            return fallback
-        file_object: dict[str, Any] = {"@type": "cr:FileObject"}
-        distribution.insert(0, file_object)
-        return file_object
-
     if isinstance(distribution, dict):
         return distribution
 
-    file_object = {"@type": "cr:FileObject"}
-    document["distribution"] = [file_object]
+    if not isinstance(distribution, list):
+        distribution = []
+        document["distribution"] = distribution
+
+    items = [item for item in distribution if isinstance(item, dict)]
+    file_objects = [item for item in items if _is_file_object(item)]
+    input_name = Path(input_path).expanduser().name
+    for item in file_objects:
+        if _matches_input_name(item, input_name):
+            return item
+    if file_objects:
+        return file_objects[0]
+    if items:
+        return items[0]
+
+    file_object: dict[str, Any] = {_TYPE_KEY: _CROISSANT_FILE_OBJECT}
+    distribution.insert(0, file_object)
     return file_object
+
+
+# AI-Generated.
+# Accepts both a single JSON-LD type and a list of types.
+def _is_file_object(item: dict[str, Any]) -> bool:
+    item_type = item.get(_TYPE_KEY)
+    if isinstance(item_type, list):
+        return any(value in _FILE_OBJECT_TYPES for value in item_type)
+    return item_type in _FILE_OBJECT_TYPES
+
+
+# AI-Generated.
+# Matches a FileObject to the input file by name or by contentUrl basename.
+def _matches_input_name(item: dict[str, Any], input_name: str) -> bool:
+    if item.get("name") == input_name:
+        return True
+    content_url = str(item.get("contentUrl") or "")
+    return Path(urlparse(content_url).path).name == input_name
 
 
 # AI-Generated.
