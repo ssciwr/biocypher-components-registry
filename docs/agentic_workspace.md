@@ -89,7 +89,7 @@ The backend only speaks the Anthropic Messages API. Other providers are reached 
 
 CLI alternative (proxy port is bound to `127.0.0.1:4000`):
 
-    ANTHROPIC_BASE_URL=http://localhost:4000 ANTHROPIC_API_KEY=$LITELLM_MASTER_KEY CLAUDE_MODEL=gpt-4.1 \
+    ANTHROPIC_BASE_URL=http://localhost:4000 ANTHROPIC_API_KEY=$LITELLM_MASTER_KEY CLAUDE_MODEL=Qwen3.5-int4 \
       python src/core/workspace/client_loop.py
 
 Relevant knobs:
