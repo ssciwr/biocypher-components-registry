@@ -20,6 +20,9 @@ model_list:
     litellm_params:
       model: ollama_chat/qwen3.5:4b
       api_base: http://host.docker.internal:11434
+      # Ollama's default context (4k on small GPUs) silently truncates the
+      # system prompt + tool set; raise it per request.
+      num_ctx: 32768
   # Any OpenAI-compatible server (vLLM, Ollama, ...):
   # - model_name: local-qwen
   #   litellm_params:
