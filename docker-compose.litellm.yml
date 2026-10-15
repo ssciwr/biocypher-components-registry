@@ -6,8 +6,9 @@
 
 services:
   litellm:
-    # Pin a version tag or digest for anything beyond local testing.
-    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:latest}
+    # Pinned by tag and digest (reproducible runs; this container holds the
+    # provider key). Override with LITELLM_IMAGE to test another version.
+    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:v1.104.2@sha256:3d88bd757134a00e8c00237b85a021ab1f6d54abb9c1df750f411dbe7256a500}
     container_name: biocypher-registry-litellm
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     # Only the provider key and the proxy key; deliberately no env_file, so
