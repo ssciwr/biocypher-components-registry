@@ -15,30 +15,43 @@ ENV PYTHONUNBUFFERED=1 \
 # ==== System dependencies and application user ====
 USER root
 
-# Agentic workspace sandbox: run_command executes as `sandbox`, which shares
-# only the `workspace` group with apiuser. The sudoers rule lets apiuser run
-# commands as sandbox and nothing else; env_reset + umask_override give every
-# command a clean environment and group-writable files.
+# Agentic workspace sandbox: every active session leases its own user from a
+# pool sandbox1..N (N = maximum concurrent sessions overall). Each session's
+# workspace belongs to its user (mode 0700), so sessions cannot read each
+# other's files nor inspect each other's processes. Pool users have private
+# primary groups and share only the `sandbox` group, which lets them traverse
+# /app/data and create their workspace in the workspaces root (sticky, no
+# read: they can neither list nor remove other entries). The sudoers rule lets
+# apiuser run commands as pool users and nothing else; env_reset +
+# umask_override give every command a clean environment and private files.
+ARG SANDBOX_POOL_SIZE=20
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git sudo \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system apiuser \
-    && groupadd --system workspace \
-    && useradd --system --gid apiuser --groups workspace --home-dir /app apiuser \
-    && useradd --system --gid workspace --no-create-home --home-dir /nonexistent \
-        --shell /usr/sbin/nologin sandbox \
+    && groupadd --system sandbox \
+    && useradd --system --gid apiuser --home-dir /app apiuser \
+    && pool="" \
+    && for i in $(seq 1 "$SANDBOX_POOL_SIZE"); do \
+        useradd --system --user-group --groups sandbox --no-create-home \
+            --home-dir /nonexistent --shell /usr/sbin/nologin "sandbox$i"; \
+        pool="${pool:+$pool,}sandbox$i"; \
+    done \
     && printf '%s\n' \
-        'Defaults:apiuser !use_pty, !requiretty, env_reset, umask=0007, umask_override' \
-        'apiuser ALL=(sandbox) NOPASSWD: ALL' \
+        'Defaults:apiuser !use_pty, !requiretty, env_reset, umask=0077, umask_override' \
+        "Runas_Alias SANDBOX_POOL = $pool" \
+        'apiuser ALL=(SANDBOX_POOL) NOPASSWD: ALL' \
         > /etc/sudoers.d/workspace-sandbox \
     && chmod 440 /etc/sudoers.d/workspace-sandbox \
+    && visudo -cf /etc/sudoers.d/workspace-sandbox \
     && mkdir -p /app/data /app/data/workspaces \
     && chown -R apiuser:apiuser /app \
-    && chgrp workspace /app/data /app/data/workspaces \
+    && chgrp sandbox /app/data /app/data/workspaces \
     && chmod 710 /app/data \
-    && chmod u=rwx,g=rwxs,o= /app/data/workspaces
+    && chmod 1730 /app/data/workspaces
 
-ENV AGENT_SANDBOX_USER=sandbox
+ENV AGENT_SANDBOX_USER_PREFIX=sandbox \
+    AGENT_SANDBOX_POOL_SIZE=${SANDBOX_POOL_SIZE}
 # ====
 
 # ==== Python dependency installation ====

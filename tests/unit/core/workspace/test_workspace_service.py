@@ -20,6 +20,7 @@ from tests.support.workspace_fakes import (
     fake_client_factory,
     fake_mcp_connect,
     final_message,
+    install_fake_sudo,
     text_event,
 )
 
@@ -108,7 +109,10 @@ def test_create_reports_workspace_directory_storage_error(tmp_path, monkeypatch)
     """
     manager = make_manager(tmp_path)
     monkeypatch.setattr(
-        service.asyncio, "to_thread", AsyncMock(side_effect=[None, OSError, None])
+        service.asyncio,
+        "to_thread",
+        # root mkdir, workspace mkdir (fails), cleanup rmtree, "still there?"
+        AsyncMock(side_effect=[None, OSError, None, False]),
     )
     create_session = manager.create(owner_github_user_id="12345")
     with pytest.raises(service.WorkspaceStorageError):
@@ -653,3 +657,157 @@ def test_fs_change_event_from_file_tool(tmp_path):
         await manager.shutdown()
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------- sandbox pool
+
+
+def make_pool_manager(tmp_path, monkeypatch, users=("sandbox1", "sandbox2")):
+    calls = install_fake_sudo(monkeypatch)
+    manager = SessionManager(
+        workspaces_root=tmp_path / "workspaces",
+        mcp_headers={},
+        mcp_connect=fake_mcp_connect,
+        sandbox_users=list(users),
+    )
+    return manager, calls
+
+
+def test_sandbox_pool_from_env(monkeypatch):
+    monkeypatch.setattr(service, "SANDBOX_USER_PREFIX", "sandbox")
+    monkeypatch.setattr(service, "SANDBOX_POOL_SIZE", 3)
+    assert service.sandbox_pool() == ["sandbox1", "sandbox2", "sandbox3"]
+    monkeypatch.setattr(service, "SANDBOX_POOL_SIZE", 0)
+    assert service.sandbox_pool() == []
+    assert not SessionManager(mcp_headers={}).sandboxed
+
+
+def test_sessions_lease_distinct_users_and_own_workspace(tmp_path, monkeypatch):
+    manager, calls = make_pool_manager(tmp_path, monkeypatch)
+
+    async def scenario():
+        a = await manager.create(owner_github_user_id="1")
+        b = await manager.create(owner_github_user_id="2")
+        return a, b
+
+    a, b = asyncio.run(scenario())
+    assert {a.sandbox_user, b.sandbox_user} == {"sandbox1", "sandbox2"}
+    assert ("sandbox1", ["/bin/mkdir", "-m", "700", str(a.workspace)]) in calls
+    assert a.fs.user == a.sandbox_user
+    assert service._exec_bin(a.workspace, a.sandbox_user) == a.workspace / ".venv/bin"
+
+
+def test_pool_exhausted_raises_and_teardown_frees_user(tmp_path, monkeypatch):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
+
+    async def scenario():
+        session = await manager.create(owner_github_user_id="1")
+        with pytest.raises(service.SessionPoolExhaustedError):
+            await manager.create(owner_github_user_id="2")
+        assert manager._pending_creates == {}
+        await manager.delete(session.id)
+        assert not session.workspace.exists()
+        again = await manager.create(owner_github_user_id="2")
+        assert again.sandbox_user == "sandbox1"
+
+    asyncio.run(scenario())
+
+
+def test_teardown_kills_remaining_processes_of_user(tmp_path, monkeypatch):
+    manager, calls = make_pool_manager(tmp_path, monkeypatch)
+
+    async def scenario():
+        session = await manager.create(owner_github_user_id="1")
+        await manager.delete(session.id)
+        return session
+
+    session = asyncio.run(scenario())
+    assert (session.sandbox_user, ["/bin/kill", "-KILL", "-1"]) in calls
+
+
+def test_failed_create_returns_user_to_pool(tmp_path, monkeypatch):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
+    monkeypatch.setattr(service, "READY_TIMEOUT", 0)
+    with pytest.raises(SessionStartupError):
+        asyncio.run(manager.create(owner_github_user_id="1"))
+    assert list(manager._free_users) == ["sandbox1"]
+    assert manager._leased_users == set()
+    assert list(manager.workspaces_root.iterdir()) == []
+
+
+def test_failed_workspace_creation_returns_user_to_pool(tmp_path, monkeypatch):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
+    monkeypatch.setattr(service, "_run_as", AsyncMock(return_value=1))
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(manager.create(owner_github_user_id="1"))
+    assert list(manager._free_users) == ["sandbox1"]
+
+
+def test_failed_root_creation_returns_user_to_pool(tmp_path, monkeypatch):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
+    monkeypatch.setattr(service.asyncio, "to_thread", AsyncMock(side_effect=OSError))
+    with pytest.raises(service.WorkspaceStorageError):
+        asyncio.run(manager.create(owner_github_user_id="1"))
+    assert list(manager._free_users) == ["sandbox1"]
+
+
+def test_user_withheld_when_workspace_removal_fails(tmp_path, monkeypatch, caplog):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
+    monkeypatch.setattr(service, "_remove_workspace", AsyncMock(return_value=False))
+
+    async def scenario():
+        session = await manager.create(owner_github_user_id="1")
+        await manager.delete(session.id)
+        with pytest.raises(service.SessionPoolExhaustedError):
+            await manager.create(owner_github_user_id="1")
+
+    asyncio.run(scenario())
+    assert "withheld from the pool" in caplog.text
+
+
+def test_sweep_removes_orphaned_workspaces(tmp_path, monkeypatch):
+    manager, calls = make_pool_manager(tmp_path, monkeypatch)
+    root = manager.workspaces_root
+    (root / "orphan1").mkdir(parents=True)
+    (root / "orphan1" / "f.txt").write_text("left over")
+    (root / "orphan2").mkdir()
+    monkeypatch.setattr(
+        service, "_owner_name", lambda p: "sandbox2" if p.name == "orphan1" else "x"
+    )
+    assert asyncio.run(manager.sweep_orphaned_workspaces()) == 2
+    assert list(root.iterdir()) == []
+    # Pool-owned orphans are removed as their owner, others as the API user.
+    assert ("sandbox2", ["/bin/kill", "-KILL", "-1"]) in calls
+    assert all(user == "sandbox2" for user, _ in calls)
+
+
+def test_sweep_withholds_owner_of_unremovable_orphan(tmp_path, monkeypatch):
+    manager, _ = make_pool_manager(tmp_path, monkeypatch)
+    (manager.workspaces_root / "orphan").mkdir(parents=True)
+    monkeypatch.setattr(service, "_owner_name", lambda p: "sandbox1")
+    monkeypatch.setattr(service, "_remove_workspace", AsyncMock(return_value=False))
+    assert asyncio.run(manager.sweep_orphaned_workspaces()) == 0
+    assert list(manager._free_users) == ["sandbox2"]
+
+
+def test_sweep_without_root_is_noop(tmp_path):
+    assert asyncio.run(make_manager(tmp_path).sweep_orphaned_workspaces()) == 0
+
+
+def test_sandboxed_tools_run_as_session_user(tmp_path, monkeypatch):
+    manager, calls = make_pool_manager(tmp_path, monkeypatch)
+
+    async def scenario():
+        session = await manager.create(owner_github_user_id="1")
+        tools = {t.name: t for t in session.file_tools}
+        assert await tools["write_file"].call({"path": "a.txt", "content": "hi"}) == (
+            "wrote 2 chars to a.txt"
+        )
+        assert await tools["read_file"].call({"path": "a.txt"}) == "hi"
+        out = await tools["run_command"].call({"command": "pwd; cat a.txt"})
+        assert out == f"[exit 0]\n{session.workspace}\nhi"
+        return session
+
+    session = asyncio.run(scenario())
+    users = {user for user, _ in calls}
+    assert users == {session.sandbox_user}

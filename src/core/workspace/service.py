@@ -3,6 +3,9 @@
 Each workspace session owns:
 
 - a workspace directory (file tools and run_command are confined to it),
+- when sandboxed, a pool user leased for the session's lifetime: the
+  workspace belongs to that user (mode 0700) and every file operation and
+  command of the session runs as it, so sessions cannot reach each other,
 - a conversation history with the snapshot/rollback pattern per turn,
 - an MCP connection living in a dedicated actor task (the asyncio context
   managers must be entered and exited by the same task),
@@ -24,6 +27,7 @@ import collections
 import contextlib
 import logging
 import os
+import pwd
 import secrets
 import shutil
 import sys
@@ -36,6 +40,7 @@ import httpx
 from anthropic import AsyncAnthropic
 
 from src.core.workspace import client_loop as cl
+from src.core.workspace import workspace_fs as wfs
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,11 @@ IDLE_REAPER_SECONDS = 5 * 60
 # Concurrent sessions one GitHub user may hold (each owns an MCP connection
 # and a workspace directory).
 MAX_SESSIONS_PER_USER = int(os.getenv("AGENT_MAX_SESSIONS_PER_USER", "3"))
+# Sandbox user pool: <prefix>1 .. <prefix><size>, created in the Docker image.
+# One user per active session, so the size is also the global session cap.
+# Unset = unsandboxed: everything runs as the API user (local dev, tests).
+SANDBOX_USER_PREFIX = os.getenv("AGENT_SANDBOX_USER_PREFIX", "")
+SANDBOX_POOL_SIZE = int(os.getenv("AGENT_SANDBOX_POOL_SIZE", "0"))
 # Lower-cased error substrings meaning "key valid but out of money": Anthropic
 # ("credit balance is too low") and OpenAI via LiteLLM ("insufficient_quota").
 OUT_OF_CREDIT_MARKERS = ("credit balance is too low", "insufficient_quota")
@@ -66,6 +76,10 @@ class SessionStartupError(Exception):
 
 class SessionLimitError(Exception):
     """The user already holds MAX_SESSIONS_PER_USER sessions."""
+
+
+class SessionPoolExhaustedError(SessionLimitError):
+    """Every sandbox user is leased: the service holds its maximum of sessions."""
 
 
 class TurnInFlightError(Exception):
@@ -114,18 +128,27 @@ def _has_tool_details(value: object) -> bool:
     return value not in (None, {}, [])
 
 
-def _exec_bin(workspace: Path) -> Path:
-    if cl.SANDBOX_USER:
+def sandbox_pool() -> list[str]:
+    """Pool user names from the environment; empty when unsandboxed."""
+    if not SANDBOX_USER_PREFIX or SANDBOX_POOL_SIZE <= 0:
+        return []
+    return [f"{SANDBOX_USER_PREFIX}{i}" for i in range(1, SANDBOX_POOL_SIZE + 1)]
+
+
+def _exec_bin(workspace: Path, user: str | None) -> Path:
+    if user:
         return workspace / ".venv" / "bin"
     return Path(sys.executable).parent
 
 
-async def _run_as_sandbox(argv: list[str], cwd: Path) -> int:
-    """Run a housekeeping command as the sandbox user; return its exit code."""
+async def _run_as(user: str, argv: list[str], cwd: Path) -> int:
+    """Run a housekeeping command as ``user`` in ``cwd``; return its exit code."""
     env = cl._exec_env(home=cwd)
     proc = await asyncio.create_subprocess_exec(
-        *cl.sandbox_argv(argv, env, cl.SANDBOX_USER),
-        cwd=cwd,
+        *cl.sandbox_argv(argv, env, user, cwd=cwd),
+        # This process may not enter cwd (a workspace); its parent is the
+        # workspaces root, which it owns.
+        cwd=cwd.parent,
         env=env,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
@@ -133,36 +156,55 @@ async def _run_as_sandbox(argv: list[str], cwd: Path) -> int:
     return await proc.wait()
 
 
-async def _make_workspace(workspace: Path) -> None:
-    """Create a session directory; sandboxed, also its private venv.
+async def _make_workspace(workspace: Path, user: str | None) -> None:
+    """Create a session directory; sandboxed, owned by ``user`` with a venv.
 
-    The sandbox user may not write to the service's own venv (that would let
-    model commands change the running API), so pip installs go to
-    ``.venv`` inside the workspace, created as the sandbox user.
+    Sandboxed, ``user`` creates the directory itself (mode 0700) in the
+    sticky, group-writable workspaces root, so only it can enter the
+    workspace and nobody else can rename or delete it. It may not write to
+    the service's own venv (that would let model commands change the running
+    API), so pip installs go to ``.venv`` inside the workspace.
     """
-    # mkdir is a blocking syscall; off-thread so one session's filesystem
-    # latency (or a slow/networked workspaces_root) can't stall every other
-    # session's SSE heartbeats and message dispatch on this loop.
-    await asyncio.to_thread(workspace.mkdir)
-    if not cl.SANDBOX_USER:
+    if not user:
+        # mkdir is a blocking syscall; off-thread so one session's filesystem
+        # latency (or a slow/networked workspaces_root) can't stall every
+        # other session's SSE heartbeats and message dispatch on this loop.
+        await asyncio.to_thread(workspace.mkdir)
         return
-    # Group-shared with the sandbox user; setgid keeps new files in the group.
-    await asyncio.to_thread(os.chmod, workspace, 0o2770)
-    if await _run_as_sandbox([sys.executable, "-m", "venv", ".venv"], workspace):
+    if await _run_as(
+        user, ["/bin/mkdir", "-m", "700", str(workspace)], workspace.parent
+    ):
+        raise OSError(f"could not create the session workspace {workspace}")
+    if await _run_as(user, [sys.executable, "-m", "venv", ".venv"], workspace):
         raise OSError(f"could not create the session venv in {workspace}")
 
 
-async def _remove_workspace(workspace: Path) -> None:
-    if cl.SANDBOX_USER:
-        # Files the sandbox user created (or chmod-ed) may not be deletable
-        # by this user, so let their owner restore access and remove them.
-        await _run_as_sandbox(
-            ["sh", "-c", 'chmod -R u+rwX "$1"; rm -rf "$1"', "sh", str(workspace)],
+async def _remove_workspace(workspace: Path, user: str | None) -> bool:
+    """Delete a workspace; True if it is gone afterwards.
+
+    Sandboxed, first kill everything still running as ``user`` (e.g. commands
+    started in the background), so nothing of this session survives into the
+    next session that leases the same user; then let the owner restore access
+    to and remove its files.
+    """
+    if user:
+        await _run_as(user, ["/bin/kill", "-KILL", "-1"], workspace.parent)
+        await _run_as(
+            user,
+            ["/bin/sh", "-c", 'chmod -R u+rwX "$1"; rm -rf "$1"', "sh", str(workspace)],
             workspace.parent,
         )
     # Recursive delete is a blocking syscall storm on a large/full workspace;
     # off-thread for the same reason as the mkdir in _make_workspace.
     await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
+    return not await asyncio.to_thread(os.path.lexists, workspace)
+
+
+def _owner_name(path: Path) -> str | None:
+    try:
+        return pwd.getpwuid(path.lstat().st_uid).pw_name
+    except (KeyError, OSError):
+        return None
 
 
 def _put_dropping_oldest(queue: asyncio.Queue, item) -> None:
@@ -186,11 +228,13 @@ class Session:
         workspace: Path,
         mcp_url: str,
         mcp_headers: dict[str, str],
+        sandbox_user: str | None = None,
     ):
         self.id = session_id
         self.owner_github_user_id = owner_github_user_id
         self.token = secrets.token_urlsafe(32)
         self.workspace = workspace
+        self.sandbox_user = sandbox_user
         self.mcp_url = mcp_url
         self.mcp_headers = mcp_headers
         self.history: list = []
@@ -217,9 +261,15 @@ class Session:
             get_root=lambda: self.workspace,
             # No interactive env prompt like in the CLI: sandboxed sessions
             # get their own venv, unsandboxed ones share the service's.
-            get_exec_bin=lambda: _exec_bin(self.workspace),
+            get_exec_bin=lambda: _exec_bin(self.workspace, self.sandbox_user),
             on_fs_change=self._on_fs_change,
+            get_user=lambda: self.sandbox_user,
         )
+
+    @property
+    def fs(self) -> wfs.WorkspaceFS:
+        """File access to this session's workspace, as its sandbox user."""
+        return wfs.WorkspaceFS(self.workspace, self.sandbox_user)
 
     @property
     def busy(self) -> bool:
@@ -440,6 +490,7 @@ class SessionManager:
         mcp_url: str | None = None,
         mcp_headers: dict[str, str] | None = None,
         mcp_connect=None,
+        sandbox_users: list[str] | None = None,
     ):
         self.workspaces_root = Path(
             workspaces_root or os.getenv("AGENT_WORKSPACES_ROOT", "workspaces")
@@ -451,6 +502,10 @@ class SessionManager:
         self.mcp_connect = mcp_connect
         self.sessions: dict[str, Session] = {}
         self._pending_creates: collections.Counter[str] = collections.Counter()
+        pool = sandbox_pool() if sandbox_users is None else list(sandbox_users)
+        self.sandboxed = bool(pool)
+        self._free_users: collections.deque[str] = collections.deque(pool)
+        self._leased_users: set[str] = set()
         self._sse_disconnect_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def create(self, *, owner_github_user_id: str) -> Session:
@@ -460,37 +515,75 @@ class SessionManager:
         )
         if owned + self._pending_creates[owner_github_user_id] >= MAX_SESSIONS_PER_USER:
             raise SessionLimitError
+        # Lease before the first await, for the same reason as the reservation
+        # below; _create_session hands the user back if creation fails.
+        sandbox_user = self._lease_user()
         # Increment immediately/Reserve before the await so simultaneous invocations of session creation cannot be made at the same time
         self._pending_creates[owner_github_user_id] += 1
         try:
-            return await self._create_session(owner_github_user_id=owner_github_user_id)
+            return await self._create_session(
+                owner_github_user_id=owner_github_user_id, sandbox_user=sandbox_user
+            )
         finally:
             self._pending_creates[owner_github_user_id] -= 1
             # on error or normal successful end, reset the users count
             if not self._pending_creates[owner_github_user_id]:
                 del self._pending_creates[owner_github_user_id]
 
-    async def _create_session(self, *, owner_github_user_id: str) -> Session:
+    def _lease_user(self) -> str | None:
+        """Take a free pool user; None when unsandboxed."""
+        if not self.sandboxed:
+            return None
+        if not self._free_users:
+            raise SessionPoolExhaustedError
+        user = self._free_users.popleft()
+        self._leased_users.add(user)
+        return user
+
+    def _release_user(self, user: str | None, workspace_removed: bool) -> None:
+        """Return a leased user to the pool.
+
+        A user whose workspace could not be removed stays out of the pool:
+        the next session leasing it could open the leftover files.
+        """
+        if user is None or user not in self._leased_users:
+            return
+        self._leased_users.discard(user)
+        if workspace_removed:
+            self._free_users.append(user)
+        else:
+            logger.error(
+                "workspace removal failed; sandbox user %s withheld from the pool",
+                user,
+            )
+
+    async def _create_session(
+        self, *, owner_github_user_id: str, sandbox_user: str | None
+    ) -> Session:
         """Originally this was in the create function above, separated out
         so we can prevent concurrent creates"""
         try:
             await asyncio.to_thread(
                 self.workspaces_root.mkdir, parents=True, exist_ok=True
             )
-        except OSError as e:
-            logger.exception("Could not create workspace root")
-            raise WorkspaceStorageError from e
+        except BaseException as e:
+            self._release_user(sandbox_user, workspace_removed=True)
+            if isinstance(e, OSError):
+                logger.exception("Could not create workspace root")
+                raise WorkspaceStorageError from e
+            raise
         session_id = uuid.uuid4().hex
         workspace = self.workspaces_root / session_id
         try:
-            await _make_workspace(workspace)
+            await _make_workspace(workspace, sandbox_user)
         except BaseException as e:
             # Also on cancellation: to_thread's worker thread runs mkdir to
             # completion even if this await is cancelled (e.g. task killed on
             # shutdown), so the dir can land on disk with nothing left to
             # track/clean it. Nothing references `session` yet, so clean up
             # here before propagating.
-            await _remove_workspace(workspace)
+            removed = await _remove_workspace(workspace, sandbox_user)
+            self._release_user(sandbox_user, removed)
             if isinstance(e, OSError):
                 logger.exception("Could not create workspace directory")
                 raise WorkspaceStorageError from e
@@ -501,6 +594,7 @@ class SessionManager:
             workspace,
             self.mcp_url,
             self.mcp_headers,
+            sandbox_user,
         )  # same authentication as using Github login for registering adapters
         if self.mcp_connect is not None:
             session.mcp_connect = self.mcp_connect
@@ -624,7 +718,36 @@ class SessionManager:
         # instead of heartbeating a dead session forever.
         session.publish("session_closed")
         session.subscribers.clear()
-        await _remove_workspace(session.workspace)
+        removed = await _remove_workspace(session.workspace, session.sandbox_user)
+        self._release_user(session.sandbox_user, removed)
+
+    async def sweep_orphaned_workspaces(self) -> int:
+        """Remove workspaces left behind by a crash or restart; call at startup.
+
+        Leases live in memory, so after a restart every pool user is free
+        again; a leftover workspace must not stay readable by whichever
+        session leases its owner next. Returns the number of entries removed.
+        """
+        try:
+            entries = await asyncio.to_thread(
+                lambda: list(self.workspaces_root.iterdir())
+            )
+        except FileNotFoundError:
+            return 0
+        pool = set(self._free_users) | self._leased_users
+        removed = 0
+        for entry in entries:
+            if entry.name in self.sessions:
+                continue
+            owner = _owner_name(entry)
+            if await _remove_workspace(entry, owner if owner in pool else None):
+                removed += 1
+            else:
+                logger.error("could not remove orphaned workspace %s", entry.name)
+                # Same rule as _release_user: its owner must not be leased.
+                with contextlib.suppress(ValueError):
+                    self._free_users.remove(owner)
+        return removed
 
     async def shutdown(self) -> None:
         # delete() pops from self.sessions synchronously before its first
