@@ -122,6 +122,7 @@ def test_helper_rejects_bad_request(root):
         input=json.dumps({"root": str(root), "args": {}}),
         capture_output=True,
         text=True,
+        check=False,
     )
     assert proc.returncode == 2
     assert json.loads(proc.stderr)["message"].startswith("bad request")
