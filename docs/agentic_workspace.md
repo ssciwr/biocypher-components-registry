@@ -71,7 +71,7 @@ Four numbers are printed per LLM round-trip: `input_tokens`, `cache_read_input_t
     - `RESULT_MAX_CHARS` = biggest token lever. MCP results can be huge; truncation caps what enters context at 20k chars (~5k tokens). System prompt tells model: result cut off → narrow arguments, don't repeat call.
     - Output capped at `CLAUDE_MAX_TOKENS` (default 16000) per response. Thinking tokens count as output when adaptive thinking is on.
 
-`cache_control={"type": "ephemeral"}` is a top-level kwarg — the SDK's auto-prefix-caching convenience on the tool runner. Works with real Anthropic; proxies and local endpoints (LiteLLM/llama.cpp) may reject it, so like thinking it is sent only when `ANTHROPIC_BASE_URL` is unset. Override with `CLAUDE_PROMPT_CACHE=on|off`.
+`cache_control={"type": "ephemeral"}` is a top-level kwarg — the SDK's auto-prefix-caching convenience on the tool runner. Works with real Anthropic; proxies and local endpoints (LiteLLM/llama.cpp) may reject it, so like for the thinking mode boolean, it is sent only when `ANTHROPIC_BASE_URL` is unset. Override with `CLAUDE_PROMPT_CACHE=on|off`.
 
 ## Testing other models (OpenAI etc.) via LiteLLM
 
