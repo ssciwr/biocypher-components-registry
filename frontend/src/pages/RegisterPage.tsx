@@ -240,6 +240,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [hasCroissantFile, setHasCroissantFile] = useState(false)
   const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
@@ -275,6 +276,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   }
 
   const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm) => {
+    if (!hasCroissantFile) return
+
     setError(null)
     setResult(null)
 
@@ -335,9 +338,10 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
           : details?.details || details?.detail || 'Registration failed.'
       )
     }
-  }, [])
+  }, [hasCroissantFile])
 
   useEffect(() => {
+    if (!hasCroissantFile) return
     if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
     if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
@@ -348,10 +352,11 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       void submitAuthenticatedRegistration(form)
     })
-  }, [authUser, authVerified, form, result, status, submitAuthenticatedRegistration])
+  }, [authUser, authVerified, form, hasCroissantFile, result, status, submitAuthenticatedRegistration])
 
   async function submitRegistration(event: { preventDefault: () => void }) {
     event.preventDefault()
+    if (!hasCroissantFile || status !== 'idle') return
 
     const doi = registrationDoiValue(form.doi)
 
@@ -433,8 +438,10 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 labelClassName="grid gap-3 text-sm font-semibold text-slate-950"
                 onChange={(value) => {
                   setError(null)
+                  if (value.trim() !== form.repositoryLocation.trim()) setHasCroissantFile(false)
                   updateField('repositoryLocation', value)
                 }}
+                onValidationChange={setHasCroissantFile}
                 placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
                 required
                 value={form.repositoryLocation}
@@ -492,8 +499,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 Sign in once so we can attach your login to the registration.
               </p>
               <button
-                className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                disabled={status !== 'idle'}
+                className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white enabled:hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                disabled={!hasCroissantFile || status !== 'idle'}
                 type="submit"
               >
                 {submitButtonText}
