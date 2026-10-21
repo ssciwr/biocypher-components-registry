@@ -5,6 +5,9 @@ from __future__ import annotations
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from src.persistence.github_auth_migration import (
+    migrate_registration_github_login_columns,
+)
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
 from src.persistence.tables import metadata
 
@@ -44,6 +47,7 @@ class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
                         f"ADD COLUMN IF NOT EXISTS {column_name} VARCHAR"
                     )
                 )
+            migrate_registration_github_login_columns(connection)
             connection.execute(
                 text(
                     "CREATE UNIQUE INDEX IF NOT EXISTS "
