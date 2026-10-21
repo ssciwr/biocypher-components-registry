@@ -311,7 +311,10 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       setStatus('processing')
 
-      const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
+      const processRegistration = registration.status === 'INVALID'
+        ? revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost
+        : processRegistrationApiV1RegistrationsRegistrationIdProcessPost
+      const processResult = await processRegistration({
         path: { registration_id: registration.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed processing request.
       })
 
