@@ -366,18 +366,11 @@ bc.run()`}
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
             ) : null}
             {adapter.can_delete ? (
-              <div className="mt-7 border-t border-slate-100 pt-5">
-                <button
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isDeleting}
-                  onClick={() => void deleteCurrentAdapter()}
-                  type="button"
-                >
-                  <TrashIcon className="h-4 w-4" aria-hidden="true" />
-                  {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
-                </button>
-                {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
-              </div>
+              <DeleteAdapterSection
+                deleteError={deleteError}
+                isDeleting={isDeleting}
+                onDelete={() => void deleteCurrentAdapter()}
+              />
             ) : null}
           </section>
 
@@ -421,6 +414,27 @@ bc.run()`}
         </aside>
       </div>
     </section>
+  )
+}
+
+function DeleteAdapterSection({
+  deleteError,
+  isDeleting,
+  onDelete,
+}: Readonly<{ deleteError: string | null; isDeleting: boolean; onDelete: () => void }>) {
+  return (
+    <div className="mt-7 border-t border-slate-100 pt-5">
+      <button
+        className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={isDeleting}
+        onClick={onDelete}
+        type="button"
+      >
+        <TrashIcon className="h-4 w-4" aria-hidden="true" />
+        {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
+      </button>
+      {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
+    </div>
   )
 }
 
