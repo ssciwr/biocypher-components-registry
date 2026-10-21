@@ -118,3 +118,39 @@ def fake_client_factory(runner):
         )
 
     return factory
+
+
+def install_fake_sudo(monkeypatch):
+    """Run "sandboxed" commands as the current user instead of via sudo.
+
+    Exercises the sandboxed code paths (pool users, ``env --chdir``, the
+    workspace_fs helper subprocess) without sudo or real pool users. Returns
+    the list of ``(user, argv)`` calls. ``kill -1`` (kill every process of
+    the user) and the shared-temp ``find -delete`` become no-ops: as the test
+    user they would kill the test run and delete the test user's files.
+    """
+    from src.core.workspace import client_loop, workspace_fs
+
+    calls = []
+
+    def fake_sandbox_argv(argv, env, user, cwd=None):
+        if not user:
+            return argv
+        calls.append((user, list(argv)))
+        if argv[0] == "/bin/kill" and argv[-1] == "-1":
+            return ["/bin/true"]
+        if argv[0] == "/usr/bin/find":
+            # Clearing the user's files in /tmp: as the test user it would
+            # delete the test user's files.
+            return ["/bin/true"]
+        if argv[1:3] == ["-m", "venv"]:
+            # A real venv takes seconds; only its bin dir is used.
+            argv = ["/bin/mkdir", "-p", ".venv/bin"]
+        prefix = ["/usr/bin/env", "-i"]
+        if cwd is not None:
+            prefix.append(f"--chdir={cwd}")
+        return [*prefix, *(f"{k}={v}" for k, v in env.items()), *argv]
+
+    monkeypatch.setattr(workspace_fs, "sandbox_argv", fake_sandbox_argv)
+    monkeypatch.setattr(client_loop, "sandbox_argv", fake_sandbox_argv)
+    return calls

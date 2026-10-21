@@ -17,10 +17,8 @@ import asyncio
 import json
 import logging
 import os
-from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Annotated
-from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -44,11 +42,12 @@ from src.api.schemas.workspace import (
     workspace_error_responses,
 )
 from src.core.auth.models import AuthSession
-from src.core.workspace import client_loop as cl
+from src.core.workspace import workspace_fs as wfs
 from src.core.workspace.service import (
     Session,
     SessionLimitError,
     SessionManager,
+    SessionPoolExhaustedError,
     SessionStartupError,
     TurnInFlightError,
     WorkspaceStorageError,
@@ -58,11 +57,13 @@ from src.core.workspace.service import (
 # stream while the agent is idle).
 HEARTBEAT_SECONDS = 5  # specifically this amount due to this report: https://github.com/enisdenjo/graphql-sse/issues/99
 
-# Tool state in the workspace (session venv, HOME caches), not user files;
-# left out of the download.
-ARCHIVE_EXCLUDED = {".venv", ".cache"}
+# Tool state in the workspace (session venv, HOME caches, temp files), not
+# user files; left out of the download.
+ARCHIVE_EXCLUDED = {".venv", ".cache", wfs.TMP_DIR}
 # Largest file the preview pane will load.
 MAX_PREVIEW_BYTES = 1_000_000
+# Largest workspace download (compressed zip size).
+MAX_ARCHIVE_BYTES = int(os.getenv("AGENT_MAX_ARCHIVE_BYTES", str(200 * 1024 * 1024)))
 
 logger = logging.getLogger(__name__)
 
@@ -82,26 +83,34 @@ WorkspaceSessionDep = Annotated[Session, Depends(get_workspace_session)]
 CurrentAuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
 
 
-def _resolve(session: Session, path: str):
-    try:
-        return cl.resolve_in_root(path, session.workspace)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+# File errors from the sandbox user's file operations, as HTTP status codes.
+FS_ERROR_STATUS = {
+    wfs.INVALID_PATH: 400,
+    wfs.NOT_FOUND: 404,
+    wfs.TOO_LARGE: 413,
+    wfs.NOT_TEXT: 415,
+}
 
 
-# Build the ZIP away from the request event loop to avoid potential thread errors/to avoid using sync in an async context which SonarQUbe does not like
-def _create_workspace_archive(workspace: Path) -> str:
+def _fs_http_error(session: Session, error: wfs.WorkspaceFSError) -> HTTPException:
+    status = FS_ERROR_STATUS.get(error.kind)
+    if status is not None:
+        return HTTPException(status, str(error))
+    # Other errors carry the absolute server path. Session id, not the
+    # user-supplied path: keeps request input out of the log.
+    logger.error(
+        "workspace file operation failed: session_id=%s: %s", session.id, error
+    )
+    return HTTPException(409, "filesystem error in the workspace")
+
+
+async def _create_workspace_archive(session: Session) -> str:
+    """Zip the workspace into a temp file owned by this process; return its path."""
     with NamedTemporaryFile(suffix=".zip", delete=False) as file:
         archive_path = file.name
         try:
-            with ZipFile(file, "w", ZIP_DEFLATED) as archive:
-                for path in workspace.rglob("*"):
-                    relative = path.relative_to(workspace)
-                    if relative.parts[0] in ARCHIVE_EXCLUDED:
-                        continue
-                    if path.is_file() and not path.is_symlink():
-                        archive.write(path, relative)
-        except (OSError, RuntimeError):
+            await session.fs.archive(file, ARCHIVE_EXCLUDED, MAX_ARCHIVE_BYTES)
+        except BaseException:
             os.unlink(archive_path)
             raise
     return archive_path
@@ -129,6 +138,10 @@ async def create_session(
     """Create a new workspace session."""
     try:
         session = await manager.create(owner_github_user_id=auth_session.github_user_id)
+    except SessionPoolExhaustedError:
+        raise HTTPException(
+            429, "The workspace service is at capacity; try again later."
+        )
     except SessionLimitError:
         raise HTTPException(
             429, "Too many open workspace sessions; end one and try again."
@@ -320,10 +333,8 @@ async def events(
     )
 
 
-# File IO in the routes below is synchronous inside async handlers: it blocks
-# # the event loop for the duration of one read/write. Fine at workspace scale
-# # (text files, single user per session); revisit with anyio.to_thread if the
-# # workspace ever holds large files.
+# File IO in the routes below runs as the session's sandbox user (see
+# workspace_fs): the API user cannot read workspaces itself.
 
 
 # ===========================================================
@@ -344,20 +355,13 @@ async def list_files(
     session_id: str, session: WorkspaceSessionDep, path: str = ""
 ) -> FileListResponse:
     """List one directory level of a session's workspace."""
-    target = _resolve(session, path or ".")
-    if not target.is_dir():
-        raise HTTPException(404, f"no such directory: {path}")
-    entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+    try:
+        entries = await session.fs.list_dir(path or ".")
+    except wfs.WorkspaceFSError as e:
+        raise _fs_http_error(session, e) from None
     return FileListResponse(
         path=path,
-        entries=[
-            FileEntryResponse(
-                name=e.name,
-                path=str(e.relative_to(session.workspace)),
-                is_dir=e.is_dir(),
-            )
-            for e in entries
-        ],
+        entries=[FileEntryResponse(**e) for e in entries],
     )
 
 
@@ -371,15 +375,20 @@ async def list_files(
             }
         },
         409: {"description": "The workspace download could not be prepared."},
+        413: {"description": "The workspace archive exceeds the download limit."},
     },
 )
 # Create .zip for user with the files from the workspace.
 async def download_files(session_id: str, session: WorkspaceSessionDep) -> FileResponse:
     try:
-        archive_path = await asyncio.to_thread(
-            _create_workspace_archive, session.workspace
-        )
-    except (OSError, RuntimeError):
+        archive_path = await _create_workspace_archive(session)
+    except wfs.WorkspaceFSError as e:
+        if e.kind == wfs.TOO_LARGE:
+            raise HTTPException(413, "Workspace too large to download.") from None
+        logger.error("workspace download failed: session_id=%s: %s", session.id, e)
+        raise HTTPException(409, "Could not prepare workspace download.") from None
+    except OSError:
+        logger.exception("workspace download failed: session_id=%s", session.id)
         raise HTTPException(409, "Could not prepare workspace download.") from None
     return FileResponse(
         archive_path,
@@ -399,19 +408,8 @@ async def read_file(
     session_id: str, path: str, session: WorkspaceSessionDep
 ) -> FileContentResponse:
     """Read one text file from a session's workspace."""
-    target = _resolve(session, path)
-    if not target.is_file():
-        raise HTTPException(404, f"no such file: {path}")
-    if target.stat().st_size > MAX_PREVIEW_BYTES:
-        raise HTTPException(413, f"file too large to preview: {path}")
     try:
-        content = target.read_text()
-    except UnicodeDecodeError:
-        raise HTTPException(415, f"not a text file: {path}")
-    except OSError:
-        # The OSError text carries the absolute server path.
-        # Session id, not the user-supplied path: keeps request input out of
-        # the log (the exception itself names the file).
-        logger.exception("Could not read workspace file: session_id=%s", session.id)
-        raise HTTPException(409, f"filesystem error reading {path}")
+        content = await session.fs.read_text(path, max_bytes=MAX_PREVIEW_BYTES)
+    except wfs.WorkspaceFSError as e:
+        raise _fs_http_error(session, e) from None
     return FileContentResponse(path=path, content=content)

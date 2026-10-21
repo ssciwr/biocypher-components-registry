@@ -1,11 +1,12 @@
 """API tests for the workspace routes — TestClient over fake MCP and Anthropic."""
 
+import asyncio
 import time
 from functools import partial
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 from zipfile import ZipFile
 
 import pytest
@@ -346,22 +347,35 @@ def test_download_archives_workspace_files_without_symlinks(client, session):
     assert names == ["adapter.py"]
 
 
-def test_workspace_archive_removes_temp_file_when_writing_fails(tmp_path, monkeypatch):
+def test_workspace_archive_removes_temp_file_when_writing_fails(
+    tmp_path, monkeypatch, session
+):
+    _, _, session_obj = session
     archive_root = tmp_path / "archives"
     archive_root.mkdir()
-    archive = MagicMock()
-    archive.__enter__.return_value.write.side_effect = OSError
     monkeypatch.setattr(
         workspace_router,
         "NamedTemporaryFile",
         partial(NamedTemporaryFile, dir=archive_root),
     )
-    monkeypatch.setattr(workspace_router, "ZipFile", Mock(return_value=archive))
+    monkeypatch.setattr(
+        workspace_router.wfs.WorkspaceFS,
+        "archive",
+        AsyncMock(side_effect=OSError),
+    )
     with pytest.raises(OSError):
-        workspace_router._create_workspace_archive(tmp_path)
-    assert archive.__enter__.return_value.write.call_count == 1
+        asyncio.run(workspace_router._create_workspace_archive(session_obj))
     assert list(archive_root.iterdir()) == []
-    assert archive.__exit__.called
+
+
+def test_download_returns_payload_too_large_over_archive_cap(
+    client, session, monkeypatch
+):
+    sid, headers, session_obj = session
+    monkeypatch.setattr(workspace_router, "MAX_ARCHIVE_BYTES", 10)
+    (session_obj.workspace / "adapter.py").write_text("x" * 1000)
+    response = client.get(f"{PREFIX}/sessions/{sid}/download", headers=headers)
+    assert response.status_code == 413
 
 
 def test_download_returns_conflict_when_archive_creation_fails(

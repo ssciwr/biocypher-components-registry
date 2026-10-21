@@ -39,11 +39,11 @@ Env vars:
                               reach model context; rest stays local)
 - FILE_TOOLS_ROOT            (default: cwd — root dir the read/write/edit
                               file tools are confined to)
-- AGENT_SANDBOX_USER         (optional: run run_command as this user via
-                              sudo; set in the Docker image)
 
 run_command subprocesses get only an allowlisted environment (see
 EXEC_ENV_ALLOWLIST), so model-generated shell commands never inherit secrets.
+The CLI runs the tools as the current user; the API service runs each
+session's tools as the sandbox user leased for that session (see service.py).
 
 Run:
     python src/core/workspace/client_loop.py               # interactive chat
@@ -51,14 +51,12 @@ Run:
 """
 
 import asyncio
-import contextlib
 import json
 import logging
 import os
-import signal
 import sys
 from contextlib import asynccontextmanager
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 
 import anthropic
 from anthropic import AsyncAnthropic
@@ -67,6 +65,11 @@ from mcp import ClientSession
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
+
+try:
+    from src.core.workspace import workspace_fs as wfs
+except ImportError:  # run as a script: src/core/workspace is on sys.path
+    import workspace_fs as wfs
 
 MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
 MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "16000"))
@@ -154,9 +157,6 @@ def optional_request_params() -> dict:
 EXEC_ENV_ALLOWLIST = ("PATH", "LANG", "LC_ALL", "TZ")
 # Upper bound on the model-chosen run_command timeout.
 MAX_COMMAND_SECONDS = 600
-# Unprivileged user run_command executes as (via sudo; see the Dockerfile's
-# sudoers rule). Unset = run as this process's user (local dev, tests).
-SANDBOX_USER = os.getenv("AGENT_SANDBOX_USER") or None
 
 
 def read_secret(name: str) -> str | None:
@@ -260,28 +260,10 @@ def make_tool(mcp_tool_def, session: ClientSession):
     )
 
 
-def resolve_in_root(path: str, root: Path) -> Path:
-    """Resolve a tool-supplied path and confine it to ``root``.
-
-    The untrusted input is validated before any path is constructed from it:
-    absolute paths and ``..`` components are rejected outright, so only plain
-    relative paths below the workspace root ever reach the filesystem. The
-    final containment check guards against anything the component validation
-    missed (e.g. symlinks inside the workspace pointing outside it).
-    """
-    candidate = PurePosixPath(path)
-    if candidate.is_absolute() or PureWindowsPath(path).is_absolute():
-        raise ValueError(f"absolute paths are not allowed: {path}")
-    if any(part == ".." for part in candidate.parts):
-        raise ValueError(f"path must not contain '..': {path}")
-    root_str = str(root)
-    normalized = os.path.normpath(os.path.join(root_str, path))
-    if normalized != root_str and not normalized.startswith(root_str + os.sep):
-        raise ValueError(f"path escapes workspace root: {path}")
-    resolved = Path(normalized).resolve()
-    if resolved != root and not resolved.is_relative_to(root):
-        raise ValueError(f"path escapes workspace root: {path}")
-    return resolved
+# Path confinement and sudo argv live with the file operations that run as
+# the sandbox user; re-exported for the API routes and the CLI.
+resolve_in_root = wfs.resolve_in_root
+sandbox_argv = wfs.sandbox_argv
 
 
 def _resolve_path(path: str) -> Path:
@@ -310,37 +292,6 @@ def _exec_env(exec_bin: Path | None = None, home: Path | None = None) -> dict[st
     return env
 
 
-def sandbox_argv(argv: list[str], env: dict[str, str], user: str | None) -> list[str]:
-    """Prefix ``argv`` so it runs as ``user`` with exactly ``env``.
-
-    sudo resets the environment, so ``env`` is re-applied through ``env -i``.
-    Without a user the argv is returned unchanged.
-    """
-    if not user:
-        return argv
-    assignments = [f"{k}={v}" for k, v in env.items()]
-    return ["sudo", "-n", "-u", user, "--", "/usr/bin/env", "-i", *assignments, *argv]
-
-
-async def _kill_group(proc) -> None:
-    """SIGKILL a command's whole process group, then reap it."""
-    if SANDBOX_USER:
-        # The group's processes belong to the sandbox user, so only that user
-        # may signal them.
-        killer = await asyncio.create_subprocess_exec(
-            *sandbox_argv(
-                ["/bin/kill", "-KILL", "--", f"-{proc.pid}"], {}, SANDBOX_USER
-            ),
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        await killer.wait()
-    else:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGKILL)
-    await proc.wait()
-
-
 async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
     """Drain a subprocess's stdout, keeping at most ``limit`` bytes.
 
@@ -358,26 +309,24 @@ async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
 
 
 def make_file_tools(
-    get_root,
+    get_fs,
     get_exec_bin=None,
     get_cap=None,
     on_fs_change=None,
 ):
-    """Build the five workspace tools bound to one workspace root.
+    """Build the five workspace tools bound to one workspace.
 
     All parameters are zero-argument callables (except ``on_fs_change``, which
     takes the changed path): the CLI binds them to the module globals so they
     stay monkeypatchable, and the API service binds them to per-session state.
     ``on_fs_change`` is called after every mutation (write/edit/command) so the
     service can emit ``fs_changed`` events; an empty-string path means
-    "anything under the root may have changed".
+    "anything under the root may have changed". ``get_fs`` returns the
+    workspace's :class:`WorkspaceFS`, whose root and user every tool uses.
     """
     get_exec_bin = get_exec_bin or (lambda: None)
     get_cap = get_cap or (lambda: RESULT_MAX_CHARS)
     notify = on_fs_change or (lambda path: None)
-
-    def _resolve(path: str) -> Path:
-        return resolve_in_root(path, get_root())
 
     def _truncate(text: str) -> str:
         cap = get_cap()
@@ -396,15 +345,12 @@ def make_file_tools(
         """
         logger.debug("[tool] list_dir %s", path)
         try:
-            entries = sorted(
-                _resolve(path).iterdir(),
-                key=lambda p: (not p.is_dir(), p.name),
-            )
-        except (OSError, ValueError) as e:
+            entries = await get_fs().list_dir(path)
+        except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         if not entries:
             return "[empty directory]"
-        lines = [f"{e.name}/" if e.is_dir() else e.name for e in entries]
+        lines = [f"{e['name']}/" if e["is_dir"] else e["name"] for e in entries]
         return _truncate("\n".join(lines))
 
     @beta_async_tool
@@ -416,8 +362,8 @@ def make_file_tools(
         """
         logger.debug("[tool] read_file %s", path)
         try:
-            text = _resolve(path).read_text()
-        except (OSError, ValueError) as e:
+            text = await get_fs().read_text(path)
+        except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         return _truncate(text)
 
@@ -432,10 +378,8 @@ def make_file_tools(
         """
         logger.debug("[tool] write_file %s (%d chars)", path, len(content))
         try:
-            target = _resolve(path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
-        except (OSError, ValueError) as e:
+            await get_fs().write_text(path, content)
+        except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         notify(path)
         return f"wrote {len(content)} chars to {path}"
@@ -452,18 +396,8 @@ def make_file_tools(
         """
         logger.debug("[tool] edit_file %s", path)
         try:
-            target = _resolve(path)
-            text = target.read_text()
-        except (OSError, ValueError) as e:
-            return f"[tool error] {e}"
-        count = text.count(old_string)
-        if count == 0:
-            return "[tool error] old_string not found in file"
-        if count > 1:
-            return f"[tool error] old_string occurs {count} times; add context to make it unique"
-        try:
-            target.write_text(text.replace(old_string, new_string, 1))
-        except OSError as e:
+            await get_fs().edit_text(path, old_string, new_string)
+        except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         notify(path)
         return f"edited {path}"
@@ -483,14 +417,21 @@ def make_file_tools(
         """
         logger.debug("[tool] run_command %s", command)
         timeout_seconds = max(1, min(timeout_seconds, MAX_COMMAND_SECONDS))
-        root = get_root()
+        fs = get_fs()
+        root, user = fs.root, fs.user
         env = _exec_env(get_exec_bin(), home=root)
+        if user:
+            # Temp files stay in the workspace, removed with it, rather than
+            # in /tmp, shared by every session that leases this user.
+            env["TMPDIR"] = str(root / wfs.TMP_DIR)
         try:
             # New session: the command and all its children share one process
-            # group, killed as a whole on timeout or interrupt.
+            # group, killed as a whole on timeout or interrupt. Sandboxed, the
+            # sandbox user enters the workspace itself (sandbox_argv): this
+            # process may not.
             proc = await asyncio.create_subprocess_exec(
-                *sandbox_argv(["/bin/sh", "-c", command], env, SANDBOX_USER),
-                cwd=root,
+                *sandbox_argv(["/bin/sh", "-c", command], env, user, cwd=root),
+                cwd=root.parent if user else root,
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -501,10 +442,10 @@ def make_file_tools(
                     _read_capped(proc, get_cap()), timeout=timeout_seconds
                 )
             except TimeoutError:
-                await _kill_group(proc)
+                await wfs.kill_group(proc, user)
                 return f"[tool error] command timed out after {timeout_seconds}s"
             except asyncio.CancelledError:
-                await _kill_group(proc)
+                await wfs.kill_group(proc, user)
                 raise
         except OSError as e:
             return f"[tool error] {e}"
@@ -519,7 +460,7 @@ def make_file_tools(
 
 
 FILE_TOOLS = make_file_tools(
-    get_root=lambda: FILE_ROOT,
+    get_fs=lambda: wfs.WorkspaceFS(FILE_ROOT, None),
     get_exec_bin=lambda: EXEC_BIN,
     get_cap=lambda: RESULT_MAX_CHARS,
 )

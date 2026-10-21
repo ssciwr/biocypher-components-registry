@@ -43,17 +43,42 @@ Consequences without isolation:
   `MCP_RESULT_MAX_CHARS`; `run_command` output is read with the same byte
   cap (memory stays bounded) and the command is killed after
   `timeout_seconds` (default 300 s, clamped to `MAX_COMMAND_SECONDS` = 600 s).
-- **Sandbox user** (`AGENT_SANDBOX_USER`, set to `sandbox` in the Docker
-  image): `run_command` runs via `sudo -u sandbox` (sudoers rule in the
-  `Dockerfile` allows apiuser to become `sandbox` only). `sandbox` shares
-  just the `workspace` group with apiuser: it can reach the setgid
-  workspaces directory but not the registry database (`umask 007` plus the
-  entrypoint's permission fix-up), the API process's `/proc` entries, or the
-  service venv. Each session gets its own `.venv` in the workspace, created
-  as `sandbox`, for `pip install`. Needs `sudo` to work in the container, so
+- **Sandbox user pool** (`AGENT_SANDBOX_USER_PREFIX` and
+  `AGENT_SANDBOX_POOL_SIZE`, set to `sandbox` and 20 in the Docker image,
+  build arg `SANDBOX_POOL_SIZE`): the image creates the users
+  `sandbox1..N`, and every session leases one of them for its lifetime. The
+  session's workspace belongs to its user (mode `0700`), and everything the
+  session does runs as that user via sudo: `run_command`, the file tools, the
+  file routes and the zip download (`src/core/workspace/workspace_fs.py`).
+  The sudoers rule in the `Dockerfile` lets apiuser become pool users only.
+  So sessions cannot list, read or write each other's workspaces, nor read
+  the cwd or environment of each other's processes; the API user cannot read
+  workspaces either. Pool users share only the `sandbox` group, which lets
+  them traverse `/app/data` and create their workspace in the workspaces
+  root (`1730`: sticky, no read). They cannot reach the registry database,
+  the API process's `/proc` entries or the service venv. Each session gets
+  its own `.venv` in the workspace for `pip install`, and `TMPDIR` points
+  at `.tmp` inside it. On teardown, every process of the user is killed, its
+  files in `/tmp`, `/var/tmp` and `/dev/shm` are deleted and the workspace
+  is removed before the user returns to the pool. A user is held back from
+  the pool if its workspace could not be removed or its session's turn did
+  not stop within 10 s. At startup the API removes workspaces (session-id
+  directories only) left behind by a crash, and drops pool users that do
+  not exist in the image (`AGENT_SANDBOX_POOL_SIZE` above the build arg).
+  The pool size is also the global session cap: when every user is leased,
+  creating a session returns 429. Leases live in one process, so run the
+  API with a **single uvicorn worker**: a lock file in the workspaces root
+  makes any further process refuse workspace sessions (429). Needs `sudo` to work in the container, so
   do not set `no-new-privileges`; `init: true` in compose reaps processes
-  orphaned by killed commands. Known limit: all sessions share the one
-  `sandbox` uid, so a command can read other sessions' workspaces.
+  orphaned by killed commands. Known limit: process command lines are still
+  visible to all users through `ps` (hiding them needs `/proc` mounted with
+  `hidepid`).
+- **Isolation check**: `scripts/check_workspace_isolation.py` verifies the
+  sandbox in the built image; the `Workspace isolation` CI workflow runs it
+  on pull requests that touch the image or the workspace code. Locally:
+  `docker build -t biocypher-registry . && docker run --rm --init -e PYTHONPATH=/app -v "$PWD/scripts:/app/scripts:ro" biocypher-registry uv run --no-sync python scripts/check_workspace_isolation.py`
+- **Workspace download**: capped at `AGENT_MAX_ARCHIVE_BYTES` (default
+  200 MiB of zip); larger workspaces get 413.
 - **Per-user limits**: at most `AGENT_MAX_SESSIONS_PER_USER` sessions per
   GitHub user; chat messages capped at 100 000 chars; file preview capped at
   1 MB.
