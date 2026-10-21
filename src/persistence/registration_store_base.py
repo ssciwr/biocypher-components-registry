@@ -70,7 +70,7 @@ class SQLAlchemyRegistrationStore:
                     self._current_registry_entry(connection, source_id),
                     self._latest_event_for_source(connection, source_id),
                 )
-                if existing_registration.status == RegistrationStatus.VALID:
+                if existing_registration.status != RegistrationStatus.INVALID:
                     raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
                 return existing_registration
             try:

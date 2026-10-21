@@ -137,6 +137,21 @@ def test_submit_registration_rejects_main_master_branch_duplicate(
     assert len(active_registrations) == 1
 
 
+@pytest.mark.parametrize(
+    ("main_url", "master_url", "canonical_url"),
+    [
+        (
+            "https://github.com/biocypher/example-adapter/tree/main",
+            "https://github.com/biocypher/example-adapter/tree/master",
+            "https://github.com/biocypher/example-adapter",
+        ),
+        (
+            "https://gitlab.example.org/group/example-adapter/-/tree/main",
+            "https://gitlab.example.org/group/example-adapter/-/tree/master",
+            "https://gitlab.example.org/group/example-adapter",
+        ),
+    ],
+)
 def test_submit_registration_reuses_failed_registration_to_complete_reattempt_with(
     tmp_path: Path,
     main_url: str,
