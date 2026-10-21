@@ -20,11 +20,16 @@ import anything from the application.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
+import signal
 import sys
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from zipfile import ZIP_DEFLATED, ZipFile
+
+# Sandboxed workspaces' TMPDIR, relative to the workspace root.
+TMP_DIR = ".tmp"
 
 # Error kinds, mapped to HTTP status codes by the file routes.
 INVALID_PATH = "invalid_path"
@@ -182,6 +187,25 @@ def sandbox_argv(
     return [*prefix, *(f"{k}={v}" for k, v in env.items()), *argv]
 
 
+async def kill_group(proc, user: str | None) -> None:
+    """SIGKILL a process group started with ``start_new_session``, then reap it.
+
+    Sandboxed, ``proc`` is the root-owned sudo, which this process may not
+    signal; its children belong to ``user``, so that user kills the group.
+    """
+    if user:
+        killer = await asyncio.create_subprocess_exec(
+            *sandbox_argv(["/bin/kill", "-KILL", "--", f"-{proc.pid}"], {}, user),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await killer.wait()
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
+    await proc.wait()
+
+
 def _helper_error(stderr: bytes, returncode: int) -> WorkspaceFSError:
     try:
         reply = json.loads(stderr)
@@ -195,7 +219,10 @@ def _helper_error(stderr: bytes, returncode: int) -> WorkspaceFSError:
 
 
 class WorkspaceFS:
-    """File operations on one workspace, as ``user`` (None: as this process)."""
+    """File operations on one workspace, as ``user`` (None: as this process).
+
+    ``root`` and ``user`` also tell run_command where and as whom to run.
+    """
 
     def __init__(self, root: Path, user: str | None):
         self.root = root
@@ -214,6 +241,8 @@ class WorkspaceFS:
             stdin=asyncio.subprocess.PIPE,
             stdout=stdout,
             stderr=asyncio.subprocess.PIPE,
+            # Own process group, so kill_group can end the helper as the user.
+            start_new_session=True,
         )
 
     async def _call(self, op: str, **kwargs):
@@ -221,7 +250,11 @@ class WorkspaceFS:
             return await asyncio.to_thread(OPERATIONS[op], str(self.root), **kwargs)
         request = json.dumps({"root": str(self.root), "args": kwargs}).encode()
         proc = await self._spawn(op, asyncio.subprocess.PIPE)
-        out, err = await proc.communicate(request)
+        try:
+            out, err = await proc.communicate(request)
+        except BaseException:
+            await kill_group(proc, self.user)
+            raise
         if proc.returncode:
             raise _helper_error(err, proc.returncode)
         return json.loads(out)
@@ -263,9 +296,9 @@ class WorkspaceFS:
             while chunk := await proc.stdout.read(65536):
                 await asyncio.to_thread(writer.write, chunk)
         except BaseException:
-            proc.kill()
-            await proc.wait()
+            # Over the cap or cancelled (client gone): stop the helper.
             stderr_task.cancel()
+            await kill_group(proc, self.user)
             raise
         err = await stderr_task
         if await proc.wait():

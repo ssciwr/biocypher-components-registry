@@ -126,7 +126,8 @@ def install_fake_sudo(monkeypatch):
     Exercises the sandboxed code paths (pool users, ``env --chdir``, the
     workspace_fs helper subprocess) without sudo or real pool users. Returns
     the list of ``(user, argv)`` calls. ``kill -1`` (kill every process of
-    the user) becomes a no-op: as the test user it would kill the test run.
+    the user) and the shared-temp ``find -delete`` become no-ops: as the test
+    user they would kill the test run and delete the test user's files.
     """
     from src.core.workspace import client_loop, workspace_fs
 
@@ -137,6 +138,10 @@ def install_fake_sudo(monkeypatch):
             return argv
         calls.append((user, list(argv)))
         if argv[0] == "/bin/kill" and argv[-1] == "-1":
+            return ["/bin/true"]
+        if argv[0] == "/usr/bin/find":
+            # Clearing the user's files in /tmp: as the test user it would
+            # delete the test user's files.
             return ["/bin/true"]
         if argv[1:3] == ["-m", "venv"]:
             # A real venv takes seconds; only its bin dir is used.

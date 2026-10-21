@@ -57,9 +57,9 @@ from src.core.workspace.service import (
 # stream while the agent is idle).
 HEARTBEAT_SECONDS = 5  # specifically this amount due to this report: https://github.com/enisdenjo/graphql-sse/issues/99
 
-# Tool state in the workspace (session venv, HOME caches), not user files;
-# left out of the download.
-ARCHIVE_EXCLUDED = {".venv", ".cache"}
+# Tool state in the workspace (session venv, HOME caches, temp files), not
+# user files; left out of the download.
+ARCHIVE_EXCLUDED = {".venv", ".cache", wfs.TMP_DIR}
 # Largest file the preview pane will load.
 MAX_PREVIEW_BYTES = 1_000_000
 # Largest workspace download (compressed zip size).

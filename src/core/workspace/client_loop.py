@@ -51,11 +51,9 @@ Run:
 """
 
 import asyncio
-import contextlib
 import json
 import logging
 import os
-import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -294,23 +292,6 @@ def _exec_env(exec_bin: Path | None = None, home: Path | None = None) -> dict[st
     return env
 
 
-async def _kill_group(proc, user: str | None) -> None:
-    """SIGKILL a command's whole process group, then reap it."""
-    if user:
-        # The group's processes belong to the sandbox user, so only that user
-        # may signal them.
-        killer = await asyncio.create_subprocess_exec(
-            *sandbox_argv(["/bin/kill", "-KILL", "--", f"-{proc.pid}"], {}, user),
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        await killer.wait()
-    else:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGKILL)
-    await proc.wait()
-
-
 async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
     """Drain a subprocess's stdout, keeping at most ``limit`` bytes.
 
@@ -328,29 +309,24 @@ async def _read_capped(proc, limit: int) -> tuple[bytes, int]:
 
 
 def make_file_tools(
-    get_root,
+    get_fs,
     get_exec_bin=None,
     get_cap=None,
     on_fs_change=None,
-    get_user=None,
 ):
-    """Build the five workspace tools bound to one workspace root.
+    """Build the five workspace tools bound to one workspace.
 
     All parameters are zero-argument callables (except ``on_fs_change``, which
     takes the changed path): the CLI binds them to the module globals so they
     stay monkeypatchable, and the API service binds them to per-session state.
     ``on_fs_change`` is called after every mutation (write/edit/command) so the
     service can emit ``fs_changed`` events; an empty-string path means
-    "anything under the root may have changed". ``get_user`` names the
-    sandbox user every tool runs as (None: this process's user).
+    "anything under the root may have changed". ``get_fs`` returns the
+    workspace's :class:`WorkspaceFS`, whose root and user every tool uses.
     """
     get_exec_bin = get_exec_bin or (lambda: None)
     get_cap = get_cap or (lambda: RESULT_MAX_CHARS)
     notify = on_fs_change or (lambda path: None)
-    get_user = get_user or (lambda: None)
-
-    def _fs() -> wfs.WorkspaceFS:
-        return wfs.WorkspaceFS(get_root(), get_user())
 
     def _truncate(text: str) -> str:
         cap = get_cap()
@@ -369,7 +345,7 @@ def make_file_tools(
         """
         logger.debug("[tool] list_dir %s", path)
         try:
-            entries = await _fs().list_dir(path)
+            entries = await get_fs().list_dir(path)
         except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         if not entries:
@@ -386,7 +362,7 @@ def make_file_tools(
         """
         logger.debug("[tool] read_file %s", path)
         try:
-            text = await _fs().read_text(path)
+            text = await get_fs().read_text(path)
         except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         return _truncate(text)
@@ -402,7 +378,7 @@ def make_file_tools(
         """
         logger.debug("[tool] write_file %s (%d chars)", path, len(content))
         try:
-            await _fs().write_text(path, content)
+            await get_fs().write_text(path, content)
         except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         notify(path)
@@ -420,7 +396,7 @@ def make_file_tools(
         """
         logger.debug("[tool] edit_file %s", path)
         try:
-            await _fs().edit_text(path, old_string, new_string)
+            await get_fs().edit_text(path, old_string, new_string)
         except wfs.WorkspaceFSError as e:
             return f"[tool error] {e}"
         notify(path)
@@ -441,9 +417,13 @@ def make_file_tools(
         """
         logger.debug("[tool] run_command %s", command)
         timeout_seconds = max(1, min(timeout_seconds, MAX_COMMAND_SECONDS))
-        root = get_root()
-        user = get_user()
+        fs = get_fs()
+        root, user = fs.root, fs.user
         env = _exec_env(get_exec_bin(), home=root)
+        if user:
+            # Temp files stay in the workspace, removed with it, rather than
+            # in /tmp, shared by every session that leases this user.
+            env["TMPDIR"] = str(root / wfs.TMP_DIR)
         try:
             # New session: the command and all its children share one process
             # group, killed as a whole on timeout or interrupt. Sandboxed, the
@@ -462,10 +442,10 @@ def make_file_tools(
                     _read_capped(proc, get_cap()), timeout=timeout_seconds
                 )
             except TimeoutError:
-                await _kill_group(proc, user)
+                await wfs.kill_group(proc, user)
                 return f"[tool error] command timed out after {timeout_seconds}s"
             except asyncio.CancelledError:
-                await _kill_group(proc, user)
+                await wfs.kill_group(proc, user)
                 raise
         except OSError as e:
             return f"[tool error] {e}"
@@ -480,7 +460,7 @@ def make_file_tools(
 
 
 FILE_TOOLS = make_file_tools(
-    get_root=lambda: FILE_ROOT,
+    get_fs=lambda: wfs.WorkspaceFS(FILE_ROOT, None),
     get_exec_bin=lambda: EXEC_BIN,
     get_cap=lambda: RESULT_MAX_CHARS,
 )
