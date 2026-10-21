@@ -63,25 +63,41 @@ async def check_isolation(user_a, user_b, root, ws_a, ws_b) -> None:
     check(code == 0 and bool(pids), f"{user_b} runs a command")
     pid = pids[0] if pids else "0"
 
-    check(await fails(user_a, 'ls "$1"', str(root)),
-          f"{user_a} cannot list the workspaces root")
-    check(await fails(user_a, 'ls "$1"', str(ws_b)),
-          f"{user_a} cannot list {user_b}'s workspace")
-    check(await fails(user_a, 'cat "$1/secret.txt"', str(ws_b)),
-          f"{user_a} cannot read {user_b}'s file")
-    check(await fails(user_a, 'touch "$1/x"', str(ws_b)),
-          f"{user_a} cannot write into {user_b}'s workspace")
+    check(
+        await fails(user_a, 'ls "$1"', str(root)),
+        f"{user_a} cannot list the workspaces root",
+    )
+    check(
+        await fails(user_a, 'ls "$1"', str(ws_b)),
+        f"{user_a} cannot list {user_b}'s workspace",
+    )
+    check(
+        await fails(user_a, 'cat "$1/secret.txt"', str(ws_b)),
+        f"{user_a} cannot read {user_b}'s file",
+    )
+    check(
+        await fails(user_a, 'touch "$1/x"', str(ws_b)),
+        f"{user_a} cannot write into {user_b}'s workspace",
+    )
     await as_user(user_a, 'rm -rf "$1"', str(ws_b))
     check(ws_b.exists(), f"{user_a} cannot remove {user_b}'s workspace")
-    check(await fails(user_a, 'readlink "/proc/$1/cwd"', pid),
-          f"{user_a} cannot see the cwd of {user_b}'s process")
-    check(await fails(user_a, 'cat "/proc/$1/environ"', pid),
-          f"{user_a} cannot read the environment of {user_b}'s process")
-    check(await fails(user_a, 'kill -0 "$1"', pid),
-          f"{user_a} cannot signal {user_b}'s process")
+    check(
+        await fails(user_a, 'readlink "/proc/$1/cwd"', pid),
+        f"{user_a} cannot see the cwd of {user_b}'s process",
+    )
+    check(
+        await fails(user_a, 'cat "/proc/$1/environ"', pid),
+        f"{user_a} cannot read the environment of {user_b}'s process",
+    )
+    check(
+        await fails(user_a, 'kill -0 "$1"', pid),
+        f"{user_a} cannot signal {user_b}'s process",
+    )
     check(await fails(user_a, "ls /app/data"), f"{user_a} cannot list /app/data")
-    check(await fails(user_a, "touch /app/.venv/x"),
-          f"{user_a} cannot write to the service venv")
+    check(
+        await fails(user_a, "touch /app/.venv/x"),
+        f"{user_a} cannot write to the service venv",
+    )
 
     try:
         os.listdir(ws_a)
@@ -96,8 +112,10 @@ async def check_session_access(user_a, ws_a, ws_b) -> None:
     fs_a = wfs.WorkspaceFS(ws_a, user_a)
     await fs_a.write_text(TEXT_FILE, "hello")
     await fs_a.edit_text(TEXT_FILE, "hello", "hello a")
-    check(await fs_a.read_text(TEXT_FILE) == "hello a",
-          "file write/edit/read as the session user")
+    check(
+        await fs_a.read_text(TEXT_FILE) == "hello a",
+        "file write/edit/read as the session user",
+    )
     names = [e["name"] for e in await fs_a.list_dir(".")]
     check("dir" in names, "directory listing as the session user")
     out = io.BytesIO()
@@ -120,8 +138,10 @@ async def check_session_access(user_a, ws_a, ws_b) -> None:
     check(kind == wfs.TOO_LARGE, "download over the cap is refused")
     await asyncio.sleep(0.5)
     # [w]: the pattern must not match the shell running pgrep.
-    check(await fails(user_a, 'pgrep -u "$(id -u)" -f "[w]orkspace_fs"'),
-          "no zip helper left running after the refused download")
+    check(
+        await fails(user_a, 'pgrep -u "$(id -u)" -f "[w]orkspace_fs"'),
+        "no zip helper left running after the refused download",
+    )
 
     tools = {
         t.name: t
@@ -178,8 +198,10 @@ async def main() -> int:
         if sleeper is not None:
             code = await asyncio.wait_for(sleeper.wait(), timeout=10)
             check(code != 0, "teardown killed the command")
-        check(await fails(user_b, 'test -e "$1"', leftover),
-              f"teardown deleted {user_b}'s files in /tmp")
+        check(
+            await fails(user_b, 'test -e "$1"', leftover),
+            f"teardown deleted {user_b}'s files in /tmp",
+        )
 
     print(f"\n{len(failures)} failure(s)")
     return 1 if failures else 0
