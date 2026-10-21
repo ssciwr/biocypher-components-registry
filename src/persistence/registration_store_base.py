@@ -59,11 +59,20 @@ class SQLAlchemyRegistrationStore:
         )
 
         with self.engine.begin() as connection:
-            if self._registration_source_by_repository_location(
+            existing_source = self._registration_source_by_repository_location(
                 connection,
                 registration.repository_location,
-            ):
-                raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
+            )
+            if existing_source is not None:
+                source_id = str(existing_source["id"])
+                existing_registration = self._source_to_registration(
+                    existing_source,
+                    self._current_registry_entry(connection, source_id),
+                    self._latest_event_for_source(connection, source_id),
+                )
+                if existing_registration.status == RegistrationStatus.VALID:
+                    raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
+                return existing_registration
             try:
                 connection.execute(
                     insert(registration_sources_table).values(

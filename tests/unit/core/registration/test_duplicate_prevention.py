@@ -137,6 +137,27 @@ def test_submit_registration_rejects_main_master_branch_duplicate(
     assert len(active_registrations) == 1
 
 
+def test_submit_registration_reuses_failed_registration_to_complete_reattempt_with(
+    tmp_path: Path,
+    main_url: str,
+    master_url: str,
+    canonical_url: str,
+) -> None:
+    """Reuse a failed registration if the user provides a url for one which has already failed later on in a "resubmission"
+    Test based on `test_submit_registration_rejects_main_master_branch_duplicate`.
+    """
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    first = submit_registration(main_url, store)
+    store.mark_registration_invalid(first.registration_id, ["Invalid metadata."], None)
+    second = submit_registration(master_url, store)
+    active_registrations = store.list_active_registrations()
+
+    assert second.registration_id == first.registration_id
+    assert first.repository_location == canonical_url
+    assert active_registrations[0].repository_location == canonical_url
+    assert len(active_registrations) == 1
+
+
 def test_sqlite_store_rejects_duplicate_valid_uniqueness_key(tmp_path: Path) -> None:
     """Reject a second valid registration that reuses the same uniqueness key."""
     database_path = tmp_path / "registry.sqlite3"
