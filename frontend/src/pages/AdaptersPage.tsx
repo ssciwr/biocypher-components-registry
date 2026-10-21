@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  ArrowPathIcon,
   CircleStackIcon,
   ExclamationTriangleIcon,
   FlagIcon,
@@ -22,7 +23,6 @@ import {
   type AdapterLatestItemResponse,
   type AdapterMaintainerResponse,
 } from '../api/client'
-import { client } from '../api/client/client.gen'
 
 type DataSource = AdapterDataSourceResponse
 type LatestAdapter = AdapterLatestItemResponse
@@ -30,18 +30,19 @@ type AdapterDetail = AdapterDetailResponse
 
 type AdaptersPageProps = Readonly<{
   adapterId?: string
+  signedIn: boolean
 }>
 
-function AdaptersPage({ adapterId }: AdaptersPageProps) {
+function AdaptersPage({ adapterId, signedIn }: AdaptersPageProps) {
   return adapterId ? (
-    <AdapterDetailView adapterId={adapterId} />
+    <AdapterDetailView adapterId={adapterId} signedIn={signedIn} />
   ) : (
     <AdapterListView />
   )
 }
 
 function AdapterListView() {
-  const [adapters, setAdapters] = useState<LatestAdapter[]>([])
+  const [adapters, setAdapters] = useState<LatestAdapter[] | null>(null)
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('query') ?? '')
   const [loadError, setLoadError] = useState(false)
 
@@ -91,7 +92,11 @@ function AdapterListView() {
           <input
             aria-label="Search adapters"
             className="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setAdapters(null)
+              setLoadError(false)
+            }}
             placeholder="Search adapters..."
             type="search"
             value={query}
@@ -106,7 +111,16 @@ function AdapterListView() {
         ) : null}
 
         <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-          {adapters.map((adapter) => (
+          {adapters === null ? (
+            <div className="col-span-full flex justify-center text-slate-500" role="status">
+              <ArrowPathIcon className="h-6 w-6 animate-spin" aria-hidden="true" /><br />
+              <span className="sr-only">Searching adapters...</span>
+            </div>
+          ) : null}
+          {!loadError && adapters?.length === 0 ? (
+            <p className="col-span-full text-center text-slate-500" role="status">No Adapters found</p>
+          ) : null}
+          {adapters?.map((adapter) => (
             <article
               className="flex min-h-72 flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-200 hover:shadow-md"
               key={adapter.adapter_id}
@@ -139,7 +153,7 @@ function AdapterListView() {
   )
 }
 
-function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
+function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string; signedIn: boolean }>) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
@@ -188,8 +202,8 @@ function AdapterDetailView({ adapterId }: Readonly<{ adapterId: string }>) {
       })
 
       if (result.response?.status === 401) {
-        globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: globalThis.location.pathname } })
-        return // send the user to login if they are not logged in yet, hardcoded.
+        setEndorsementError('Your sign-in session has expired. Sign in again before endorsing this adapter.')
+        return
       }
 
       const endorsementErrorValue = result.error as unknown
@@ -352,8 +366,8 @@ bc.run()`}
             <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
               <button
                 aria-label={`Endorse ${adapter.adapter_name}`}
-                className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 ${adapter.endorsed_by_current_user ? 'cursor-default font-semibold' : 'cursor-pointer font-medium hover:border-slate-300 hover:bg-slate-100'} disabled:cursor-default disabled:opacity-80`}
-                disabled={isEndorsing || adapter.endorsed_by_current_user}
+                className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 ${adapter.endorsed_by_current_user ? 'font-semibold' : 'font-medium'} enabled:cursor-pointer enabled:hover:border-slate-300 enabled:hover:bg-slate-100 disabled:cursor-default disabled:opacity-50`}
+                disabled={!signedIn || isEndorsing || adapter.endorsed_by_current_user}
                 onClick={() => void endorseCurrentAdapter()}
                 type="button"
               >
