@@ -1,8 +1,8 @@
 services:
   frontend:
-    image: ghcr.io/ssciwr/biocypher-components-registry/frontend:sha-b0f53f549d35b89db6e114466f4d155cda07d463
+    image: ghcr.io/ssciwr/biocypher-components-registry/frontend:sha-dd52d6c2325837701e9d724b4ab0fcfeffb55641
+    user: root
     environment:
-      # When integrating, adjust this in .env.
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
       FRONTEND_SERVER_NAME: ${FRONTEND_SERVER_NAME:-registry.biocypher.org}
       CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:-registry.biocypher.org}
@@ -46,14 +46,13 @@ services:
       - biocypher-network
 
   backend:
-    image: ghcr.io/ssciwr/biocypher-components-registry/backend:sha-b0f53f549d35b89db6e114466f4d155cda07d463
+    image: ghcr.io/ssciwr/biocypher-components-registry/backend:sha-dd52d6c2325837701e9d724b4ab0fcfeffb55641
     # Reaps processes orphaned by killed run_command process groups.
     init: true
     env_file: .env
     environment:
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
       AGENT_WORKSPACES_ROOT: /app/data/workspaces
-      # When integrating, adjust these public HTTPS URLs in .env.
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://registry.biocypher.org}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://registry.biocypher.org}
     volumes:
