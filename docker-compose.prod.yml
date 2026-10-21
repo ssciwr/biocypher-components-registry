@@ -1,6 +1,7 @@
 services:
   frontend:
     image: ghcr.io/ssciwr/biocypher-components-registry/frontend:sha-dd52d6c2325837701e9d724b4ab0fcfeffb55641
+    user: root
     environment:
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
       FRONTEND_SERVER_NAME: ${FRONTEND_SERVER_NAME:-registry.biocypher.org}
