@@ -134,3 +134,14 @@ def test_sandbox_argv_enters_cwd_as_user():
         "sudo", "-n", "-u", "sandbox1", "--",
         "/usr/bin/env", "-i", "--chdir=/w", "PATH=/bin", "ls",
     ]  # fmt: skip
+
+
+def test_helper_over_archive_cap_is_killed_as_user(root, monkeypatch):
+    calls = install_fake_sudo(monkeypatch)
+    (root / "a.txt").write_bytes(bytes(range(256)) * 4000)
+    with pytest.raises(wfs.WorkspaceFSError) as excinfo:
+        run(wfs.WorkspaceFS(root, "sandbox1").archive(io.BytesIO(), set(), 100))
+    assert excinfo.value.kind == wfs.TOO_LARGE
+    kills = [argv for _, argv in calls if argv[0] == "/bin/kill"]
+    assert len(kills) == 1
+    assert kills[0][:3] == ["/bin/kill", "-KILL", "--"]

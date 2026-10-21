@@ -57,12 +57,18 @@ Consequences without isolation:
   them traverse `/app/data` and create their workspace in the workspaces
   root (`1730`: sticky, no read). They cannot reach the registry database,
   the API process's `/proc` entries or the service venv. Each session gets
-  its own `.venv` in the workspace for `pip install`. On teardown, every
-  process of the user is killed and the workspace removed before the user
-  returns to the pool; a user whose workspace could not be removed is held
-  back. At startup the API removes workspaces left behind by a crash. The
-  pool size is also the global session cap: when every user is leased,
-  creating a session returns 429. Needs `sudo` to work in the container, so
+  its own `.venv` in the workspace for `pip install`, and `TMPDIR` points
+  at `.tmp` inside it. On teardown, every process of the user is killed, its
+  files in `/tmp`, `/var/tmp` and `/dev/shm` are deleted and the workspace
+  is removed before the user returns to the pool. A user is held back from
+  the pool if its workspace could not be removed or its session's turn did
+  not stop within 10 s. At startup the API removes workspaces (session-id
+  directories only) left behind by a crash, and drops pool users that do
+  not exist in the image (`AGENT_SANDBOX_POOL_SIZE` above the build arg).
+  The pool size is also the global session cap: when every user is leased,
+  creating a session returns 429. Leases live in one process, so run the
+  API with a **single uvicorn worker**: a lock file in the workspaces root
+  makes any further process refuse workspace sessions (429). Needs `sudo` to work in the container, so
   do not set `no-new-privileges`; `init: true` in compose reaps processes
   orphaned by killed commands. Known limit: process command lines are still
   visible to all users through `ps` (hiding them needs `/proc` mounted with
