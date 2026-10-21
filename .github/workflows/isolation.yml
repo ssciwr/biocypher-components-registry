@@ -1,0 +1,44 @@
+name: Workspace isolation
+
+# Builds the backend image and checks the agentic workspace sandbox inside it:
+# sessions run as different pool users and cannot reach each other's files or
+# processes (scripts/check_workspace_isolation.py). The unit tests fake sudo,
+# so only this job exercises the real users, permissions and sudoers rule.
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - "docker-entrypoint.sh"
+      - "src/core/workspace/**"
+      - "scripts/check_workspace_isolation.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/isolation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolation-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        # actions/checkout v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Build backend image
+        run: docker build -t biocypher-registry-isolation .
+
+      - name: Run isolation check in the image
+        # Runs as the image's default user (apiuser), like the API does; the
+        # script is mounted, not part of the image.
+        run: >-
+          docker run --rm --init
+          -e PYTHONPATH=/app
+          -v "$PWD/scripts:/app/scripts:ro"
+          biocypher-registry-isolation
+          uv run --no-sync python scripts/check_workspace_isolation.py

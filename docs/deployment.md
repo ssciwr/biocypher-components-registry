@@ -73,9 +73,10 @@ Consequences without isolation:
   orphaned by killed commands. Known limit: process command lines are still
   visible to all users through `ps` (hiding them needs `/proc` mounted with
   `hidepid`).
-- **Isolation check**: run
-  `docker compose -f docker-compose-sqlite.yml run --rm --no-deps backend uv run --no-sync python -m src.core.workspace.isolation_check`
-  against a built image after changing the sandbox setup.
+- **Isolation check**: `scripts/check_workspace_isolation.py` verifies the
+  sandbox in the built image; the `Workspace isolation` CI workflow runs it
+  on pull requests that touch the image or the workspace code. Locally:
+  `docker build -t biocypher-registry . && docker run --rm --init -e PYTHONPATH=/app -v "$PWD/scripts:/app/scripts:ro" biocypher-registry uv run --no-sync python scripts/check_workspace_isolation.py`
 - **Workspace download**: capped at `AGENT_MAX_ARCHIVE_BYTES` (default
   200 MiB of zip); larger workspaces get 413.
 - **Per-user limits**: at most `AGENT_MAX_SESSIONS_PER_USER` sessions per
