@@ -186,7 +186,7 @@ function App() {
       />
     )
   } else if (pathname === '/adapters' || adapterId) {
-    page = <AdaptersPage adapterId={adapterId} />
+    page = <AdaptersPage adapterId={adapterId} signedIn={Boolean(authUser && authVerified)} />
   }
 
   return (

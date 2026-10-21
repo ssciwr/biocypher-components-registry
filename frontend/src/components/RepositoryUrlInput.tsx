@@ -13,6 +13,7 @@ type RepositoryUrlInputProps = Readonly<{
   labelClassName?: string
   maxLength?: number
   onChange: (value: string) => void
+  onValidationChange?: (isValid: boolean) => void
   placeholder?: string
   required?: boolean
   value: string
@@ -37,8 +38,8 @@ const repositoryCheckDisplays: Record<RepositoryCheckStatus, { className: string
   idle: { className: 'text-blue-700', text: 'Checking Croissant file' },
   checking: { className: 'text-blue-700', text: 'Checking Croissant file' },
   found: { className: 'text-emerald-600', text: 'Croissant file found at repository root' },
-  missing: { className: 'text-red-600', text: "Croissant file not found at this repository link's root" },
-  blocked: { className: 'text-red-600', text: 'Could not check Croissant file' },
+  missing: { className: 'text-red-600', text: "Croissant file not found at this repository link's root (Your repository may be private)" },
+  blocked: { className: 'text-red-600', text: 'Could not check Croissant file (Your repository may be private)' },
 }
 
 /*
@@ -51,6 +52,7 @@ export function RepositoryUrlInput({
   labelClassName = 'grid gap-2 text-sm font-semibold text-slate-950',
   maxLength,
   onChange,
+  onValidationChange,
   placeholder,
   required = false,
   value,
@@ -65,6 +67,10 @@ export function RepositoryUrlInput({
       : 'checking'
   }
   const statusDisplay = repositoryCheckDisplays[status]
+
+  useEffect(() => {
+    onValidationChange?.(status === 'found')
+  }, [onValidationChange, status])
 
   useEffect(() => {
     if (!canCheckRepositoryUrl) {
