@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowPathIcon,
   CircleStackIcon,
   ExclamationTriangleIcon,
   FlagIcon,
-  MagnifyingGlassIcon,
   RocketLaunchIcon,
   StarIcon,
   TrashIcon,
@@ -12,20 +10,17 @@ import {
 import GenericModal from '../components/GenericModal'
 import LinkToModal from '../components/LinkToModal'
 import CitationEndorsement from '../components/CitationEndorsement'
+import AdapterSearch from '../components/AdapterSearch'
+import MaintainerAvatar from '../components/MaintainerAvatar'
 import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
   deleteAdapterApiV1AdaptersAdapterIdDelete,
   getAdapterApiV1AdaptersAdapterIdGet,
-  listLatestAdaptersApiV1AdaptersLatestGet,
-  searchAdaptersApiV1AdaptersSearchGet,
   type AdapterDataSourceResponse,
   type AdapterDetailResponse,
-  type AdapterLatestItemResponse,
-  type AdapterMaintainerResponse,
 } from '../api/client'
 
 type DataSource = AdapterDataSourceResponse
-type LatestAdapter = AdapterLatestItemResponse
 type AdapterDetail = AdapterDetailResponse
 
 type AdaptersPageProps = Readonly<{
@@ -42,112 +37,13 @@ function AdaptersPage({ adapterId, signedIn }: AdaptersPageProps) {
 }
 
 function AdapterListView() {
-  const [adapters, setAdapters] = useState<LatestAdapter[] | null>(null)
-  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('query') ?? '')
-  const [loadError, setLoadError] = useState(false)
-
-  useEffect(() => {
-    let ignore = false
-    const searchTerm = query.trim()
-    const adapterRequest = searchTerm
-      ? searchAdaptersApiV1AdaptersSearchGet({
-          query: { query: searchTerm },
-        })
-      : listLatestAdaptersApiV1AdaptersLatestGet()
-
-    void adapterRequest
-      .then((result) => {
-        if (ignore) return
-
-        const adapterListError = result.error as unknown
-        if (adapterListError || !result.data) {
-          setAdapters([])
-          setLoadError(true)
-          return
-        }
-
-        setAdapters(result.data.items)
-        setLoadError(false)
-      })
-      .catch(() => {
-        if (!ignore) {
-          setAdapters([])
-          setLoadError(true)
-        }
-      })
-    return () => {
-      ignore = true
-    }
-  }, [query])
-
-
   return (
     <section className="bg-slate-100">
       <div className="mx-auto max-w-7xl px-6 py-16 md:py-20">
         <h1 className="text-center text-4xl font-semibold tracking-normal text-slate-950 md:text-5xl">
           BioCypher Adapter Repository
         </h1>
-        <label className="mx-auto mt-8 flex max-w-2xl items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <MagnifyingGlassIcon className="h-5 w-5 flex-none text-slate-300" aria-hidden="true" />
-          <input
-            aria-label="Search adapters"
-            className="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500"
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setAdapters(null)
-              setLoadError(false)
-            }}
-            placeholder="Search adapters..."
-            type="search"
-            value={query}
-          />
-        </label>
-
-        {loadError ? (
-          <div className="mx-auto mt-8 flex max-w-2xl items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700" role="alert">
-            <ExclamationTriangleIcon className="h-5 w-5 flex-none" aria-hidden="true" />
-            <span>Unable to load adapters right now...</span>
-          </div>
-        ) : null}
-
-        <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-          {adapters === null ? (
-            <div className="col-span-full flex justify-center text-slate-500" role="status">
-              <ArrowPathIcon className="h-6 w-6 animate-spin" aria-hidden="true" /><br />
-              <span className="sr-only">Searching adapters...</span>
-            </div>
-          ) : null}
-          {!loadError && adapters?.length === 0 ? (
-            <p className="col-span-full text-center text-slate-500" role="status">No Adapters found</p>
-          ) : null}
-          {adapters?.map((adapter) => (
-            <article
-              className="flex min-h-72 flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-              key={adapter.adapter_id}
-            >
-              <a className="block" href={`/adapters/${adapter.adapter_id}`}>
-                <h2 className="text-xl font-bold text-slate-950">{adapter.adapter_name}</h2>
-                <p className="mt-5 line-clamp-4 text-sm leading-5 text-slate-800">
-                  {adapter.description ?? 'No adapter description has been submitted yet.'}
-                </p>
-              </a>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {(adapter.keywords ?? []).slice(0, 3).map((keyword) => (
-                  <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-auto flex items-center justify-between gap-2 pt-6">
-                <MaintainerAvatar maintainer={adapter.maintainer} />
-                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600">
-                  <span aria-hidden="true">👍</span>
-                  <span>{adapter.endorsement_count ?? 0}</span>
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
+        <AdapterSearch />
       </div>
     </section>
   )
@@ -435,40 +331,6 @@ bc.run()`}
         </aside>
       </div>
     </section>
-  )
-}
-
-/*
-AI-Generated.
-*/
-function MaintainerAvatar({ maintainer, showName = false }: Readonly<{ maintainer?: AdapterMaintainerResponse | null; showName?: boolean }>) {
-  if (!maintainer) return <span className="text-sm text-slate-500">No maintainer avatar available</span>
-
-  const displayName = maintainer.username.trim() || 'Unknown maintainer'
-  const profileUrl = maintainer.profile_url ?? null
-  const fallbackLabel = displayName.slice(0, 2).toUpperCase()
-
-  return (
-    <span className="flex items-center gap-3">
-      {maintainer.avatar_url ? (
-        <img alt={displayName} className="h-10 w-10 rounded-full border border-slate-200" src={maintainer.avatar_url} />
-      ) : (
-        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-sm font-semibold text-slate-700" aria-hidden="true">
-          {fallbackLabel}
-        </span>
-      )}
-      {showName ? (
-        <span>
-          {profileUrl ? (
-            <a className="block text-sm font-medium text-slate-950 hover:text-blue-700" href={profileUrl} rel="noreferrer" target="_blank">
-              {displayName}
-            </a>
-          ) : (
-            <span className="block text-sm font-medium text-slate-950">{displayName}</span>
-          )}
-        </span>
-      ) : null}
-    </span>
   )
 }
 
