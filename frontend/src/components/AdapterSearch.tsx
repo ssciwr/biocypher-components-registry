@@ -15,7 +15,7 @@ function AdapterSearch({ showLatest = true, children }: Readonly<{ showLatest?: 
 
   useEffect(() => {
     let ignore = false
-    const searchTerm = query.trim()
+    const searchTerm = query.replace(/\s/g, '').toLowerCase()
     if (!showLatest && !searchTerm) return
 
     const adapterRequest = searchTerm
