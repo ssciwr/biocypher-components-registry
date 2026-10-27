@@ -58,3 +58,47 @@ def test_auto_selects_native_for_tsv_gz_input(tmp_path) -> None:
 
     assert isinstance(generator, NativeDatasetGenerator)
     assert ".tsv.gz" in reason
+
+
+def test_auto_selects_native_for_file_without_structured_handler(tmp_path) -> None:
+    dataset_path = tmp_path / "map.sbgn"
+    dataset_path.write_text("<sbgn/>", encoding="utf-8")
+
+    generator, _ = select_generator_for_request(
+        GenerationRequest(input_path=str(dataset_path), output_path="out.jsonld")
+    )
+
+    assert isinstance(generator, NativeDatasetGenerator)
+
+
+def test_auto_keeps_croissant_baker_for_baker_only_formats(tmp_path) -> None:
+    """Formats croissant-baker handles but native does not must not be downgraded."""
+    (tmp_path / "scan.png").write_bytes(b"not-really-a-png")
+
+    generator, _ = select_generator_for_request(
+        GenerationRequest(input_path=str(tmp_path), output_path="out.jsonld")
+    )
+
+    assert isinstance(generator, CroissantBakerGenerator)
+
+
+def test_auto_keeps_croissant_baker_for_mixed_directory(tmp_path) -> None:
+    (tmp_path / "data.csv").write_text("id\n1\n", encoding="utf-8")
+    (tmp_path / "notes.sbgn").write_text("<sbgn/>", encoding="utf-8")
+
+    generator, _ = select_generator_for_request(
+        GenerationRequest(input_path=str(tmp_path), output_path="out.jsonld")
+    )
+
+    assert isinstance(generator, CroissantBakerGenerator)
+
+
+def test_auto_selects_native_for_json_which_baker_does_not_handle(tmp_path) -> None:
+    dataset_path = tmp_path / "records.jsonl"
+    dataset_path.write_text('{"a": 1}\n', encoding="utf-8")
+
+    generator, _ = select_generator_for_request(
+        GenerationRequest(input_path=str(dataset_path), output_path="out.jsonld")
+    )
+
+    assert isinstance(generator, NativeDatasetGenerator)

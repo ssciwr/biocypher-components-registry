@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
+from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from src.core.dataset.backends.base import DatasetGenerator
@@ -21,6 +25,11 @@ class CroissantBakerGenerator(DatasetGenerator):
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         """Run ``croissant-baker`` and return its process output."""
+        with TemporaryDirectory() as staging:
+            return self._run(_stage_file_input(request, Path(staging)))
+
+    def _run(self, request: GenerationRequest) -> GenerationResult:
+        """Invoke the CLI for a request whose input is a directory."""
         command = build_croissant_baker_command(
             request=request,
             executable=self.executable,
@@ -49,6 +58,19 @@ class CroissantBakerGenerator(DatasetGenerator):
             stdout=result.stdout,
             stderr=result.stderr,
         )
+
+
+def _stage_file_input(request: GenerationRequest, staging: Path) -> GenerationRequest:
+    """Wrap a single input file in a directory, as croissant-baker expects."""
+    source = Path(request.input_path).expanduser()
+    if not source.is_file():
+        return request
+    staged = staging / source.name
+    try:
+        staged.symlink_to(source.resolve())
+    except OSError:
+        shutil.copy2(source, staged)
+    return replace(request, input_path=str(staging))
 
 
 def build_croissant_baker_command(

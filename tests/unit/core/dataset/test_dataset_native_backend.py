@@ -92,3 +92,95 @@ def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
 
     assert "Missing license; using 'UNKNOWN'." in result.stderr
     assert "Missing dataset version; using '0.1.0'." in result.stderr
+
+
+def _generate(tmp_path: Path, filename: str, content: bytes, **kwargs):
+    source = tmp_path / filename
+    source.write_bytes(content)
+    return NativeDatasetGenerator().generate(
+        GenerationRequest(
+            input_path=str(source),
+            output_path=str(tmp_path / "out" / "dataset.jsonld"),
+            name="Example",
+            description="Example dataset",
+            license_value="https://creativecommons.org/licenses/by/4.0/",
+            dataset_version="1.0.0",
+            date_published="2024-01-01",
+            url="https://example.org/data",
+            **kwargs,
+        )
+    )
+
+
+def test_native_generator_builds_file_level_metadata_for_sbgn(tmp_path: Path) -> None:
+    import hashlib
+
+    content = b"<sbgn xmlns='http://sbgn.org/libsbgn/0.3'/>"
+    result = _generate(tmp_path, "map.sbgn", content)
+
+    assert result.document is not None
+    assert "recordSet" not in result.document
+    (file_object,) = result.document["distribution"]
+    assert file_object["@type"] == "cr:FileObject"
+    assert file_object["name"] == "map.sbgn"
+    assert file_object["contentSize"] == str(len(content))
+    assert file_object["sha256"] == hashlib.sha256(content).hexdigest()
+    assert file_object["encodingFormat"]
+    assert "No supported dataset files" not in result.stderr
+
+
+def test_native_generator_uses_octet_stream_for_unknown_binary(tmp_path: Path) -> None:
+    result = _generate(tmp_path, "blob.zzqx9", b"\x00\x01\x02")
+
+    assert result.document["distribution"][0]["encodingFormat"] == (
+        "application/octet-stream"
+    )
+
+
+def test_native_generator_prefers_explicit_encoding_format(tmp_path: Path) -> None:
+    result = _generate(
+        tmp_path, "map.sbgn", b"<sbgn/>", encoding_format="application/xml"
+    )
+
+    assert result.document["distribution"][0]["encodingFormat"] == "application/xml"
+
+
+def test_native_generator_keeps_csv_field_inference(tmp_path: Path) -> None:
+    result = _generate(tmp_path, "people.csv", b"id,name\n1,Alice\n")
+
+    assert result.document["recordSet"]
+    field_names = [f["name"] for f in result.document["recordSet"][0]["field"]]
+    assert field_names == ["id", "name"]
+
+
+def test_native_generator_uses_filename_as_content_url_for_single_file(
+    tmp_path: Path,
+) -> None:
+    generic = _generate(tmp_path, "glycolysis_upper.sbgn", b"<sbgn/>")
+    tabular = _generate(tmp_path, "people.csv", b"id,name\n1,Alice\n")
+
+    assert generic.document["distribution"][0]["contentUrl"] == "glycolysis_upper.sbgn"
+    assert tabular.document["distribution"][0]["contentUrl"] == "people.csv"
+
+
+def test_native_generator_keeps_relative_content_url_for_directory(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "data" / "sub"
+    nested.mkdir(parents=True)
+    (nested / "map.sbgn").write_bytes(b"<sbgn/>")
+    (tmp_path / "data" / "people.csv").write_text("id\n1\n", encoding="utf-8")
+
+    result = NativeDatasetGenerator().generate(
+        GenerationRequest(
+            input_path=str(tmp_path / "data"),
+            output_path=str(tmp_path / "out.jsonld"),
+            validate=False,
+        )
+    )
+
+    urls = {d["name"]: d["contentUrl"] for d in result.document["distribution"]}
+    assert urls == {
+        "map.sbgn": str(Path("sub") / "map.sbgn"),
+        "people.csv": "people.csv",
+    }
