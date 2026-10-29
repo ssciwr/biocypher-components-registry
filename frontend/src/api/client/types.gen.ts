@@ -715,6 +715,18 @@ export type RegistrationAttemptResponse = {
      * Validation Errors
      */
     validation_errors?: Array<string>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Validation Checks
+     */
+    validation_checks?: Array<ValidationCheckResponse>;
+    /**
+     * Profile Version
+     */
+    profile_version?: string | null;
 };
 
 /**
@@ -1151,6 +1163,32 @@ export type RegistrationRevalidateResponse = {
 export type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID';
 
 /**
+ * RegistrationStreamEvent
+ *
+ * SSE data envelope; exactly one terminal result or error ends a stream.
+ */
+export type RegistrationStreamEvent = {
+    /**
+     * Type
+     */
+    type: 'snapshot' | 'check' | 'result' | 'error';
+    /**
+     * Checks
+     */
+    checks?: Array<ValidationCheckResponse>;
+    check?: ValidationCheckResponse | null;
+    result?: RegistrationAttemptResponse | null;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Detail
+     */
+    detail?: string | null;
+};
+
+/**
  * RegistryEntryListResponse
  *
  * Response model for canonical registry entries.
@@ -1361,6 +1399,126 @@ export type RegistryRegistrationResponse = {
      * Uniqueness Key
      */
     uniqueness_key?: string | null;
+};
+
+/**
+ * ValidationCheckResponse
+ *
+ * A validation stage, its provenance, and its inline diagnostic information.
+ */
+export type ValidationCheckResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Status
+     */
+    status: 'PENDING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'NOT_RUN';
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Errors
+     */
+    errors?: Array<string>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
+     * Dataset Index
+     */
+    dataset_index?: number | null;
+    /**
+     * Dataset Name
+     */
+    dataset_name?: string | null;
+    /**
+     * Profile Version
+     */
+    profile_version?: string | null;
+    /**
+     * Schema Title
+     */
+    schema_title?: string | null;
+    /**
+     * Schema Id
+     */
+    schema_id?: string | null;
+    /**
+     * Schema Dialect
+     */
+    schema_dialect?: string | null;
+    /**
+     * Validator Name
+     */
+    validator_name?: string | null;
+    /**
+     * Validator Version
+     */
+    validator_version?: string | null;
+};
+
+/**
+ * ValidationDetailResponse
+ *
+ * Response-only context supplied by a metadata validator.
+ */
+export type ValidationDetailResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Json Path
+     */
+    json_path?: string | null;
+    /**
+     * Requirement
+     */
+    requirement?: string | null;
+    /**
+     * Expected Format
+     */
+    expected_format?: string | null;
+    /**
+     * Location Description
+     */
+    location_description?: string | null;
+    /**
+     * Source File
+     */
+    source_file?: string | null;
+    /**
+     * Source Url
+     */
+    source_url?: string | null;
+    /**
+     * Line
+     */
+    line?: number | null;
+    /**
+     * Column
+     */
+    column?: number | null;
+    /**
+     * Location Kind
+     */
+    location_kind?: 'value' | 'containing_object' | null;
 };
 
 /**
@@ -1793,6 +1951,31 @@ export type CreateRegistrationApiV1RegistrationsPostResponses = {
 
 export type CreateRegistrationApiV1RegistrationsPostResponse = CreateRegistrationApiV1RegistrationsPostResponses[keyof CreateRegistrationApiV1RegistrationsPostResponses];
 
+export type StreamRegistrationApiV1RegistrationsStreamPostData = {
+    body: RegistrationCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/registrations/stream';
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostError = StreamRegistrationApiV1RegistrationsStreamPostErrors[keyof StreamRegistrationApiV1RegistrationsStreamPostErrors];
+
+export type StreamRegistrationApiV1RegistrationsStreamPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RegistrationStreamEvent;
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostResponse = StreamRegistrationApiV1RegistrationsStreamPostResponses[keyof StreamRegistrationApiV1RegistrationsStreamPostResponses];
+
 export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetData = {
     body?: never;
     path?: never;
@@ -2058,3 +2241,37 @@ export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponses = {
 };
 
 export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponse = CreateRegistryRefreshApiV1RegistryRefreshesPostResponses[keyof CreateRegistryRefreshApiV1RegistryRefreshesPostResponses];
+
+export type GetValidationSchemaApiV1SchemasVersionGetData = {
+    body?: never;
+    path: {
+        /**
+         * Version
+         */
+        version: string;
+    };
+    query?: never;
+    url: '/api/v1/schemas/{version}';
+};
+
+export type GetValidationSchemaApiV1SchemasVersionGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetValidationSchemaApiV1SchemasVersionGetError = GetValidationSchemaApiV1SchemasVersionGetErrors[keyof GetValidationSchemaApiV1SchemasVersionGetErrors];
+
+export type GetValidationSchemaApiV1SchemasVersionGetResponses = {
+    /**
+     * Response Get Validation Schema Api V1 Schemas  Version  Get
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetValidationSchemaApiV1SchemasVersionGetResponse = GetValidationSchemaApiV1SchemasVersionGetResponses[keyof GetValidationSchemaApiV1SchemasVersionGetResponses];

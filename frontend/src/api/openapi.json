@@ -697,6 +697,67 @@
         }
       }
     },
+    "/api/v1/registrations/stream": {
+      "post": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Register an adapter with live validation progress",
+        "description": "One submission per connection. Terminal result follows persistence. Do not automatically reconnect or retry this POST.",
+        "operationId": "stream_registration_api_v1_registrations_stream_post",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "$ref": "#/components/schemas/RegistrationStreamEvent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/registrations/croissant-file-present-check": {
       "get": {
         "tags": [
@@ -1140,6 +1201,51 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistryRefreshResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schemas/{version}": {
+      "get": {
+        "tags": [
+          "schemas"
+        ],
+        "summary": "Get Validation Schema",
+        "description": "Return the exact deployed schema for a registered profile version.",
+        "operationId": "get_validation_schema_api_v1_schemas__version__get",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Validation Schema Api V1 Schemas  Version  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -3541,6 +3647,31 @@
             },
             "type": "array",
             "title": "Validation Errors"
+          },
+          "validation_details": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationDetailResponse"
+            },
+            "type": "array",
+            "title": "Validation Details"
+          },
+          "validation_checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheckResponse"
+            },
+            "type": "array",
+            "title": "Validation Checks"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
           }
         },
         "type": "object",
@@ -4469,6 +4600,75 @@
         "title": "RegistrationStatus",
         "description": "Tracked states for a stored registration request."
       },
+      "RegistrationStreamEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "snapshot",
+              "check",
+              "result",
+              "error"
+            ],
+            "title": "Type"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheckResponse"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationCheckResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "RegistrationStreamEvent",
+        "description": "SSE data envelope; exactly one terminal result or error ends a stream."
+      },
       "RegistryEntryListResponse": {
         "properties": {
           "items": {
@@ -4910,6 +5110,291 @@
         ],
         "title": "ToolDescriptor",
         "description": "One tool available to a session's agent loop."
+      },
+      "ValidationCheckResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "PASSED",
+              "FAILED",
+              "NOT_RUN"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "validation_details": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationDetailResponse"
+            },
+            "type": "array",
+            "title": "Validation Details"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "dataset_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Index"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "schema_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Title"
+          },
+          "schema_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Id"
+          },
+          "schema_dialect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Dialect"
+          },
+          "validator_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validator Name"
+          },
+          "validator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validator Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "title": "ValidationCheckResponse",
+        "description": "A validation stage, its provenance, and its inline diagnostic information."
+      },
+      "ValidationDetailResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "json_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Path"
+          },
+          "requirement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement"
+          },
+          "expected_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Format"
+          },
+          "location_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Description"
+          },
+          "source_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "location_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "value",
+                  "containing_object"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ValidationDetailResponse",
+        "description": "Response-only context supplied by a metadata validator."
       },
       "ValidationError": {
         "properties": {

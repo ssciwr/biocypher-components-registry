@@ -41,8 +41,9 @@ describe('registration DOI check', () => {
   it('auto submits the saved draft after GitHub sign-in returns', () => {
     cy.intercept('GET', '**/api/v1/auth/me', { body: { authenticated: true } })
     cy.intercept('GET', '**/api/v1/registrations/croissant-file-present-check*', { body: { status: 'FOUND', has_croissant_file: true, repository_url: draft.repositoryLocation, message: 'Croissant file found at repository root.' } })
-    cy.intercept('POST', '**/api/v1/registrations', {
-      body: submittedRegistration,
+    cy.intercept('POST', '**/api/v1/registrations/stream', {
+      headers: { 'content-type': 'text/event-stream' },
+      body: `event: result\ndata: ${JSON.stringify({ type: 'result', result: submittedRegistration })}\n\n`,
     }).as('createRegistration')
 
     cy.visit('/register', {
@@ -56,7 +57,7 @@ describe('registration DOI check', () => {
       license_value: draft.licenseValue,
       doi,
     })
-    cy.contains('Adapter registration successful').should('be.visible')
+    cy.contains('Adapter registered successfully').should('be.visible')
     cy.window().its('localStorage').invoke('getItem', draftKey).should('equal', null)
     cy.window().its('localStorage').invoke('getItem', submitAfterAuthKey).should('equal', null)
   })

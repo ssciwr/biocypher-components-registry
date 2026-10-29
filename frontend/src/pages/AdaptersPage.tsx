@@ -154,6 +154,34 @@ function AdapterListView() {
   )
 }
 
+function AdapterUpdateStatus({ attempt }: Readonly<{ attempt: NonNullable<AdapterDetail['latest_attempt']> }>) {
+  const failed = attempt.attempt_status === 'FAILED'
+  const status = failed ? 'Update failed' : attempt.update_applied ? 'Update successful' : 'Already up to date'
+  const errors = attempt.validation_errors ?? []
+
+  return (
+    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm" role="status">
+      <p><strong>Update status:</strong> {status}</p>
+      <p><strong>Current version:</strong> {attempt.published_version ?? 'None'}</p>
+      {failed ? (
+        <>
+          <p className="mt-2">
+            The metadata could not be updated.{' '}
+            {attempt.published_version ? <>Version {attempt.published_version} is still available. </> : null}
+            Fix the issues below, then click <strong>Update</strong> again.
+          </p>
+          {errors.length > 0 ? (
+            <details className="mt-2">
+              <summary>Update details</summary>
+              <ul>{errors.map((message, index) => <li key={index}>{message}</li>)}</ul>
+            </details>
+          ) : <p className="mt-2">{attempt.message}</p>}
+        </>
+      ) : null}
+    </div>
+  )
+}
+
 function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string; signedIn: boolean }>) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -425,14 +453,9 @@ bc.run()`}
                   {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
                 </button> : null}
                 </div>
-                {isUpdating ? <p className="mt-3 text-sm text-blue-700" role="status">PROCESSING</p> : null}
+                {isUpdating ? <p className="mt-3 text-sm text-blue-700" role="status">Checking for updates...</p> : null}
                 {!isUpdating && adapter.latest_attempt ? (
-                  <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm" role="status">
-                    <p><strong>Latest attempt:</strong> {adapter.latest_attempt.attempt_status}</p>
-                    <p><strong>Published version:</strong> {adapter.latest_attempt.published_version ?? 'None'}</p>
-                    <p>{adapter.latest_attempt.message}</p>
-                    {(adapter.latest_attempt.validation_errors ?? []).length > 1 ? <details className="mt-2"><summary>Validation details</summary><ul>{(adapter.latest_attempt.validation_errors ?? []).map((message, index) => <li key={index}>{message}</li>)}</ul></details> : null}
-                  </div>
+                  <AdapterUpdateStatus attempt={adapter.latest_attempt} />
                 ) : null}
                 {updateError ? <p className="mt-2 text-sm text-red-700" role="alert">{updateError}</p> : null}
                 {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
