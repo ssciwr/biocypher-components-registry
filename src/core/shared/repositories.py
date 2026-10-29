@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import signal
@@ -23,6 +24,29 @@ from src.core.shared.errors import (
 GIT_COMMAND_TIMEOUT = 15
 GIT_OPERATION_TIMEOUT = 60
 MAX_METADATA_BYTES = 5 * 1024 * 1024
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _time_operation(operation: str) -> Iterator[None]:
+    """Record phase durations and failures without logging submitted URLs."""
+    started = time.monotonic()
+    outcome = "success"
+    reason_code = None
+    try:
+        yield
+    except Exception as exc:
+        outcome = "error"
+        reason_code = getattr(exc, "reason_code", type(exc).__name__)
+        raise
+    finally:
+        logger.info(
+            "Repository operation=%s outcome=%s duration_ms=%.1f reason_code=%s",
+            operation,
+            outcome,
+            (time.monotonic() - started) * 1000,
+            reason_code,
+        )
 
 
 def normalize_repository_url(value: str) -> str:
@@ -115,7 +139,9 @@ def _run_git(arguments: list[str], deadline: float) -> bytes:
     if process.returncode:
         detail = errors.decode("utf-8", errors="replace").lower()
         if "filter" in detail and (
-            "not supported" in detail or "does not support" in detail
+            "not supported" in detail
+            or "does not support" in detail
+            or "allows max depth" in detail
         ):
             raise RepositoryUnavailableError(
                 "Git filtering is unsupported by this host.", "GIT_FILTER_UNSUPPORTED"
@@ -154,18 +180,19 @@ class RepositorySnapshot:
     deadline: float
 
     def has_metadata(self) -> bool:
-        tree = _run_git(
-            [
-                "-C",
-                self.directory,
-                "ls-tree",
-                "-z",
-                self.commit,
-                "--",
-                METADATA_FILENAME,
-            ],
-            self.deadline,
-        )
+        with _time_operation("inspect_root"):
+            tree = _run_git(
+                [
+                    "-C",
+                    self.directory,
+                    "ls-tree",
+                    "-z",
+                    self.commit,
+                    "--",
+                    METADATA_FILENAME,
+                ],
+                self.deadline,
+            )
         # A directory or symbolic link named croissant.jsonld is not a metadata file.
         return tree.startswith((b"100644 blob ", b"100755 blob "))
 
@@ -196,57 +223,76 @@ class RepositorySnapshot:
 
 
 @contextmanager
-def repository_snapshot(repository_url: str) -> Iterator[RepositorySnapshot]:
-    """Resolve default HEAD and fetch only its snapshot, without a checkout."""
+def repository_snapshot(
+    repository_url: str, *, root_only: bool = False
+) -> Iterator[RepositorySnapshot]:
+    """Fetch default HEAD without a checkout, optionally limiting trees to its root."""
     normalized = normalize_repository_url(repository_url)
     # GitLab redirects project-root Git requests to this canonical endpoint.
     # Address it directly so arbitrary HTTP redirects can remain disabled.
     transport_url = f"{normalized}.git"
     deadline = time.monotonic() + GIT_OPERATION_TIMEOUT
-    references = _run_git(
-        ["ls-remote", "--symref", transport_url, "HEAD"], deadline
-    ).decode()
-    branch = re.search(r"^ref: refs/heads/([^\t\n]+)\tHEAD$", references, re.MULTILINE)
-    commit = re.search(r"^([0-9a-f]{40,64})\tHEAD$", references, re.MULTILINE)
-    if branch is None or commit is None:
-        raise RepositoryUnavailableError(
-            "Could not resolve the repository's default branch.",
-            "DEFAULT_BRANCH_UNRESOLVED",
+    with _time_operation("resolve_head"):
+        references = _run_git(
+            ["ls-remote", "--symref", transport_url, "HEAD"], deadline
+        ).decode()
+        branch = re.search(
+            r"^ref: refs/heads/([^\t\n]+)\tHEAD$", references, re.MULTILINE
         )
+        commit = re.search(r"^([0-9a-f]{40,64})\tHEAD$", references, re.MULTILINE)
+        if branch is None or commit is None:
+            raise RepositoryUnavailableError(
+                "Could not resolve the repository's default branch.",
+                "DEFAULT_BRANCH_UNRESOLVED",
+            )
     with tempfile.TemporaryDirectory(prefix="registry-git-") as directory:
-        _run_git(["init", "--bare", directory], deadline)
-        _run_git(["-C", directory, "remote", "add", "origin", transport_url], deadline)
-        _run_git(
-            ["-C", directory, "config", "remote.origin.promisor", "true"], deadline
-        )
-        _run_git(
-            [
-                "-C",
-                directory,
-                "config",
-                "remote.origin.partialclonefilter",
-                "blob:none",
-            ],
-            deadline,
-        )
+        with _time_operation("prepare_snapshot"):
+            _run_git(["init", "--bare", directory], deadline)
+            _run_git(
+                ["-C", directory, "remote", "add", "origin", transport_url], deadline
+            )
+            _run_git(
+                ["-C", directory, "config", "remote.origin.promisor", "true"], deadline
+            )
         # Git falls back to an ordinary shallow transfer when a server ignores filtering.
         fetch = ["-C", directory, "fetch", "--quiet", "--depth=1", "--no-tags"]
-        try:
-            _run_git(
-                [*fetch, "--filter=blob:none", "origin", commit.group(1)], deadline
-            )
-        except RepositoryUnavailableError as exc:
-            if exc.reason_code != "GIT_FILTER_UNSUPPORTED":
-                raise
-            _run_git(
-                [
-                    "-C",
-                    directory,
-                    "config",
-                    "--unset",
-                    "remote.origin.partialclonefilter",
-                ],
-                deadline,
-            )
-            _run_git([*fetch, "origin", commit.group(1)], deadline)
+        # GitHub rejects tree:1 ("tree filter allows max depth 0"). Avoid a
+        # guaranteed extra network round trip there; blob:none still omits files.
+        root_filter_supported = (
+            root_only and urlparse(normalized).hostname != "github.com"
+        )
+        filters = (
+            ("tree:1", "blob:none", None)
+            if root_filter_supported
+            else ("blob:none", None)
+        )
+        with _time_operation("fetch_snapshot"):
+            for filter_spec in filters:
+                config_args = (
+                    ["remote.origin.partialclonefilter", filter_spec]
+                    if filter_spec is not None
+                    else ["--unset", "remote.origin.partialclonefilter"]
+                )
+                _run_git(
+                    ["-C", directory, "config", *config_args],
+                    deadline,
+                )
+                filter_args = (
+                    [f"--filter={filter_spec}"] if filter_spec is not None else []
+                )
+                try:
+                    _run_git(
+                        [*fetch, *filter_args, "origin", commit.group(1)], deadline
+                    )
+                    break
+                except RepositoryUnavailableError as exc:
+                    if (
+                        filter_spec is None
+                        or exc.reason_code != "GIT_FILTER_UNSUPPORTED"
+                    ):
+                        raise
+                    logger.info(
+                        "Repository fetch filter=%s unsupported; trying fallback",
+                        filter_spec,
+                    )
         yield RepositorySnapshot(normalized, directory, commit.group(1), deadline)

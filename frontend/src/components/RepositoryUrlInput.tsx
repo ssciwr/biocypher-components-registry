@@ -111,7 +111,7 @@ export function RepositoryUrlInput({
         setCompletedCheck({ checkMode, repositoryUrl, status: 'UNAVAILABLE', message: 'Could not reach the server. Edit the URL to try again.' })
       }
     }
-    timer = setTimeout(() => void checkRepository(), 500)
+    timer = setTimeout(() => void checkRepository(), 300)
     return () => {
       controller.abort()
       clearTimeout(timer)

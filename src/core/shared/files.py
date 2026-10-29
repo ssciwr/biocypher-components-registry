@@ -128,7 +128,7 @@ def fetch_remote_metadata(repo_url: str) -> dict[str, Any]:
 
 def remote_metadata_exists(repo_url: str) -> bool:
     """Inspect the root tree; access failures must not be reported as absence."""
-    with repository_snapshot(repo_url) as snapshot:
+    with repository_snapshot(repo_url, root_only=True) as snapshot:
         return snapshot.has_metadata()
 
 

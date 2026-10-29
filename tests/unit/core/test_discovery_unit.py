@@ -302,10 +302,11 @@ class TestFetchRemoteMetadata:
         snapshot.has_metadata.return_value = True
 
         @contextmanager
-        def open_snapshot(url):
+        def open_snapshot(url, *, root_only=False):
             from src.core.shared.repositories import normalize_repository_url
 
             snapshot.repository_url = normalize_repository_url(url)
+            snapshot.root_only = root_only
             yield snapshot
 
         monkeypatch.setattr("src.core.shared.files.repository_snapshot", open_snapshot)
@@ -313,6 +314,7 @@ class TestFetchRemoteMetadata:
 
     def test_nominal_case(self, snapshot):
         assert fetch_remote_metadata("https://github.com/org/repo")["name"] == "remote"
+        assert snapshot.root_only is False
 
     @pytest.mark.parametrize("url", ["not-a-url", "ftp://gitlab.com/org/repo"])
     def test_invalid_url(self, snapshot, url):
@@ -343,6 +345,7 @@ class TestFetchRemoteMetadata:
 
     def test_presence_does_not_parse_metadata(self, snapshot):
         assert remote_metadata_exists(snapshot.repository_url)
+        assert snapshot.root_only is True
         snapshot.read_metadata.assert_not_called()
         snapshot.has_metadata.return_value = False
         assert not remote_metadata_exists(snapshot.repository_url)
