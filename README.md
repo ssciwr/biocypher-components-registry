@@ -121,7 +121,7 @@ uv run cli.py validate-dataset /path/to/croissant.jsonld
 Build a registration request without persisting it:
 
 ```bash
-uv run cli.py submit --name "My Adapter" /path/to/adapter-repo
+uv run cli.py submit /path/to/adapter-repo
 ```
 
 ### Metadata Generation Commands
@@ -181,6 +181,8 @@ All routes below are served under the `/api/v1` prefix.
 | GET | `/adapters/{adapter_id}/metadata` | Get full Croissant metadata for one adapter |
 | POST | `/adapters/{adapter_id}/endorse` | Endorse one adapter as the signed-in GitHub user |
 | POST | `/registrations` | Fetch, validate, and save an accepted first registration synchronously |
+| POST | `/registrations/stream` | Register once with live validation progress through server-sent events |
+| GET | `/schemas/{version}` | Read a deployed BioCypher adapter schema, such as `v1` |
 | POST | `/adapters/{adapter_id}/update` | Update a published adapter as its submitting GitHub user |
 | GET | `/registrations/croissant-file-present-check` | Check whether a remote repository exposes `croissant.jsonld` |
 | GET | `/registrations` | List active registrations |
@@ -219,17 +221,14 @@ curl http://localhost:8000/api/v1/adapters
 
 ### Registration and manual updates
 
-The registration form automatically checks for root-level `croissant.jsonld` after typing pauses for 300 ms. Repository, branch, and file links are normalized to the repository root, and Git resolves its actual default branch. The check reports `FOUND`, `NOT_FOUND`, or `UNAVAILABLE`; only `FOUND` enables Register. Inaccessible repositories are never reported as missing their metadata. Edit the URL and pause to run a fresh check, including when restoring the original URL.
+- **Register:** Sign in with GitHub and enter your repository URL. The form checks for a root-level `croissant.jsonld`; registration then fetches fresh metadata from the default branch and validates it before saving.
+- **Review validation:** The collapsible **Validation checks** section shows results for file retrieval/JSON parsing, Croissant compliance, the adapter schema, semantic checks, and each embedded dataset. Errors include available file positions, JSON paths, and expected formats. The schema viewer exposes the applied BioCypher schema version (currently **v1**, using **JSON Schema Draft 7**).
+- **Fix and retry:** Failed first browser registrations create no database records. Correct the reported issues in your repository, then click **Retry registration**. You may keep the same metadata version for this retry.
+- **Update:** Only the submitting GitHub account can update a published adapter. Changed metadata must preserve the adapter identity and use a new, unused version. Failed updates retain the accepted metadata and record the failure; fix the issues and click **Update** again. Unchanged metadata is reported as **Already up to date**.
 
-The presence check requests only the resolved commit and its root directory tree (`tree:1`) on compatible hosts. GitHub rejects this filter, so GitHub checks use `blob:none` directly to avoid a failed request. Other hosts that reject the root filter also fall back to `blob:none`, then an ordinary shallow fetch if filtering is unsupported. Registration still fetches and validates fresh metadata. Enable INFO logging for `src.core.shared.repositories` to see durations in milliseconds for `resolve_head`, `prepare_snapshot`, `fetch_snapshot`, and `inspect_root`, including failures and their reason codes. Timing messages do not include submitted repository URLs.
+If the connection ends before a final registration result arrives, the outcome is **Unconfirmed**. Check the adapter list before trying again; processing may already have completed. Registration does not automatically resubmit.
 
-First registration uses one synchronous `POST /registrations`. Metadata is fetched at a newly resolved commit, parsed, and validated before persistence. Success atomically saves the source, accepted entry, and success event. A failed first registration saves none of these; the populated form offers **Retry registration**, which repeats the initial request and can retain the same version. The response has `attempt_status: SUCCEEDED | FAILED`, a message, reason code, and validation details; failed first attempts have no registration ID. Successful creation returns HTTP 201; a completed unsuccessful attempt returns HTTP 200 with `FAILED`. Clients must inspect the outcome.
-
-Published adapters have an **Update** button beside **Delete adapter**, with the same submitting-account ownership restriction enforced on the server. Update also retries a failed update. Unchanged metadata records a successful check. Changed accepted metadata requires a new unused version for the same adapter identity. A failed update records its outcome and retains the accepted metadata. The summary shows only the attempt outcome, published version, and explanation, with expandable validation details when needed. `PROCESSING` is frontend-only; “Retrying...” and “Updating...” are messages, not statuses.
-
-Repository access uses the installed `git` executable over HTTPS, with noninteractive, isolated configuration and temporary shallow snapshots. Git network commands have a 15-second timeout and each Git operation a 60-second deadline; metadata is limited to 5 MiB. No GitHub REST Contents API, new database table, migration, job queue, worker, or scheduled refresh is introduced. Private/access-restricted repositories cannot be registered without accessible metadata. Local-path discovery and the explicit staging CLI commands remain available; processing an unaccepted staged source does not save a failed attempt. Existing historical records remain readable.
-
-Scheduled refreshes are deferred. The existing manual batch command/API uses the same processor, counts failed unaccepted attempts in its batch summary, and continues with the remaining sources.
+Batch refresh is manual through `refresh-registry` or `POST /api/v1/registry/refreshes`; scheduled refreshes are not implemented.
 
 The agentic workspace routes below are served under the `/agent/api/v1`
 prefix (kept distinct from `/api/v1` — see [docs/API.md](docs/API.md) for
@@ -370,6 +369,11 @@ pnpm run ui-tests
 | `POSTGRES_DB` | PostgreSQL database name (Docker Compose only) | `biocypher_registry` |
 | `POSTGRES_USER` | PostgreSQL user (Docker Compose only) | `biocypher` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (Docker Compose only) | required; no default |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app Client ID for browser sign-in | required for sign-in; no default |
+| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret; backend only | required for sign-in; no default |
+| `AUTH_SESSION_SECRET` | Separate secret used to sign and verify OAuth state; backend only | required for sign-in; no default |
+| `FRONTEND_BASE_URL` | Frontend URL used for sign-in redirects and allowed origins | `http://localhost:5173` |
+| `VITE_API_BASE_URL` | Public backend base URL used by the frontend and to construct OAuth callbacks; omit `/api/v1` | `http://localhost:8000` in local development |
 
 ## Troubleshooting
 
