@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.errors import (
@@ -13,8 +13,8 @@ from src.api.errors import (
     registration_submission_http_error,
 )
 from src.api.schemas.registrations import (
+    RegistrationAttemptResponse,
     RegistrationCreateRequest,
-    RegistrationCreateResponse,
     RegistrationCroissantFilePresentCheckResponse,
     RegistrationDetailResponse,
     RegistrationEventListResponse,
@@ -25,13 +25,16 @@ from src.api.schemas.registrations import (
     RegistrationRevalidateResponse,
 )
 from src.core.auth.models import AuthSession
+from src.core.registration.models import AttemptStatus
 from src.core.registration.service import (
     finish_registration,
+    register_adapter,
     revalidate_registration,
-    submit_registration,
 )
 from src.core.registration.store import RegistrationStore
+from src.core.shared.errors import InvalidRepoURLError, RepositoryUnavailableError
 from src.core.shared.files import remote_metadata_exists
+from src.core.shared.repositories import normalize_repository_url
 
 router = APIRouter()
 
@@ -39,6 +42,22 @@ RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_sto
 OptionalAuthSessionDep = Annotated[
     AuthSession | None, Depends(get_optional_auth_session)
 ]
+
+
+def _authorize_processing(
+    registration_id: str, store: RegistrationStore, session: AuthSession | None
+) -> None:
+    registration = store.get_registration(registration_id)
+    if registration is None:
+        raise registration_not_found_http_error(registration_id)
+    if registration.submitted_by_github_user_id is not None:
+        if session is None:
+            raise HTTPException(status_code=401, detail="GitHub sign-in required.")
+        if session.github_user_id != registration.submitted_by_github_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the submitting account can process this source.",
+            )
 
 
 # ===========================================================
@@ -49,22 +68,28 @@ OptionalAuthSessionDep = Annotated[
 @router.post(
     "/registrations",
     status_code=status.HTTP_201_CREATED,
+    responses={
+        200: {
+            "model": RegistrationAttemptResponse,
+            "description": "Processing failed; no first-registration records were saved.",
+        },
+        409: {"description": "The repository is already registered."},
+    },
     summary="Submit an adapter registration",
     description=(
-        "Store one adapter repository as a tracked registration request. "
-        "The repository may be a local path or remote URL and should "
-        "contain a root-level croissant.jsonld file. Processing happens later "
-        "through the process endpoint or a registry refresh."
+        "Fetch and validate metadata synchronously. Persist the registration "
+        "only after acceptance; failed first registrations create no records."
     ),
 )
 def create_registration(
     payload: RegistrationCreateRequest,
+    response: Response,
     store: RegistrationStoreDep,
     auth_session: OptionalAuthSessionDep,
-) -> RegistrationCreateResponse:
-    """Create and persist a submitted adapter registration."""
+) -> RegistrationAttemptResponse:
+    """Return a terminal result, committing only accepted first registrations."""
     try:
-        registration = submit_registration(
+        outcome = register_adapter(
             repository_location=payload.repository_location,
             store=store,
             license_value=payload.license_value,
@@ -74,10 +99,14 @@ def create_registration(
                 auth_session.github_user_id if auth_session is not None else None
             ),
         )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
         raise registration_submission_http_error(exc) from exc
 
-    return RegistrationCreateResponse.from_stored(registration)
+    if outcome.attempt_status == AttemptStatus.FAILED:
+        response.status_code = status.HTTP_200_OK
+    return RegistrationAttemptResponse.from_outcome(outcome)
 
 
 @router.get(
@@ -111,15 +140,25 @@ def check_registration_croissant_file_presence(
     repository_url: Annotated[str, Query(min_length=1)],
 ) -> RegistrationCroissantFilePresentCheckResponse:
     """Return whether the submitted repository exposes Croissant metadata."""
+    normalized = repository_url
     try:
-        has_croissant_file = remote_metadata_exists(repository_url)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="We could not check the repository url you provided (we tried to check if a raw croissant.jsonld file could be found by our system) Is your file hosted on GitHub or a Gitlab instance?",
-        ) from exc
+        normalized = normalize_repository_url(repository_url)
+        present = remote_metadata_exists(normalized)
+    except (InvalidRepoURLError, RepositoryUnavailableError) as exc:
+        return RegistrationCroissantFilePresentCheckResponse(
+            status="UNAVAILABLE",
+            repository_url=normalized,
+            has_croissant_file=False,
+            reason_code=getattr(exc, "reason_code", "INVALID_REPOSITORY_URL"),
+            message=str(exc),
+        )
     return RegistrationCroissantFilePresentCheckResponse(
-        has_croissant_file=has_croissant_file
+        status="FOUND" if present else "NOT_FOUND",
+        repository_url=normalized,
+        has_croissant_file=present,
+        message="Croissant file found at repository root."
+        if present
+        else "Croissant file not found at repository root.",
     )
 
 
@@ -183,8 +222,10 @@ def get_registration(
 def process_registration(
     registration_id: str,
     store: RegistrationStoreDep,
+    auth_session: OptionalAuthSessionDep,
 ) -> RegistrationProcessResponse:
     """Discover, validate, and persist one stored registration result."""
+    _authorize_processing(registration_id, store, auth_session)
     try:
         registration = finish_registration(
             registration_id=registration_id,
@@ -207,8 +248,10 @@ def process_registration(
 def revalidate_registration_route(
     registration_id: str,
     store: RegistrationStoreDep,
+    auth_session: OptionalAuthSessionDep,
 ) -> RegistrationRevalidateResponse:
     """Reprocess one previously invalid or fetch-failed registration."""
+    _authorize_processing(registration_id, store, auth_session)
     try:
         registration = revalidate_registration(
             registration_id=registration_id,

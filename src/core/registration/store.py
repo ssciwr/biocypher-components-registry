@@ -18,6 +18,34 @@ from src.core.registration.models import (
 class RegistrationStore(Protocol):
     """Defines the methods required to persist registration requests."""
 
+    def get_registration_by_repository_location(
+        self, location: str
+    ) -> StoredRegistration | None:
+        """Look up an existing normalized source without creating one."""
+
+    def accept_candidate(
+        self,
+        request: AdapterRegistrationRequest,
+        metadata: dict[str, Any],
+        profile_version: str,
+        uniqueness_key: str,
+        observed_checksum: str,
+        registration: StoredRegistration | None = None,
+        started_at: datetime | None = None,
+        message: str | None = None,
+    ) -> StoredRegistration:
+        """Atomically accept metadata, its source pointer, and a success event."""
+
+    def record_update_failure(
+        self,
+        registration_id: str,
+        event_type: str,
+        errors: list[str],
+        message: str,
+        started_at: datetime,
+    ) -> StoredRegistration:
+        """Record a failure only for an already published registration."""
+
     def create_registration(
         self,
         request: AdapterRegistrationRequest,

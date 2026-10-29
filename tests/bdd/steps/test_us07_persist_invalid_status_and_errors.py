@@ -149,15 +149,21 @@ def adapter_status_is_invalid(invalid_registration_context: dict[str, Any]) -> N
     assert processed_registration.status == RegistrationStatus.INVALID
 
 
-@then("detailed validation errors are persisted and retrievable")
+@then("detailed validation errors are returned without persisting the failed attempt")
 def validation_errors_are_persisted(
     invalid_registration_context: dict[str, Any],
 ) -> None:
-    """Assert that validation errors are stored and can be retrieved later."""
+    """The explicit CLI staging source survives, but its failed attempt is not saved."""
     processed_registration = invalid_registration_context["processed_registration"]
     store = SQLiteRegistrationStore(invalid_registration_context["database_path"])
     loaded = store.get_registration(processed_registration.registration_id)
 
     assert loaded is not None
-    assert loaded.validation_errors
-    assert any("version" in error for error in loaded.validation_errors)
+    assert processed_registration.validation_errors
+    assert any("version" in error for error in processed_registration.validation_errors)
+    assert loaded.validation_errors is None
+    assert loaded.status == RegistrationStatus.SUBMITTED
+    assert [
+        event.event_type
+        for event in store.list_registration_events(loaded.registration_id)
+    ] == ["SUBMITTED"]

@@ -317,6 +317,65 @@
         }
       }
     },
+    "/api/v1/adapters/{adapter_id}/update": {
+      "post": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Update a published adapter",
+        "description": "Process the displayed entry's source; use the same ownership rule as Delete.",
+        "operationId": "update_adapter_api_v1_adapters__adapter_id__update_post",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/adapters/{adapter_id}/endorse": {
       "post": {
         "tags": [
@@ -551,7 +610,7 @@
           "registrations"
         ],
         "summary": "Submit an adapter registration",
-        "description": "Store one adapter repository as a tracked registration request. The repository may be a local path or remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.",
+        "description": "Fetch and validate metadata synchronously. Persist the registration only after acceptance; failed first registrations create no records.",
         "operationId": "create_registration_api_v1_registrations_post",
         "parameters": [
           {
@@ -587,10 +646,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationCreateResponse"
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
                 }
               }
             }
+          },
+          "200": {
+            "description": "Processing failed; no first-registration records were saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The repository is already registered."
           },
           "422": {
             "description": "Validation Error",
@@ -772,6 +844,22 @@
               "type": "string",
               "title": "Registration Id"
             }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
           }
         ],
         "responses": {
@@ -814,6 +902,22 @@
             "schema": {
               "type": "string",
               "title": "Registration Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
             }
           }
         ],
@@ -885,7 +989,18 @@
                     "INVALID_MLCROISSANT",
                     "INVALID_BOTH",
                     "FETCH_FAILED",
-                    "REVALIDATED"
+                    "REVALIDATED",
+                    "SCHEMA_INVALID",
+                    "SEMANTICS_INVALID",
+                    "MLCROISSANT_INVALID",
+                    "INVALID_JSON",
+                    "METADATA_NOT_FOUND",
+                    "REPOSITORY_UNAVAILABLE",
+                    "REMOTE_TEMPORARY",
+                    "DEFAULT_BRANCH_UNRESOLVED",
+                    "METADATA_TOO_LARGE",
+                    "VERSION_NOT_BUMPED",
+                    "ADAPTER_ID_CHANGED"
                   ],
                   "type": "string"
                 },
@@ -2180,6 +2295,21 @@
             "type": "boolean",
             "title": "Can Delete",
             "default": false
+          },
+          "can_update": {
+            "type": "boolean",
+            "title": "Can Update",
+            "default": false
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2757,6 +2887,15 @@
         "title": "AdapterMetadataResponse",
         "description": "Response model for one adapter's full Croissant metadata."
       },
+      "AttemptStatus": {
+        "type": "string",
+        "enum": [
+          "SUCCEEDED",
+          "FAILED"
+        ],
+        "title": "AttemptStatus",
+        "description": "Terminal processing outcomes; loading messages are frontend-only."
+      },
       "AuthMeResponse": {
         "properties": {
           "authenticated": {
@@ -3316,6 +3455,102 @@
         "title": "MetadataValidationResponse",
         "description": "Response model for one metadata validation run."
       },
+      "RegistrationAttemptResponse": {
+        "properties": {
+          "attempt_status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "registration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Id"
+          },
+          "adapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Id"
+          },
+          "adapter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Name"
+          },
+          "repository_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Location"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "update_applied": {
+            "type": "boolean",
+            "title": "Update Applied",
+            "default": false
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "validation_errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Validation Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attempt_status",
+          "message"
+        ],
+        "title": "RegistrationAttemptResponse",
+        "description": "One terminal attempt, with accepted state kept separate from errors."
+      },
       "RegistrationCreateRequest": {
         "properties": {
           "repository_location": {
@@ -3374,107 +3609,36 @@
           "repository_location": "https://gitlab.example.org/biocypher/collectri"
         }
       },
-      "RegistrationCreateResponse": {
-        "properties": {
-          "registration_id": {
-            "type": "string",
-            "title": "Registration Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Repository Kind"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "License Value"
-          },
-          "doi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
-        ],
-        "title": "RegistrationCreateResponse",
-        "description": "Response returned after creating an adapter registration."
-      },
       "RegistrationCroissantFilePresentCheckResponse": {
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "FOUND",
+              "NOT_FOUND",
+              "UNAVAILABLE"
+            ],
+            "title": "Status"
+          },
+          "repository_url": {
+            "type": "string",
+            "title": "Repository Url"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
           "has_croissant_file": {
             "type": "boolean",
             "title": "Has Croissant File"
@@ -3482,6 +3646,9 @@
         },
         "type": "object",
         "required": [
+          "status",
+          "repository_url",
+          "message",
           "has_croissant_file"
         ],
         "title": "RegistrationCroissantFilePresentCheckResponse",

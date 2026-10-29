@@ -8,6 +8,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.core.registration.models import (
+    AttemptStatus,
+    ProcessingOutcome,
     RegistrationEvent,
     RegistrationStatus,
     StoredRegistration,
@@ -19,6 +21,39 @@ REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "doi": "10.5281/zenodo.1234567",
     "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
 }
+
+
+class RegistrationAttemptResponse(BaseModel):
+    """One terminal attempt, with accepted state kept separate from errors."""
+
+    attempt_status: AttemptStatus
+    registration_id: str | None = None
+    adapter_id: str | None = None
+    adapter_name: str | None = None
+    repository_location: str | None = None
+    published_version: str | None = None
+    update_applied: bool = False
+    reason_code: str | None = None
+    message: str
+    validation_errors: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def from_outcome(cls, outcome: ProcessingOutcome) -> RegistrationAttemptResponse:
+        registration = outcome.registration
+        return cls(
+            attempt_status=outcome.attempt_status,
+            registration_id=registration.registration_id if registration else None,
+            adapter_id=registration.adapter_id if registration else None,
+            adapter_name=registration.adapter_name if registration else None,
+            repository_location=registration.repository_location
+            if registration
+            else None,
+            published_version=outcome.published_version,
+            update_applied=outcome.update_applied,
+            reason_code=outcome.reason_code,
+            message=outcome.message,
+            validation_errors=list(outcome.validation_errors),
+        )
 
 
 class RegistrationCreateRequest(BaseModel):
@@ -178,6 +213,10 @@ class RegistrationListResponse(BaseModel):
 class RegistrationCroissantFilePresentCheckResponse(BaseModel):
     """Response model for a remote croissant.jsonld presence check."""
 
+    status: Literal["FOUND", "NOT_FOUND", "UNAVAILABLE"]
+    repository_url: str
+    reason_code: str | None = None
+    message: str
     has_croissant_file: bool
 
 

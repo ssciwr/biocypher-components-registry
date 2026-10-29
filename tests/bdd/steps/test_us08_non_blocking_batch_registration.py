@@ -257,11 +257,11 @@ def run_completes_with_mixed_outcomes(
     assert summary.invalid == 1
 
 
-@then("the run records a FETCH_FAILED outcome")
+@then("the batch counts the fetch failure without storing an unaccepted attempt")
 def run_records_a_fetch_failed_outcome(
     batch_registration_context: dict[str, Any],
 ) -> None:
-    """Assert that the broken source records a fetch failure event."""
+    """Count the failure in the batch summary without an unaccepted-source event."""
     summary = batch_registration_context["summary"]
 
     assert summary.fetch_failed == 1
@@ -277,10 +277,7 @@ def run_records_a_fetch_failed_outcome(
             (batch_registration_context["broken_registration_id"],),
         ).fetchone()
 
-    assert row == (
-        batch_registration_context["broken_registration_id"],
-        "FETCH_FAILED",
-    )
+    assert row is None
 
 
 @then("the source is reprocessed immediately")

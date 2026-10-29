@@ -163,6 +163,11 @@ export type AdapterDetailResponse = {
      * Can Delete
      */
     can_delete?: boolean;
+    /**
+     * Can Update
+     */
+    can_update?: boolean;
+    latest_attempt?: RegistrationAttemptResponse | null;
 };
 
 /**
@@ -456,6 +461,13 @@ export type AdapterMetadataResponse = {
 };
 
 /**
+ * AttemptStatus
+ *
+ * Terminal processing outcomes; loading messages are frontend-only.
+ */
+export type AttemptStatus = 'SUCCEEDED' | 'FAILED';
+
+/**
  * AuthMeResponse
  *
  * Browser-safe signed-in state.
@@ -661,6 +673,51 @@ export type MetadataValidationResponse = {
 };
 
 /**
+ * RegistrationAttemptResponse
+ *
+ * One terminal attempt, with accepted state kept separate from errors.
+ */
+export type RegistrationAttemptResponse = {
+    attempt_status: AttemptStatus;
+    /**
+     * Registration Id
+     */
+    registration_id?: string | null;
+    /**
+     * Adapter Id
+     */
+    adapter_id?: string | null;
+    /**
+     * Adapter Name
+     */
+    adapter_name?: string | null;
+    /**
+     * Repository Location
+     */
+    repository_location?: string | null;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
+    /**
+     * Update Applied
+     */
+    update_applied?: boolean;
+    /**
+     * Reason Code
+     */
+    reason_code?: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Validation Errors
+     */
+    validation_errors?: Array<string>;
+};
+
+/**
  * RegistrationCreateRequest
  *
  * Request body for creating an adapter registration.
@@ -693,60 +750,27 @@ export type RegistrationCreateRequest = {
 };
 
 /**
- * RegistrationCreateResponse
- *
- * Response returned after creating an adapter registration.
- */
-export type RegistrationCreateResponse = {
-    /**
-     * Registration Id
-     */
-    registration_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Repository Location
-     */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-};
-
-/**
  * RegistrationCroissantFilePresentCheckResponse
  *
  * Response model for a remote croissant.jsonld presence check.
  */
 export type RegistrationCroissantFilePresentCheckResponse = {
+    /**
+     * Status
+     */
+    status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE';
+    /**
+     * Repository Url
+     */
+    repository_url: string;
+    /**
+     * Reason Code
+     */
+    reason_code?: string | null;
+    /**
+     * Message
+     */
+    message: string;
     /**
      * Has Croissant File
      */
@@ -1555,6 +1579,36 @@ export type GetAdapterApiV1AdaptersAdapterIdGetResponses = {
 
 export type GetAdapterApiV1AdaptersAdapterIdGetResponse = GetAdapterApiV1AdaptersAdapterIdGetResponses[keyof GetAdapterApiV1AdaptersAdapterIdGetResponses];
 
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostData = {
+    body?: never;
+    path: {
+        /**
+         * Adapter Id
+         */
+        adapter_id: string;
+    };
+    query?: never;
+    url: '/api/v1/adapters/{adapter_id}/update';
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostError = UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors[keyof UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors];
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RegistrationAttemptResponse;
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponse = UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses[keyof UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses];
+
 export type EndorseAdapterApiV1AdaptersAdapterIdEndorsePostData = {
     body?: never;
     path: {
@@ -1715,6 +1769,10 @@ export type CreateRegistrationApiV1RegistrationsPostData = {
 
 export type CreateRegistrationApiV1RegistrationsPostErrors = {
     /**
+     * The repository is already registered.
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1724,9 +1782,13 @@ export type CreateRegistrationApiV1RegistrationsPostError = CreateRegistrationAp
 
 export type CreateRegistrationApiV1RegistrationsPostResponses = {
     /**
+     * Processing failed; no first-registration records were saved.
+     */
+    200: RegistrationAttemptResponse;
+    /**
      * Successful Response
      */
-    201: RegistrationCreateResponse;
+    201: RegistrationAttemptResponse;
 };
 
 export type CreateRegistrationApiV1RegistrationsPostResponse = CreateRegistrationApiV1RegistrationsPostResponses[keyof CreateRegistrationApiV1RegistrationsPostResponses];
@@ -1896,7 +1958,7 @@ export type ListRegistryRegistrationsApiV1RegistryRegistrationsGetData = {
          *
          * Filter by latest registration event type, such as VALID_CREATED, INVALID_SCHEMA, or FETCH_FAILED.
          */
-        latest_event?: 'SUBMITTED' | 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'REVALIDATED' | null;
+        latest_event?: 'SUBMITTED' | 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'REVALIDATED' | 'SCHEMA_INVALID' | 'SEMANTICS_INVALID' | 'MLCROISSANT_INVALID' | 'INVALID_JSON' | 'METADATA_NOT_FOUND' | 'REPOSITORY_UNAVAILABLE' | 'REMOTE_TEMPORARY' | 'DEFAULT_BRANCH_UNRESOLVED' | 'METADATA_TOO_LARGE' | 'VERSION_NOT_BUMPED' | 'ADAPTER_ID_CHANGED' | null;
     };
     url: '/api/v1/registry/registrations';
 };

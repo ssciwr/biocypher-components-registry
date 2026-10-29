@@ -344,7 +344,9 @@ def test_refresh_active_registrations_processes_mixed_outcomes(
             (missing.registration_id,),
         ).fetchone()
 
-    assert fetch_failed_events == (1,)
+    assert fetch_failed_events == (
+        0,
+    )  # Unaccepted sources do not retain failed attempts.
 
 
 def test_refresh_active_registrations_counts_duplicate_outcomes(
@@ -425,7 +427,7 @@ def test_revalidate_registration_reprocesses_corrected_invalid_source(
             (submitted.registration_id,),
         ).fetchone()
 
-    assert revalidated_events == (1,)
+    assert revalidated_events == (0,)  # First acceptance has no prior attempt marker.
     assert valid_created_events == (1,)
 
 

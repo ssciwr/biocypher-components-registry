@@ -419,3 +419,15 @@ def outcome_is_recorded_in_registration_events_as(
         ).fetchone()
 
     assert row == (registration_id, event_type)
+
+
+@then("no failed first-processing event is stored")
+def no_failed_first_processing_event_is_stored(registration_architecture_context):
+    source_id = registration_architecture_context.get(
+        "duplicate_registration_id",
+        registration_architecture_context["registration_id"],
+    )
+    store = SQLiteRegistrationStore(registration_architecture_context["database_path"])
+    assert [
+        event.event_type for event in store.list_registration_events(source_id)
+    ] == ["SUBMITTED"]

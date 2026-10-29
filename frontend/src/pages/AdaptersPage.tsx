@@ -15,6 +15,7 @@ import CitationEndorsement from '../components/CitationEndorsement'
 import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
   deleteAdapterApiV1AdaptersAdapterIdDelete,
+  updateAdapterApiV1AdaptersAdapterIdUpdatePost,
   getAdapterApiV1AdaptersAdapterIdGet,
   listLatestAdaptersApiV1AdaptersLatestGet,
   searchAdaptersApiV1AdaptersSearchGet,
@@ -158,6 +159,8 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
   const [endorsementError, setEndorsementError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -228,6 +231,30 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
     }
   }
 
+
+  async function updateCurrentAdapter() {
+    setIsUpdating(true)
+    setUpdateError(null)
+    try {
+      const response = await updateAdapterApiV1AdaptersAdapterIdUpdatePost({ path: { adapter_id: adapterId } })
+      if (!response.data || response.error) {
+        const details = response.error as { detail?: string } | undefined
+        setUpdateError(details?.detail ?? 'Could not confirm the update result. Reload this page before trying again.')
+        return
+      }
+      const outcome = response.data
+      setAdapter((current) => current ? { ...current, latest_attempt: outcome, version: outcome.published_version } : current)
+      if (outcome.attempt_status === 'SUCCEEDED' && outcome.update_applied) {
+        const refreshed = await getAdapterApiV1AdaptersAdapterIdGet({ path: { adapter_id: adapterId } })
+        if (refreshed.data) setAdapter(refreshed.data)
+        else setUpdateError('Update succeeded. Reload the page to load the latest adapter details.')
+      }
+    } catch {
+      setUpdateError('Could not confirm the update result. Reload this page before trying again.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   async function deleteCurrentAdapter() {
     if (!globalThis.confirm(`Remove ${adapter?.adapter_name ?? 'this adapter'} from the registry?`)) return
@@ -379,17 +406,35 @@ bc.run()`}
             {endorsementError ? (
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
             ) : null}
-            {adapter.can_delete ? (
+            {adapter.can_delete || adapter.can_update ? (
               <div className="mt-7 border-t border-slate-100 pt-5">
-                <button
+                <div className="flex flex-wrap gap-3">
+                {adapter.can_update ? (
+                  <button className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isUpdating || isDeleting} onClick={() => void updateCurrentAdapter()} type="button">
+                    <ArrowPathIcon className="h-4 w-4" aria-hidden="true" />
+                    {isUpdating ? 'Updating...' : 'Update'}
+                  </button>
+                ) : null}
+                {adapter.can_delete ? <button
                   className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isDeleting}
+                  disabled={isDeleting || isUpdating}
                   onClick={() => void deleteCurrentAdapter()}
                   type="button"
                 >
                   <TrashIcon className="h-4 w-4" aria-hidden="true" />
                   {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
-                </button>
+                </button> : null}
+                </div>
+                {isUpdating ? <p className="mt-3 text-sm text-blue-700" role="status">PROCESSING</p> : null}
+                {!isUpdating && adapter.latest_attempt ? (
+                  <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm" role="status">
+                    <p><strong>Latest attempt:</strong> {adapter.latest_attempt.attempt_status}</p>
+                    <p><strong>Published version:</strong> {adapter.latest_attempt.published_version ?? 'None'}</p>
+                    <p>{adapter.latest_attempt.message}</p>
+                    {(adapter.latest_attempt.validation_errors ?? []).length > 1 ? <details className="mt-2"><summary>Validation details</summary><ul>{(adapter.latest_attempt.validation_errors ?? []).map((message, index) => <li key={index}>{message}</li>)}</ul></details> : null}
+                  </div>
+                ) : null}
+                {updateError ? <p className="mt-2 text-sm text-red-700" role="alert">{updateError}</p> : null}
                 {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
               </div>
             ) : null}

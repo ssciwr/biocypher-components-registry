@@ -166,6 +166,11 @@ def test_list_registry_registrations_endpoint_returns_latest_event_type(
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
+    # Existing databases can contain historical first-attempt failure events.
+    store.mark_registration_invalid(invalid.registration_id, ["Missing version."], "v1")
+    store.mark_registration_fetch_failed(
+        missing.registration_id, "Historical fetch failure."
+    )
 
     response = client.get("/api/v1/registry/registrations")
 
@@ -222,6 +227,8 @@ def test_list_registry_registrations_endpoint_filters_by_status_and_latest_event
     client = _create_registry_client(store)
     refresh_response = client.post("/api/v1/registry/refreshes")
     assert refresh_response.status_code == 200
+    # Filtering must remain compatible with pre-existing history.
+    store.mark_registration_invalid(invalid.registration_id, ["Missing version."], "v1")
 
     response = client.get(
         "/api/v1/registry/registrations",

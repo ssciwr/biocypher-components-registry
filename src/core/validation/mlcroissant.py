@@ -18,7 +18,9 @@ def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
     """
     try:
         mlc.Dataset(document)
-    except mlc.ValidationError as exc:
+    except (mlc.ValidationError, AssertionError) as exc:
+        # MLCroissant's JSON-LD expander asserts when valid JSON has no graph
+        # nodes (for example {}). This is invalid input, not a server failure.
         return _parse_validation_error(str(exc))
     return []
 

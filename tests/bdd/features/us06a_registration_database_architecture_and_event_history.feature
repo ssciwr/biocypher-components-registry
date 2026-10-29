@@ -22,10 +22,10 @@ Feature: Registration database architecture and event history
     Given a canonical valid entry already exists for an adapter_id and version
     When another source is processed with the same canonical metadata
     Then the canonical registry state remains correct for duplicate processing
-    And the outcome is recorded in registration_events as DUPLICATE
+    And no failed first-processing event is stored
 
   Scenario: Record invalid processing without creating canonical entries
     Given a stored registration source points to invalid adapter metadata
     When architecture registration processing finishes for invalid metadata
     Then the canonical registry state remains correct for invalid processing
-    And the outcome is recorded in registration_events as INVALID_SCHEMA
+    And no failed first-processing event is stored

@@ -27,6 +27,16 @@ class MetadataDiscoveryError(Exception):
     """Raised when ``croissant.jsonld`` cannot be uniquely located or loaded."""
 
 
+class RepositoryUnavailableError(MetadataDiscoveryError):
+    """A repository could not be inspected; absence has not been established."""
+
+    def __init__(
+        self, message: str, reason_code: str = "REPOSITORY_UNAVAILABLE"
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
 class MetadataFileNotFoundError(FileNotFoundError, MetadataDiscoveryError):
     """Raised when no croissant.jsonld can be found for a repository."""
 

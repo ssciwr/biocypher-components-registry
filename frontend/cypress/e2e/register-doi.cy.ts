@@ -17,7 +17,11 @@ const submittedRegistration = {
   registration_id: 'registration-1',
   repository_kind: 'remote',
   repository_location: draft.repositoryLocation,
-  status: 'SUBMITTED',
+  attempt_status: 'SUCCEEDED',
+  published_version: '1.0.0',
+  update_applied: false,
+  message: 'Registered version 1.0.0.',
+  validation_errors: [],
   submitted_by_github_user_id: '12345',
 }
 
@@ -36,22 +40,10 @@ describe('registration DOI check', () => {
 
   it('auto submits the saved draft after GitHub sign-in returns', () => {
     cy.intercept('GET', '**/api/v1/auth/me', { body: { authenticated: true } })
-    cy.intercept('GET', '**/api/v1/registrations/croissant-file-present-check*', { body: { has_croissant_file: true } })
+    cy.intercept('GET', '**/api/v1/registrations/croissant-file-present-check*', { body: { status: 'FOUND', has_croissant_file: true, repository_url: draft.repositoryLocation, message: 'Croissant file found at repository root.' } })
     cy.intercept('POST', '**/api/v1/registrations', {
       body: submittedRegistration,
     }).as('createRegistration')
-    cy.intercept('POST', '**/api/v1/registrations/registration-1/process', {
-      body: {
-        ...submittedRegistration,
-        metadata: {},
-        metadata_path: 'croissant.jsonld',
-        profile_version: '1.0',
-        status: 'VALID',
-        uniqueness_key: 'auto-submit-adapter::1.0.0',
-        updated_at: '2026-07-29T12:00:01Z',
-        validation_errors: [],
-      },
-    }).as('processRegistration')
 
     cy.visit('/register', {
       onBeforeLoad(window) {
@@ -64,7 +56,6 @@ describe('registration DOI check', () => {
       license_value: draft.licenseValue,
       doi,
     })
-    cy.wait('@processRegistration')
     cy.contains('Adapter registration successful').should('be.visible')
     cy.window().its('localStorage').invoke('getItem', draftKey).should('equal', null)
     cy.window().its('localStorage').invoke('getItem', submitAfterAuthKey).should('equal', null)

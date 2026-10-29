@@ -16,6 +16,27 @@ class RegistrationStatus(StrEnum):
     INVALID = "INVALID"
 
 
+class AttemptStatus(StrEnum):
+    """Terminal processing outcomes; loading messages are frontend-only."""
+
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+@dataclass(slots=True, frozen=True)
+class ProcessingOutcome:
+    """A processing result independent of whether a registration was persisted."""
+
+    attempt_status: AttemptStatus
+    message: str
+    registration: StoredRegistration | None = None
+    published_version: str | None = None
+    update_applied: bool = False
+    reason_code: str | None = None
+    validation_errors: tuple[str, ...] = ()
+    profile_version: str | None = None
+
+
 @dataclass(slots=True, frozen=True)
 class StoredRegistration:
     """Represents a registration request saved in the database.

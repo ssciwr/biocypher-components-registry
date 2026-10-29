@@ -12,7 +12,7 @@ Key capabilities:
 - **Dual Database Support**: SQLite (development) and PostgreSQL (production)
 - **Batch Processing**: Non-blocking registry refresh with isolated error handling
 - **Multiple Interfaces**: CLI, Web UI, and REST API
-- **Event Sourcing**: Complete audit trail of all registration attempts
+- **Update History**: Recorded outcomes for published adapter updates; failed first registrations are not stored
 - **Duplicate Prevention**: Enforced uniqueness by adapter id and metadata version
 - **On-Demand Revalidation**: Fix and reprocess failed registrations
 
@@ -59,6 +59,12 @@ Run a specific test file:
 
 ```bash
 uv run pytest tests/unit/test_cli_submit.py
+```
+
+The synchronous-processing tests also run against PostgreSQL when `REGISTRY_TEST_POSTGRES_URL` is set to a test database URL. Each case creates and removes its own uniquely named schema; existing tables are not cleared. For example:
+
+```bash
+REGISTRY_TEST_POSTGRES_URL=postgresql://registry@localhost/registry_test uv run pytest tests/unit/core/registration/test_synchronous_processing.py
 ```
 
 ## CLI Usage
@@ -174,13 +180,14 @@ All routes below are served under the `/api/v1` prefix.
 | GET | `/adapters/{adapter_id}` | Get one public adapter |
 | GET | `/adapters/{adapter_id}/metadata` | Get full Croissant metadata for one adapter |
 | POST | `/adapters/{adapter_id}/endorse` | Endorse one adapter as the signed-in GitHub user |
-| POST | `/registrations` | Submit an adapter registration |
+| POST | `/registrations` | Fetch, validate, and save an accepted first registration synchronously |
+| POST | `/adapters/{adapter_id}/update` | Update a published adapter as its submitting GitHub user |
 | GET | `/registrations/croissant-file-present-check` | Check whether a remote repository exposes `croissant.jsonld` |
 | GET | `/registrations` | List active registrations |
 | GET | `/registrations/{registration_id}` | Get one registration detail |
 | GET | `/registrations/{registration_id}/events` | List event history for one registration |
 | POST | `/registrations/{registration_id}/process` | Discover, validate, and persist a submitted registration |
-| POST | `/registrations/{registration_id}/revalidate` | Reprocess one invalid or fetch-failed registration |
+| POST | `/registrations/{registration_id}/revalidate` | Retry a staged source or failed published update with full validation |
 | GET | `/registry/registrations` | List registry registration rows with public status and latest event |
 | GET | `/registry/entries` | List canonical valid registry entries |
 | GET | `/registry/entries/{entry_id}` | Get one canonical valid registry entry |
@@ -209,6 +216,18 @@ curl http://localhost:8000/api/v1/registry/registrations
 curl -X POST http://localhost:8000/api/v1/registry/refreshes
 curl http://localhost:8000/api/v1/adapters
 ```
+
+### Registration and manual updates
+
+The registration form automatically checks for root-level `croissant.jsonld` after typing pauses for 500 ms. Repository, branch, and file links are normalized to the repository root, and Git resolves its actual default branch. The check reports `FOUND`, `NOT_FOUND`, or `UNAVAILABLE`; only `FOUND` enables Register. Inaccessible repositories are never reported as missing their metadata. Edit the URL and pause to run a fresh check, including when restoring the original URL.
+
+First registration uses one synchronous `POST /registrations`. Metadata is fetched at a newly resolved commit, parsed, and validated before persistence. Success atomically saves the source, accepted entry, and success event. A failed first registration saves none of these; the populated form offers **Retry registration**, which repeats the initial request and can retain the same version. The response has `attempt_status: SUCCEEDED | FAILED`, a message, reason code, and validation details; failed first attempts have no registration ID. Successful creation returns HTTP 201; a completed unsuccessful attempt returns HTTP 200 with `FAILED`. Clients must inspect the outcome.
+
+Published adapters have an **Update** button beside **Delete adapter**, with the same submitting-account ownership restriction enforced on the server. Update also retries a failed update. Unchanged metadata records a successful check. Changed accepted metadata requires a new unused version for the same adapter identity. A failed update records its outcome and retains the accepted metadata. The summary shows only the attempt outcome, published version, and explanation, with expandable validation details when needed. `PROCESSING` is frontend-only; “Retrying...” and “Updating...” are messages, not statuses.
+
+Repository access uses the installed `git` executable over HTTPS, with noninteractive, isolated configuration and temporary shallow snapshots. Git network commands have a 15-second timeout and each Git operation a 60-second deadline; metadata is limited to 5 MiB. No GitHub REST Contents API, new database table, migration, job queue, worker, or scheduled refresh is introduced. Private/access-restricted repositories cannot be registered without accessible metadata. Local-path discovery and the explicit staging CLI commands remain available; processing an unaccepted staged source does not save a failed attempt. Existing historical records remain readable.
+
+Scheduled refreshes are deferred. The existing manual batch command/API uses the same processor, counts failed unaccepted attempts in its batch summary, and continues with the remaining sources.
 
 The agentic workspace routes below are served under the `/agent/api/v1`
 prefix (kept distinct from `/api/v1` — see [docs/API.md](docs/API.md) for

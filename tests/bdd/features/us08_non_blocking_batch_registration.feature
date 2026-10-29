@@ -10,7 +10,7 @@ Feature: Non-blocking batch registration
     Given one active source cannot be fetched and another is valid
     When the batch registration workflow runs
     Then remaining adapters are still processed
-    And the run records a FETCH_FAILED outcome
+    And the batch counts the fetch failure without storing an unaccepted attempt
 
   Scenario: Corrected metadata can be reprocessed on demand
     Given an active source previously failed validation

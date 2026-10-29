@@ -110,30 +110,12 @@ def _normalize_repository_into_pure_branchless_location(
     repository_location: str,
 ) -> str:
     normalized_location = repository_location.strip()
-    if normalized_location.startswith(("github.com/", "gitlab.com/")):
-        normalized_location = f"https://{normalized_location}"
-    parsed_location = urlparse(normalized_location)
-    if parsed_location.scheme:
-        path_parts = [part for part in parsed_location.path.split("/") if part]
-        if parsed_location.netloc.lower() == "github.com" and len(path_parts) >= 2:
-            path_parts = path_parts[:2]
-        elif "-" in path_parts:
-            marker_index = path_parts.index("-")
-            if marker_index >= 2:
-                path_parts = path_parts[:marker_index]
-        if path_parts:
-            path_parts[-1] = path_parts[-1].removesuffix(".git")
-        return (
-            parsed_location._replace(
-                netloc=parsed_location.netloc.lower(),
-                path=f"/{'/'.join(path_parts)}" if path_parts else "",
-                params="",
-                query="",
-                fragment="",
-            )
-            .geturl()
-            .rstrip("/")
-        )
+    if urlparse(normalized_location).scheme or normalized_location.startswith(
+        ("github.com/", "gitlab.com/")
+    ):
+        from src.core.shared.repositories import normalize_repository_url
+
+        return normalize_repository_url(normalized_location)
     return normalized_location
 
 
