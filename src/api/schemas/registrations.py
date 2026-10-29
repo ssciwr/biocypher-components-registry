@@ -14,6 +14,7 @@ from src.core.registration.models import (
     RegistrationStatus,
     StoredRegistration,
 )
+from src.core.validation.results import CheckStatus
 
 REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "repository_location": "https://gitlab.example.org/biocypher/collectri",
@@ -21,6 +22,46 @@ REGISTRATION_CREATE_EXAMPLE: dict[str, Any] = {
     "doi": "10.5281/zenodo.1234567",
     "cff_url": "https://gitlab.example.org/biocypher/collectri/-/raw/main/CITATION.cff",
 }
+
+
+class ValidationDetailResponse(BaseModel):
+    """Response-only context supplied by a metadata validator."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    message: str
+    json_path: str | None = None
+    requirement: str | None = None
+    expected_format: str | None = None
+    location_description: str | None = None
+    source_file: str | None = None
+    source_url: str | None = None
+    line: int | None = Field(default=None, ge=1)
+    column: int | None = Field(default=None, ge=1)
+    location_kind: Literal["value", "containing_object"] | None = None
+
+
+class ValidationCheckResponse(BaseModel):
+    """A validation stage, its provenance, and its inline diagnostic information."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    status: CheckStatus
+    description: str | None = None
+    reason: str | None = None
+    errors: list[str] = Field(default_factory=list)
+    validation_details: list[ValidationDetailResponse] = Field(default_factory=list)
+    parent_id: str | None = None
+    dataset_index: int | None = None
+    dataset_name: str | None = None
+    profile_version: str | None = None
+    schema_title: str | None = None
+    schema_id: str | None = None
+    schema_dialect: str | None = None
+    validator_name: str | None = None
+    validator_version: str | None = None
 
 
 class RegistrationAttemptResponse(BaseModel):
@@ -36,6 +77,9 @@ class RegistrationAttemptResponse(BaseModel):
     reason_code: str | None = None
     message: str
     validation_errors: list[str] = Field(default_factory=list)
+    validation_details: list[ValidationDetailResponse] = Field(default_factory=list)
+    validation_checks: list[ValidationCheckResponse] = Field(default_factory=list)
+    profile_version: str | None = None
 
     @classmethod
     def from_outcome(cls, outcome: ProcessingOutcome) -> RegistrationAttemptResponse:
@@ -53,7 +97,27 @@ class RegistrationAttemptResponse(BaseModel):
             reason_code=outcome.reason_code,
             message=outcome.message,
             validation_errors=list(outcome.validation_errors),
+            validation_details=[
+                ValidationDetailResponse.model_validate(detail)
+                for detail in outcome.validation_details
+            ],
+            validation_checks=[
+                ValidationCheckResponse.model_validate(check)
+                for check in outcome.validation_checks
+            ],
+            profile_version=outcome.profile_version,
         )
+
+
+class RegistrationStreamEvent(BaseModel):
+    """SSE data envelope; exactly one terminal result or error ends a stream."""
+
+    type: Literal["snapshot", "check", "result", "error"]
+    checks: list[ValidationCheckResponse] = Field(default_factory=list)
+    check: ValidationCheckResponse | None = None
+    result: RegistrationAttemptResponse | None = None
+    status_code: int | None = None
+    detail: str | None = None
 
 
 class RegistrationCreateRequest(BaseModel):

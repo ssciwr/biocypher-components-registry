@@ -7,7 +7,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from src.core.validation.results import ValidationCheckReport, ValidationDetail
 
+
+# legacy, remove when the the CLI application will be updated.
 class RegistrationStatus(StrEnum):
     """Tracked states for a stored registration request."""
 
@@ -35,6 +38,8 @@ class ProcessingOutcome:
     reason_code: str | None = None
     validation_errors: tuple[str, ...] = ()
     profile_version: str | None = None
+    validation_details: tuple[ValidationDetail, ...] = ()
+    validation_checks: tuple[ValidationCheckReport, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)

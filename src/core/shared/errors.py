@@ -48,6 +48,21 @@ class AmbiguousMetadataFileError(ValueError, MetadataDiscoveryError):
 class InvalidMetadataJSONError(ValueError, MetadataDiscoveryError):
     """Raised when croissant.jsonld contains invalid JSON."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+        source_file: str | None = None,
+        source_url: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.line = line
+        self.column = column
+        self.source_file = source_file
+        self.source_url = source_url
+
 
 class RemoteResourceNotFoundError(FileNotFoundError):
     """Raised when a remote resource is not found."""

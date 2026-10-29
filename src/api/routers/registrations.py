@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.errors import (
@@ -23,6 +26,8 @@ from src.api.schemas.registrations import (
     RegistrationListResponse,
     RegistrationProcessResponse,
     RegistrationRevalidateResponse,
+    RegistrationStreamEvent,
+    ValidationCheckResponse,
 )
 from src.core.auth.models import AuthSession
 from src.core.registration.models import AttemptStatus
@@ -35,8 +40,13 @@ from src.core.registration.store import RegistrationStore
 from src.core.shared.errors import InvalidRepoURLError, RepositoryUnavailableError
 from src.core.shared.files import remote_metadata_exists
 from src.core.shared.repositories import normalize_repository_url
+from src.core.validation.progress import CheckObserver, ValidationProgress
+from src.core.validation.results import ValidationCheckReport
 
 router = APIRouter()
+HEARTBEAT_SECONDS = 15
+# Retain workers on disconnect: processing may already have committed. Never resubmit.
+_processing_tasks: set[asyncio.Task] = set()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
 OptionalAuthSessionDep = Annotated[
@@ -88,10 +98,23 @@ def create_registration(
     auth_session: OptionalAuthSessionDep,
 ) -> RegistrationAttemptResponse:
     """Return a terminal result, committing only accepted first registrations."""
+    result = _submit_registration(payload, store, auth_session)
+    if result.attempt_status == AttemptStatus.FAILED:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+def _submit_registration(
+    payload: RegistrationCreateRequest,
+    store: RegistrationStore,
+    auth_session: AuthSession | None,
+    on_check: CheckObserver | None = None,
+) -> RegistrationAttemptResponse:
     try:
         outcome = register_adapter(
             repository_location=payload.repository_location,
             store=store,
+            on_check=on_check,
             license_value=payload.license_value,
             doi=payload.doi,
             cff_url=payload.cff_url,
@@ -99,14 +122,102 @@ def create_registration(
                 auth_session.github_user_id if auth_session is not None else None
             ),
         )
+        return RegistrationAttemptResponse.from_outcome(outcome)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
         raise registration_submission_http_error(exc) from exc
 
-    if outcome.attempt_status == AttemptStatus.FAILED:
-        response.status_code = status.HTTP_200_OK
-    return RegistrationAttemptResponse.from_outcome(outcome)
+
+class RegistrationEventStreamResponse(StreamingResponse):
+    media_type = "text/event-stream"
+
+
+async def _registration_events(
+    payload: RegistrationCreateRequest,
+    store: RegistrationStore,
+    auth_session: AuthSession | None,
+) -> AsyncIterator[str]:
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[RegistrationStreamEvent] = asyncio.Queue()
+    connected = True
+
+    def enqueue(event: RegistrationStreamEvent) -> None:
+        if connected:
+            queue.put_nowait(event)
+
+    def publish(event: RegistrationStreamEvent) -> None:
+        if connected:
+            loop.call_soon_threadsafe(enqueue, event)
+
+    def on_check(check: ValidationCheckReport) -> None:
+        publish(
+            RegistrationStreamEvent(
+                type="check", check=ValidationCheckResponse.model_validate(check)
+            )
+        )
+
+    def process() -> None:
+        try:
+            result = _submit_registration(payload, store, auth_session, on_check)
+            publish(RegistrationStreamEvent(type="result", result=result))
+        except HTTPException as exc:
+            publish(
+                RegistrationStreamEvent(
+                    type="error", status_code=exc.status_code, detail=str(exc.detail)
+                )
+            )
+
+    def encode(event: RegistrationStreamEvent) -> str:
+        return f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
+
+    try:
+        yield encode(
+            RegistrationStreamEvent(
+                type="snapshot",
+                checks=[
+                    ValidationCheckResponse.model_validate(check)
+                    for check in ValidationProgress(
+                        include_file=True, include_datasets=True
+                    ).reports
+                ],
+            )
+        )
+        worker = asyncio.create_task(asyncio.to_thread(process))
+        _processing_tasks.add(worker)
+        worker.add_done_callback(_processing_tasks.discard)
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_SECONDS)
+            except TimeoutError:
+                yield ": heartbeat\n\n"
+                continue
+            yield encode(event)
+            if event.type in {"result", "error"}:
+                break
+    finally:
+        connected = False
+        while not queue.empty():
+            queue.get_nowait()
+
+
+@router.post(
+    "/registrations/stream",
+    response_class=RegistrationEventStreamResponse,
+    response_model=RegistrationStreamEvent,
+    responses={200: {"model": RegistrationStreamEvent}},
+    summary="Register an adapter with live validation progress",
+    description="One submission per connection. Terminal result follows persistence. Do not automatically reconnect or retry this POST.",
+)
+async def stream_registration(
+    payload: RegistrationCreateRequest,
+    store: RegistrationStoreDep,
+    auth_session: OptionalAuthSessionDep,
+) -> StreamingResponse:
+    return RegistrationEventStreamResponse(
+        _registration_events(payload, store, auth_session),
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get(

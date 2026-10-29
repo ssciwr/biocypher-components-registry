@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 from requests import HTTPError, RequestException
@@ -16,6 +17,7 @@ from src.core.shared.errors import (
     MetadataFileNotFoundError,
     RemoteResourceNotFoundError,
 )
+from src.core.shared.json_source import JSONSource, MetadataDocument
 from src.core.shared.repositories import repository_snapshot
 
 
@@ -64,7 +66,9 @@ def fetch_remote_file(url: str) -> str:
         raise RequestException(msg) from exc
 
 
-def parse_json_metadata(content: str, source: str) -> dict[str, Any]:
+def parse_json_metadata(
+    content: str, source: str, *, source_url: str | None = None
+) -> dict[str, Any]:
     """Parse JSON metadata and attach the source to parsing errors.
 
     Args:
@@ -80,10 +84,18 @@ def parse_json_metadata(content: str, source: str) -> dict[str, Any]:
             raise InvalidMetadataJSONError(
                 f"Metadata in {source} must be a JSON object."
             )
-        return metadata
+        return MetadataDocument(
+            metadata, JSONSource(content, METADATA_FILENAME, source_url)
+        )
     except json.JSONDecodeError as exc:
         msg = f"Invalid JSON in {source}: {exc}"
-        raise InvalidMetadataJSONError(msg) from exc
+        raise InvalidMetadataJSONError(
+            msg,
+            line=exc.lineno,
+            column=exc.colno,
+            source_file=METADATA_FILENAME,
+            source_url=source_url,
+        ) from exc
 
 
 def fetch_local_metadata(repo_path: str | Path) -> tuple[Path, dict[str, Any]]:
@@ -123,7 +135,15 @@ def fetch_local_metadata(repo_path: str | Path) -> tuple[Path, dict[str, Any]]:
 def fetch_remote_metadata(repo_url: str) -> dict[str, Any]:
     """Read root metadata from the repository's resolved default-branch commit."""
     with repository_snapshot(repo_url) as snapshot:
-        return parse_json_metadata(snapshot.read_metadata(), snapshot.repository_url)
+        source_url = (
+            f"{snapshot.repository_url}/blob/{snapshot.commit}/{METADATA_FILENAME}"
+            if urlparse(snapshot.repository_url).hostname == "github.com"
+            and isinstance(snapshot.commit, str)
+            else None
+        )
+        return parse_json_metadata(
+            snapshot.read_metadata(), snapshot.repository_url, source_url=source_url
+        )
 
 
 def remote_metadata_exists(repo_url: str) -> bool:

@@ -13,25 +13,68 @@ from __future__ import annotations
 
 from typing import Any
 
-import jsonschema
 import jsonschema.validators
 
-from src.core.schema.profile import load_active_schema
+from src.core.schema import profile
 from src.core.validation.dataset import validate_embedded_dataset
 from src.core.validation.mlcroissant import validate_with_mlcroissant
-from src.core.validation.results import ValidationCheck, ValidationResult
+from src.core.validation.progress import ValidationProgress, croissant_validator_info
+from src.core.validation.results import (
+    ValidationCheck,
+    ValidationCheckReport,
+    ValidationResult,
+)
+from src.core.validation.schema_diagnostics import (
+    format_schema_error,
+    schema_validation_details,
+)
 
 
-def validate_adapter(data: dict[str, Any]) -> ValidationResult:
+def validate_adapter(
+    data: dict[str, Any], *, progress: ValidationProgress | None = None
+) -> ValidationResult:
     """Validate adapter metadata against the active adapter schema."""
-    schema = load_active_schema()
+    progress = progress or ValidationProgress()
+    profile_version = profile.ACTIVE_PROFILE_VERSION
+    schema = profile.load_schema(profile_version)
 
     validator_cls = jsonschema.validators.validator_for(schema)
     validator = validator_cls(schema)
 
+    progress.update("croissant", status="RUNNING", **croissant_validator_info())
     mlcroissant_errors = validate_with_mlcroissant(data)
-    schema_errors = [_format_error(err) for err in validator.iter_errors(data)]
+    progress.update(
+        "croissant",
+        status="FAILED" if mlcroissant_errors else "PASSED",
+        errors=tuple(mlcroissant_errors),
+    )
+    progress.update(
+        "schema",
+        status="RUNNING",
+        profile_version=profile_version,
+        schema_title=schema.get("title"),
+        schema_id=schema.get("$id"),
+        schema_dialect=schema.get("$schema"),
+        validator_name="jsonschema",
+    )
+    raw_schema_errors = list(validator.iter_errors(data))
+    schema_errors = [format_schema_error(err) for err in raw_schema_errors]
+    schema_details = schema_validation_details(
+        raw_schema_errors, schema, getattr(data, "json_source", None)
+    )
+    progress.update(
+        "schema",
+        status="FAILED" if schema_errors else "PASSED",
+        errors=tuple(schema_errors),
+        validation_details=tuple(schema_details),
+    )
+    progress.update("semantics", status="RUNNING")
     semantic_errors = _semantic_errors(data)
+    progress.update(
+        "semantics",
+        status="FAILED" if semantic_errors else "PASSED",
+        errors=tuple(semantic_errors),
+    )
     checks = [
         ValidationCheck(
             name="Croissant compliance",
@@ -42,6 +85,7 @@ def validate_adapter(data: dict[str, Any]) -> ValidationResult:
             name="Adapter schema",
             is_valid=len(schema_errors) == 0,
             errors=schema_errors,
+            validation_details=schema_details,
         ),
         ValidationCheck(
             name="Adapter semantics",
@@ -59,6 +103,11 @@ def validate_adapter(data: dict[str, Any]) -> ValidationResult:
         is_valid=all(check.is_valid for check in checks),
         errors=errors,
         checks=checks,
+        profile_version=profile_version,
+        validation_checks=progress.reports,
+        validation_details=[
+            detail for check in checks for detail in check.validation_details
+        ],
     )
 
 
@@ -67,7 +116,9 @@ def validate(data: dict[str, Any]) -> ValidationResult:
     return validate_adapter(data)
 
 
-def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationResult:
+def validate_adapter_with_embedded_datasets(
+    data: dict[str, Any], *, progress: ValidationProgress | None = None
+) -> ValidationResult:
     """Validate adapter metadata and each embedded dataset fragment.
 
     This is the registry-level adapter validation contract used by user-facing
@@ -75,8 +126,11 @@ def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationR
     dataset checks together so the API, CLI, and registration workflow
     agree on what a valid adapter means.
     """
-    adapter_result = validate_adapter(data)
-    embedded_checks = _embedded_dataset_checks(data)
+    progress = progress or ValidationProgress(include_datasets=True)
+    if not any(check.id == "datasets" for check in progress.reports):
+        progress.put(ValidationCheckReport("datasets", "Embedded datasets"))
+    adapter_result = validate_adapter(data, progress=progress)
+    embedded_checks = _embedded_dataset_checks(data, progress)
     checks = [*adapter_result.checks, *embedded_checks]
     errors = [error for check in checks for error in check.errors]
 
@@ -85,23 +139,63 @@ def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationR
         errors=errors,
         checks=checks,
         profile_version=adapter_result.profile_version,
+        validation_checks=progress.reports,
+        validation_details=[
+            detail for check in checks for detail in check.validation_details
+        ],
     )
 
 
-def _embedded_dataset_checks(data: dict[str, Any]) -> list[ValidationCheck]:
+def _embedded_dataset_checks(
+    data: dict[str, Any], progress: ValidationProgress
+) -> list[ValidationCheck]:
     """Validate each embedded dataset as a standalone Croissant dataset."""
     has_part = data.get("hasPart")
     if isinstance(has_part, dict):
         has_part = [has_part]
-    if not isinstance(has_part, list):
+    if not isinstance(has_part, list) or not has_part:
+        progress.update(
+            "datasets",
+            status="NOT_RUN",
+            reason="No embedded dataset objects are available. See the adapter schema result.",
+        )
         return []
 
+    progress.update("datasets", status="RUNNING")
+    for index, dataset in enumerate(has_part):
+        label = (
+            str(dataset.get("name") or f"Dataset {index + 1}")
+            if isinstance(dataset, dict)
+            else f"Dataset {index + 1}"
+        )
+        progress.put(
+            ValidationCheckReport(
+                id=f"dataset:{index}",
+                name=label,
+                parent_id="datasets",
+                dataset_index=index,
+                dataset_name=label,
+            )
+        )
     checks: list[ValidationCheck] = []
     for index, dataset in enumerate(has_part, start=1):
+        check_id = f"dataset:{index - 1}"
         if not isinstance(dataset, dict):
+            progress.update(
+                check_id,
+                status="NOT_RUN",
+                reason="This hasPart item is not an object. See the adapter schema result.",
+            )
             continue
+        progress.update(check_id, status="RUNNING", **croissant_validator_info())
         label = str(dataset.get("name") or f"dataset[{index}]")
         result = validate_embedded_dataset(dataset)
+        progress.update(
+            check_id,
+            status="PASSED" if result.is_valid else "FAILED",
+            errors=tuple(f"[{label}] {error}" for error in result.errors),
+            validation_details=tuple(result.validation_details),
+        )
         checks.append(
             ValidationCheck(
                 name=f"Embedded dataset: {label}",
@@ -109,13 +203,25 @@ def _embedded_dataset_checks(data: dict[str, Any]) -> list[ValidationCheck]:
                 errors=[f"[{label}] {error}" for error in result.errors],
             )
         )
+    _complete_dataset_group(progress)
     return checks
 
 
-def _format_error(error: jsonschema.ValidationError) -> str:
-    path = " → ".join(str(p) for p in error.absolute_path)
-    location = f"[{path}] " if path else ""
-    return f"{location}{error.message}"
+def _complete_dataset_group(progress: ValidationProgress) -> None:
+    """Finalize the group, giving failed checks precedence over skipped checks."""
+    children = [check for check in progress.reports if check.parent_id == "datasets"]
+    status = "PASSED"
+    if any(check.status == "FAILED" for check in children):
+        status = "FAILED"
+    elif any(check.status == "NOT_RUN" for check in children):
+        status = "NOT_RUN"
+    progress.update(
+        "datasets",
+        status=status,
+        reason="Some dataset checks could not run. See their results below."
+        if status == "NOT_RUN"
+        else None,
+    )
 
 
 def _semantic_errors(data: dict[str, Any]) -> list[str]:

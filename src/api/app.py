@@ -13,6 +13,7 @@ from src.api.routers import (
     metadata,
     registrations,
     registry,
+    schemas,
     workspace,
 )
 from src.api.settings import settings
@@ -88,6 +89,7 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         prefix=settings.api_v1_prefix,
         tags=["registry"],
     )
+    app.include_router(schemas.router, prefix=settings.api_v1_prefix, tags=["schemas"])
     if agentic_api_active:
         app.include_router(
             workspace.router,
