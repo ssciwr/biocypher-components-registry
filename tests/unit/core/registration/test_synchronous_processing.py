@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -22,6 +23,11 @@ from src.core.registration.service import (
     update_registration,
 )
 from src.core.shared.errors import RepositoryUnavailableError
+from src.core.validation.results import (
+    ValidationCheck,
+    ValidationDetail,
+    ValidationResult,
+)
 from src.persistence.registration_postgres_store import PostgreSQLRegistrationStore
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from src.persistence.tables import (
@@ -236,6 +242,86 @@ def test_update_accepts_new_version_and_unchanged_is_a_success(repository, store
     assert counts(store) == (1, 2, 3)
 
 
+@pytest.mark.parametrize("force_validation", [False, True])
+def test_unchanged_update_revalidates_only_when_forced(
+    repository, store, monkeypatch, force_validation
+):
+    from src.core.registration import service
+
+    first = register_adapter(str(repository), store).registration
+    validate = service.validate_discovered_adapter
+    validated = []
+
+    def track_validation(candidate, **kwargs):
+        validated.append(candidate)
+        return validate(candidate, **kwargs)
+
+    monkeypatch.setattr(service, "validate_discovered_adapter", track_validation)
+    outcome = update_registration(
+        first.registration_id, store, force_validation=force_validation
+    )
+
+    assert len(validated) == int(force_validation)
+    assert outcome.attempt_status == AttemptStatus.SUCCEEDED
+    assert outcome.message == "No changes found."
+    assert not outcome.update_applied
+    assert outcome.profile_version == "v1"
+    assert outcome.validation_checks[0].status == "PASSED"
+    expected_status = "PASSED" if force_validation else "NOT_RUN"
+    assert all(
+        check.status == expected_status for check in outcome.validation_checks[1:]
+    )
+    assert counts(store) == (1, 1, 2)
+
+
+@pytest.mark.parametrize(
+    "failed_checks, is_valid, errors, reason",
+    [
+        (["Adapter semantics"], False, ["Broken reference"], "SEMANTICS_INVALID"),
+        (["Croissant compliance"], False, ["Invalid Croissant"], "MLCROISSANT_INVALID"),
+        (["Adapter schema"], False, ["Missing field"], "SCHEMA_INVALID"),
+        (
+            ["Adapter semantics", "Croissant compliance"],
+            False,
+            ["Multiple failures"],
+            "SCHEMA_INVALID",
+        ),
+        ([], True, ["Reported error"], "SCHEMA_INVALID"),
+        ([], False, [], "SCHEMA_INVALID"),
+    ],
+)
+def test_validation_failure_preserves_reason_profile_and_details(
+    repository, store, monkeypatch, failed_checks, is_valid, errors, reason
+):
+    from src.core.registration import service
+
+    detail = ValidationDetail(message="Invalid metadata", json_path="$.name")
+    validation = ValidationResult(
+        is_valid=is_valid,
+        errors=errors,
+        checks=[ValidationCheck(name=name, is_valid=False) for name in failed_checks],
+        profile_version="test-profile",
+        validation_details=[detail],
+    )
+    monkeypatch.setattr(
+        service,
+        "validate_discovered_adapter",
+        lambda candidate, **kwargs: replace(candidate, validation=validation),
+    )
+
+    outcome = register_adapter(str(repository), store)
+
+    assert outcome.attempt_status == AttemptStatus.FAILED
+    assert outcome.reason_code == reason
+    assert outcome.validation_errors == tuple(errors or ["Metadata is invalid."])
+    assert outcome.validation_details == (detail,)
+    assert outcome.profile_version == "test-profile"
+    assert outcome.registration is None
+    assert outcome.validation_checks[0].status == "PASSED"
+    assert all(check.status == "NOT_RUN" for check in outcome.validation_checks[1:])
+    assert counts(store) == (0, 0, 0)
+
+
 def test_stale_update_cannot_replace_a_concurrent_success(
     repository, store, monkeypatch
 ):
@@ -247,7 +333,7 @@ def test_stale_update_cannot_replace_a_concurrent_success(
 
     validate = service.validate_discovered_adapter
 
-    def concurrent_validation(candidate):
+    def concurrent_validation(candidate, **kwargs):
         other = sample_adapter_document()
         other["version"] = "1.2.0"
         request = service.create_registration_request(str(repository))
@@ -259,7 +345,7 @@ def test_stale_update_cannot_replace_a_concurrent_success(
             service._metadata_checksum(other),
             first,
         )
-        return validate(candidate)
+        return validate(candidate, **kwargs)
 
     monkeypatch.setattr(service, "validate_discovered_adapter", concurrent_validation)
     with pytest.raises(ConcurrentRegistrationChangeError):
@@ -279,9 +365,9 @@ def test_deletion_during_processing_cannot_recreate_registration(
 
     validate = service.validate_discovered_adapter
 
-    def delete_during_validation(candidate):
+    def delete_during_validation(candidate, **kwargs):
         store.remove_adapter(first.adapter_id, [first.registration_id])
-        return validate(candidate)
+        return validate(candidate, **kwargs)
 
     monkeypatch.setattr(
         service, "validate_discovered_adapter", delete_during_validation

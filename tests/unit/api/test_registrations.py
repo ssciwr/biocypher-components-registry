@@ -83,6 +83,7 @@ def test_create_registration_endpoint_persists_accepted_registration(
     assert payload["adapter_name"] == "Example Adapter"
     assert payload["adapter_id"] == "example-adapter"
     assert payload["published_version"] == "1.0.0"
+    assert payload["validation_details"] == []
     stored = store.get_registration(payload["registration_id"])
     assert stored.status == "VALID"
     assert stored.license_value == "MIT"
@@ -119,6 +120,14 @@ def test_failed_first_registration_returns_errors_without_records(
     assert response.json()["reason_code"] == reason
     assert response.json()["registration_id"] is None
     assert response.json()["published_version"] is None
+    if reason == "INVALID_JSON":
+        if content == "{":
+            detail = response.json()["validation_details"][0]
+            assert (detail["line"], detail["column"]) == (1, 2)
+            assert detail["source_file"] == "croissant.jsonld"
+            assert detail["location_kind"] == "value"
+        else:
+            assert response.json()["validation_details"] == []
     assert_no_registration_writes(store)
 
 
@@ -138,6 +147,42 @@ def test_retry_repeats_initial_request_with_same_version(client, repository, sto
     )
     assert response.status_code == 201
     assert response.json()["published_version"] == "1.0.0"
+
+
+def test_failed_registration_returns_schema_context_without_database_writes(
+    client, repository, store
+):
+    metadata = sample_adapter_document()
+    metadata.pop("keywords")
+    metadata.pop("license")
+    (repository / "croissant.jsonld").write_text(
+        "\n\n" + json.dumps(metadata, indent=2)
+    )
+    response = client.post(
+        "/api/v1/registrations", json={"repository_location": str(repository)}
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["attempt_status"] == "FAILED"
+    assert payload["registration_id"] is None
+    assert payload["reason_code"] == "SCHEMA_INVALID"
+    assert payload["message"] == payload["validation_errors"][0]
+    assert [detail["message"] for detail in payload["validation_details"]] == payload[
+        "validation_errors"
+    ]
+    details = {detail["json_path"]: detail for detail in payload["validation_details"]}
+    assert details["$.keywords"]["requirement"] == "Required property"
+    assert (
+        details["$.keywords"]["expected_format"]
+        == "An array containing at least one non-empty string"
+    )
+    assert details["$.license"]["expected_format"] == "A non-empty string"
+    assert details["$.keywords"]["line"] == 3
+    assert details["$.keywords"]["column"] == 1
+    assert details["$.keywords"]["location_kind"] == "containing_object"
+    assert details["$.keywords"]["source_file"] == "croissant.jsonld"
+    assert "top-level object" in details["$.keywords"]["location_description"]
+    assert_no_registration_writes(store)
 
 
 def test_duplicate_repository_returns_conflict(client, repository, store):
@@ -263,8 +308,301 @@ def test_registration_openapi_documents_success_and_unsuccessful_attempts():
     responses = create_app().openapi()["paths"]["/api/v1/registrations"]["post"][
         "responses"
     ]
-    assert "200" in responses and "201" in responses and "409" in responses
+    assert "200" in responses
+    assert "201" in responses
+    assert "409" in responses
     assert (
         responses["200"]["content"]["application/json"]["schema"]
         == responses["201"]["content"]["application/json"]["schema"]
     )
+
+
+def stream_events(response):
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["x-accel-buffering"] == "no"
+    return [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def test_stream_registration_reports_success_only_after_acceptance(
+    client, repository, store
+):
+    events = stream_events(
+        client.post(
+            "/api/v1/registrations/stream",
+            json={"repository_location": str(repository)},
+        )
+    )
+    assert events[0]["type"] == "snapshot"
+    assert all(check["status"] == "PENDING" for check in events[0]["checks"])
+    assert events[-1]["type"] == "result"
+    result = events[-1]["result"]
+    assert result["attempt_status"] == "SUCCEEDED"
+    assert result["profile_version"] == "v1"
+    assert all(check["status"] == "PASSED" for check in result["validation_checks"])
+    assert store.get_registration(result["registration_id"]).status == "VALID"
+    states = [
+        (event["check"]["id"], event["check"]["status"])
+        for event in events
+        if event["type"] == "check"
+    ]
+    assert ("file", "RUNNING") in states
+    assert ("schema", "PASSED") in states
+    assert ("dataset:0", "PASSED") in states
+
+
+def test_stream_schema_failure_preserves_diagnostics_and_no_writes(
+    client, repository, store
+):
+    document = sample_adapter_document()
+    document.pop("keywords")
+    (repository / "croissant.jsonld").write_text(json.dumps(document, indent=2))
+    events = stream_events(
+        client.post(
+            "/api/v1/registrations/stream",
+            json={"repository_location": str(repository)},
+        )
+    )
+    result = events[-1]["result"]
+    assert result["attempt_status"] == "FAILED"
+    reports = {check["id"]: check for check in result["validation_checks"]}
+    assert reports["file"]["status"] == "PASSED"
+    assert reports["schema"]["status"] == "FAILED"
+    assert reports["semantics"]["status"] == "PASSED"
+    detail = reports["schema"]["validation_details"][0]
+    assert detail["message"] == "'keywords' is a required property"
+    assert detail["json_path"] == "$.keywords"
+    assert detail["location_kind"] == "containing_object"
+    assert detail["line"] == 1
+    assert_no_registration_writes(store)
+
+
+def test_stream_invalid_json_blocks_validation_without_claiming_a_schema(
+    client, repository, store
+):
+    (repository / "croissant.jsonld").write_text("{")
+    events = stream_events(
+        client.post(
+            "/api/v1/registrations/stream",
+            json={"repository_location": str(repository)},
+        )
+    )
+    result = events[-1]["result"]
+    assert result["reason_code"] == "INVALID_JSON"
+    file, *blocked = result["validation_checks"]
+    assert file["status"] == "FAILED"
+    assert file["validation_details"][0]["line"] == 1
+    assert all(check["status"] == "NOT_RUN" and check["reason"] for check in blocked)
+    assert all(check["profile_version"] is None for check in blocked)
+    assert_no_registration_writes(store)
+
+
+def test_stream_duplicate_request_returns_terminal_error_without_resubmission(
+    client, repository, store
+):
+    client.post("/api/v1/registrations", json={"repository_location": str(repository)})
+    events = stream_events(
+        client.post(
+            "/api/v1/registrations/stream",
+            json={"repository_location": str(repository)},
+        )
+    )
+    assert events[-1]["type"] == "error"
+    assert events[-1]["status_code"] == 409
+    assert not any(event["type"] == "result" for event in events)
+    assert len(store.list_active_registrations()) == 1
+
+
+def test_schema_endpoint_returns_deployed_schema_and_rejects_unknown_versions(client):
+    from src.core.schema.profile import load_schema
+
+    response = client.get("/api/v1/schemas/v1")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/schema+json"
+    assert response.json() == load_schema("v1")
+    assert client.get("/api/v1/schemas/unknown").status_code == 404
+
+
+def test_stream_openapi_documents_event_envelope():
+    schema = create_app().openapi()
+    content = schema["paths"]["/api/v1/registrations/stream"]["post"]["responses"][
+        "200"
+    ]["content"]
+    assert content["text/event-stream"]["schema"]["$ref"].endswith(
+        "/RegistrationStreamEvent"
+    )
+
+
+def test_live_progress_and_heartbeats_arrive_before_processing_finishes(
+    repository, store, monkeypatch
+):
+    import asyncio
+    import threading
+
+    from src.api.routers import registrations as router
+    from src.api.schemas.registrations import RegistrationCreateRequest
+    from src.core.registration import service
+
+    release = threading.Event()
+    discover = service._discover_registration_metadata
+
+    def blocked_discovery(request):
+        if not release.wait(5):
+            raise RuntimeError("Test did not release discovery")
+        return discover(request)
+
+    monkeypatch.setattr(service, "_discover_registration_metadata", blocked_discovery)
+    monkeypatch.setattr(router, "HEARTBEAT_SECONDS", 0.02)
+
+    async def exercise():
+        stream = router._registration_events(
+            RegistrationCreateRequest(repository_location=str(repository)), store, None
+        )
+        try:
+            assert "event: snapshot" in await anext(stream)
+            update = await asyncio.wait_for(anext(stream), 2)
+            assert '"id":"file"' in update
+            assert '"status":"RUNNING"' in update
+            assert not release.is_set()
+            assert await asyncio.wait_for(anext(stream), 2) == ": heartbeat\n\n"
+            release.set()
+            remaining = [event async for event in stream]
+            assert "event: result" in remaining[-1]
+        finally:
+            release.set()
+            await stream.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_disconnect_keeps_one_processing_attempt_without_saving_failed_records(
+    repository, store, monkeypatch
+):
+    import asyncio
+    import threading
+
+    from src.api.routers import registrations as router
+    from src.api.schemas.registrations import RegistrationCreateRequest
+    from src.core.registration import service
+
+    release = threading.Event()
+    calls = []
+    discover = service._discover_registration_metadata
+    (repository / "croissant.jsonld").write_text("{")
+
+    def blocked_discovery(request):
+        calls.append(request)
+        if not release.wait(5):
+            raise RuntimeError("Test did not release discovery")
+        return discover(request)
+
+    monkeypatch.setattr(service, "_discover_registration_metadata", blocked_discovery)
+
+    async def exercise():
+        stream = router._registration_events(
+            RegistrationCreateRequest(repository_location=str(repository)), store, None
+        )
+        try:
+            await anext(stream)
+            await asyncio.wait_for(anext(stream), 2)
+            await stream.aclose()
+        finally:
+            release.set()
+            await asyncio.gather(*list(router._processing_tasks))
+
+    asyncio.run(exercise())
+    assert len(calls) == 1
+    assert_no_registration_writes(store)
+
+
+def test_persistence_failure_does_not_turn_passed_validation_checks_red(
+    client, repository, store, monkeypatch
+):
+    def cannot_save(*args, **kwargs):
+        raise OSError("Storage unavailable")
+
+    monkeypatch.setattr(store, "accept_candidate", cannot_save)
+    events = stream_events(
+        client.post(
+            "/api/v1/registrations/stream",
+            json={"repository_location": str(repository)},
+        )
+    )
+    result = events[-1]["result"]
+    assert result["attempt_status"] == "FAILED"
+    assert all(check["status"] == "PASSED" for check in result["validation_checks"])
+    assert result["message"] == "Storage unavailable"
+    assert_no_registration_writes(store)
+
+
+def test_progress_is_flushed_over_http_before_discovery_finishes(
+    client, repository, monkeypatch
+):
+    import socket
+    import threading
+    import time
+
+    import httpx
+    import uvicorn
+
+    from src.core.registration import service
+
+    release = threading.Event()
+    discover = service._discover_registration_metadata
+
+    def blocked_discovery(request):
+        if not release.wait(5):
+            raise RuntimeError("Test did not release discovery")
+        return discover(request)
+
+    monkeypatch.setattr(service, "_discover_registration_metadata", blocked_discovery)
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(
+        uvicorn.Config(client.app, lifespan="off", log_level="warning")
+    )
+    thread = threading.Thread(
+        target=server.run, kwargs={"sockets": [listener]}, daemon=True
+    )
+    thread.start()
+    try:
+        deadline = time.monotonic() + 3
+        while not server.started:
+            assert thread.is_alive()
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        with (
+            httpx.Client(timeout=3, trust_env=False) as transport,
+            transport.stream(
+                "POST",
+                f"http://127.0.0.1:{listener.getsockname()[1]}/api/v1/registrations/stream",
+                json={"repository_location": str(repository)},
+            ) as response,
+        ):
+            assert response.status_code == 200
+            assert response.headers["cache-control"] == "no-store"
+            events = iter(response.iter_lines())
+            first = next(line for line in events if line.startswith("data: "))
+            assert json.loads(first.removeprefix("data: "))["type"] == "snapshot"
+            running = next(line for line in events if line.startswith("data: "))
+            check = json.loads(running.removeprefix("data: "))["check"]
+            assert (check["id"], check["status"]) == ("file", "RUNNING")
+            assert not release.is_set()
+            release.set()
+            remaining = [
+                json.loads(line.removeprefix("data: "))
+                for line in events
+                if line.startswith("data: ")
+            ]
+            assert remaining[-1]["type"] == "result"
+            assert remaining[-1]["result"]["attempt_status"] == "SUCCEEDED"
+    finally:
+        release.set()
+        server.should_exit = True
+        thread.join(timeout=5)
+        listener.close()
+    assert not thread.is_alive()

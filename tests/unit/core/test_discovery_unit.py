@@ -297,7 +297,7 @@ class TestFetchRemoteMetadata:
         from contextlib import contextmanager
         from unittest.mock import Mock
 
-        snapshot = Mock(repository_url="https://github.com/org/repo")
+        snapshot = Mock(repository_url="https://github.com/org/repo", commit="a" * 40)
         snapshot.read_metadata.return_value = '{"name": "remote"}'
         snapshot.has_metadata.return_value = True
 
@@ -313,7 +313,13 @@ class TestFetchRemoteMetadata:
         return snapshot
 
     def test_nominal_case(self, snapshot):
-        assert fetch_remote_metadata("https://github.com/org/repo")["name"] == "remote"
+        metadata = fetch_remote_metadata("https://github.com/org/repo")
+        assert metadata["name"] == "remote"
+        assert metadata.json_source.text == '{"name": "remote"}'
+        assert (
+            metadata.json_source.url
+            == f"https://github.com/org/repo/blob/{'a' * 40}/croissant.jsonld"
+        )
         assert snapshot.root_only is False
 
     @pytest.mark.parametrize("url", ["not-a-url", "ftp://gitlab.com/org/repo"])
