@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.dependencies import get_registration_store
 from src.api.routers import (
     adapters,
     auth,
@@ -18,6 +19,7 @@ from src.api.routers import (
 )
 from src.api.settings import settings
 from src.core.workspace.service import SessionManager
+from src.persistence.factory import close_stores
 
 agentic_api_active: bool = False
 
@@ -36,6 +38,10 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):  # pragma: no cover - workspace API is disabled
+        initialize = app.dependency_overrides.get(
+            get_registration_store, get_registration_store
+        )
+        await asyncio.to_thread(initialize)
         app.state.workspace_manager = workspace_manager or SessionManager()
         idle_reaper = asyncio.create_task(app.state.workspace_manager.run_idle_reaper())
         try:
@@ -45,6 +51,7 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
             with suppress(asyncio.CancelledError):
                 await idle_reaper
             await app.state.workspace_manager.shutdown()
+            close_stores()
 
     app = FastAPI(
         title=settings.app_title,

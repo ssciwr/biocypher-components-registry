@@ -11,7 +11,6 @@ from src.core.registration.models import (
     AttemptStatus,
     ProcessingOutcome,
     RegistrationEvent,
-    RegistrationStatus,
     StoredRegistration,
 )
 from src.core.validation.results import CheckStatus
@@ -175,8 +174,8 @@ class RegistrationCreateResponse(BaseModel):
     adapter_id: str
     repository_location: str
     repository_kind: Literal["local", "remote"] | str
-    status: RegistrationStatus
     created_at: datetime
+    published_version: str | None = None
     license_value: str | None = None
     doi: str | None = None
     cff_url: str | None = None
@@ -193,8 +192,11 @@ class RegistrationCreateResponse(BaseModel):
             adapter_id=registration.adapter_id,
             repository_location=registration.repository_location,
             repository_kind=registration.repository_kind,
-            status=registration.status,
             created_at=registration.created_at,
+            published_version=str((registration.metadata or {}).get("version", ""))
+            or None
+            if registration.current_registry_entry_id
+            else None,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
@@ -205,6 +207,7 @@ class RegistrationCreateResponse(BaseModel):
 class RegistrationDetailResponse(RegistrationCreateResponse):
     """Detailed response for one stored registration."""
 
+    latest_attempt: RegistrationAttemptResponse | None = None
     metadata_path: str | None = None
     metadata: dict[str, Any] | None = None
     profile_version: str | None = None
@@ -214,17 +217,24 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
 
     @classmethod
     def from_stored(
-        cls, registration: StoredRegistration
+        cls,
+        registration: StoredRegistration,
+        *,
+        latest_attempt: RegistrationAttemptResponse | None = None,
     ) -> RegistrationDetailResponse:
         """Build a detailed API response from a stored core registration model."""
         return cls(
+            latest_attempt=latest_attempt,
             registration_id=registration.registration_id,
             adapter_name=registration.adapter_name,
             adapter_id=registration.adapter_id,
             repository_location=registration.repository_location,
             repository_kind=registration.repository_kind,
-            status=registration.status,
             created_at=registration.created_at,
+            published_version=str((registration.metadata or {}).get("version", ""))
+            or None
+            if registration.current_registry_entry_id
+            else None,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
@@ -241,23 +251,31 @@ class RegistrationDetailResponse(RegistrationCreateResponse):
 class RegistrationListItemResponse(RegistrationCreateResponse):
     """Summary response model for one registration in a list."""
 
+    latest_attempt: RegistrationAttemptResponse | None = None
     profile_version: str | None = None
     updated_at: datetime | None = None
     uniqueness_key: str | None = None
 
     @classmethod
     def from_stored(
-        cls, registration: StoredRegistration
+        cls,
+        registration: StoredRegistration,
+        *,
+        latest_attempt: RegistrationAttemptResponse | None = None,
     ) -> RegistrationListItemResponse:
         """Build a list item response from a stored core registration model."""
         return cls(
+            latest_attempt=latest_attempt,
             registration_id=registration.registration_id,
             adapter_name=registration.adapter_name,
             adapter_id=registration.adapter_id,
             repository_location=registration.repository_location,
             repository_kind=registration.repository_kind,
-            status=registration.status,
             created_at=registration.created_at,
+            published_version=str((registration.metadata or {}).get("version", ""))
+            or None
+            if registration.current_registry_entry_id
+            else None,
             license_value=registration.license_value,
             doi=registration.doi,
             cff_url=registration.cff_url,
@@ -323,11 +341,3 @@ class RegistrationEventListResponse(BaseModel):
     """Response model for a registration event history list."""
 
     items: list[RegistrationEventResponse]
-
-
-class RegistrationProcessResponse(RegistrationDetailResponse):
-    """Response returned after processing one registration."""
-
-
-class RegistrationRevalidateResponse(RegistrationDetailResponse):
-    """Response returned after revalidating one registration."""

@@ -52,6 +52,8 @@ MANDATORY_FIELDS = (
 )
 
 DEFAULT_PROFILE_URL = "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/"
+# Croissant requires this exact HTTP identifier; it is not a transport endpoint.
+# https://docs.mlcommons.org/croissant/docs/croissant-spec.html
 CROISSANT_CONFORMS_TO_URL = "http://mlcommons.org/croissant/1.0"
 DEFAULT_PROGRAMMING_LANGUAGE = "Python"
 DEFAULT_TARGET_PRODUCT = "BioCypher"

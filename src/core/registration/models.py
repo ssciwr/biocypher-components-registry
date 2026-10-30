@@ -10,15 +10,6 @@ from typing import Any
 from src.core.validation.results import ValidationCheckReport, ValidationDetail
 
 
-# legacy, remove when the the CLI application will be updated.
-class RegistrationStatus(StrEnum):
-    """Tracked states for a stored registration request."""
-
-    SUBMITTED = "SUBMITTED"
-    VALID = "VALID"
-    INVALID = "INVALID"
-
-
 class AttemptStatus(StrEnum):
     """Terminal processing outcomes; loading messages are frontend-only."""
 
@@ -52,7 +43,6 @@ class StoredRegistration:
         adapter_id: Stable slug identifier for the adapter.
         repository_location: Normalized repository path or URL.
         repository_kind: Repository location type.
-        status: Current tracked status for the submission.
         created_at: Timestamp when the submission was stored.
         description: Optional maintainer-facing adapter summary.
         license_value: Optional submitted adapter license text.
@@ -73,7 +63,6 @@ class StoredRegistration:
     adapter_id: str
     repository_location: str
     repository_kind: str
-    status: RegistrationStatus
     created_at: datetime
     description: str | None = None
     license_value: str | None = None
@@ -146,6 +135,7 @@ class BatchRefreshSummary:
     duplicate: int = 0
     rejected_same_version_changed: int = 0
     fetch_failed: int = 0
+    internal_failed: int = 0
 
 
 @dataclass(slots=True, frozen=True)
@@ -163,3 +153,4 @@ class BatchRefreshRecord:
     duplicate: int = 0
     rejected_same_version_changed: int = 0
     fetch_failed: int = 0
+    internal_failed: int = 0

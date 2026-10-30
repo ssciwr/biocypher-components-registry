@@ -6,10 +6,10 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from src.api.schemas.registrations import RegistrationAttemptResponse
 from src.core.registration.models import (
     BatchRefreshRecord,
     BatchRefreshSummary,
-    RegistrationStatus,
     RegistryEntry,
     StoredRegistration,
 )
@@ -29,6 +29,7 @@ class RegistryRefreshResponse(BaseModel):
     invalid: int
     duplicate: int
     rejected_same_version_changed: int
+    internal_failed: int
     fetch_failed: int
 
     @classmethod
@@ -43,6 +44,7 @@ class RegistryRefreshResponse(BaseModel):
             duplicate=summary.duplicate,
             rejected_same_version_changed=summary.rejected_same_version_changed,
             fetch_failed=summary.fetch_failed,
+            internal_failed=summary.internal_failed,
         )
 
 
@@ -59,6 +61,7 @@ class RegistryRefreshLatestResponse(BaseModel):
     invalid: int
     duplicate: int
     rejected_same_version_changed: int
+    internal_failed: int
     fetch_failed: int
 
     @classmethod
@@ -79,6 +82,7 @@ class RegistryRefreshLatestResponse(BaseModel):
             duplicate=record.duplicate,
             rejected_same_version_changed=record.rejected_same_version_changed,
             fetch_failed=record.fetch_failed,
+            internal_failed=record.internal_failed,
         )
 
 
@@ -90,9 +94,10 @@ class RegistryRegistrationResponse(BaseModel):
     adapter_id: str
     repository_kind: str
     repository_location: str
-    status: RegistrationStatus
     latest_event_type: str
     created_at: datetime
+    published_version: str | None = None
+    latest_attempt: RegistrationAttemptResponse | None = None
     updated_at: datetime | None = None
     profile_version: str | None = None
     uniqueness_key: str | None = None
@@ -103,17 +108,22 @@ class RegistryRegistrationResponse(BaseModel):
         registration: StoredRegistration,
         *,
         latest_event_type: str,
+        latest_attempt: RegistrationAttemptResponse | None = None,
     ) -> RegistryRegistrationResponse:
         """Build a registry registration row from a stored registration."""
         return cls(
+            latest_attempt=latest_attempt,
             registration_id=registration.registration_id,
             adapter_name=registration.adapter_name,
             adapter_id=registration.adapter_id,
             repository_kind=registration.repository_kind,
             repository_location=registration.repository_location,
-            status=registration.status,
             latest_event_type=latest_event_type,
             created_at=registration.created_at,
+            published_version=str((registration.metadata or {}).get("version", ""))
+            or None
+            if registration.current_registry_entry_id
+            else None,
             updated_at=registration.updated_at,
             profile_version=registration.profile_version,
             uniqueness_key=registration.uniqueness_key,

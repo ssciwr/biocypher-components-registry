@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import re
@@ -66,9 +67,33 @@ def normalize_repository_url(value: str) -> str:
         _ = parsed.port
     except ValueError as exc:
         raise InvalidRepoURLError(value) from exc
+    hostname = parsed.hostname.lower().rstrip(".")
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        raise InvalidRepoURLError(value)
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None and not address.is_global:
+        raise InvalidRepoURLError(value)
+    authority = hostname if parsed.port in (None, 443) else f"{hostname}:{parsed.port}"
+    allowed = {
+        item.strip().lower()
+        for item in os.getenv(
+            "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.com"
+        ).split(",")
+        if item.strip()
+    }
+    approved_authority = (
+        "github.com"
+        if hostname == "raw.githubusercontent.com" and parsed.port in (None, 443)
+        else authority
+    )
+    if approved_authority not in allowed:
+        raise InvalidRepoURLError(value)
     parts = [part for part in parsed.path.split("/") if part]
-    host = parsed.netloc.lower()
-    if parsed.hostname.lower() in {"github.com", "raw.githubusercontent.com"}:
+    host = authority
+    if hostname in {"github.com", "raw.githubusercontent.com"}:
         host = "github.com"
         parts = parts[:2]
     elif "-" in parts:

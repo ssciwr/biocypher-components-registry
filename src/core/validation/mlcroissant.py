@@ -16,6 +16,9 @@ def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
     Returns:
         A list of validation error messages.
     """
+    shape_errors = _jsonld_shape_errors(document)
+    if shape_errors:
+        return shape_errors
     try:
         mlc.Dataset(document)
     except (mlc.ValidationError, AssertionError) as exc:
@@ -23,6 +26,27 @@ def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
         # nodes (for example {}). This is invalid input, not a server failure.
         return _parse_validation_error(str(exc))
     return []
+
+
+def _jsonld_shape_errors(value: Any, path: str = "$") -> list[str]:
+    """Reject known provider argument failures without masking internal errors."""
+    errors = []
+    if isinstance(value, dict):
+        if "@context" in value and not isinstance(value["@context"], dict):
+            errors.append(
+                f"{path}.@context must be a JSON object for Croissant validation."
+            )
+        if "@id" in value and (
+            not isinstance(value["@id"], str) or not value["@id"].strip()
+        ):
+            errors.append(f"{path}.@id must be a non-empty string.")
+        for key, item in value.items():
+            if key != "@context":
+                errors.extend(_jsonld_shape_errors(item, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            errors.extend(_jsonld_shape_errors(item, f"{path}[{index}]"))
+    return errors
 
 
 def _parse_validation_error(message: str) -> list[str]:

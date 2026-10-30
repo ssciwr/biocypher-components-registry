@@ -82,7 +82,9 @@ class InvalidRepoURLError(ValueError):
 
     def __init__(self, repo_url: str) -> None:
         self.repo_url = repo_url
-        super().__init__(f"Invalid repository URL: {repo_url}")
+        super().__init__(
+            "Invalid repository URL. Use an approved HTTPS repository host without embedded credentials."
+        )
 
 
 class MetadataNotFoundError(RemoteResourceNotFoundError):

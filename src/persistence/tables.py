@@ -108,4 +108,5 @@ registry_refreshes_table = Table(
     Column("duplicate", Integer, nullable=False),
     Column("rejected_same_version_changed", Integer, nullable=False),
     Column("fetch_failed", Integer, nullable=False),
+    Column("internal_failed", Integer, nullable=False),
 )

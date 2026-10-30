@@ -23,14 +23,20 @@ from src.api.schemas.adapters import (
     AdapterLatestItemResponse,
     AdapterLatestListResponse,
     AdapterMetadataResponse,
+)
+from src.api.schemas.registrations import RegistrationAttemptResponse
+from src.core.adapter.catalog import (
     adapter_id_from_uniqueness_key,
     latest_registry_entry,
 )
-from src.api.schemas.registrations import RegistrationAttemptResponse
 from src.core.auth.models import AuthSession
 from src.core.registration.errors import ConcurrentRegistrationChangeError
 from src.core.registration.models import RegistryEntry
-from src.core.registration.service import latest_processing_outcome, update_registration
+from src.core.registration.service import (
+    latest_processing_outcome,
+    owns_adapter_sources,
+)
+from src.core.registration.service import update_adapter as update_adapter_service
 from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
@@ -52,7 +58,7 @@ OptionalAuthSessionDep = Annotated[
     summary="List public adapters",
     description=(
         "Return the public adapter catalog derived from canonical valid registry "
-        "entries. Registrations that are SUBMITTED, INVALID, or FETCH_FAILED do "
+        "entries. Sources without accepted metadata do "
         "not appear here."
     ),
 )
@@ -196,16 +202,7 @@ def can_delete_adapter(
     entries: list[RegistryEntry],
     store: RegistrationStore,
 ) -> bool:
-    if auth_session is None:
-        return False
-    for entry in entries:
-        registration = store.get_registration(entry.source_id)
-        if (
-            registration is None
-            or registration.submitted_by_github_user_id != auth_session.github_user_id
-        ):
-            return False
-    return True
+    return owns_adapter_sources(auth_session, entries, store)
 
 
 @router.post("/adapters/{adapter_id}/update", summary="Update a published adapter")
@@ -215,16 +212,12 @@ def update_adapter(
     store: RegistrationStoreDep,
 ) -> RegistrationAttemptResponse:
     """Process the displayed entry's source; use the same ownership rule as Delete."""
-    entries = _entries_for_adapter(adapter_id, store.list_registry_entries())
-    if not entries:
-        raise adapter_not_found_http_error(adapter_id)
-    if not can_delete_adapter(auth_session, entries, store):
-        raise HTTPException(
-            status_code=403,
-            detail="Only the submitting GitHub account can update this adapter.",
-        )
     try:
-        outcome = update_registration(latest_registry_entry(entries).source_id, store)
+        outcome = update_adapter_service(adapter_id, store, actor=auth_session)
+    except LookupError as exc:
+        raise adapter_not_found_http_error(adapter_id) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ConcurrentRegistrationChangeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return RegistrationAttemptResponse.from_outcome(outcome)

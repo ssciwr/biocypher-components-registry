@@ -9,10 +9,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 
-from src.api.dependencies import get_optional_auth_session, get_registration_store
+from src.api.dependencies import get_current_auth_session, get_registration_store
 from src.api.errors import (
     registration_not_found_http_error,
-    registration_processing_http_error,
     registration_submission_http_error,
 )
 from src.api.schemas.registrations import (
@@ -24,17 +23,14 @@ from src.api.schemas.registrations import (
     RegistrationEventResponse,
     RegistrationListItemResponse,
     RegistrationListResponse,
-    RegistrationProcessResponse,
-    RegistrationRevalidateResponse,
     RegistrationStreamEvent,
     ValidationCheckResponse,
 )
 from src.core.auth.models import AuthSession
 from src.core.registration.models import AttemptStatus
 from src.core.registration.service import (
-    finish_registration,
+    latest_processing_outcome,
     register_adapter,
-    revalidate_registration,
 )
 from src.core.registration.store import RegistrationStore
 from src.core.shared.errors import InvalidRepoURLError, RepositoryUnavailableError
@@ -49,25 +45,7 @@ HEARTBEAT_SECONDS = 15
 _processing_tasks: set[asyncio.Task] = set()
 
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
-OptionalAuthSessionDep = Annotated[
-    AuthSession | None, Depends(get_optional_auth_session)
-]
-
-
-def _authorize_processing(
-    registration_id: str, store: RegistrationStore, session: AuthSession | None
-) -> None:
-    registration = store.get_registration(registration_id)
-    if registration is None:
-        raise registration_not_found_http_error(registration_id)
-    if registration.submitted_by_github_user_id is not None:
-        if session is None:
-            raise HTTPException(status_code=401, detail="GitHub sign-in required.")
-        if session.github_user_id != registration.submitted_by_github_user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Only the submitting account can process this source.",
-            )
+AuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
 
 
 # ===========================================================
@@ -95,7 +73,7 @@ def create_registration(
     payload: RegistrationCreateRequest,
     response: Response,
     store: RegistrationStoreDep,
-    auth_session: OptionalAuthSessionDep,
+    auth_session: AuthSessionDep,
 ) -> RegistrationAttemptResponse:
     """Return a terminal result, committing only accepted first registrations."""
     result = _submit_registration(payload, store, auth_session)
@@ -107,7 +85,7 @@ def create_registration(
 def _submit_registration(
     payload: RegistrationCreateRequest,
     store: RegistrationStore,
-    auth_session: AuthSession | None,
+    auth_session: AuthSession,
     on_check: CheckObserver | None = None,
 ) -> RegistrationAttemptResponse:
     try:
@@ -118,9 +96,7 @@ def _submit_registration(
             license_value=payload.license_value,
             doi=payload.doi,
             cff_url=payload.cff_url,
-            submitted_by_github_user_id=(
-                auth_session.github_user_id if auth_session is not None else None
-            ),
+            actor=auth_session,
         )
         return RegistrationAttemptResponse.from_outcome(outcome)
     except PermissionError as exc:
@@ -136,7 +112,7 @@ class RegistrationEventStreamResponse(StreamingResponse):
 async def _registration_events(
     payload: RegistrationCreateRequest,
     store: RegistrationStore,
-    auth_session: AuthSession | None,
+    auth_session: AuthSession,
 ) -> AsyncIterator[str]:
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[RegistrationStreamEvent] = asyncio.Queue()
@@ -212,7 +188,7 @@ async def _registration_events(
 async def stream_registration(
     payload: RegistrationCreateRequest,
     store: RegistrationStoreDep,
-    auth_session: OptionalAuthSessionDep,
+    auth_session: AuthSessionDep,
 ) -> StreamingResponse:
     return RegistrationEventStreamResponse(
         _registration_events(payload, store, auth_session),
@@ -235,7 +211,12 @@ def list_registrations(
     """Return active stored adapter registrations."""
     registrations = store.list_active_registrations()
     items = [
-        RegistrationListItemResponse.from_stored(registration)
+        RegistrationListItemResponse.from_stored(
+            registration,
+            latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
+            if (outcome := latest_processing_outcome(registration, store))
+            else None,
+        )
         for registration in registrations
     ]
 
@@ -318,57 +299,9 @@ def get_registration(
     if registration is None:
         raise registration_not_found_http_error(registration_id)
 
-    return RegistrationDetailResponse.from_stored(registration)
-
-
-@router.post(
-    "/registrations/{registration_id}/process",
-    summary="Process one registration",
-    description=(
-        "Discover the submitted repository metadata, validate the adapter and "
-        "embedded datasets, update registration status, and create or reuse a "
-        "canonical registry entry when valid."
-    ),
-)
-def process_registration(
-    registration_id: str,
-    store: RegistrationStoreDep,
-    auth_session: OptionalAuthSessionDep,
-) -> RegistrationProcessResponse:
-    """Discover, validate, and persist one stored registration result."""
-    _authorize_processing(registration_id, store, auth_session)
-    try:
-        registration = finish_registration(
-            registration_id=registration_id,
-            store=store,
-        )
-    except Exception as exc:
-        raise registration_processing_http_error(registration_id, exc) from exc
-
-    return RegistrationProcessResponse.from_stored(registration)
-
-
-@router.post(
-    "/registrations/{registration_id}/revalidate",
-    summary="Revalidate one registration",
-    description=(
-        "Reprocess one registration whose current status is INVALID or whose "
-        "latest event is FETCH_FAILED."
-    ),
-)
-def revalidate_registration_route(
-    registration_id: str,
-    store: RegistrationStoreDep,
-    auth_session: OptionalAuthSessionDep,
-) -> RegistrationRevalidateResponse:
-    """Reprocess one previously invalid or fetch-failed registration."""
-    _authorize_processing(registration_id, store, auth_session)
-    try:
-        registration = revalidate_registration(
-            registration_id=registration_id,
-            store=store,
-        )
-    except Exception as exc:
-        raise registration_processing_http_error(registration_id, exc) from exc
-
-    return RegistrationRevalidateResponse.from_stored(registration)
+    return RegistrationDetailResponse.from_stored(
+        registration,
+        latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
+        if (outcome := latest_processing_outcome(registration, store))
+        else None,
+    )

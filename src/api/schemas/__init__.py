@@ -27,8 +27,6 @@ from src.api.schemas.registrations import (
     RegistrationEventResponse,
     RegistrationListItemResponse,
     RegistrationListResponse,
-    RegistrationProcessResponse,
-    RegistrationRevalidateResponse,
 )
 from src.api.schemas.registry import (
     RegistryEntryListResponse,
@@ -80,8 +78,6 @@ __all__ = [
     "RegistrationEventResponse",
     "RegistrationListItemResponse",
     "RegistrationListResponse",
-    "RegistrationProcessResponse",
-    "RegistrationRevalidateResponse",
     "RegistryEntryListResponse",
     "RegistryEntryResponse",
     "RegistryRefreshLatestResponse",
