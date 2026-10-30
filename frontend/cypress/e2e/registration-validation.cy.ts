@@ -1,3 +1,16 @@
+
+function pressEnter() {
+  // Include the carriage-return text so Chromium performs native button activation.
+  cy.then(() => Cypress.automation('remote:debugger:protocol', {
+    command: 'Input.dispatchKeyEvent',
+    params: { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' },
+  }))
+  cy.then(() => Cypress.automation('remote:debugger:protocol', {
+    command: 'Input.dispatchKeyEvent',
+    params: { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 },
+  }))
+}
+
 const repo = 'https://github.com/example/adapter'
 const message = "'keywords' is a required property"
 const detail = {
@@ -64,7 +77,8 @@ describe('registration validation breakdown', () => {
     cy.contains('h3', 'Validation checks').should('be.visible')
     cy.contains('3 failed checks').should('be.visible')
     cy.contains('button', 'Expand checks').should('have.attr', 'aria-expanded', 'false').focus()
-    cy.press(Cypress.Keyboard.Keys.ENTER)
+    cy.focused().should('contain', 'Expand checks')
+    pressEnter()
     cy.get('table').should('be.visible')
     cy.contains('The missing field has no existing line.').should('be.visible')
     cy.get('[data-check-id="schema"] li > p').should('have.length', 1)

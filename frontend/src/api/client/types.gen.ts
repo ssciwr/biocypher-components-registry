@@ -815,11 +815,14 @@ export type RegistrationDetailResponse = {
      * Repository Kind
      */
     repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
     /**
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
     /**
      * License Value
      */
@@ -836,6 +839,7 @@ export type RegistrationDetailResponse = {
      * Submitted By Github User Id
      */
     submitted_by_github_user_id?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Metadata Path
      */
@@ -958,11 +962,14 @@ export type RegistrationListItemResponse = {
      * Repository Kind
      */
     repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
     /**
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
     /**
      * License Value
      */
@@ -979,6 +986,7 @@ export type RegistrationListItemResponse = {
      * Submitted By Github User Id
      */
     submitted_by_github_user_id?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Profile Version
      */
@@ -1004,163 +1012,6 @@ export type RegistrationListResponse = {
      */
     items: Array<RegistrationListItemResponse>;
 };
-
-/**
- * RegistrationProcessResponse
- *
- * Response returned after processing one registration.
- */
-export type RegistrationProcessResponse = {
-    /**
-     * Registration Id
-     */
-    registration_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Repository Location
-     */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-    /**
-     * Metadata Path
-     */
-    metadata_path?: string | null;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Profile Version
-     */
-    profile_version?: string | null;
-    /**
-     * Updated At
-     */
-    updated_at?: string | null;
-    /**
-     * Uniqueness Key
-     */
-    uniqueness_key?: string | null;
-    /**
-     * Validation Errors
-     */
-    validation_errors?: Array<string> | null;
-};
-
-/**
- * RegistrationRevalidateResponse
- *
- * Response returned after revalidating one registration.
- */
-export type RegistrationRevalidateResponse = {
-    /**
-     * Registration Id
-     */
-    registration_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Repository Location
-     */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-    /**
-     * Metadata Path
-     */
-    metadata_path?: string | null;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Profile Version
-     */
-    profile_version?: string | null;
-    /**
-     * Updated At
-     */
-    updated_at?: string | null;
-    /**
-     * Uniqueness Key
-     */
-    uniqueness_key?: string | null;
-    /**
-     * Validation Errors
-     */
-    validation_errors?: Array<string> | null;
-};
-
-/**
- * RegistrationStatus
- *
- * Tracked states for a stored registration request.
- */
-export type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID';
 
 /**
  * RegistrationStreamEvent
@@ -1295,45 +1146,9 @@ export type RegistryRefreshLatestResponse = {
      */
     rejected_same_version_changed: number;
     /**
-     * Fetch Failed
+     * Internal Failed
      */
-    fetch_failed: number;
-};
-
-/**
- * RegistryRefreshResponse
- *
- * Response returned after refreshing active registration sources.
- */
-export type RegistryRefreshResponse = {
-    /**
-     * Active Sources
-     */
-    active_sources: number;
-    /**
-     * Processed
-     */
-    processed: number;
-    /**
-     * Valid Created
-     */
-    valid_created: number;
-    /**
-     * Unchanged
-     */
-    unchanged: number;
-    /**
-     * Invalid
-     */
-    invalid: number;
-    /**
-     * Duplicate
-     */
-    duplicate: number;
-    /**
-     * Rejected Same Version Changed
-     */
-    rejected_same_version_changed: number;
+    internal_failed: number;
     /**
      * Fetch Failed
      */
@@ -1378,7 +1193,6 @@ export type RegistryRegistrationResponse = {
      * Repository Location
      */
     repository_location: string;
-    status: RegistrationStatus;
     /**
      * Latest Event Type
      */
@@ -1387,6 +1201,11 @@ export type RegistryRegistrationResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Updated At
      */
@@ -2066,82 +1885,16 @@ export type GetRegistrationApiV1RegistrationsRegistrationIdGetResponses = {
 
 export type GetRegistrationApiV1RegistrationsRegistrationIdGetResponse = GetRegistrationApiV1RegistrationsRegistrationIdGetResponses[keyof GetRegistrationApiV1RegistrationsRegistrationIdGetResponses];
 
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostData = {
-    body?: never;
-    path: {
-        /**
-         * Registration Id
-         */
-        registration_id: string;
-    };
-    query?: never;
-    url: '/api/v1/registrations/{registration_id}/process';
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostError = ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors[keyof ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors];
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: RegistrationProcessResponse;
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponse = ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses[keyof ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses];
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostData = {
-    body?: never;
-    path: {
-        /**
-         * Registration Id
-         */
-        registration_id: string;
-    };
-    query?: never;
-    url: '/api/v1/registrations/{registration_id}/revalidate';
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostError = RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors[keyof RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors];
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses = {
-    /**
-     * Successful Response
-     */
-    200: RegistrationRevalidateResponse;
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponse = RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses[keyof RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses];
-
 export type ListRegistryRegistrationsApiV1RegistryRegistrationsGetData = {
     body?: never;
     path?: never;
     query?: {
         /**
-         * Status
-         *
-         * Filter registry registrations by public registration status.
-         */
-        status?: RegistrationStatus | null;
-        /**
          * Latest Event
          *
          * Filter by latest registration event type, such as VALID_CREATED, INVALID_SCHEMA, or FETCH_FAILED.
          */
-        latest_event?: 'SUBMITTED' | 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'REVALIDATED' | 'SCHEMA_INVALID' | 'SEMANTICS_INVALID' | 'MLCROISSANT_INVALID' | 'INVALID_JSON' | 'METADATA_NOT_FOUND' | 'REPOSITORY_UNAVAILABLE' | 'REMOTE_TEMPORARY' | 'DEFAULT_BRANCH_UNRESOLVED' | 'METADATA_TOO_LARGE' | 'VERSION_NOT_BUMPED' | 'ADAPTER_ID_CHANGED' | null;
+        latest_event?: 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'SCHEMA_INVALID' | 'SEMANTICS_INVALID' | 'MLCROISSANT_INVALID' | 'INVALID_JSON' | 'METADATA_NOT_FOUND' | 'REPOSITORY_UNAVAILABLE' | 'REMOTE_TEMPORARY' | 'DEFAULT_BRANCH_UNRESOLVED' | 'METADATA_TOO_LARGE' | 'VERSION_NOT_BUMPED' | 'ADAPTER_ID_CHANGED' | null;
     };
     url: '/api/v1/registry/registrations';
 };
@@ -2225,22 +1978,6 @@ export type GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses = {
 };
 
 export type GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponse = GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses[keyof GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses];
-
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/registry/refreshes';
-};
-
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: RegistryRefreshResponse;
-};
-
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponse = CreateRegistryRefreshApiV1RegistryRefreshesPostResponses[keyof CreateRegistryRefreshApiV1RegistryRefreshesPostResponses];
 
 export type GetValidationSchemaApiV1SchemasVersionGetData = {
     body?: never;

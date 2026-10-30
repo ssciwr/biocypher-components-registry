@@ -126,7 +126,7 @@
           "adapters"
         ],
         "summary": "List public adapters",
-        "description": "Return the public adapter catalog derived from canonical valid registry entries. Registrations that are SUBMITTED, INVALID, or FETCH_FAILED do not appear here.",
+        "description": "Return the public adapter catalog derived from canonical valid registry entries. Sources without accepted metadata do not appear here.",
         "operationId": "list_adapters_api_v1_adapters_get",
         "responses": {
           "200": {
@@ -888,151 +888,15 @@
         }
       }
     },
-    "/api/v1/registrations/{registration_id}/process": {
-      "post": {
-        "tags": [
-          "registrations"
-        ],
-        "summary": "Process one registration",
-        "description": "Discover the submitted repository metadata, validate the adapter and embedded datasets, update registration status, and create or reuse a canonical registry entry when valid.",
-        "operationId": "process_registration_api_v1_registrations__registration_id__process_post",
-        "parameters": [
-          {
-            "name": "registration_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Registration Id"
-            }
-          },
-          {
-            "name": "bcr_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Bcr Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationProcessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/registrations/{registration_id}/revalidate": {
-      "post": {
-        "tags": [
-          "registrations"
-        ],
-        "summary": "Revalidate one registration",
-        "description": "Reprocess one registration whose current status is INVALID or whose latest event is FETCH_FAILED.",
-        "operationId": "revalidate_registration_route_api_v1_registrations__registration_id__revalidate_post",
-        "parameters": [
-          {
-            "name": "registration_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Registration Id"
-            }
-          },
-          {
-            "name": "bcr_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Bcr Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRevalidateResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/registry/registrations": {
       "get": {
         "tags": [
           "registry"
         ],
         "summary": "List registry registrations",
-        "description": "Return maintainer/operator rows for active registrations, including public status and latest event type. The optional filters are strict; unsupported values return 422.",
+        "description": "Return maintainer/operator rows for active registrations, including latest event type. The optional filters are strict; unsupported values return 422.",
         "operationId": "list_registry_registrations_api_v1_registry_registrations_get",
         "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/RegistrationStatus"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter registry registrations by public registration status.",
-              "title": "Status"
-            },
-            "description": "Filter registry registrations by public registration status."
-          },
           {
             "name": "latest_event",
             "in": "query",
@@ -1041,7 +905,6 @@
               "anyOf": [
                 {
                   "enum": [
-                    "SUBMITTED",
                     "VALID_CREATED",
                     "UNCHANGED",
                     "DUPLICATE",
@@ -1050,7 +913,6 @@
                     "INVALID_MLCROISSANT",
                     "INVALID_BOTH",
                     "FETCH_FAILED",
-                    "REVALIDATED",
                     "SCHEMA_INVALID",
                     "SEMANTICS_INVALID",
                     "MLCROISSANT_INVALID",
@@ -1179,28 +1041,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistryRefreshLatestResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/registry/refreshes": {
-      "post": {
-        "tags": [
-          "registry"
-        ],
-        "summary": "Run registry refresh",
-        "description": "Process every active registration once, continue past per-source failures, persist the refresh summary, and return aggregate outcome counts.",
-        "operationId": "create_registry_refresh_api_v1_registry_refreshes_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryRefreshResponse"
                 }
               }
             }
@@ -3818,13 +3658,21 @@
             ],
             "title": "Repository Kind"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
           },
           "license_value": {
             "anyOf": [
@@ -3869,6 +3717,16 @@
               }
             ],
             "title": "Submitted By Github User Id"
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "metadata_path": {
             "anyOf": [
@@ -3949,7 +3807,6 @@
           "adapter_id",
           "repository_location",
           "repository_kind",
-          "status",
           "created_at"
         ],
         "title": "RegistrationDetailResponse",
@@ -4133,13 +3990,21 @@
             ],
             "title": "Repository Kind"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
           },
           "license_value": {
             "anyOf": [
@@ -4185,6 +4050,16 @@
             ],
             "title": "Submitted By Github User Id"
           },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "profile_version": {
             "anyOf": [
               {
@@ -4227,7 +4102,6 @@
           "adapter_id",
           "repository_location",
           "repository_kind",
-          "status",
           "created_at"
         ],
         "title": "RegistrationListItemResponse",
@@ -4249,356 +4123,6 @@
         ],
         "title": "RegistrationListResponse",
         "description": "Response model for a registration list."
-      },
-      "RegistrationProcessResponse": {
-        "properties": {
-          "registration_id": {
-            "type": "string",
-            "title": "Registration Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Repository Kind"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "License Value"
-          },
-          "doi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          },
-          "metadata_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata Path"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "profile_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Version"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "uniqueness_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uniqueness Key"
-          },
-          "validation_errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Validation Errors"
-          }
-        },
-        "type": "object",
-        "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
-        ],
-        "title": "RegistrationProcessResponse",
-        "description": "Response returned after processing one registration."
-      },
-      "RegistrationRevalidateResponse": {
-        "properties": {
-          "registration_id": {
-            "type": "string",
-            "title": "Registration Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Repository Kind"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "License Value"
-          },
-          "doi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          },
-          "metadata_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata Path"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "profile_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Version"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "uniqueness_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uniqueness Key"
-          },
-          "validation_errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Validation Errors"
-          }
-        },
-        "type": "object",
-        "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
-        ],
-        "title": "RegistrationRevalidateResponse",
-        "description": "Response returned after revalidating one registration."
-      },
-      "RegistrationStatus": {
-        "type": "string",
-        "enum": [
-          "SUBMITTED",
-          "VALID",
-          "INVALID"
-        ],
-        "title": "RegistrationStatus",
-        "description": "Tracked states for a stored registration request."
       },
       "RegistrationStreamEvent": {
         "properties": {
@@ -4809,6 +4333,10 @@
             "type": "integer",
             "title": "Rejected Same Version Changed"
           },
+          "internal_failed": {
+            "type": "integer",
+            "title": "Internal Failed"
+          },
           "fetch_failed": {
             "type": "integer",
             "title": "Fetch Failed"
@@ -4826,59 +4354,11 @@
           "invalid",
           "duplicate",
           "rejected_same_version_changed",
+          "internal_failed",
           "fetch_failed"
         ],
         "title": "RegistryRefreshLatestResponse",
         "description": "Response model for the latest persisted registry refresh."
-      },
-      "RegistryRefreshResponse": {
-        "properties": {
-          "active_sources": {
-            "type": "integer",
-            "title": "Active Sources"
-          },
-          "processed": {
-            "type": "integer",
-            "title": "Processed"
-          },
-          "valid_created": {
-            "type": "integer",
-            "title": "Valid Created"
-          },
-          "unchanged": {
-            "type": "integer",
-            "title": "Unchanged"
-          },
-          "invalid": {
-            "type": "integer",
-            "title": "Invalid"
-          },
-          "duplicate": {
-            "type": "integer",
-            "title": "Duplicate"
-          },
-          "rejected_same_version_changed": {
-            "type": "integer",
-            "title": "Rejected Same Version Changed"
-          },
-          "fetch_failed": {
-            "type": "integer",
-            "title": "Fetch Failed"
-          }
-        },
-        "type": "object",
-        "required": [
-          "active_sources",
-          "processed",
-          "valid_created",
-          "unchanged",
-          "invalid",
-          "duplicate",
-          "rejected_same_version_changed",
-          "fetch_failed"
-        ],
-        "title": "RegistryRefreshResponse",
-        "description": "Response returned after refreshing active registration sources."
       },
       "RegistryRegistrationListResponse": {
         "properties": {
@@ -4919,9 +4399,6 @@
             "type": "string",
             "title": "Repository Location"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "latest_event_type": {
             "type": "string",
             "title": "Latest Event Type"
@@ -4930,6 +4407,27 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "anyOf": [
@@ -4973,7 +4471,6 @@
           "adapter_id",
           "repository_kind",
           "repository_location",
-          "status",
           "latest_event_type",
           "created_at"
         ],
