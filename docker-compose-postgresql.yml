@@ -33,7 +33,12 @@ services:
     init: true
     environment:
       # PostgreSQL connection string
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-biocypher}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@database:5432/${POSTGRES_DB:-biocypher_registry}"
+      DATABASE_URL: ""
+      POSTGRES_HOST: database
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-biocypher}
+      POSTGRES_DB: ${POSTGRES_DB:-biocypher_registry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       # Agentic workspace API (src/api/routers/workspace.py): per-session
       # directories live on their own persisted volume.
       AGENT_WORKSPACES_ROOT: /app/data/workspaces

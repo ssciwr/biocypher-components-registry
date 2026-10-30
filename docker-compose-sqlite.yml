@@ -35,6 +35,8 @@ services:
     # Reaps processes orphaned by killed run_command process groups.
     init: true
     environment:
+      DATABASE_URL: ""
+      POSTGRES_HOST: ""
       BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
       # Agentic workspace API (src/api/routers/workspace.py): per-session
       # directories live under the same persisted data volume.
