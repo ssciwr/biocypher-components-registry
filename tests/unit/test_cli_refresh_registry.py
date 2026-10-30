@@ -6,6 +6,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from cli import app
+from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.registration_fixtures import accepted_source
 
 runner = CliRunner()
 
@@ -131,27 +133,15 @@ def test_refresh_registry_command_processes_active_sources_and_reports_summary(
         encoding="utf-8",
     )
 
-    submit_valid = runner.invoke(
-        app,
-        [
-            "submit-registration",
-            str(valid_repo),
-            "--db-path",
-            str(database_path),
-        ],
+    store = SQLiteRegistrationStore(database_path)
+    accepted_source(
+        store,
+        str(valid_repo),
+        metadata=json.loads((valid_repo / "croissant.jsonld").read_text()),
     )
-    submit_invalid = runner.invoke(
-        app,
-        [
-            "submit-registration",
-            str(invalid_repo),
-            "--db-path",
-            str(database_path),
-        ],
+    accepted_source(
+        store, str(invalid_repo), metadata=invalid_document | {"version": "1.0.0"}
     )
-
-    assert submit_valid.exit_code == 0, submit_valid.output
-    assert submit_invalid.exit_code == 0, submit_invalid.output
 
     result = runner.invoke(
         app,

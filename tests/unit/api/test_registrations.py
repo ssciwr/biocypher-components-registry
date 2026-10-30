@@ -14,7 +14,6 @@ from src.api.app import create_app
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.api.schemas.registrations import REGISTRATION_CREATE_EXAMPLE
 from src.core.auth.models import AuthSession
-from src.core.registration.service import submit_registration
 from src.core.shared.errors import RepositoryUnavailableError
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from src.persistence.tables import (
@@ -23,6 +22,7 @@ from src.persistence.tables import (
     registry_entries_table,
 )
 from tests.support.croissant_fixtures import sample_adapter_document
+from tests.support.registration_fixtures import historical_source
 
 
 @pytest.fixture
@@ -85,7 +85,8 @@ def test_create_registration_endpoint_persists_accepted_registration(
     assert payload["published_version"] == "1.0.0"
     assert payload["validation_details"] == []
     stored = store.get_registration(payload["registration_id"])
-    assert stored.status == "VALID"
+    assert stored.current_registry_entry_id is not None
+    assert not hasattr(stored, "status")
     assert stored.license_value == "MIT"
     assert stored.doi == "10.5281/zenodo.1234567"
     assert stored.submitted_by_github_user_id == "12345"
@@ -210,11 +211,14 @@ def test_detail_and_list_expose_accepted_registration(client, repository):
         "/api/v1/registrations", json={"repository_location": str(repository)}
     ).json()
     detail = client.get(f"/api/v1/registrations/{created['registration_id']}").json()
-    assert detail["status"] == "VALID"
+    assert "status" not in detail
+    assert detail["published_version"] == "1.0.0"
+    assert detail["latest_attempt"]["attempt_status"] == "SUCCEEDED"
     assert detail["metadata"]["version"] == "1.0.0"
     items = client.get("/api/v1/registrations").json()["items"]
     assert len(items) == 1
-    assert items[0]["status"] == "VALID"
+    assert "status" not in items[0]
+    assert items[0]["published_version"] == "1.0.0"
     assert "metadata" not in items[0]
     assert "validation_errors" not in items[0]
 
@@ -236,6 +240,9 @@ def test_unknown_registration_returns_not_found(client, suffix, method):
 
 @pytest.mark.parametrize("present, expected", [(True, "FOUND"), (False, "NOT_FOUND")])
 def test_presence_check_normalizes_branch_links(monkeypatch, present, expected):
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.example.org"
+    )
     exists = Mock(return_value=present)
     monkeypatch.setattr("src.api.routers.registrations.remote_metadata_exists", exists)
     response = TestClient(create_app()).get(
@@ -272,26 +279,32 @@ def test_invalid_presence_url_is_unavailable():
     assert response.json()["reason_code"] == "INVALID_REPOSITORY_URL"
 
 
-def test_legacy_process_endpoint_can_process_staged_sources(client, repository, store):
-    staged = submit_registration(str(repository), store)
-    response = client.post(f"/api/v1/registrations/{staged.registration_id}/process")
-    assert response.status_code == 200
-    assert response.json()["status"] == "VALID"
+@pytest.mark.parametrize("action", ["process", "revalidate"])
+def test_legacy_processing_routes_removed(client, repository, store, action):
+    legacy = historical_source(store, str(repository), owner="12345")
+    response = client.post(f"/api/v1/registrations/{legacy.registration_id}/{action}")
+    assert response.status_code == 404
+    assert store.list_registration_events(legacy.registration_id) == []
 
 
-def test_legacy_processing_cannot_bypass_update_ownership(client, repository, store):
-    staged = submit_registration(
-        str(repository), store, submitted_by_github_user_id="another-account"
+@pytest.mark.parametrize("suffix", ["", "/stream"])
+def test_registration_requires_authenticated_identity(store, repository, suffix):
+    app = create_app()
+    app.dependency_overrides[get_registration_store] = lambda: store
+    app.dependency_overrides[get_optional_auth_session] = lambda: None
+    response = TestClient(app).post(
+        f"/api/v1/registrations{suffix}", json={"repository_location": str(repository)}
     )
-    for action in ("process", "revalidate"):
-        response = client.post(
-            f"/api/v1/registrations/{staged.registration_id}/{action}"
-        )
-        assert response.status_code == 403
-    assert [
-        event.event_type
-        for event in store.list_registration_events(staged.registration_id)
-    ] == ["SUBMITTED"]
+    assert response.status_code == 401
+    assert_no_registration_writes(store)
+
+
+def test_removed_lifecycle_absent_from_openapi():
+    schema = create_app().openapi()
+    assert not any(
+        path.endswith(("/process", "/revalidate")) for path in schema["paths"]
+    )
+    assert "RegistrationStatus" not in schema["components"]["schemas"]
 
 
 def test_success_event_is_available_from_history(client, repository):
@@ -344,7 +357,10 @@ def test_stream_registration_reports_success_only_after_acceptance(
     assert result["attempt_status"] == "SUCCEEDED"
     assert result["profile_version"] == "v1"
     assert all(check["status"] == "PASSED" for check in result["validation_checks"])
-    assert store.get_registration(result["registration_id"]).status == "VALID"
+    assert (
+        store.get_registration(result["registration_id"]).current_registry_entry_id
+        is not None
+    )
     states = [
         (event["check"]["id"], event["check"]["status"])
         for event in events
@@ -460,7 +476,9 @@ def test_live_progress_and_heartbeats_arrive_before_processing_finishes(
 
     async def exercise():
         stream = router._registration_events(
-            RegistrationCreateRequest(repository_location=str(repository)), store, None
+            RegistrationCreateRequest(repository_location=str(repository)),
+            store,
+            AuthSession(github_user_id="12345"),
         )
         try:
             assert "event: snapshot" in await anext(stream)
@@ -504,7 +522,9 @@ def test_disconnect_keeps_one_processing_attempt_without_saving_failed_records(
 
     async def exercise():
         stream = router._registration_events(
-            RegistrationCreateRequest(repository_location=str(repository)), store, None
+            RegistrationCreateRequest(repository_location=str(repository)),
+            store,
+            AuthSession(github_user_id="12345"),
         )
         try:
             await anext(stream)

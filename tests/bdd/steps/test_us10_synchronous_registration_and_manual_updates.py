@@ -5,6 +5,7 @@ import json
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from src.core.auth.models import AuthSession
 from src.core.registration.service import (
     latest_processing_outcome,
     register_adapter,
@@ -42,7 +43,9 @@ def invalid_repository(context):
 
 @when("the repository is registered synchronously")
 def register(context):
-    context["outcome"] = register_adapter(str(context["repository"]), context["store"])
+    context["outcome"] = register_adapter(
+        str(context["repository"]), context["store"], actor=AuthSession("123")
+    )
 
 
 @given("its first synchronous registration failed")
@@ -111,7 +114,7 @@ def update_without_version_change(context):
 @then("the published metadata remains accepted")
 def published_metadata_retained(context):
     current = context["store"].get_registration(context["published"].registration_id)
-    assert current.status == "VALID"
+    assert not hasattr(current, "status")
     assert current.metadata == context["published"].metadata
     assert (
         current.current_registry_entry_id

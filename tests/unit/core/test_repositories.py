@@ -18,6 +18,13 @@ from src.core.shared.errors import (
 )
 
 
+@pytest.fixture(autouse=True)
+def approved_test_hosts(monkeypatch):
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.com,gitlab.example.org"
+    )
+
+
 def git(repository: Path, *arguments: str) -> bytes:
     return subprocess.run(
         [

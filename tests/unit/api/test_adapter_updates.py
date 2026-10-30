@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from src.core.auth.models import AuthSession
 from src.core.registration.service import register_adapter
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from tests.support.croissant_fixtures import sample_adapter_document
@@ -19,7 +20,7 @@ def published_adapter(tmp_path):
     (repository / "croissant.jsonld").write_text(json.dumps(sample_adapter_document()))
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     outcome = register_adapter(
-        str(repository), store, submitted_by_github_user_id="owner"
+        str(repository), store, actor=AuthSession(github_user_id="owner")
     )
     return repository, store, outcome.registration
 
@@ -85,3 +86,21 @@ def test_unknown_adapter_update_returns_not_found(published_adapter):
         .status_code
         == 404
     )
+
+
+@pytest.mark.parametrize("field,value", [("@id", None), ("@context", [])])
+def test_malformed_jsonld_update_returns_failed_attempt_not_internal_error(
+    published_adapter, field, value
+):
+    repository, store, registration = published_adapter
+    document = sample_adapter_document()
+    document[field] = value
+    document["version"] = "next"
+    (repository / "croissant.jsonld").write_text(json.dumps(document))
+    response = create_adapter_client(store, github_user_id="owner").post(
+        "/api/v1/adapters/example-adapter/update"
+    )
+    assert response.status_code == 200
+    assert response.json()["attempt_status"] == "FAILED"
+    assert response.json()["published_version"] == "1.0.0"
+    assert len(store.list_registration_events(registration.registration_id)) == 2

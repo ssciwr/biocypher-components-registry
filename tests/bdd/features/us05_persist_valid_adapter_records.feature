@@ -1,7 +1,7 @@
-Feature: Persist valid adapter records
+Feature: Persist accepted adapter metadata
 
-  Scenario: Finish a valid stored registration
-    Given a submitted registration points to valid adapter metadata
-    When registration processing finishes
-    Then the adapter record is persisted
-    And the adapter status is VALID
+  Scenario: Accept a valid first registration synchronously
+    Given an unregistered repository contains valid adapter metadata
+    When the adapter is registered
+    Then its accepted metadata is persisted
+    And the published registration has a success event and no lifecycle status

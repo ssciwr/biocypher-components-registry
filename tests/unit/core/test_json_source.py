@@ -118,8 +118,12 @@ def test_missing_fields_point_to_the_containing_object_without_inventing_a_field
 def test_invalid_json_retains_the_parsers_exact_line_and_column():
     with pytest.raises(InvalidMetadataJSONError) as caught:
         parse_json_metadata('{\n  "keywords": [1,]\n}', "repository")
-    assert caught.value.line == 2
-    assert caught.value.column == 18
+    import json
+
+    with pytest.raises(json.JSONDecodeError) as parser_error:
+        json.loads('{\n  "keywords": [1,]\n}')
+    assert caught.value.line == parser_error.value.lineno
+    assert caught.value.column == parser_error.value.colno
     assert caught.value.source_file == "croissant.jsonld"
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
@@ -12,11 +11,12 @@ import pytest
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
+from src.core.auth.models import AuthSession
 from src.core.registration.errors import (
     ConcurrentRegistrationChangeError,
     DuplicateRegistrationError,
 )
-from src.core.registration.models import AttemptStatus, RegistrationStatus
+from src.core.registration.models import AttemptStatus
 from src.core.registration.service import (
     latest_processing_outcome,
     register_adapter,
@@ -51,11 +51,7 @@ def store(tmp_path: Path, request):
     if request.param == "sqlite":
         yield SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
         return
-    url = os.environ.get("REGISTRY_TEST_POSTGRES_URL")
-    if not url:
-        pytest.skip(
-            "Set REGISTRY_TEST_POSTGRES_URL to exercise PostgreSQL transactions."
-        )
+    url = request.getfixturevalue("postgres_test_url")
     # Each case owns a fresh schema; never clear an existing database's tables.
     schema = f"registry_test_{uuid4().hex}"
     admin = create_engine(url)
@@ -125,7 +121,9 @@ def test_failed_first_registration_writes_nothing(
         monkeypatch.setattr(
             "src.core.registration.service._discover_registration_metadata", unavailable
         )
-    outcome = register_adapter(str(repository), store)
+    outcome = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    )
     assert outcome.attempt_status == AttemptStatus.FAILED
     assert outcome.reason_code == reason
     assert outcome.registration is None
@@ -139,11 +137,14 @@ def test_first_success_commits_all_records_and_retry_can_keep_version(
     path = repository / "croissant.jsonld"
     path.write_text("{")
     assert (
-        register_adapter(str(repository), store).attempt_status == AttemptStatus.FAILED
+        register_adapter(
+            str(repository), store, actor=AuthSession(github_user_id="123")
+        ).attempt_status
+        == AttemptStatus.FAILED
     )
     path.write_text(json.dumps(sample_adapter_document()))
     outcome = register_adapter(
-        str(repository), store, submitted_by_github_user_id="123"
+        str(repository), store, actor=AuthSession(github_user_id="123")
     )
     assert outcome.attempt_status == AttemptStatus.SUCCEEDED
     assert outcome.published_version == "1.0.0"
@@ -164,15 +165,19 @@ def test_first_persistence_failure_rolls_back_source_and_entry(
 
     monkeypatch.setattr(store, "_insert_registration_event", fail_event)
     with pytest.raises(RuntimeError, match="event insert failed"):
-        register_adapter(str(repository), store)
+        register_adapter(
+            str(repository), store, actor=AuthSession(github_user_id="123")
+        )
     assert counts(store) == (0, 0, 0)
 
 
 def test_duplicate_repository_does_not_create_another_attempt(repository, store):
-    register_adapter(str(repository), store)
+    register_adapter(str(repository), store, actor=AuthSession(github_user_id="123"))
     before = counts(store)
     with pytest.raises(DuplicateRegistrationError):
-        register_adapter(str(repository), store)
+        register_adapter(
+            str(repository), store, actor=AuthSession(github_user_id="123")
+        )
     assert counts(store) == before
 
 
@@ -189,7 +194,9 @@ def test_duplicate_repository_does_not_create_another_attempt(repository, store)
 def test_failed_update_records_attempt_and_preserves_published_metadata(
     repository, store, failure, reason
 ):
-    first = register_adapter(str(repository), store).registration
+    first = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    ).registration
     path = repository / "croissant.jsonld"
     document = sample_adapter_document()
     if failure == "missing":
@@ -211,7 +218,7 @@ def test_failed_update_records_attempt_and_preserves_published_metadata(
     assert outcome.published_version == "1.0.0"
     assert not outcome.update_applied
     stored = store.get_registration(first.registration_id)
-    assert stored.status == RegistrationStatus.VALID
+    assert stored.current_registry_entry_id is not None
     assert stored.current_registry_entry_id == first.current_registry_entry_id
     assert stored.metadata == first.metadata
     assert counts(store) == (1, 1, 2)
@@ -222,7 +229,9 @@ def test_failed_update_records_attempt_and_preserves_published_metadata(
 
 
 def test_update_accepts_new_version_and_unchanged_is_a_success(repository, store):
-    first = register_adapter(str(repository), store).registration
+    first = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    ).registration
     document = sample_adapter_document()
     document.update(version="1.1.0", description="Updated description")
     (repository / "croissant.jsonld").write_text(json.dumps(document))
@@ -248,7 +257,9 @@ def test_unchanged_update_revalidates_only_when_forced(
 ):
     from src.core.registration import service
 
-    first = register_adapter(str(repository), store).registration
+    first = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    ).registration
     validate = service.validate_discovered_adapter
     validated = []
 
@@ -309,7 +320,9 @@ def test_validation_failure_preserves_reason_profile_and_details(
         lambda candidate, **kwargs: replace(candidate, validation=validation),
     )
 
-    outcome = register_adapter(str(repository), store)
+    outcome = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    )
 
     assert outcome.attempt_status == AttemptStatus.FAILED
     assert outcome.reason_code == reason
@@ -325,7 +338,9 @@ def test_validation_failure_preserves_reason_profile_and_details(
 def test_stale_update_cannot_replace_a_concurrent_success(
     repository, store, monkeypatch
 ):
-    first = register_adapter(str(repository), store).registration
+    first = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    ).registration
     document = sample_adapter_document()
     document["version"] = "1.1.0"
     (repository / "croissant.jsonld").write_text(json.dumps(document))
@@ -336,7 +351,9 @@ def test_stale_update_cannot_replace_a_concurrent_success(
     def concurrent_validation(candidate, **kwargs):
         other = sample_adapter_document()
         other["version"] = "1.2.0"
-        request = service.create_registration_request(str(repository))
+        request = service.create_registration_request(
+            str(repository), submitted_by_github_user_id="123"
+        )
         store.accept_candidate(
             request,
             other,
@@ -357,7 +374,9 @@ def test_stale_update_cannot_replace_a_concurrent_success(
 def test_deletion_during_processing_cannot_recreate_registration(
     repository, store, monkeypatch
 ):
-    first = register_adapter(str(repository), store).registration
+    first = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    ).registration
     document = sample_adapter_document()
     document["version"] = "1.1.0"
     (repository / "croissant.jsonld").write_text(json.dumps(document))
