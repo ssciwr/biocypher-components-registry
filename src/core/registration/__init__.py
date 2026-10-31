@@ -1,15 +1,14 @@
-"""Public registration API for storing submitted adapter registrations."""
+"""Shared synchronous registration services."""
 
 from src.core.registration.errors import DuplicateRegistrationError
-from src.core.registration.models import RegistrationStatus, StoredRegistration
-from src.core.registration.service import finish_registration, submit_registration
+from src.core.registration.models import StoredRegistration
+from src.core.registration.service import register_adapter, update_adapter
 from src.core.registration.store import RegistrationStore
 
 __all__ = [
     "DuplicateRegistrationError",
-    "RegistrationStatus",
     "RegistrationStore",
     "StoredRegistration",
-    "finish_registration",
-    "submit_registration",
+    "register_adapter",
+    "update_adapter",
 ]

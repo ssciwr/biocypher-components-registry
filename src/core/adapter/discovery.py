@@ -8,6 +8,7 @@ from typing import Any
 
 from src.core.shared.files import fetch_local_metadata, fetch_remote_metadata
 from src.core.validation import validate_adapter_with_embedded_datasets
+from src.core.validation.progress import ValidationProgress
 from src.core.validation.results import ValidationResult
 
 
@@ -42,11 +43,15 @@ def discover_remote_adapter(repo_url: str) -> AdapterDiscoveryResult:
 
 def validate_discovered_adapter(
     result: AdapterDiscoveryResult,
+    *,
+    progress: ValidationProgress | None = None,
 ) -> AdapterDiscoveryResult:
     """Attach adapter validation results to a discovery result."""
     return AdapterDiscoveryResult(
         source=result.source,
         metadata=result.metadata,
         metadata_path=result.metadata_path,
-        validation=validate_adapter_with_embedded_datasets(result.metadata),
+        validation=validate_adapter_with_embedded_datasets(
+            result.metadata, progress=progress
+        ),
     )

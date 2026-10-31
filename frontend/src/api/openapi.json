@@ -126,7 +126,7 @@
           "adapters"
         ],
         "summary": "List public adapters",
-        "description": "Return the public adapter catalog derived from canonical valid registry entries. Registrations that are SUBMITTED, INVALID, or FETCH_FAILED do not appear here.",
+        "description": "Return the public adapter catalog derived from canonical valid registry entries. Sources without accepted metadata do not appear here.",
         "operationId": "list_adapters_api_v1_adapters_get",
         "responses": {
           "200": {
@@ -303,6 +303,65 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adapters/{adapter_id}/update": {
+      "post": {
+        "tags": [
+          "adapters"
+        ],
+        "summary": "Update a published adapter",
+        "description": "Process the displayed entry's source; use the same ownership rule as Delete.",
+        "operationId": "update_adapter_api_v1_adapters__adapter_id__update_post",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter Id"
+            }
+          },
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -551,7 +610,7 @@
           "registrations"
         ],
         "summary": "Submit an adapter registration",
-        "description": "Store one adapter repository as a tracked registration request. The repository may be a local path or remote URL and should contain a root-level croissant.jsonld file. Processing happens later through the process endpoint or a registry refresh.",
+        "description": "Fetch and validate metadata synchronously. Persist the registration only after acceptance; failed first registrations create no records.",
         "operationId": "create_registration_api_v1_registrations_post",
         "parameters": [
           {
@@ -587,10 +646,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationCreateResponse"
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
                 }
               }
             }
+          },
+          "200": {
+            "description": "Processing failed; no first-registration records were saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The repository is already registered."
           },
           "422": {
             "description": "Validation Error",
@@ -618,6 +690,67 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistrationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/registrations/stream": {
+      "post": {
+        "tags": [
+          "registrations"
+        ],
+        "summary": "Register an adapter with live validation progress",
+        "description": "One submission per connection. Terminal result follows persistence. Do not automatically reconnect or retry this POST.",
+        "operationId": "stream_registration_api_v1_registrations_stream_post",
+        "parameters": [
+          {
+            "name": "bcr_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcr Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "$ref": "#/components/schemas/RegistrationStreamEvent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -755,119 +888,15 @@
         }
       }
     },
-    "/api/v1/registrations/{registration_id}/process": {
-      "post": {
-        "tags": [
-          "registrations"
-        ],
-        "summary": "Process one registration",
-        "description": "Discover the submitted repository metadata, validate the adapter and embedded datasets, update registration status, and create or reuse a canonical registry entry when valid.",
-        "operationId": "process_registration_api_v1_registrations__registration_id__process_post",
-        "parameters": [
-          {
-            "name": "registration_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Registration Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationProcessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/registrations/{registration_id}/revalidate": {
-      "post": {
-        "tags": [
-          "registrations"
-        ],
-        "summary": "Revalidate one registration",
-        "description": "Reprocess one registration whose current status is INVALID or whose latest event is FETCH_FAILED.",
-        "operationId": "revalidate_registration_route_api_v1_registrations__registration_id__revalidate_post",
-        "parameters": [
-          {
-            "name": "registration_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Registration Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRevalidateResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/registry/registrations": {
       "get": {
         "tags": [
           "registry"
         ],
         "summary": "List registry registrations",
-        "description": "Return maintainer/operator rows for active registrations, including public status and latest event type. The optional filters are strict; unsupported values return 422.",
+        "description": "Return maintainer/operator rows for active registrations, including latest event type. The optional filters are strict; unsupported values return 422.",
         "operationId": "list_registry_registrations_api_v1_registry_registrations_get",
         "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/RegistrationStatus"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter registry registrations by public registration status.",
-              "title": "Status"
-            },
-            "description": "Filter registry registrations by public registration status."
-          },
           {
             "name": "latest_event",
             "in": "query",
@@ -876,7 +905,6 @@
               "anyOf": [
                 {
                   "enum": [
-                    "SUBMITTED",
                     "VALID_CREATED",
                     "UNCHANGED",
                     "DUPLICATE",
@@ -885,7 +913,17 @@
                     "INVALID_MLCROISSANT",
                     "INVALID_BOTH",
                     "FETCH_FAILED",
-                    "REVALIDATED"
+                    "SCHEMA_INVALID",
+                    "SEMANTICS_INVALID",
+                    "MLCROISSANT_INVALID",
+                    "INVALID_JSON",
+                    "METADATA_NOT_FOUND",
+                    "REPOSITORY_UNAVAILABLE",
+                    "REMOTE_TEMPORARY",
+                    "DEFAULT_BRANCH_UNRESOLVED",
+                    "METADATA_TOO_LARGE",
+                    "VERSION_NOT_BUMPED",
+                    "ADAPTER_ID_CHANGED"
                   ],
                   "type": "string"
                 },
@@ -1010,21 +1048,44 @@
         }
       }
     },
-    "/api/v1/registry/refreshes": {
-      "post": {
+    "/api/v1/schemas/{version}": {
+      "get": {
         "tags": [
-          "registry"
+          "schemas"
         ],
-        "summary": "Run registry refresh",
-        "description": "Process every active registration once, continue past per-source failures, persist the refresh summary, and return aggregate outcome counts.",
-        "operationId": "create_registry_refresh_api_v1_registry_refreshes_post",
+        "summary": "Get Validation Schema",
+        "description": "Return the exact deployed schema for a registered profile version.",
+        "operationId": "get_validation_schema_api_v1_schemas__version__get",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
+              "application/schema+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Validation Schema Api V1 Schemas  Version  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistryRefreshResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2180,6 +2241,21 @@
             "type": "boolean",
             "title": "Can Delete",
             "default": false
+          },
+          "can_update": {
+            "type": "boolean",
+            "title": "Can Update",
+            "default": false
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2757,6 +2833,15 @@
         "title": "AdapterMetadataResponse",
         "description": "Response model for one adapter's full Croissant metadata."
       },
+      "AttemptStatus": {
+        "type": "string",
+        "enum": [
+          "SUCCEEDED",
+          "FAILED"
+        ],
+        "title": "AttemptStatus",
+        "description": "Terminal processing outcomes; loading messages are frontend-only."
+      },
       "AuthMeResponse": {
         "properties": {
           "authenticated": {
@@ -3316,6 +3401,127 @@
         "title": "MetadataValidationResponse",
         "description": "Response model for one metadata validation run."
       },
+      "RegistrationAttemptResponse": {
+        "properties": {
+          "attempt_status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "registration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Id"
+          },
+          "adapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Id"
+          },
+          "adapter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Name"
+          },
+          "repository_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Location"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "update_applied": {
+            "type": "boolean",
+            "title": "Update Applied",
+            "default": false
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "validation_errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Validation Errors"
+          },
+          "validation_details": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationDetailResponse"
+            },
+            "type": "array",
+            "title": "Validation Details"
+          },
+          "validation_checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheckResponse"
+            },
+            "type": "array",
+            "title": "Validation Checks"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attempt_status",
+          "message"
+        ],
+        "title": "RegistrationAttemptResponse",
+        "description": "One terminal attempt, with accepted state kept separate from errors."
+      },
       "RegistrationCreateRequest": {
         "properties": {
           "repository_location": {
@@ -3374,107 +3580,36 @@
           "repository_location": "https://gitlab.example.org/biocypher/collectri"
         }
       },
-      "RegistrationCreateResponse": {
-        "properties": {
-          "registration_id": {
-            "type": "string",
-            "title": "Registration Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Repository Kind"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "License Value"
-          },
-          "doi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
-        ],
-        "title": "RegistrationCreateResponse",
-        "description": "Response returned after creating an adapter registration."
-      },
       "RegistrationCroissantFilePresentCheckResponse": {
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "FOUND",
+              "NOT_FOUND",
+              "UNAVAILABLE"
+            ],
+            "title": "Status"
+          },
+          "repository_url": {
+            "type": "string",
+            "title": "Repository Url"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
           "has_croissant_file": {
             "type": "boolean",
             "title": "Has Croissant File"
@@ -3482,6 +3617,9 @@
         },
         "type": "object",
         "required": [
+          "status",
+          "repository_url",
+          "message",
           "has_croissant_file"
         ],
         "title": "RegistrationCroissantFilePresentCheckResponse",
@@ -3520,13 +3658,21 @@
             ],
             "title": "Repository Kind"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
           },
           "license_value": {
             "anyOf": [
@@ -3571,6 +3717,16 @@
               }
             ],
             "title": "Submitted By Github User Id"
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "metadata_path": {
             "anyOf": [
@@ -3651,7 +3807,6 @@
           "adapter_id",
           "repository_location",
           "repository_kind",
-          "status",
           "created_at"
         ],
         "title": "RegistrationDetailResponse",
@@ -3835,13 +3990,21 @@
             ],
             "title": "Repository Kind"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
           },
           "license_value": {
             "anyOf": [
@@ -3887,6 +4050,16 @@
             ],
             "title": "Submitted By Github User Id"
           },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "profile_version": {
             "anyOf": [
               {
@@ -3929,7 +4102,6 @@
           "adapter_id",
           "repository_location",
           "repository_kind",
-          "status",
           "created_at"
         ],
         "title": "RegistrationListItemResponse",
@@ -3952,59 +4124,57 @@
         "title": "RegistrationListResponse",
         "description": "Response model for a registration list."
       },
-      "RegistrationProcessResponse": {
+      "RegistrationStreamEvent": {
         "properties": {
-          "registration_id": {
+          "type": {
             "type": "string",
-            "title": "Registration Id"
+            "enum": [
+              "snapshot",
+              "check",
+              "result",
+              "error"
+            ],
+            "title": "Type"
           },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheckResponse"
+            },
+            "type": "array",
+            "title": "Checks"
           },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
+          "check": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
+                "$ref": "#/components/schemas/ValidationCheckResponse"
               },
               {
-                "type": "string"
+                "type": "null"
               }
-            ],
-            "title": "Repository Kind"
+            ]
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
+          "result": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "License Value"
+            "title": "Status Code"
           },
-          "doi": {
+          "detail": {
             "anyOf": [
               {
                 "type": "string"
@@ -4013,294 +4183,15 @@
                 "type": "null"
               }
             ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          },
-          "metadata_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata Path"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "profile_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Version"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "uniqueness_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uniqueness Key"
-          },
-          "validation_errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Validation Errors"
+            "title": "Detail"
           }
         },
         "type": "object",
         "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
+          "type"
         ],
-        "title": "RegistrationProcessResponse",
-        "description": "Response returned after processing one registration."
-      },
-      "RegistrationRevalidateResponse": {
-        "properties": {
-          "registration_id": {
-            "type": "string",
-            "title": "Registration Id"
-          },
-          "adapter_name": {
-            "type": "string",
-            "title": "Adapter Name"
-          },
-          "adapter_id": {
-            "type": "string",
-            "title": "Adapter Id"
-          },
-          "repository_location": {
-            "type": "string",
-            "title": "Repository Location"
-          },
-          "repository_kind": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "local",
-                  "remote"
-                ]
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Repository Kind"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "license_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "License Value"
-          },
-          "doi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Doi"
-          },
-          "cff_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cff Url"
-          },
-          "submitted_by_github_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Submitted By Github User Id"
-          },
-          "metadata_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata Path"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "profile_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Version"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          },
-          "uniqueness_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uniqueness Key"
-          },
-          "validation_errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Validation Errors"
-          }
-        },
-        "type": "object",
-        "required": [
-          "registration_id",
-          "adapter_name",
-          "adapter_id",
-          "repository_location",
-          "repository_kind",
-          "status",
-          "created_at"
-        ],
-        "title": "RegistrationRevalidateResponse",
-        "description": "Response returned after revalidating one registration."
-      },
-      "RegistrationStatus": {
-        "type": "string",
-        "enum": [
-          "SUBMITTED",
-          "VALID",
-          "INVALID"
-        ],
-        "title": "RegistrationStatus",
-        "description": "Tracked states for a stored registration request."
+        "title": "RegistrationStreamEvent",
+        "description": "SSE data envelope; exactly one terminal result or error ends a stream."
       },
       "RegistryEntryListResponse": {
         "properties": {
@@ -4442,6 +4333,10 @@
             "type": "integer",
             "title": "Rejected Same Version Changed"
           },
+          "internal_failed": {
+            "type": "integer",
+            "title": "Internal Failed"
+          },
           "fetch_failed": {
             "type": "integer",
             "title": "Fetch Failed"
@@ -4459,59 +4354,11 @@
           "invalid",
           "duplicate",
           "rejected_same_version_changed",
+          "internal_failed",
           "fetch_failed"
         ],
         "title": "RegistryRefreshLatestResponse",
         "description": "Response model for the latest persisted registry refresh."
-      },
-      "RegistryRefreshResponse": {
-        "properties": {
-          "active_sources": {
-            "type": "integer",
-            "title": "Active Sources"
-          },
-          "processed": {
-            "type": "integer",
-            "title": "Processed"
-          },
-          "valid_created": {
-            "type": "integer",
-            "title": "Valid Created"
-          },
-          "unchanged": {
-            "type": "integer",
-            "title": "Unchanged"
-          },
-          "invalid": {
-            "type": "integer",
-            "title": "Invalid"
-          },
-          "duplicate": {
-            "type": "integer",
-            "title": "Duplicate"
-          },
-          "rejected_same_version_changed": {
-            "type": "integer",
-            "title": "Rejected Same Version Changed"
-          },
-          "fetch_failed": {
-            "type": "integer",
-            "title": "Fetch Failed"
-          }
-        },
-        "type": "object",
-        "required": [
-          "active_sources",
-          "processed",
-          "valid_created",
-          "unchanged",
-          "invalid",
-          "duplicate",
-          "rejected_same_version_changed",
-          "fetch_failed"
-        ],
-        "title": "RegistryRefreshResponse",
-        "description": "Response returned after refreshing active registration sources."
       },
       "RegistryRegistrationListResponse": {
         "properties": {
@@ -4552,9 +4399,6 @@
             "type": "string",
             "title": "Repository Location"
           },
-          "status": {
-            "$ref": "#/components/schemas/RegistrationStatus"
-          },
           "latest_event_type": {
             "type": "string",
             "title": "Latest Event Type"
@@ -4563,6 +4407,27 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "latest_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "anyOf": [
@@ -4606,7 +4471,6 @@
           "adapter_id",
           "repository_kind",
           "repository_location",
-          "status",
           "latest_event_type",
           "created_at"
         ],
@@ -4743,6 +4607,291 @@
         ],
         "title": "ToolDescriptor",
         "description": "One tool available to a session's agent loop."
+      },
+      "ValidationCheckResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "PASSED",
+              "FAILED",
+              "NOT_RUN"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "validation_details": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationDetailResponse"
+            },
+            "type": "array",
+            "title": "Validation Details"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "dataset_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Index"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "schema_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Title"
+          },
+          "schema_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Id"
+          },
+          "schema_dialect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Dialect"
+          },
+          "validator_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validator Name"
+          },
+          "validator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validator Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "title": "ValidationCheckResponse",
+        "description": "A validation stage, its provenance, and its inline diagnostic information."
+      },
+      "ValidationDetailResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "json_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Path"
+          },
+          "requirement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement"
+          },
+          "expected_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Format"
+          },
+          "location_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Description"
+          },
+          "source_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "location_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "value",
+                  "containing_object"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ValidationDetailResponse",
+        "description": "Response-only context supplied by a metadata validator."
       },
       "ValidationError": {
         "properties": {

@@ -1,0 +1,21 @@
+name: biocypher-registry-tests
+
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: biocypher-registry-test-database
+    labels:
+      io.biocypher.registry.test-database: "true"
+    environment:
+      POSTGRES_DB: registry_test
+      POSTGRES_USER: registry_test
+      POSTGRES_PASSWORD: registry_test
+    ports:
+      - "127.0.0.1::5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U registry_test -d registry_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

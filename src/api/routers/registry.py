@@ -11,22 +11,22 @@ from src.api.errors import (
     registry_entry_not_found_http_error,
     registry_refresh_not_found_http_error,
 )
+from src.api.schemas.registrations import RegistrationAttemptResponse
 from src.api.schemas.registry import (
     RegistryEntryListResponse,
     RegistryEntryResponse,
     RegistryRefreshLatestResponse,
-    RegistryRefreshResponse,
     RegistryRegistrationListResponse,
     RegistryRegistrationResponse,
 )
-from src.core.registration.models import RegistrationStatus
-from src.core.registration.service import refresh_active_registrations
+from src.core.registration.service import (
+    latest_processing_outcome,
+)
 from src.core.registration.store import RegistrationStore
 
 router = APIRouter()
 RegistrationStoreDep = Annotated[RegistrationStore, Depends(get_registration_store)]
 RegistryLatestEvent = Literal[
-    "SUBMITTED",
     "VALID_CREATED",
     "UNCHANGED",
     "DUPLICATE",
@@ -35,7 +35,17 @@ RegistryLatestEvent = Literal[
     "INVALID_MLCROISSANT",
     "INVALID_BOTH",
     "FETCH_FAILED",
-    "REVALIDATED",
+    "SCHEMA_INVALID",
+    "SEMANTICS_INVALID",
+    "MLCROISSANT_INVALID",
+    "INVALID_JSON",
+    "METADATA_NOT_FOUND",
+    "REPOSITORY_UNAVAILABLE",
+    "REMOTE_TEMPORARY",
+    "DEFAULT_BRANCH_UNRESOLVED",
+    "METADATA_TOO_LARGE",
+    "VERSION_NOT_BUMPED",
+    "ADAPTER_ID_CHANGED",
 ]
 
 
@@ -49,18 +59,12 @@ RegistryLatestEvent = Literal[
     summary="List registry registrations",
     description=(
         "Return maintainer/operator rows for active registrations, including "
-        "public status and latest event type. The optional filters are strict; "
+        "latest event type. The optional filters are strict; "
         "unsupported values return 422."
     ),
 )
 def list_registry_registrations(
     store: RegistrationStoreDep,
-    status: Annotated[
-        RegistrationStatus | None,
-        Query(
-            description=("Filter registry registrations by public registration status.")
-        ),
-    ] = None,
     latest_event: Annotated[
         RegistryLatestEvent | None,
         Query(
@@ -76,10 +80,8 @@ def list_registry_registrations(
 
     for registration in store.list_active_registrations():
         latest_event_type = (
-            store.get_latest_event_type(registration.registration_id) or "SUBMITTED"
+            store.get_latest_event_type(registration.registration_id) or ""
         )
-        if status is not None and registration.status != status:
-            continue
         if latest_event is not None and latest_event_type != latest_event:
             continue
 
@@ -87,6 +89,9 @@ def list_registry_registrations(
             RegistryRegistrationResponse.from_registration(
                 registration,
                 latest_event_type=latest_event_type,
+                latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
+                if (outcome := latest_processing_outcome(registration, store))
+                else None,
             )
         )
 
@@ -148,30 +153,3 @@ def get_latest_registry_refresh(
         raise registry_refresh_not_found_http_error()
 
     return RegistryRefreshLatestResponse.from_record(refresh)
-
-
-@router.post(
-    "/registry/refreshes",
-    summary="Run registry refresh",
-    description=(
-        "Process every active registration once, continue past per-source "
-        "failures, persist the refresh summary, and return aggregate outcome "
-        "counts."
-    ),
-)
-def create_registry_refresh(
-    store: RegistrationStoreDep,
-) -> RegistryRefreshResponse:
-    """Process all active registration sources once."""
-    return _refresh_registry_response(store)
-
-
-# ===========================================================
-# Route Helpers
-# ===========================================================
-
-
-def _refresh_registry_response(store: RegistrationStore) -> RegistryRefreshResponse:
-    """Process all active registration sources once and serialize the summary."""
-    summary = refresh_active_registrations(store=store)
-    return RegistryRefreshResponse.from_summary(summary)

@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from src.core.schema.profile import ACTIVE_PROFILE_VERSION, load_active_schema
+from src.core.schema import profile
 from src.core.validation.adapter import validate_adapter
 from src.core.validation.results import ValidationResult
 
@@ -114,33 +114,36 @@ def valid_adapter_metadata_for_validation(
     validation_context: dict[str, Any],
 ) -> None:
     call_log: list[str] = []
-    original_loader = load_active_schema
+    expected_profile_version = profile.ACTIVE_PROFILE_VERSION
+    original_loader = profile.load_schema
 
-    def tracked_loader() -> dict[str, Any]:
-        call_log.append(ACTIVE_PROFILE_VERSION)
-        return original_loader()
+    def tracked_loader(version: str) -> dict[str, Any]:
+        call_log.append(version)
+        return original_loader(version)
 
-    monkeypatch.setattr(
-        "src.core.validation.adapter.load_active_schema", tracked_loader
-    )
+    monkeypatch.setattr(profile, "load_schema", tracked_loader)
     validation_context["metadata"] = _valid_adapter_document()
     validation_context["call_log"] = call_log
+    validation_context["expected_profile_version"] = expected_profile_version
 
 
 @when("adapter validation starts")
 def adapter_validation_starts(validation_context: dict[str, Any]) -> None:
     metadata = validation_context["metadata"]
-    validation_context["result"] = validate_adapter(metadata)
+    result = validate_adapter(metadata)
+    assert result.is_valid, result.errors
+    validation_context["result"] = result
 
 
 @then("exactly one active validation profile version is used")
 def exactly_one_active_profile_used(validation_context: dict[str, Any]) -> None:
     result = validation_context["result"]
     call_log = validation_context["call_log"]
+    expected_profile_version = validation_context["expected_profile_version"]
 
     assert isinstance(result, ValidationResult)
-    assert result.profile_version == ACTIVE_PROFILE_VERSION
-    assert call_log == [ACTIVE_PROFILE_VERSION]
+    assert result.profile_version == expected_profile_version
+    assert call_log == [expected_profile_version]
 
 
 @when("adapter validation completes")
@@ -156,4 +159,8 @@ def validation_result_records_profile_version(
 
     assert isinstance(result, ValidationResult)
     assert isinstance(result.profile_version, str)
-    assert result.profile_version == ACTIVE_PROFILE_VERSION
+    assert result.profile_version == validation_context["expected_profile_version"]
+    schema_check = next(
+        check for check in result.validation_checks if check.id == "schema"
+    )
+    assert schema_check.profile_version == result.profile_version

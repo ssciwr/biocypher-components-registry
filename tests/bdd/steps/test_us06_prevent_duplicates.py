@@ -1,177 +1,55 @@
-from __future__ import annotations
-
 import json
-from pathlib import Path
-from typing import Any
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from src.core.registration.errors import DuplicateRegistrationError
-from src.core.registration.service import finish_registration, submit_registration
+from src.core.auth.models import AuthSession
+from src.core.registration.service import register_adapter
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.croissant_fixtures import sample_adapter_document
 
 scenarios("../features/us06_prevent_duplicates.feature")
 
 
 @pytest.fixture
-def duplicate_context(tmp_path: Path) -> dict[str, Any]:
-    """Provide shared state for duplicate-registration scenarios."""
+def context(tmp_path):
     return {
-        "database_path": tmp_path / "registry.sqlite3",
-        "repo_a": tmp_path / "adapter-repo-a",
-        "repo_b": tmp_path / "adapter-repo-b",
+        "root": tmp_path,
+        "store": SQLiteRegistrationStore(tmp_path / "registry.sqlite3"),
     }
 
 
-def _valid_adapter_document(
-    name: str = "Example Adapter",
-    version: str = "1.0.0",
-    adapter_id: str = "example-adapter",
-) -> dict:
-    return {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "citeAs": "cr:citeAs",
-            "column": "cr:column",
-            "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-            "dct": "http://purl.org/dc/terms/",
-            "examples": {"@id": "cr:examples", "@type": "@json"},
-            "extract": "cr:extract",
-            "field": "cr:field",
-            "fileObject": "cr:fileObject",
-            "recordSet": "cr:recordSet",
-            "sc": "https://schema.org/",
-            "source": "cr:source",
-        },
-        "@type": "SoftwareSourceCode",
-        "@id": adapter_id,
-        "name": name,
-        "description": "Adapter description",
-        "conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
-        "version": version,
-        "license": "https://opensource.org/licenses/MIT",
-        "codeRepository": "https://example.org/repo",
-        "programmingLanguage": "Python",
-        "targetProduct": "BioCypher",
-        "creator": [
-            {
-                "@type": "sc:Person",
-                "name": "Example Creator",
-                "affiliation": "SSC",
-                "identifier": "https://orcid.org/0000-0000-0000-0000",
-            }
-        ],
-        "keywords": ["adapter", "biocypher"],
-        "hasPart": [
-            {
-                "@type": "sc:Dataset",
-                "name": "Example dataset",
-                "description": "Example dataset",
-                "conformsTo": "http://mlcommons.org/croissant/1.0",
-                "citeAs": "https://example.org/dataset",
-                "creator": [{"@type": "sc:Person", "name": "Example Creator"}],
-                "datePublished": "2024-01-01T00:00:00",
-                "license": "https://opensource.org/licenses/MIT",
-                "url": "https://example.org/dataset",
-                "version": "1.0.0",
-                "distribution": [
-                    {
-                        "@id": "file-1",
-                        "@type": "cr:FileObject",
-                        "name": "data.csv",
-                        "contentUrl": "data.csv",
-                        "encodingFormat": "text/csv",
-                        "sha256": "abc123",
-                    }
-                ],
-                "recordSet": [
-                    {
-                        "@id": "rs-1",
-                        "@type": "cr:RecordSet",
-                        "name": "records",
-                        "field": [
-                            {
-                                "@id": "rs-1/id",
-                                "@type": "cr:Field",
-                                "name": "id",
-                                "description": "Column 'id' from data.csv",
-                                "dataType": "cr:Int64",
-                                "source": {
-                                    "@id": "rs-1/id/source",
-                                    "fileObject": {"@id": "file-1"},
-                                    "extract": {"column": "id"},
-                                },
-                            }
-                        ],
-                    }
-                ],
-            }
-        ],
-    }
+def repository(context, name):
+    path = context["root"] / name
+    path.mkdir()
+    (path / "croissant.jsonld").write_text(json.dumps(sample_adapter_document()))
+    return str(path)
 
 
 @given("an adapter is already stored with a uniqueness key")
-def adapter_already_stored_with_uniqueness_key(
-    duplicate_context: dict[str, Any],
-) -> None:
-    """Store and finish one valid registration to occupy the uniqueness key."""
-    repo_a = duplicate_context["repo_a"]
-    repo_a.mkdir()
-    (repo_a / "croissant.jsonld").write_text(
-        json.dumps(
-            _valid_adapter_document(
-                name="OmniPath Adapter",
-                adapter_id="omnipath-adapter",
-            )
-        ),
-        encoding="utf-8",
+def accepted(context):
+    first = register_adapter(
+        repository(context, "first"), context["store"], actor=AuthSession("123")
     )
-
-    store = SQLiteRegistrationStore(duplicate_context["database_path"])
-    registration = submit_registration(
-        repository_location=str(repo_a),
-        store=store,
-    )
-    finish_registration(registration.registration_id, store)
+    assert first.attempt_status == "SUCCEEDED"
+    context["first"] = first.registration
 
 
 @when("another registration uses the same uniqueness key")
-def another_registration_uses_same_uniqueness_key(
-    duplicate_context: dict[str, Any],
-) -> None:
-    """Attempt to finish a second valid registration with the same uniqueness key."""
-    repo_b = duplicate_context["repo_b"]
-    repo_b.mkdir()
-    (repo_b / "croissant.jsonld").write_text(
-        json.dumps(
-            _valid_adapter_document(
-                name="omnipath adapter",
-                adapter_id="omnipath-adapter",
-            )
-        ),
-        encoding="utf-8",
+def duplicate(context):
+    context["outcome"] = register_adapter(
+        repository(context, "second"), context["store"], actor=AuthSession("123")
     )
-
-    store = SQLiteRegistrationStore(duplicate_context["database_path"])
-    duplicate = submit_registration(
-        repository_location=str(repo_b),
-        store=store,
-    )
-    try:
-        finish_registration(duplicate.registration_id, store)
-    except Exception as exc:  # noqa: BLE001
-        duplicate_context["error"] = exc
-    else:
-        duplicate_context["error"] = None
 
 
 @then("the system rejects the new submission as duplicate")
-def system_rejects_duplicate_submission(duplicate_context: dict[str, Any]) -> None:
-    """Assert that duplicate completion is rejected."""
-    error = duplicate_context["error"]
-
-    assert isinstance(error, DuplicateRegistrationError)
+def rejected(context):
+    assert context["outcome"].attempt_status == "FAILED"
+    assert context["outcome"].reason_code == "DUPLICATE"
+    assert context["outcome"].registration is None
+    assert len(context["store"].list_active_registrations()) == 1
+    assert len(context["store"].list_registry_entries()) == 1
+    assert (
+        context["store"].get_registration(context["first"].registration_id).metadata
+        == context["first"].metadata
+    )

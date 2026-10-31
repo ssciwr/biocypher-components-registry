@@ -4,140 +4,438 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import replace
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from src.core.adapter.catalog import (
+    adapter_id_from_uniqueness_key,
+    canonical_adapter_id,
+    latest_registry_entry,
+)
 from src.core.adapter.discovery import (
     AdapterDiscoveryResult,
     discover_local_adapter,
     discover_remote_adapter,
     validate_discovered_adapter,
 )
+from src.core.adapter.request import AdapterRegistrationRequest
 from src.core.adapter.service import create_registration_request
-from src.core.registration.errors import DuplicateRegistrationError
+from src.core.auth.models import AuthSession
+from src.core.registration.errors import (
+    ConcurrentRegistrationChangeError,
+    DuplicateRegistrationError,
+)
 from src.core.registration.models import (
+    AttemptStatus,
     BatchRefreshSummary,
-    RegistrationStatus,
+    ProcessingOutcome,
+    RegistryEntry,
     StoredRegistration,
 )
 from src.core.registration.store import RegistrationStore
-from src.core.shared.errors import MetadataDiscoveryError
-from src.core.shared.ids import slugify_identifier
+from src.core.shared.errors import (
+    InvalidMetadataJSONError,
+    MetadataFileNotFoundError,
+    MetadataNotFoundError,
+    RepositoryUnavailableError,
+)
+from src.core.validation.progress import CheckObserver, ValidationProgress
+from src.core.validation.results import ValidationDetail
+
+logger = logging.getLogger(__name__)
+
+EVENT_REASONS = {
+    "INVALID_SCHEMA": "SCHEMA_INVALID",
+    "INVALID_MLCROISSANT": "MLCROISSANT_INVALID",
+    "INVALID_BOTH": "VALIDATION_FAILED",
+    "REJECTED_SAME_VERSION_CHANGED": "VERSION_NOT_BUMPED",
+    "FETCH_FAILED": "REPOSITORY_UNAVAILABLE",
+}
 
 
-def submit_registration(
+def latest_processing_outcome(
+    registration: StoredRegistration, store: RegistrationStore
+) -> ProcessingOutcome | None:
+    """Project terminal events separately from accepted registration state."""
+    events = store.list_registration_events(registration.registration_id)
+    if not events:
+        return None
+    event = max(
+        events, key=lambda item: (item.finished_at, item.started_at, item.event_id)
+    )
+    succeeded = event.event_type in {"VALID_CREATED", "UNCHANGED"}
+    return ProcessingOutcome(
+        attempt_status=AttemptStatus.SUCCEEDED if succeeded else AttemptStatus.FAILED,
+        registration=registration,
+        published_version=_published_version(registration),
+        update_applied=event.event_type == "VALID_CREATED"
+        and any(
+            previous.event_type == "VALID_CREATED"
+            and previous.event_id != event.event_id
+            and previous.finished_at <= event.finished_at
+            for previous in events
+        ),
+        message=event.message
+        or ("Metadata accepted." if succeeded else "Processing failed."),
+        reason_code=None
+        if succeeded
+        else EVENT_REASONS.get(event.event_type, event.event_type),
+        validation_errors=tuple(event.error_details or ()),
+        profile_version=event.profile_version,
+    )
+
+
+def _published_version(registration: StoredRegistration | None) -> str | None:
+    if (
+        registration is None
+        or not registration.current_registry_entry_id
+        or not registration.metadata
+    ):
+        return None
+    return str(registration.metadata.get("version", "")) or None
+
+
+def register_adapter(
     repository_location: str,
     store: RegistrationStore,
-    description: str | None = None,
-    license_value: str | None = None,
-    doi: str | None = None,
-    cff_url: str | None = None,
-    submitted_by_github_user_id: str | None = None,
-) -> StoredRegistration:
-    """Create and persist a registration submission.
-
-    Note on adapter_name: This former property is now always extracted with croissant, and not needed or possible to
-    supply here to avoid confusion.
-
-    Args:
-        repository_location: Local repository path or remote repository URL.
-        store: Persistence backend used to save the submission.
-        description: Optional maintainer-facing adapter summary.
-        license_value: Optional submitted adapter license text.
-        doi: Optional submitted DOI text.
-        cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_user_id: GitHub user id for browser submissions.
-
-    Returns:
-        The stored registration record with a tracked status.
-    """
+    *,
+    actor: AuthSession,
+    on_check: CheckObserver | None = None,
+    **fields: Any,
+) -> ProcessingOutcome:
+    """Validate first; create registration records only when metadata is accepted."""
+    if actor is None:
+        raise PermissionError("GitHub sign-in required.")
     request = create_registration_request(
         repository_location=repository_location,
-        description=description,
-        license_value=license_value,
-        doi=doi,
-        cff_url=cff_url,
-        submitted_by_github_user_id=submitted_by_github_user_id,
+        submitted_by_github_user_id=actor.github_user_id,
+        **fields,
     )
-    return store.create_registration(request)
+    existing = store.get_registration_by_repository_location(
+        request.repository_location
+    )
+    if existing is not None:
+        if existing.current_registry_entry_id is not None:
+            raise DuplicateRegistrationError(
+                "This repository is already registered. Update the published adapter instead."
+            )
+        if existing.submitted_by_github_user_id != request.submitted_by_github_user_id:
+            raise PermissionError(
+                "Only the submitting account can process this source."
+            )
+    return _process_candidate(request, store, existing, on_check=on_check)
 
 
-def finish_registration(
+def update_adapter(
+    adapter_id: str,
+    store: RegistrationStore,
+    *,
+    actor: AuthSession,
+    force_validation: bool = False,
+    on_check: CheckObserver | None = None,
+) -> ProcessingOutcome:
+    """Update a public adapter only when every published source belongs to actor."""
+    if actor is None:
+        raise PermissionError("GitHub sign-in required.")
+    entries = [
+        entry
+        for entry in store.list_registry_entries()
+        if adapter_id_from_uniqueness_key(entry.uniqueness_key) == adapter_id
+    ]
+    if not entries:
+        raise LookupError(f"Adapter not found: {adapter_id}")
+    if not owns_adapter_sources(actor, entries, store):
+        raise PermissionError(
+            "Only the submitting GitHub account can update this adapter."
+        )
+    return update_registration(
+        latest_registry_entry(entries).source_id,
+        store,
+        force_validation=force_validation,
+        on_check=on_check,
+    )
+
+
+def owns_adapter_sources(
+    actor: AuthSession | None, entries: list[RegistryEntry], store: RegistrationStore
+) -> bool:
+    """Share the all-source ownership rule across application interfaces."""
+    if actor is None or not entries:
+        return False
+    return all(
+        (source := store.get_registration(entry.source_id)) is not None
+        and source.submitted_by_github_user_id == actor.github_user_id
+        for entry in entries
+    )
+
+
+def update_registration(
     registration_id: str,
     store: RegistrationStore,
-) -> StoredRegistration:
-    """Discover, validate, and persist one stored registration result.
-
-    Args:
-        registration_id: Identifier of the stored submission to process.
-        store: Persistence backend used to load and update the submission.
-
-    Returns:
-        The updated registration record marked as ``VALID`` or ``INVALID``.
-
-    Raises:
-        ValueError: If the registration does not exist or discovery fails before validation.
-    """
+    *,
+    force_validation: bool = False,
+    on_check: CheckObserver | None = None,
+) -> ProcessingOutcome:
+    """Process one source for authenticated updates or trusted batch maintenance."""
     registration = store.get_registration(registration_id)
     if registration is None:
         raise ValueError(f"Registration not found: {registration_id}")
+    request = AdapterRegistrationRequest(
+        adapter_name=registration.adapter_name,
+        adapter_id=registration.adapter_id,
+        repository_location=registration.repository_location,
+        repository_kind=registration.repository_kind,
+        source=registration.repository_location,
+        description=registration.description,
+        license_value=registration.license_value,
+        doi=registration.doi,
+        cff_url=registration.cff_url,
+        submitted_by_github_user_id=registration.submitted_by_github_user_id,
+    )
+    return _process_candidate(
+        request,
+        store,
+        registration,
+        force_validation=force_validation,
+        on_check=on_check,
+    )
 
-    discovered = _discover_registration_metadata(registration)
-    observed_checksum = _metadata_checksum(discovered.metadata)
-    discovered = validate_discovered_adapter(discovered)
-    if discovered.validation is None:
-        raise ValueError("Registration validation did not produce a validation result.")
 
-    validation_errors = list(discovered.validation.errors)
-    if discovered.validation.is_valid is False or validation_errors:
-        event_type, mlcroissant_valid, schema_valid = _classify_invalid_outcome(
-            discovered.validation.checks,
+def _process_candidate(
+    request: AdapterRegistrationRequest,
+    store: RegistrationStore,
+    registration: StoredRegistration | None,
+    *,
+    force_validation: bool = False,
+    on_check: CheckObserver | None = None,
+) -> ProcessingOutcome:
+    """Evaluate in memory; only published sources retain failed attempts."""
+    processor = _CandidateProcessor(request, store, registration, on_check=on_check)
+    return processor.process(force_validation=force_validation)
+
+
+class _CandidateProcessor:
+    """Keep one candidate's discovery, validation, and persistence state together."""
+
+    def __init__(
+        self,
+        request: AdapterRegistrationRequest,
+        store: RegistrationStore,
+        registration: StoredRegistration | None,
+        *,
+        on_check: CheckObserver | None = None,
+    ) -> None:
+        self.request = request
+        self.store = store
+        self.registration = registration
+        self.started_at = datetime.now(UTC)
+        self.previous_version = _published_version(registration)
+        self.published = (
+            registration is not None
+            and registration.current_registry_entry_id is not None
         )
-        stored = store.mark_registration_invalid(
-            registration_id=registration.registration_id,
-            errors=validation_errors or ["Adapter metadata is invalid."],
-            profile_version=discovered.validation.profile_version,
-            metadata=discovered.metadata,
-            metadata_path=str(discovered.metadata_path)
-            if discovered.metadata_path
-            else None,
-            event_type=event_type,
-            mlcroissant_valid=mlcroissant_valid,
-            schema_valid=schema_valid,
-            observed_checksum=observed_checksum,
+        self.discovered: AdapterDiscoveryResult | None = None
+        self.progress = ValidationProgress(
+            on_check, include_file=True, include_datasets=True
         )
-        return replace(
+
+    def process(self, *, force_validation: bool = False) -> ProcessingOutcome:
+        try:
+            return self._evaluate(force_validation=force_validation)
+        except InvalidMetadataJSONError as exc:
+            return self._failure("INVALID_JSON", [str(exc)], _json_syntax_details(exc))
+        except (MetadataNotFoundError, MetadataFileNotFoundError) as exc:
+            return self._failure("METADATA_NOT_FOUND", [str(exc)])
+        except RepositoryUnavailableError as exc:
+            return self._failure(exc.reason_code, [str(exc)])
+        except DuplicateRegistrationError as exc:
+            reason = "VERSION_NOT_BUMPED" if self.published else "DUPLICATE"
+            return self._failure(reason, [str(exc)])
+        except (ConcurrentRegistrationChangeError, PermissionError):
+            raise
+        except OSError as exc:
+            return self._failure("REPOSITORY_UNAVAILABLE", [str(exc)])
+
+    def _evaluate(self, *, force_validation: bool) -> ProcessingOutcome:
+        self.progress.update("file", status="RUNNING")
+        self.discovered = _discover_registration_metadata(self.request)
+        self.progress.update("file", status="PASSED")
+        checksum = _metadata_checksum(self.discovered.metadata)
+        current = (
+            self.store.get_registry_entry(self.registration.current_registry_entry_id)
+            if self.published and self.registration
+            else None
+        )
+        unchanged = current is not None and current.metadata_checksum == checksum
+        validation_failure = self._validate_candidate(
+            unchanged=unchanged, force_validation=force_validation
+        )
+        if validation_failure is not None:
+            return validation_failure
+        key = _build_uniqueness_key(
+            self.discovered.metadata,
+            self.registration.adapter_id
+            if self.published and self.registration
+            else self.request.adapter_id,
+        )
+        update_failure = self._check_update(key, unchanged=unchanged)
+        if update_failure is not None:
+            return update_failure
+        profile = (
+            self.discovered.validation.profile_version
+            if self.discovered.validation
+            else current.profile_version
+        )
+        message = self._success_message(
+            str(self.discovered.metadata.get("version", "")), unchanged=unchanged
+        )
+        stored = self.store.accept_candidate(
+            self.request,
+            self.discovered.metadata,
+            profile or "v1",
+            key,
+            checksum,
+            registration=self.registration,
+            started_at=self.started_at,
+            message=message,
+        )
+        version = _published_version(stored)
+        return ProcessingOutcome(
+            AttemptStatus.SUCCEEDED,
+            self._success_message(version, unchanged=unchanged),
             stored,
-            metadata_path=str(discovered.metadata_path)
-            if discovered.metadata_path
-            else None,
+            version,
+            update_applied=self.published and not unchanged,
+            profile_version=profile,
+            validation_checks=tuple(self.progress.reports),
         )
 
-    stored = store.mark_registration_valid(
-        registration_id=registration.registration_id,
-        metadata=discovered.metadata,
-        metadata_path=str(discovered.metadata_path)
-        if discovered.metadata_path
-        else None,
-        profile_version=discovered.validation.profile_version,
-        uniqueness_key=_build_uniqueness_key(
-            discovered.metadata,
-            fallback_adapter_id=registration.adapter_id,
-        ),
-        observed_checksum=observed_checksum,
-    )
+    def _validate_candidate(
+        self, *, unchanged: bool, force_validation: bool
+    ) -> ProcessingOutcome | None:
+        if unchanged and not force_validation:
+            self.progress.stop_unfinished(
+                "Metadata is unchanged; validation was not repeated."
+            )
+            return None
+        self.discovered = validate_discovered_adapter(
+            self.discovered, progress=self.progress
+        )
+        validation = self.discovered.validation
+        if validation is None:
+            raise RuntimeError("Metadata validation did not return a result.")
+        if validation.is_valid and not validation.errors:
+            return None
+        failed = [check.name for check in validation.checks if check.is_valid is False]
+        reason = "SCHEMA_INVALID"
+        if failed == ["Adapter semantics"]:
+            reason = "SEMANTICS_INVALID"
+        elif failed == ["Croissant compliance"]:
+            reason = "MLCROISSANT_INVALID"
+        return self._failure(
+            reason, list(validation.errors) or ["Metadata is invalid."]
+        )
 
-    return replace(
-        stored,
-        metadata_path=str(discovered.metadata_path)
-        if discovered.metadata_path
-        else None,
-    )
+    def _check_update(self, key: str, *, unchanged: bool) -> ProcessingOutcome | None:
+        if not self.published or self.registration is None:
+            return None
+        if key.split("::", 1)[0] != self.registration.adapter_id:
+            return self._failure(
+                "ADAPTER_ID_CHANGED",
+                ["An update must preserve the registered adapter identity."],
+            )
+        if not unchanged and key == self.registration.uniqueness_key:
+            return self._failure(
+                "VERSION_NOT_BUMPED",
+                ["Metadata changed for an accepted version. Please bump the version."],
+            )
+        return None
+
+    def _success_message(self, version: str | None, *, unchanged: bool) -> str:
+        if unchanged:
+            return "No changes found."
+        if self.published:
+            return f"Updated from {self.previous_version} to {version}."
+        return f"Registered version {version}."
+
+    def _failure(
+        self,
+        reason: str,
+        errors: list[str],
+        details: tuple[ValidationDetail, ...] | None = None,
+    ) -> ProcessingOutcome:
+        stored = self.registration
+        message = errors[0] if errors else "Processing failed."
+        if self.published and self.registration is not None:
+            message += " Previous metadata retained."
+            stored = self.store.record_update_failure(
+                self.registration.registration_id,
+                {value: key for key, value in EVENT_REASONS.items()}.get(
+                    reason, reason
+                ),
+                errors,
+                message,
+                self.started_at,
+            )
+        validation = self.discovered.validation if self.discovered else None
+        if details is None:
+            details = tuple(validation.validation_details) if validation else ()
+        if self.progress.reports[0].status == "RUNNING":
+            self.progress.update(
+                "file",
+                status="FAILED",
+                reason=reason,
+                errors=tuple(errors),
+                validation_details=details,
+            )
+        self.progress.stop_unfinished(
+            "An earlier processing step prevented this check from running."
+        )
+        return ProcessingOutcome(
+            AttemptStatus.FAILED,
+            message,
+            stored if self.published else None,
+            published_version=_published_version(stored) if self.published else None,
+            reason_code=reason,
+            validation_errors=tuple(errors),
+            profile_version=validation.profile_version if validation else None,
+            validation_details=details,
+            validation_checks=tuple(self.progress.reports),
+        )
+
+
+def _json_syntax_details(exc: InvalidMetadataJSONError) -> tuple[ValidationDetail, ...]:
+    details = []
+    if exc.line is not None:
+        details.append(
+            ValidationDetail(
+                message=str(exc),
+                location_description="Correct the JSON syntax at this position.",
+                source_file=exc.source_file,
+                source_url=exc.source_url,
+                line=exc.line,
+                column=exc.column,
+                location_kind="value",
+            )
+        )
+    return tuple(details)
+
+
+VALIDATION_FAILURES = {
+    "SCHEMA_INVALID",
+    "SEMANTICS_INVALID",
+    "MLCROISSANT_INVALID",
+    "VALIDATION_FAILED",
+    "INVALID_JSON",
+    "ADAPTER_ID_CHANGED",
+}
 
 
 def refresh_active_registrations(
     store: RegistrationStore,
+    *,
+    force_validation: bool = False,
 ) -> BatchRefreshSummary:
     """Process every active registration source without stopping on per-source failures."""
     started_at = datetime.now(UTC)
@@ -149,28 +447,36 @@ def refresh_active_registrations(
         "duplicate": 0,
         "rejected_same_version_changed": 0,
         "fetch_failed": 0,
+        "internal_failed": 0,
     }
 
     for registration_id in registration_ids:
         try:
-            processed = finish_registration(registration_id, store)
-        except DuplicateRegistrationError:
-            latest_event_type = store.get_latest_event_type(registration_id)
-            _increment_summary_count(counts, latest_event_type)
-            continue
-        except Exception as exc:  # noqa: BLE001
-            store.mark_registration_fetch_failed(
-                registration_id=registration_id,
-                error_message=str(exc),
+            previous = store.get_registration(registration_id)
+            outcome = update_registration(
+                registration_id, store, force_validation=force_validation
             )
-            counts["fetch_failed"] += 1
+        except Exception:
+            logger.exception(
+                "Batch processing failed for registration %s", registration_id
+            )
+            counts["internal_failed"] += 1
             continue
-
-        latest_event_type = store.get_latest_event_type(registration_id)
-        if processed.status == RegistrationStatus.INVALID:
-            counts["invalid"] += 1
-            continue
-        _increment_summary_count(counts, latest_event_type)
+        if outcome.attempt_status == AttemptStatus.SUCCEEDED:
+            bucket = (
+                "unchanged"
+                if previous.current_registry_entry_id and not outcome.update_applied
+                else "valid_created"
+            )
+        elif outcome.reason_code == "DUPLICATE":
+            bucket = "duplicate"
+        elif outcome.reason_code == "VERSION_NOT_BUMPED":
+            bucket = "rejected_same_version_changed"
+        elif outcome.reason_code in VALIDATION_FAILURES:
+            bucket = "invalid"
+        else:
+            bucket = "fetch_failed"
+        counts[bucket] += 1
 
     summary = BatchRefreshSummary(
         active_sources=len(registration_ids),
@@ -181,6 +487,7 @@ def refresh_active_registrations(
         duplicate=counts["duplicate"],
         rejected_same_version_changed=counts["rejected_same_version_changed"],
         fetch_failed=counts["fetch_failed"],
+        internal_failed=counts["internal_failed"],
     )
     store.record_batch_refresh(
         summary,
@@ -190,62 +497,13 @@ def refresh_active_registrations(
     return summary
 
 
-def revalidate_registration(
-    registration_id: str,
-    store: RegistrationStore,
-) -> StoredRegistration:
-    """Reprocess one previously failing source immediately on demand."""
-    registration = store.get_registration(registration_id)
-    if registration is None:
-        raise ValueError(f"Registration not found: {registration_id}")
-
-    latest_event_type = store.get_latest_event_type(registration_id)
-    if (
-        registration.status != RegistrationStatus.INVALID
-        and latest_event_type != "FETCH_FAILED"
-    ):
-        raise ValueError(
-            "On-demand revalidation is only available for INVALID or FETCH_FAILED registrations."
-        )
-
-    store.record_revalidation_requested(registration_id)
-    try:
-        return finish_registration(registration_id, store)
-    except DuplicateRegistrationError:
-        raise
-    except (OSError, MetadataDiscoveryError) as exc:
-        store.mark_registration_fetch_failed(
-            registration_id=registration_id,
-            error_message=str(exc),
-        )
-        raise ValueError(str(exc)) from exc
-
-
 def _discover_registration_metadata(
-    registration: StoredRegistration,
+    registration: StoredRegistration | AdapterRegistrationRequest,
 ) -> AdapterDiscoveryResult:
     """Load croissant metadata for one stored registration."""
     if registration.repository_kind == "remote":
         return discover_remote_adapter(registration.repository_location)
     return discover_local_adapter(registration.repository_location)
-
-
-def _increment_summary_count(counts: dict[str, int], event_type: str | None) -> None:
-    """Increment the correct batch summary bucket for one recorded event type."""
-    if event_type == "VALID_CREATED":
-        counts["valid_created"] += 1
-        return
-    if event_type == "UNCHANGED":
-        counts["unchanged"] += 1
-        return
-    if event_type == "DUPLICATE":
-        counts["duplicate"] += 1
-        return
-    if event_type == "REJECTED_SAME_VERSION_CHANGED":
-        counts["rejected_same_version_changed"] += 1
-        return
-    if event_type == "FETCH_FAILED":
-        counts["fetch_failed"] += 1
 
 
 def _build_uniqueness_key(
@@ -265,44 +523,7 @@ def _resolve_adapter_id(
     fallback_adapter_id: str | None = None,
 ) -> str:
     """Resolve a stable adapter identifier for duplicate detection."""
-    metadata_adapter_id = str(metadata.get("@id", "")).strip()
-    if metadata_adapter_id:
-        return slugify_identifier(metadata_adapter_id)
-
-    if fallback_adapter_id:
-        return slugify_identifier(fallback_adapter_id)
-
-    metadata_name = str(metadata.get("name", "")).strip()
-    if metadata_name:
-        return slugify_identifier(metadata_name)
-
-    return ""
-
-
-def _classify_invalid_outcome(
-    checks: list[Any],
-) -> tuple[str, bool | None, bool | None]:
-    """Classify one invalid validation outcome into a registration event type."""
-    mlcroissant_valid: bool | None = None
-    schema_valid = True
-
-    for check in checks:
-        name = str(getattr(check, "name", ""))
-        is_valid = getattr(check, "is_valid", None)
-        if name == "Croissant compliance":
-            mlcroissant_valid = is_valid
-            continue
-        if name.startswith("Embedded dataset:") and is_valid is False:
-            schema_valid = False
-            continue
-        if is_valid is False:
-            schema_valid = False
-
-    if mlcroissant_valid is False and schema_valid is False:
-        return "INVALID_BOTH", mlcroissant_valid, schema_valid
-    if mlcroissant_valid is False:
-        return "INVALID_MLCROISSANT", mlcroissant_valid, schema_valid
-    return "INVALID_SCHEMA", mlcroissant_valid, schema_valid
+    return canonical_adapter_id(metadata, fallback_adapter_id)
 
 
 def _metadata_checksum(metadata: dict[str, Any]) -> str:

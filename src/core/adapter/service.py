@@ -58,7 +58,7 @@ def create_registration_request(
         license_value: Optional submitted adapter license text.
         doi: Optional submitted DOI text.
         cff_url: Optional submitted Citation File Format URL.
-        submitted_by_github_user_id: GitHub user id for browser submissions.
+        submitted_by_github_user_id: Verified GitHub user id for attribution.
 
     Returns:
         A normalized registration request ready for the registry workflow.
@@ -93,7 +93,7 @@ def create_registration_request(
         uuid4().hex
     )  # ID does not need to be related to the name/content
     return AdapterRegistrationRequest(
-        adapter_name=temporary_adapter_id,  # This gets overwritten by the next /registrations/x/process call.
+        adapter_name=temporary_adapter_id,  # Replaced by accepted metadata during candidate processing.
         adapter_id=temporary_adapter_id,
         repository_location=normalized_repository_location,
         repository_kind=repository_kind,
@@ -110,30 +110,12 @@ def _normalize_repository_into_pure_branchless_location(
     repository_location: str,
 ) -> str:
     normalized_location = repository_location.strip()
-    if normalized_location.startswith(("github.com/", "gitlab.com/")):
-        normalized_location = f"https://{normalized_location}"
-    parsed_location = urlparse(normalized_location)
-    if parsed_location.scheme:
-        path_parts = [part for part in parsed_location.path.split("/") if part]
-        if parsed_location.netloc.lower() == "github.com" and len(path_parts) >= 2:
-            path_parts = path_parts[:2]
-        elif "-" in path_parts:
-            marker_index = path_parts.index("-")
-            if marker_index >= 2:
-                path_parts = path_parts[:marker_index]
-        if path_parts:
-            path_parts[-1] = path_parts[-1].removesuffix(".git")
-        return (
-            parsed_location._replace(
-                netloc=parsed_location.netloc.lower(),
-                path=f"/{'/'.join(path_parts)}" if path_parts else "",
-                params="",
-                query="",
-                fragment="",
-            )
-            .geturl()
-            .rstrip("/")
-        )
+    if urlparse(normalized_location).scheme or normalized_location.startswith(
+        ("github.com/", "gitlab.com/")
+    ):
+        from src.core.shared.repositories import normalize_repository_url
+
+        return normalize_repository_url(normalized_location)
     return normalized_location
 
 

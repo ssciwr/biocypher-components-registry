@@ -290,119 +290,68 @@ class TestFetchRemoteFile:
 
 
 class TestFetchRemoteMetadata:
-    """
-    Test cases for fetch_remote_metadata.
-    """
+    """The file helpers delegate presence and reads to the same Git snapshot."""
 
-    # ---- Nominal Case Tests
-    def test_nominal_case(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """
-        Test remote discovery when metadata exists.
-        """
+    @pytest.fixture
+    def snapshot(self, monkeypatch):
+        from contextlib import contextmanager
+        from unittest.mock import Mock
 
-        def fake_fetch(url: str) -> str:
-            return '{"name": "remote"}'
+        snapshot = Mock(repository_url="https://github.com/org/repo", commit="a" * 40)
+        snapshot.read_metadata.return_value = '{"name": "remote"}'
+        snapshot.has_metadata.return_value = True
 
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
+        @contextmanager
+        def open_snapshot(url, *, root_only=False):
+            from src.core.shared.repositories import normalize_repository_url
+
+            snapshot.repository_url = normalize_repository_url(url)
+            snapshot.root_only = root_only
+            yield snapshot
+
+        monkeypatch.setattr("src.core.shared.files.repository_snapshot", open_snapshot)
+        return snapshot
+
+    def test_nominal_case(self, snapshot):
         metadata = fetch_remote_metadata("https://github.com/org/repo")
         assert metadata["name"] == "remote"
-
-    # ---- Negative Case Tests
-    def test_invalid_url(self) -> None:
-        """
-        Test remote discovery when the repository URL is invalid.
-        """
-        with pytest.raises(InvalidRepoURLError):
-            fetch_remote_metadata("not-a-url")
-
-    def test_unsupported_remote_url_scheme(self) -> None:
-        """
-        Test remote discovery when the repository URL scheme is unsupported.
-        """
-        unsupported_scheme = "ftp"
-        with pytest.raises(InvalidRepoURLError):
-            fetch_remote_metadata(f"{unsupported_scheme}://gitlab.com/org/repo")
-
-    def test_metadata_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """
-        Test remote discovery when metadata is not found in main/master.
-        """
-
-        def fake_fetch(url: str) -> str:
-            raise RemoteResourceNotFoundError(url)
-
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
-        with pytest.raises(MetadataNotFoundError):
-            fetch_remote_metadata("https://github.com/org/repo")
-
-    # ---- Edge Case Tests
-    def test_repo_url_with_git_suffix(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """
-        Test remote discovery when the repo URL ends with .git.
-        """
-
-        def fake_fetch(url: str) -> str:
-            return '{"name": "remote"}'
-
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
-        metadata = fetch_remote_metadata("https://github.com/org/repo.git")
-        assert metadata["name"] == "remote"
-
-    def test_remote_metadata_branch_urls(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """
-        Increase coverage of added features from workshop feedback - consider different gitlab/github combos
-        """
-        fetched: list[str] = []
-
-        def fake_fetch(url: str) -> str:
-            fetched.append(url)
-            return '{"name": "remote"}'
-
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
-
-        github = fetch_remote_metadata("https://github.com/org/repo/blob/dev/file.json")
-        gitlab = fetch_remote_metadata(
-            "https://gitlab.com/org/repo/-/raw/dev/file.json"
+        assert metadata.json_source.text == '{"name": "remote"}'
+        assert (
+            metadata.json_source.url
+            == f"https://github.com/org/repo/blob/{'a' * 40}/croissant.jsonld"
         )
-        exists = remote_metadata_exists("https://example.org/team/repo")
+        assert snapshot.root_only is False
 
-        assert github["name"] == "remote"
-        assert gitlab["name"] == "remote"
-        assert exists is True
-        assert "https://raw.githubusercontent.com/org/repo/dev/file.json" in fetched
-        assert "https://gitlab.com/org/repo/-/raw/dev/croissant.jsonld" in fetched
+    @pytest.mark.parametrize("url", ["not-a-url", "ftp://gitlab.com/org/repo"])
+    def test_invalid_url(self, snapshot, url):
+        with pytest.raises(InvalidRepoURLError):
+            fetch_remote_metadata(url)
 
-    def test_remote_metadata_exists_returns_false_after_missing_candidates(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """this is used by the frontend purely because we want one source of truth and I put it in the backned
-        in theory the file can be missing or another type of repository other than Github/Gitlab which follows other url conventions so we do not find the file
-        and this test addresses that with a mock to check what the frontend would receive is accurate for user feedback, and what
-        the backend uses to validate the registration is also correct"""
-        fetched: list[str] = []
-
-        def fake_fetch(url: str) -> str:
-            fetched.append(url)
-            raise RemoteResourceNotFoundError(url)
-
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
-
-        exists = remote_metadata_exists("https://gitlab.com/org/repo")
-
-        assert exists is False
-        assert fetched[0].endswith("/-/raw/main/croissant.jsonld")
-        assert fetched[1].endswith("/-/raw/master/croissant.jsonld")
-
-    # ---- Regression Unit Tests
-    def test_error_is_specific_type(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """
-        Test that missing metadata raises MetadataNotFoundError, not ValueError.
-        """
-
-        def fake_fetch(url: str) -> str:
-            raise RemoteResourceNotFoundError(url)
-
-        monkeypatch.setattr("src.core.shared.files.fetch_remote_file", fake_fetch)
+    def test_metadata_not_found(self, snapshot):
+        snapshot.read_metadata.side_effect = MetadataNotFoundError(
+            snapshot.repository_url
+        )
         with pytest.raises(MetadataNotFoundError):
-            fetch_remote_metadata("https://github.com/org/repo")
+            fetch_remote_metadata(snapshot.repository_url)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/org/repo.git",
+            "https://github.com/org/repo/blob/dev/file.json",
+            "https://gitlab.com/org/repo/-/raw/dev/file.json",
+        ],
+    )
+    def test_branch_links_are_normalized_to_repository_root(self, snapshot, url):
+        assert fetch_remote_metadata(url)["name"] == "remote"
+        assert snapshot.repository_url in {
+            "https://github.com/org/repo",
+            "https://gitlab.com/org/repo",
+        }
+
+    def test_presence_does_not_parse_metadata(self, snapshot):
+        assert remote_metadata_exists(snapshot.repository_url)
+        assert snapshot.root_only is True
+        snapshot.read_metadata.assert_not_called()
+        snapshot.has_metadata.return_value = False
+        assert not remote_metadata_exists(snapshot.repository_url)

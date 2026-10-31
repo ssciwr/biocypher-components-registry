@@ -11,7 +11,6 @@ from src.api.schemas.adapters import (
     _repository_url,
 )
 from src.core.registration.models import (
-    RegistrationStatus,
     RegistryEntry,
     StoredRegistration,
 )
@@ -99,7 +98,6 @@ def test_adapter_items_use_singular_maintainer_and_keywords() -> None:
         "example",
         "github.com/org/repo",
         "remote",
-        RegistrationStatus.VALID,
         now,
     )
     latest_item = AdapterLatestItemResponse.from_entry(entry, registration, 2, True)

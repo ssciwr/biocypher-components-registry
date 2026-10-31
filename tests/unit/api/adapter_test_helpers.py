@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from src.api.app import create_app
 from src.api.dependencies import get_optional_auth_session, get_registration_store
 from src.core.auth.models import AuthSession
-from src.core.registration.service import submit_registration
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.registration_fixtures import accepted_source
 
 """
 This file is fully AI-generated to save time and made tests easier to read/manage
@@ -36,21 +36,13 @@ def create_adapter_entry(
             raise ValueError("Local repository path is required.")
         repository.mkdir()
         repository_location = str(repository)
-    metadata_path = str(repository / "croissant.jsonld") if repository else None
-    registration = submit_registration(
-        repository_location,
+    accepted_source(
         store,
+        repository_location,
+        metadata={"@id": adapter_id, "name": adapter_name, "version": version},
+        owner=submitted_by_github_user_id,
         doi=doi,
         cff_url=cff_url,
-        submitted_by_github_user_id=submitted_by_github_user_id,
-    )
-    store.mark_registration_valid(
-        registration_id=registration.registration_id,
-        metadata={"@id": adapter_id, "name": adapter_name, "version": version},
-        metadata_path=metadata_path,
-        profile_version="v1",
-        uniqueness_key=f"{adapter_id}::{version}",
-        observed_checksum=f"checksum-{adapter_id}",
     )
 
 

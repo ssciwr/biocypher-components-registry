@@ -8,6 +8,11 @@ from urllib.parse import ParseResult, quote, urlparse
 
 from pydantic import BaseModel, Field
 
+from src.api.schemas.registrations import RegistrationAttemptResponse
+from src.core.adapter.catalog import (
+    adapter_id_from_uniqueness_key,
+    latest_registry_entry,
+)
 from src.core.registration.models import RegistryEntry, StoredRegistration
 
 # ===========================================================
@@ -159,6 +164,8 @@ class AdapterDetailResponse(BaseModel):
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
     can_delete: bool = False
+    can_update: bool = False
+    latest_attempt: RegistrationAttemptResponse | None = None
 
     @classmethod
     def from_entries(
@@ -169,6 +176,7 @@ class AdapterDetailResponse(BaseModel):
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
         can_delete: bool = False,
+        latest_attempt: RegistrationAttemptResponse | None = None,
     ) -> AdapterDetailResponse:
         """Build adapter detail from canonical entry and source data."""
         latest = latest_registry_entry(entries)
@@ -196,6 +204,8 @@ class AdapterDetailResponse(BaseModel):
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
             can_delete=can_delete,
+            can_update=can_delete,
+            latest_attempt=latest_attempt,
         )
 
 
@@ -219,16 +229,6 @@ class AdapterMetadataResponse(BaseModel):
 # ===========================================================
 # =====================  Mapping Helpers ====================
 # ===========================================================
-
-
-def adapter_id_from_uniqueness_key(uniqueness_key: str) -> str:
-    """Extract the adapter id from the canonical uniqueness key."""
-    return uniqueness_key.split("::", maxsplit=1)[0]
-
-
-def latest_registry_entry(entries: list[RegistryEntry]) -> RegistryEntry:
-    """Return the most recently updated entry from a non-empty entry list."""
-    return max(entries, key=lambda entry: (entry.updated_at, entry.created_at))
 
 
 def _repository_url(repository_location: str | None) -> ParseResult | None:

@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
-from src.persistence.tables import metadata
+from src.persistence.schema import initialize_schema
 
 
 class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
-    """SQLite engine and migration wrapper for tests and local development."""
+    """SQLite engine for the current registry schema."""
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
@@ -22,46 +22,10 @@ class SQLiteRegistrationStore(SQLAlchemyRegistrationStore):
         self._initialize_database()
 
     def _initialize_database(self) -> None:
-        metadata.create_all(self.engine)
-        with self.engine.begin() as connection:
-            self._ensure_registration_sources_columns(connection)
-            connection.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS "
-                    "uq_registration_source_repository_location "
-                    "ON registration_sources (repository_location)"
-                )
-            )
-            connection.execute(
-                text("DROP INDEX IF EXISTS ix_registrations_uniqueness_key")
-            )
-            connection.execute(text("DROP TABLE IF EXISTS registration_failures"))
-            connection.execute(text("DROP TABLE IF EXISTS registrations"))
+        initialize_schema(self.engine)
 
     def _build_engine(self) -> Engine:
         return create_engine(
             f"sqlite+pysqlite:///{self.database_path}",
             poolclass=NullPool,
         )  # Fix open sqlite handles (connections) bug seen in CI testing environment
-
-    def _ensure_registration_sources_columns(self, connection: Engine | object) -> None:
-        columns = {
-            str(row["name"])
-            for row in connection.execute(
-                text("PRAGMA table_info(registration_sources)")
-            ).mappings()
-        }
-        for column_name in (
-            "description",
-            "license_value",
-            "doi",
-            "cff_url",
-            "submitted_by_github_user_id",
-        ):
-            if column_name not in columns:
-                connection.execute(
-                    text(
-                        "ALTER TABLE registration_sources "
-                        f"ADD COLUMN {column_name} VARCHAR"
-                    )
-                )
