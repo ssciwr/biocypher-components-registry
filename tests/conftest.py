@@ -31,15 +31,18 @@ def isolated_application_environment(monkeypatch, tmp_path):
 
 @pytest.fixture(scope="session")
 def postgres_test_url():
-    from tests.support.postgres import docker_postgres_url
+    from tests.support.postgres import PostgresTestUnavailable, docker_postgres_url
 
-    container = os.environ.get("REGISTRY_TEST_POSTGRES_CONTAINER")
+    container = os.environ.get("REGISTRY_TEST_POSTGRES_CONTAINER", "").strip()
     if not container:
         pytest.skip(
             "Start docker-compose.test.yml and set REGISTRY_TEST_POSTGRES_CONTAINER "
             "to exercise Docker PostgreSQL."
         )
-    return docker_postgres_url(container)
+    try:
+        return docker_postgres_url(container)
+    except PostgresTestUnavailable as exc:
+        pytest.skip(str(exc))
 
 
 @pytest.fixture
