@@ -12,6 +12,7 @@ import LinkToModal from '../components/LinkToModal'
 import CitationEndorsement from '../components/CitationEndorsement'
 import AdapterSearch from '../components/AdapterSearch'
 import MaintainerAvatar from '../components/MaintainerAvatar'
+import ColumnPreviewModal from '../components/ColumnPreviewModal'
 import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
   deleteAdapterApiV1AdaptersAdapterIdDelete,
@@ -30,7 +31,7 @@ type AdaptersPageProps = Readonly<{
 
 function AdaptersPage({ adapterId, signedIn }: AdaptersPageProps) {
   return adapterId ? (
-    <AdapterDetailView adapterId={adapterId} signedIn={signedIn} />
+    <AdapterDetailView key={adapterId} adapterId={adapterId} signedIn={signedIn} />
   ) : (
     <AdapterListView />
   )
@@ -58,33 +59,17 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
-    let ignore = false
-
     void getAdapterApiV1AdaptersAdapterIdGet({
       path: { adapter_id: adapterId },
     })
-      .then((result) => {
-        if (ignore) return
-
-        const adapterDetailError = result.error as unknown
-        if (adapterDetailError || !result.data) {
-          setAdapter(null)
-          setLoadError(true)
-          return
-        }
-
-        setAdapter(result.data)
-        setLoadError(false)
+      .then(({ data }) => {
+        setAdapter(data ?? null)
+        setLoadError(!data)
       })
       .catch(() => {
-        if (!ignore) {
-          setAdapter(null)
-          setLoadError(true)
-        }
+        setAdapter(null)
+        setLoadError(true)
       })
-    return () => {
-      ignore = true
-    }
   }, [adapterId])
 
 
@@ -213,7 +198,7 @@ bc.run()`}
                 <div className="p-4" key={source.name}>
                   <div className="flex items-center justify-between gap-4">
                     <h3 className="text-base font-semibold text-slate-950">{source.name}</h3>
-                    {source.column_count ? <ColumnModal source={source} /> : null}
+                    {source.column_count ? <ColumnModal adapterId={adapterId} source={source} /> : null}
                   </div>
                   {source.description ? <p className="mt-3 text-sm leading-5 text-slate-700">{source.description}</p> : null}
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-700">
@@ -334,10 +319,10 @@ bc.run()`}
   )
 }
 
-function ColumnModal({ source }: Readonly<{ source: DataSource }>) {
+function ColumnModal({ adapterId, source }: Readonly<{ adapterId: string; source: DataSource }>) {
   return (
-    <LinkToModal modal={<GenericModal title={`Data Source "${source.name}" - ${source.column_count} Columns`} content={<div className="text-sm text-slate-700">Column metadata is not exposed by the adapter API yet.</div>} />}>
-      {source.column_count} Columns
+    <LinkToModal modal={<ColumnPreviewModal adapterId={adapterId} source={source} />}>
+      {source.column_count} {source.column_count === 1 ? 'Column' : 'Columns'}
     </LinkToModal>
   )
 }
