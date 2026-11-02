@@ -71,6 +71,7 @@ def test_seed_demo_adapters_command_is_idempotent(tmp_path, monkeypatch):
     store = SQLiteRegistrationStore(path)
     assert len(store.list_registry_entries()) == 3
     assert {
-        source.submitted_by_github_user_id for source in store.list_active_registrations()
+        source.submitted_by_github_user_id
+        for source in store.list_active_registrations()
     } == {"123"}
     assert authorize.call_count == 2

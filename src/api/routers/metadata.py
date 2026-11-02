@@ -115,10 +115,7 @@ async def generate_dataset_metadata(
             )
         except ValidationError as exc:
             raise RequestValidationError(
-                [
-                    {**error, "loc": ("body", *error["loc"])}
-                    for error in exc.errors()
-                ]
+                [{**error, "loc": ("body", *error["loc"])} for error in exc.errors()]
             ) from exc
 
         return await asyncio.to_thread(

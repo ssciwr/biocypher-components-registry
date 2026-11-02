@@ -206,11 +206,7 @@ class SQLAlchemyRegistrationStore:
                 )
             )
             return
-        if (
-            source is None
-            or str(source["id"]) != source_id
-            or not source["is_active"]
-        ):
+        if source is None or str(source["id"]) != source_id or not source["is_active"]:
             raise ConcurrentRegistrationChangeError(
                 "The registration was removed. Reload the adapter page."
             )
@@ -233,8 +229,7 @@ class SQLAlchemyRegistrationStore:
     ) -> tuple[str, bool]:
         current = self._current_registry_entry(connection, source_id)
         unchanged = (
-            current is not None
-            and current["metadata_checksum"] == observed_checksum
+            current is not None and current["metadata_checksum"] == observed_checksum
         )
         if unchanged:
             return str(current["id"]), True
@@ -313,7 +308,8 @@ class SQLAlchemyRegistrationStore:
             profile_version=profile_version,
             metadata_json=metadata_json,
             error_details=None,
-            message=message or ("No changes found." if unchanged else "Metadata accepted."),
+            message=message
+            or ("No changes found." if unchanged else "Metadata accepted."),
             started_at=started_at,
             finished_at=finished_at,
             mlcroissant_valid=True,

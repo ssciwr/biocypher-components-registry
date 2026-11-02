@@ -49,9 +49,7 @@ def _jsonld_dict_shape_errors(value: dict[str, Any], path: str) -> list[str]:
 
 
 def _jsonld_context_errors(value: dict[str, Any], path: str) -> list[str]:
-    if _JSONLD_CONTEXT_KEY not in value or isinstance(
-        value[_JSONLD_CONTEXT_KEY], dict
-    ):
+    if _JSONLD_CONTEXT_KEY not in value or isinstance(value[_JSONLD_CONTEXT_KEY], dict):
         return []
     return [
         f"{path}.{_JSONLD_CONTEXT_KEY} must be a JSON object for Croissant validation."
