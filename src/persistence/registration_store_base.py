@@ -854,9 +854,6 @@ class SQLAlchemyRegistrationStore:
         latest_event: RowMapping | None,
     ) -> StoredRegistration:
         """Convert three-table state into the public registration model."""
-        latest_event_type = (
-            str(latest_event["event_type"]) if latest_event is not None else ""
-        )
         current_metadata = (
             self._parse_json(current_entry["metadata_json"]) if current_entry else None
         )
@@ -866,7 +863,6 @@ class SQLAlchemyRegistrationStore:
             else None
         )
         metadata = self._select_registration_metadata(
-            latest_event_type=latest_event_type,
             current_metadata=current_metadata,
             latest_event_metadata=latest_event_metadata,
         )
@@ -964,21 +960,10 @@ class SQLAlchemyRegistrationStore:
     def _select_registration_metadata(
         self,
         *,
-        latest_event_type: str,
         current_metadata: dict[str, object] | None,
         latest_event_metadata: dict[str, object] | None,
     ) -> dict[str, object] | None:
         """Choose which metadata payload best represents the registration state."""
-        if current_metadata is not None:
-            return current_metadata
-        if latest_event_type.startswith("INVALID_"):
-            return latest_event_metadata
-        if latest_event_type in {
-            "DUPLICATE",
-            "REJECTED_SAME_VERSION_CHANGED",
-            "FETCH_FAILED",
-        }:
-            return latest_event_metadata
         if current_metadata is not None:
             return current_metadata
         return latest_event_metadata
