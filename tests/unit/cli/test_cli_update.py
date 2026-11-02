@@ -9,12 +9,14 @@ from src.core.registration.service import register_adapter
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from src.persistence.tables import registration_sources_table
 from tests.support.croissant_fixtures import sample_adapter_document
-from tests.unit.test_cli_register import (
+from tests.unit.cli.test_cli_register import (
     REPO,
     remote_document,
     table_counts,
 )
-from tests.unit.test_cli_register import cli_environment as cli_environment  # noqa: PLC0414 - expose the pytest fixture.
+from tests.unit.cli.test_cli_register import (
+    cli_environment as cli_environment,  # noqa: PLC0414 - expose the pytest fixture.
+)
 
 runner = CliRunner()
 

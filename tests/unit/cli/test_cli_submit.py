@@ -20,7 +20,8 @@ def test_list_registrations_command_shows_only_published_registration(
     result = runner.invoke(app, ["list-registrations", "--db-path", str(path)])
     assert result.exit_code == 0, result.output
     assert "Stored Registrations" in result.output
-    assert "Example" in result.output and "Adapter" in result.output
+    assert "Example" in result.output
+    assert "Adapter" in result.output
     assert "SUBMITTED" not in result.output
     assert "legacy" not in result.output
 
@@ -47,7 +48,8 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path, monkeyp
     result = runner.invoke(app, ["list-registry-entries", "--db-path", str(path)])
     assert result.exit_code == 0, result.output
     assert "Registry Entries" in result.output
-    assert "Example" in result.output and "Adapter" in result.output
+    assert "Example" in result.output
+    assert "Adapter" in result.output
     assert "1.0.0" in result.output
 
 
@@ -69,7 +71,6 @@ def test_seed_demo_adapters_command_is_idempotent(tmp_path, monkeypatch):
     store = SQLiteRegistrationStore(path)
     assert len(store.list_registry_entries()) == 3
     assert {
-        source.submitted_by_github_user_id
-        for source in store.list_active_registrations()
+        source.submitted_by_github_user_id for source in store.list_active_registrations()
     } == {"123"}
     assert authorize.call_count == 2
