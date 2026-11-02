@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.core.shared.constants import (
+    CROISSANT_CONFORMS_TO_URL,
+    CROISSANT_NAMESPACE_IRI,
+    CROISSANT_RAI_NAMESPACE_IRI,
+    DCT_CONFORMS_TO_KEY,
+)
 from src.core.shared.ids import slugify_identifier
 
 JSONLD_TYPE_KEY = "@type"
@@ -12,13 +18,13 @@ ADAPTER_CONTEXT: dict[str, Any] = {
     "@language": "en",
     "@vocab": "https://schema.org/",
     "sc": "https://schema.org/",
-    "cr": "http://mlcommons.org/croissant/",
-    "rai": "http://mlcommons.org/croissant/RAI/",
+    "cr": CROISSANT_NAMESPACE_IRI,
+    "rai": CROISSANT_RAI_NAMESPACE_IRI,
     "dct": "http://purl.org/dc/terms/",
     "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
     "citeAs": "cr:citeAs",
     "column": "cr:column",
-    "conformsTo": "dct:conformsTo",
+    "conformsTo": DCT_CONFORMS_TO_KEY,
     "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
     "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
     "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
@@ -90,7 +96,7 @@ def build_adapter_document(
     document: dict[str, Any] = {
         "@context": ADAPTER_CONTEXT,
         JSONLD_TYPE_KEY: "SoftwareSourceCode",
-        "dct:conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
+        DCT_CONFORMS_TO_KEY: "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
         "@id": adapter_id or slugify_identifier(name),
         "name": name,
         "description": description,
@@ -170,7 +176,7 @@ def build_embedded_dataset_document(
     """Build a dataset fragment suitable for embedding under ``hasPart``."""
     document: dict[str, Any] = {
         JSONLD_TYPE_KEY: "sc:Dataset",
-        "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
+        DCT_CONFORMS_TO_KEY: CROISSANT_CONFORMS_TO_URL,
         "name": name,
         "description": description,
         "version": version,

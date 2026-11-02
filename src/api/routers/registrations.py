@@ -61,6 +61,7 @@ AuthSessionDep = Annotated[AuthSession, Depends(get_current_auth_session)]
             "model": RegistrationAttemptResponse,
             "description": "Processing failed; no first-registration records were saved.",
         },
+        403: {"description": "The signed-in GitHub account cannot claim this source."},
         409: {"description": "The repository is already registered."},
     },
     summary="Submit an adapter registration",

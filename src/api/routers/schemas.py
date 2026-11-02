@@ -14,7 +14,11 @@ class SchemaResponse(JSONResponse):
     media_type = "application/schema+json"
 
 
-@router.get("/schemas/{version}", response_class=SchemaResponse)
+@router.get(
+    "/schemas/{version}",
+    response_class=SchemaResponse,
+    responses={404: {"description": "Unknown registry schema version."}},
+)
 def get_validation_schema(version: str) -> dict[str, Any]:
     """Return the exact deployed schema for a registered profile version."""
     try:

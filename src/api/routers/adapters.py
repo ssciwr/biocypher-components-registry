@@ -205,7 +205,18 @@ def can_delete_adapter(
     return owns_adapter_sources(auth_session, entries, store)
 
 
-@router.post("/adapters/{adapter_id}/update", summary="Update a published adapter")
+@router.post(
+    "/adapters/{adapter_id}/update",
+    summary="Update a published adapter",
+    responses={
+        403: {
+            "description": "Only the submitting GitHub account can update this adapter."
+        },
+        409: {
+            "description": "The registration changed while the update was processing."
+        },
+    },
+)
 def update_adapter(
     adapter_id: str,
     auth_session: AuthSessionDep,
