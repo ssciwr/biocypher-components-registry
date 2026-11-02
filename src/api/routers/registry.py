@@ -85,13 +85,16 @@ def list_registry_registrations(
         if latest_event is not None and latest_event_type != latest_event:
             continue
 
+        outcome = latest_processing_outcome(registration, store)
         items.append(
             RegistryRegistrationResponse.from_registration(
                 registration,
                 latest_event_type=latest_event_type,
-                latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
-                if (outcome := latest_processing_outcome(registration, store))
-                else None,
+                latest_attempt=(
+                    RegistrationAttemptResponse.from_outcome(outcome)
+                    if outcome
+                    else None
+                ),
             )
         )
 

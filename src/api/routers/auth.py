@@ -29,6 +29,7 @@ from src.core.auth.service import GitHubAuthenticationError, github_user, github
 from src.persistence.auth_store import AuthSessionStore
 
 router = APIRouter()
+GITHUB_LOGIN_FAILED_DETAIL = "GitHub login failed."
 AuthSessionCookie = Annotated[
     str | None,
     Cookie(alias=settings.auth_session_cookie_name),
@@ -182,7 +183,7 @@ def _github_access_token(client_id: str, client_secret: str, code: str) -> str:
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="GitHub login failed.",
+            detail=GITHUB_LOGIN_FAILED_DETAIL,
         )
     return token
 
@@ -192,7 +193,7 @@ def _github_user(access_token: str) -> dict[str, Any]:
     try:
         return github_user(access_token, http=requests)
     except GitHubAuthenticationError as exc:
-        raise HTTPException(status_code=400, detail="GitHub login failed.") from exc
+        raise HTTPException(status_code=400, detail=GITHUB_LOGIN_FAILED_DETAIL) from exc
 
 
 def _github_user_id(payload: dict[str, Any]) -> str:
@@ -200,7 +201,7 @@ def _github_user_id(payload: dict[str, Any]) -> str:
     try:
         return github_user_id(payload)
     except GitHubAuthenticationError as exc:
-        raise HTTPException(status_code=400, detail="GitHub login failed.") from exc
+        raise HTTPException(status_code=400, detail=GITHUB_LOGIN_FAILED_DETAIL) from exc
 
 
 def _signed_state(state: str, secret: str) -> str:

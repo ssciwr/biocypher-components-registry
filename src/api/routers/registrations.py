@@ -210,15 +210,17 @@ def list_registrations(
 ) -> RegistrationListResponse:
     """Return active stored adapter registrations."""
     registrations = store.list_active_registrations()
-    items = [
-        RegistrationListItemResponse.from_stored(
-            registration,
-            latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
-            if (outcome := latest_processing_outcome(registration, store))
-            else None,
+    items = []
+    for registration in registrations:
+        outcome = latest_processing_outcome(registration, store)
+        items.append(
+            RegistrationListItemResponse.from_stored(
+                registration,
+                latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
+                if outcome
+                else None,
+            )
         )
-        for registration in registrations
-    ]
 
     return RegistrationListResponse(items=items)
 
@@ -299,9 +301,10 @@ def get_registration(
     if registration is None:
         raise registration_not_found_http_error(registration_id)
 
+    outcome = latest_processing_outcome(registration, store)
     return RegistrationDetailResponse.from_stored(
         registration,
         latest_attempt=RegistrationAttemptResponse.from_outcome(outcome)
-        if (outcome := latest_processing_outcome(registration, store))
+        if outcome
         else None,
     )

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+JSONLD_TYPE_KEY = "@type"
+
 DATASET_CONTEXT: dict[str, Any] = {
     "@language": "en",
     "@vocab": "https://schema.org/",
@@ -12,10 +14,10 @@ DATASET_CONTEXT: dict[str, Any] = {
     "conformsTo": "dct:conformsTo",
     "cr": "http://mlcommons.org/croissant/",
     "rai": "http://mlcommons.org/croissant/RAI/",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
+    "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
+    "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
     "dct": "http://purl.org/dc/terms/",
-    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -57,7 +59,10 @@ def build_creator(
         if str(creator_type).strip().lower() == "organization"
         else "Person"
     )
-    creator: dict[str, Any] = {"@type": f"sc:{normalized_type}", "name": name}
+    creator: dict[str, Any] = {
+        JSONLD_TYPE_KEY: f"sc:{normalized_type}",
+        "name": name,
+    }
     if affiliation:
         creator["affiliation"] = affiliation
     if email:
@@ -79,7 +84,7 @@ def build_distribution_file(
 ) -> dict[str, Any]:
     """Build a Croissant ``FileObject`` entry for a dataset distribution."""
     file_object = {
-        "@type": "cr:FileObject",
+        JSONLD_TYPE_KEY: "cr:FileObject",
         "@id": file_id,
         "name": name,
     }
@@ -105,7 +110,7 @@ def build_field(
     if description_suffix:
         description = f"{description} from {description_suffix}"
     return {
-        "@type": "cr:Field",
+        JSONLD_TYPE_KEY: "cr:Field",
         "@id": f"{record_set_id}/{name}",
         "name": name,
         "description": description,
@@ -127,7 +132,7 @@ def build_record_set(
 ) -> dict[str, Any]:
     """Build a Croissant record set node."""
     record_set = {
-        "@type": "cr:RecordSet",
+        JSONLD_TYPE_KEY: "cr:RecordSet",
         "@id": record_set_id,
         "name": name,
     }
@@ -153,7 +158,7 @@ def build_dataset_document(
     """Assemble a full standalone dataset Croissant document."""
     document: dict[str, Any] = {
         "@context": DATASET_CONTEXT,
-        "@type": "sc:Dataset",
+        JSONLD_TYPE_KEY: "sc:Dataset",
         "name": name,
         "description": description,
         "conformsTo": "http://mlcommons.org/croissant/1.0",

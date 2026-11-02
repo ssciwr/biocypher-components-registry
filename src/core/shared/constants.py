@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 METADATA_FILENAME = "croissant.jsonld"
+JSONLD_TYPE_KEY = "@type"
 
 STANDARD_CONTEXT = {
     "@language": "en",
@@ -15,9 +16,9 @@ STANDARD_CONTEXT = {
     "citeAs": "cr:citeAs",
     "column": "cr:column",
     "conformsTo": "dct:conformsTo",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
+    "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
+    "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -63,6 +64,7 @@ __all__ = [
     "DEFAULT_PROFILE_URL",
     "DEFAULT_PROGRAMMING_LANGUAGE",
     "DEFAULT_TARGET_PRODUCT",
+    "JSONLD_TYPE_KEY",
     "MANDATORY_FIELDS",
     "METADATA_FILENAME",
     "STANDARD_CONTEXT",

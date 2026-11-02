@@ -6,6 +6,8 @@ from typing import Any
 
 from src.core.shared.ids import slugify_identifier
 
+JSONLD_TYPE_KEY = "@type"
+
 ADAPTER_CONTEXT: dict[str, Any] = {
     "@language": "en",
     "@vocab": "https://schema.org/",
@@ -17,9 +19,9 @@ ADAPTER_CONTEXT: dict[str, Any] = {
     "citeAs": "cr:citeAs",
     "column": "cr:column",
     "conformsTo": "dct:conformsTo",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
+    "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
+    "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -60,7 +62,7 @@ def build_adapter_creator(
         if str(creator_type).strip().lower() == "organization"
         else "Person"
     )
-    creator: dict[str, Any] = {"@type": normalized_type, "name": name}
+    creator: dict[str, Any] = {JSONLD_TYPE_KEY: normalized_type, "name": name}
     if affiliation:
         creator["affiliation"] = affiliation
     if email:
@@ -87,7 +89,7 @@ def build_adapter_document(
     """Assemble a full adapter metadata document."""
     document: dict[str, Any] = {
         "@context": ADAPTER_CONTEXT,
-        "@type": "SoftwareSourceCode",
+        JSONLD_TYPE_KEY: "SoftwareSourceCode",
         "dct:conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
         "@id": adapter_id or slugify_identifier(name),
         "name": name,
@@ -113,7 +115,7 @@ def build_dataset_distribution_file(
 ) -> dict[str, Any]:
     """Build a dataset distribution file entry for embedded metadata."""
     document: dict[str, Any] = {
-        "@type": "cr:FileObject",
+        JSONLD_TYPE_KEY: "cr:FileObject",
         "@id": file_id,
         "name": name,
         "contentUrl": content_url,
@@ -137,7 +139,7 @@ def build_dataset_field(
 ) -> dict[str, Any]:
     """Build a field node for an embedded dataset record set."""
     field: dict[str, Any] = {
-        "@type": "cr:Field",
+        JSONLD_TYPE_KEY: "cr:Field",
         "@id": f"{record_set_id}/{name}",
         "name": name,
         "description": description,
@@ -167,7 +169,7 @@ def build_embedded_dataset_document(
 ) -> dict[str, Any]:
     """Build a dataset fragment suitable for embedding under ``hasPart``."""
     document: dict[str, Any] = {
-        "@type": "sc:Dataset",
+        JSONLD_TYPE_KEY: "sc:Dataset",
         "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
         "name": name,
         "description": description,
@@ -197,7 +199,7 @@ def build_embedded_record_set(
 ) -> dict[str, Any]:
     """Build a record set node for an embedded dataset fragment."""
     record_set: dict[str, Any] = {
-        "@type": "cr:RecordSet",
+        JSONLD_TYPE_KEY: "cr:RecordSet",
         "@id": record_set_id,
         "name": name,
         "field": fields,

@@ -6,6 +6,8 @@ from typing import Any
 
 import mlcroissant as mlc
 
+_JSONLD_CONTEXT_KEY = "@context"
+
 
 def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
     """Validate a document with ``mlcroissant``.
@@ -30,22 +32,45 @@ def validate_with_mlcroissant(document: dict[str, Any]) -> list[str]:
 
 def _jsonld_shape_errors(value: Any, path: str = "$") -> list[str]:
     """Reject known provider argument failures without masking internal errors."""
-    errors = []
     if isinstance(value, dict):
-        if "@context" in value and not isinstance(value["@context"], dict):
-            errors.append(
-                f"{path}.@context must be a JSON object for Croissant validation."
-            )
-        if "@id" in value and (
-            not isinstance(value["@id"], str) or not value["@id"].strip()
-        ):
-            errors.append(f"{path}.@id must be a non-empty string.")
-        for key, item in value.items():
-            if key != "@context":
-                errors.extend(_jsonld_shape_errors(item, f"{path}.{key}"))
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            errors.extend(_jsonld_shape_errors(item, f"{path}[{index}]"))
+        return _jsonld_dict_shape_errors(value, path)
+    if isinstance(value, list):
+        return _jsonld_list_shape_errors(value, path)
+    return []
+
+
+def _jsonld_dict_shape_errors(value: dict[str, Any], path: str) -> list[str]:
+    errors = _jsonld_context_errors(value, path)
+    errors.extend(_jsonld_id_errors(value, path))
+    for key, item in value.items():
+        if key != _JSONLD_CONTEXT_KEY:
+            errors.extend(_jsonld_shape_errors(item, f"{path}.{key}"))
+    return errors
+
+
+def _jsonld_context_errors(value: dict[str, Any], path: str) -> list[str]:
+    if _JSONLD_CONTEXT_KEY not in value or isinstance(
+        value[_JSONLD_CONTEXT_KEY], dict
+    ):
+        return []
+    return [
+        f"{path}.{_JSONLD_CONTEXT_KEY} must be a JSON object for Croissant validation."
+    ]
+
+
+def _jsonld_id_errors(value: dict[str, Any], path: str) -> list[str]:
+    if "@id" not in value:
+        return []
+    identifier = value["@id"]
+    if isinstance(identifier, str) and identifier.strip():
+        return []
+    return [f"{path}.@id must be a non-empty string."]
+
+
+def _jsonld_list_shape_errors(value: list[Any], path: str) -> list[str]:
+    errors = []
+    for index, item in enumerate(value):
+        errors.extend(_jsonld_shape_errors(item, f"{path}[{index}]"))
     return errors
 
 

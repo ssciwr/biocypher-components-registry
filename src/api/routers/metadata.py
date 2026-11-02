@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+from starlette.datastructures import UploadFile
 
 from src.api.schemas.metadata import (
     AdapterCreatorGenerateRequest,
     AdapterEmbeddedDatasetGenerateRequest,
     AdapterMetadataGenerateRequest,
     AdapterMetadataGenerateResponse,
+    DatasetMetadataGenerateForm,
     DatasetMetadataGeneratePayload,
     DatasetMetadataGenerateResponse,
     MetadataValidationRequest,
@@ -31,6 +36,17 @@ from src.core.validation import (
 from src.core.validation.results import ValidationResult
 
 router = APIRouter()
+_DATASET_METADATA_FORM_SCHEMA = DatasetMetadataGenerateForm.model_json_schema(
+    by_alias=True
+)
+_DATASET_METADATA_MULTIPART_SCHEMA = {
+    **_DATASET_METADATA_FORM_SCHEMA,
+    "properties": {
+        **_DATASET_METADATA_FORM_SCHEMA["properties"],
+        "file": {"type": "string", "format": "binary"},
+    },
+    "required": ["file"],
+}
 
 
 # ===========================================================
@@ -65,26 +81,59 @@ def validate_metadata(
         "The backend stores the upload temporarily, runs the selected generator, "
         "returns the generated metadata, and validates by default."
     ),
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "multipart/form-data": {
+                    "schema": _DATASET_METADATA_MULTIPART_SCHEMA,
+                }
+            }
+        }
+    },
 )
 # modified lightly using AI to support data flow
-def generate_dataset_metadata(
-    file: Annotated[UploadFile, File(...)],
-    generator: Annotated[Literal["auto", "croissant-baker", "native"], Form()] = "auto",
-    run_validation: Annotated[bool, Form(alias="validate")] = True,
-    name: Annotated[str | None, Form()] = None,
-    description: Annotated[str | None, Form()] = None,
-    url: Annotated[str | None, Form()] = None,
-    license_value: Annotated[str | None, Form(alias="license")] = None,
-    citation: Annotated[str | None, Form()] = None,
-    content_url: Annotated[str | None, Form()] = None,
-    dataset_version: Annotated[str | None, Form()] = None,
-    date_published: Annotated[str | None, Form()] = None,
-    encoding_format: Annotated[str | None, Form()] = None,
-    filename: Annotated[str | None, Form()] = None,
-    sha256: Annotated[str | None, Form()] = None,
-    creators_json: Annotated[str, Form()] = "[]",
+async def generate_dataset_metadata(
+    request: Request,
 ) -> DatasetMetadataGenerateResponse:
     """Generate dataset metadata from an uploaded source file."""
+    async with request.form() as form_data:
+        file = form_data.get("file")
+        if not isinstance(file, UploadFile):
+            raise RequestValidationError(
+                [
+                    {
+                        "type": "missing",
+                        "loc": ("body", "file"),
+                        "msg": "Field required",
+                        "input": None,
+                    }
+                ]
+            )
+        try:
+            form = DatasetMetadataGenerateForm.model_validate(
+                {key: value for key, value in form_data.items() if key != "file"}
+            )
+        except ValidationError as exc:
+            raise RequestValidationError(
+                [
+                    {**error, "loc": ("body", *error["loc"])}
+                    for error in exc.errors()
+                ]
+            ) from exc
+
+        return await asyncio.to_thread(
+            _generate_dataset_metadata_from_upload,
+            file=file,
+            form=form,
+        )
+
+
+def _generate_dataset_metadata_from_upload(
+    *,
+    file: UploadFile,
+    form: DatasetMetadataGenerateForm,
+) -> DatasetMetadataGenerateResponse:
+    """Copy the upload and generate metadata outside the event loop."""
     with TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
         input_path = temporary_path / Path(file.filename or "dataset-upload").name
@@ -93,20 +142,20 @@ def generate_dataset_metadata(
 
         payload = DatasetMetadataGeneratePayload(
             input_path=str(input_path),
-            generator=generator,
-            validate=run_validation,
-            name=name,
-            description=description,
-            url=url,
-            license_value=license_value,
-            citation=citation,
-            content_url=content_url,
-            dataset_version=dataset_version,
-            date_published=date_published,
-            encoding_format=encoding_format,
-            filename=filename,
-            sha256=sha256,
-            creators=_parse_creators_json(creators_json),
+            generator=form.generator,
+            validate=form.run_validation,
+            name=form.name,
+            description=form.description,
+            url=form.url,
+            license_value=form.license_value,
+            citation=form.citation,
+            content_url=form.content_url,
+            dataset_version=form.dataset_version,
+            date_published=form.date_published,
+            encoding_format=form.encoding_format,
+            filename=form.filename,
+            sha256=form.sha256,
+            creators=_parse_creators_json(form.creators_json),
             extra_args=[],
         )
         return _execute_dataset_metadata_generation(

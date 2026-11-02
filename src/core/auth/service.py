@@ -17,6 +17,7 @@ from src.core.auth.models import AuthSession
 
 _TIMEOUT = 10
 _ACCEPT = {"Accept": "application/json"}
+_INVALID_DEVICE_RESPONSE = "Invalid GitHub device authorization response."
 
 
 class GitHubAuthenticationError(Exception):
@@ -76,7 +77,7 @@ def _device_response(response: Any, *, polling: bool = False) -> dict[str, Any]:
             "Check your network or proxy, then retry."
         )
     if not isinstance(payload, dict):
-        raise GitHubAuthenticationError("Invalid GitHub device authorization response.")
+        raise GitHubAuthenticationError(_INVALID_DEVICE_RESPONSE)
     return payload
 
 
@@ -132,65 +133,21 @@ def authenticate_github_device(
     transport = http if http is not None else requests
     token = None
     try:
-        response = transport.post(
-            "https://github.com/login/device/code",
-            headers=_ACCEPT,
-            data={"client_id": client_id},
-            timeout=_TIMEOUT,
+        device, code, uri, interval, deadline = _request_device_authorization(
+            transport=transport,
+            client_id=client_id,
+            monotonic=monotonic,
         )
-        payload = _device_response(response)
-        device = payload.get("device_code")
-        code = payload.get("user_code")
-        uri = payload.get("verification_uri")
-        if uri != "https://github.com/login/device" or not all(
-            isinstance(value, str) and value for value in (device, code)
-        ):
-            raise GitHubAuthenticationError(
-                "Invalid GitHub device authorization response."
-            )
-        try:
-            interval = float(payload.get("interval", 5))
-            expires = float(payload["expires_in"])
-        except (KeyError, TypeError, ValueError):
-            raise GitHubAuthenticationError(
-                "Invalid GitHub device authorization response."
-            ) from None
-        if not math.isfinite(expires) or not math.isfinite(interval) or expires <= 0:
-            raise GitHubAuthenticationError(
-                "Invalid GitHub device authorization response."
-            )
-        interval = max(1, interval)
-        deadline = monotonic() + expires
         on_authorization(uri, code)
-        while True:
-            remaining = deadline - monotonic()
-            if remaining <= 0:
-                raise GitHubAuthenticationError("GitHub authorization expired.")
-            sleep(min(interval, remaining))
-            if monotonic() >= deadline:
-                raise GitHubAuthenticationError("GitHub authorization expired.")
-            response = transport.post(
-                "https://github.com/login/oauth/access_token",
-                headers=_ACCEPT,
-                data={
-                    "client_id": client_id,
-                    "device_code": device,
-                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                },
-                timeout=_TIMEOUT,
-            )
-            payload = _device_response(response, polling=True)
-            token = payload.get("access_token")
-            if isinstance(token, str) and token:
-                break
-            token = None
-            error = payload.get("error")
-            if error == "authorization_pending":
-                continue
-            if error == "slow_down":
-                interval += 5
-                continue
-            raise GitHubAuthenticationError("GitHub authorization denied or expired.")
+        token = _poll_for_device_token(
+            transport=transport,
+            client_id=client_id,
+            device_code=device,
+            interval=interval,
+            deadline=deadline,
+            sleep=sleep,
+            monotonic=monotonic,
+        )
         return AuthSession(
             github_user_id=github_user_id(github_user(token, http=transport))
         )
@@ -217,23 +174,112 @@ def authenticate_github_device(
     finally:
         if token:
             try:
-                response = transport.delete(
-                    f"https://api.github.com/applications/{client_id}/token",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        "X-GitHub-Api-Version": "2022-11-28",
-                    },
-                    auth=(client_id, client_secret),
-                    json={"access_token": token},
-                    timeout=_TIMEOUT,
+                _revoke_device_token(
+                    transport=transport,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    token=token,
                 )
-                if response.status_code != 204:
-                    raise GitHubAuthenticationError(
-                        "Could not revoke the GitHub token; revocation unconfirmed."
-                    )
-            except Exception:  # noqa: BLE001 - never expose the revocation request token.
-                raise GitHubAuthenticationError(
-                    "Could not revoke the GitHub token; revocation unconfirmed."
-                ) from None
             finally:
                 token = None
+
+
+def _request_device_authorization(
+    *,
+    transport: Any,
+    client_id: str,
+    monotonic: Callable[[], float],
+) -> tuple[str, str, str, float, float]:
+    """Request and validate a device code and its polling deadline."""
+    response = transport.post(
+        "https://github.com/login/device/code",
+        headers=_ACCEPT,
+        data={"client_id": client_id},
+        timeout=_TIMEOUT,
+    )
+    payload = _device_response(response)
+    device = payload.get("device_code")
+    code = payload.get("user_code")
+    uri = payload.get("verification_uri")
+    if uri != "https://github.com/login/device" or not all(
+        isinstance(value, str) and value for value in (device, code)
+    ):
+        raise GitHubAuthenticationError(_INVALID_DEVICE_RESPONSE)
+    try:
+        interval = float(payload.get("interval", 5))
+        expires = float(payload["expires_in"])
+    except (KeyError, TypeError, ValueError):
+        raise GitHubAuthenticationError(_INVALID_DEVICE_RESPONSE) from None
+    if not math.isfinite(expires) or not math.isfinite(interval) or expires <= 0:
+        raise GitHubAuthenticationError(_INVALID_DEVICE_RESPONSE)
+    return device, code, uri, max(1, interval), monotonic() + expires
+
+
+def _poll_for_device_token(
+    *,
+    transport: Any,
+    client_id: str,
+    device_code: str,
+    interval: float,
+    deadline: float,
+    sleep: Callable[[float], None],
+    monotonic: Callable[[], float],
+) -> str:
+    """Poll GitHub until authorization succeeds or its deadline expires."""
+    while True:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise GitHubAuthenticationError("GitHub authorization expired.")
+        sleep(min(interval, remaining))
+        if monotonic() >= deadline:
+            raise GitHubAuthenticationError("GitHub authorization expired.")
+        response = transport.post(
+            "https://github.com/login/oauth/access_token",
+            headers=_ACCEPT,
+            data={
+                "client_id": client_id,
+                "device_code": device_code,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            },
+            timeout=_TIMEOUT,
+        )
+        payload = _device_response(response, polling=True)
+        token = payload.get("access_token")
+        if isinstance(token, str) and token:
+            return token
+        error = payload.get("error")
+        if error == "authorization_pending":
+            continue
+        if error == "slow_down":
+            interval += 5
+            continue
+        raise GitHubAuthenticationError("GitHub authorization denied or expired.")
+
+
+def _revoke_device_token(
+    *,
+    transport: Any,
+    client_id: str,
+    client_secret: str,
+    token: str,
+) -> None:
+    """Revoke the specific device-flow token, sanitizing any failure."""
+    try:
+        response = transport.delete(
+            f"https://api.github.com/applications/{client_id}/token",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            auth=(client_id, client_secret),
+            json={"access_token": token},
+            timeout=_TIMEOUT,
+        )
+        if response.status_code != 204:
+            raise GitHubAuthenticationError(
+                "Could not revoke the GitHub token; revocation unconfirmed."
+            )
+    except Exception:  # noqa: BLE001 - never expose the revocation request token.
+        raise GitHubAuthenticationError(
+            "Could not revoke the GitHub token; revocation unconfirmed."
+        ) from None

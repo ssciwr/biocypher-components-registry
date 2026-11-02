@@ -13,7 +13,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 from src.core.shared.constants import METADATA_FILENAME
 from src.core.shared.errors import (
@@ -25,6 +25,8 @@ from src.core.shared.errors import (
 GIT_COMMAND_TIMEOUT = 15
 GIT_OPERATION_TIMEOUT = 60
 MAX_METADATA_BYTES = 5 * 1024 * 1024
+_GITHUB_HOST = "github.com"
+_RAW_GITHUB_HOST = "raw.githubusercontent.com"
 logger = logging.getLogger(__name__)
 
 
@@ -53,57 +55,83 @@ def _time_operation(operation: str) -> Iterator[None]:
 def normalize_repository_url(value: str) -> str:
     """Discard file/branch routes while preserving nested GitLab namespaces."""
     value = value.strip()
-    if value.startswith(("github.com/", "gitlab.com/")):
+    if value.startswith((f"{_GITHUB_HOST}/", "gitlab.com/")):
         value = f"https://{value}"
     parsed = urlparse(value)
+    hostname = parsed.hostname
     if (
         parsed.scheme != "https"
-        or not parsed.hostname
+        or not hostname
         or parsed.username is not None
         or parsed.password is not None
     ):
         raise InvalidRepoURLError(value)
     try:
-        _ = parsed.port
+        port = parsed.port
     except ValueError as exc:
         raise InvalidRepoURLError(value) from exc
-    hostname = parsed.hostname.lower().rstrip(".")
-    if hostname == "localhost" or hostname.endswith(".localhost"):
+    normalized_hostname = hostname.lower().rstrip(".")
+    if not _is_public_repository_hostname(normalized_hostname):
         raise InvalidRepoURLError(value)
-    try:
-        address = ipaddress.ip_address(hostname)
-    except ValueError:
-        address = None
-    if address is not None and not address.is_global:
+    authority = _repository_authority(normalized_hostname, port)
+    if not _is_approved_repository_host(normalized_hostname, authority, port):
         raise InvalidRepoURLError(value)
-    authority = hostname if parsed.port in (None, 443) else f"{hostname}:{parsed.port}"
-    allowed = {
-        item.strip().lower()
-        for item in os.getenv(
-            "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.com"
-        ).split(",")
-        if item.strip()
-    }
-    approved_authority = (
-        "github.com"
-        if hostname == "raw.githubusercontent.com" and parsed.port in (None, 443)
-        else authority
-    )
-    if approved_authority not in allowed:
-        raise InvalidRepoURLError(value)
-    parts = [part for part in parsed.path.split("/") if part]
-    host = authority
-    if hostname in {"github.com", "raw.githubusercontent.com"}:
-        host = "github.com"
-        parts = parts[:2]
-    elif "-" in parts:
-        parts = parts[: parts.index("-")]
+    host, parts = _repository_path(parsed, normalized_hostname, authority)
     if len(parts) < 2 or any(part in {".", ".."} for part in parts):
         raise InvalidRepoURLError(value)
     parts[-1] = parts[-1].removesuffix(".git")
     if not parts[-1]:
         raise InvalidRepoURLError(value)
     return f"https://{host}/{'/'.join(parts)}"
+
+
+def _is_public_repository_hostname(hostname: str) -> bool:
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return False
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return True
+    return address.is_global
+
+
+def _repository_authority(hostname: str, port: int | None) -> str:
+    return hostname if port in (None, 443) else f"{hostname}:{port}"
+
+
+def _is_approved_repository_host(
+    hostname: str,
+    authority: str,
+    port: int | None,
+) -> bool:
+    allowed = {
+        item.strip().lower()
+        for item in os.getenv(
+            "REGISTRY_ALLOWED_REPOSITORY_HOSTS", f"{_GITHUB_HOST},gitlab.com"
+        ).split(",")
+        if item.strip()
+    }
+    approved_authority = (
+        _GITHUB_HOST
+        if hostname == _RAW_GITHUB_HOST and port in (None, 443)
+        else authority
+    )
+    return approved_authority in allowed
+
+
+def _repository_path(
+    parsed: ParseResult,
+    hostname: str,
+    authority: str,
+) -> tuple[str, list[str]]:
+    parts = [part for part in parsed.path.split("/") if part]
+    host = authority
+    if hostname in {_GITHUB_HOST, _RAW_GITHUB_HOST}:
+        host = _GITHUB_HOST
+        parts = parts[:2]
+    elif "-" in parts:
+        parts = parts[: parts.index("-")]
+    return host, parts
 
 
 def _run_git(arguments: list[str], deadline: float) -> bytes:
