@@ -25,10 +25,9 @@ def test_metadata_without_id_has_one_stable_identity_through_update(registration
         )
         assert first.registration.adapter_id == "example-adapter"
         assert first.registration.uniqueness_key == "example-adapter::1.0.0"
+        actor = AuthSession("123")
         with pytest.raises(DuplicateRegistrationError):
-            register_adapter(
-                "https://github.com/owner/first", store, actor=AuthSession("123")
-            )
+            register_adapter("https://github.com/owner/first", store, actor=actor)
         document["version"] = "next-release"
         result = update_adapter(
             first.registration.adapter_id, store, actor=AuthSession("123")

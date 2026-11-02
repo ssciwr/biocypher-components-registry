@@ -164,20 +164,20 @@ def test_first_persistence_failure_rolls_back_source_and_entry(
         raise RuntimeError("event insert failed")
 
     monkeypatch.setattr(store, "_insert_registration_event", fail_event)
+    repository_location = str(repository)
+    actor = AuthSession(github_user_id="123")
     with pytest.raises(RuntimeError, match="event insert failed"):
-        register_adapter(
-            str(repository), store, actor=AuthSession(github_user_id="123")
-        )
+        register_adapter(repository_location, store, actor=actor)
     assert counts(store) == (0, 0, 0)
 
 
 def test_duplicate_repository_does_not_create_another_attempt(repository, store):
     register_adapter(str(repository), store, actor=AuthSession(github_user_id="123"))
     before = counts(store)
+    repository_location = str(repository)
+    actor = AuthSession(github_user_id="123")
     with pytest.raises(DuplicateRegistrationError):
-        register_adapter(
-            str(repository), store, actor=AuthSession(github_user_id="123")
-        )
+        register_adapter(repository_location, store, actor=actor)
     assert counts(store) == before
 
 

@@ -111,10 +111,9 @@ def test_shared_update_rejects_adapter_if_any_source_has_another_owner(
             .values(submitted_by_github_user_id="456")
         )
     before = table_counts(store)
+    actor = AuthSession(github_user_id="123")
     with pytest.raises(PermissionError):
-        update_adapter(
-            "example-adapter", store, actor=AuthSession(github_user_id="123")
-        )
+        update_adapter("example-adapter", store, actor=actor)
     assert table_counts(store) == before
 
 

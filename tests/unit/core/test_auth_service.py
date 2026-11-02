@@ -174,11 +174,12 @@ def test_local_deadline_stops_polling_without_sleeping_past_expiry(http):
         sleeps.append(seconds)
         now[0] += seconds
 
+    on_authorization = Mock()
     with pytest.raises(GitHubAuthenticationError):
         authenticate_github_device(
             client_id="fixture-client",
             client_secret="fixture-secret",
-            on_authorization=Mock(),
+            on_authorization=on_authorization,
             http=http,
             sleep=advance,
             monotonic=lambda: now[0],

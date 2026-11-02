@@ -176,10 +176,9 @@ def test_git_access_errors_are_unavailable_not_not_found(monkeypatch, error, rea
     process = Mock(returncode=128)
     process.communicate.return_value = (b"", error)
     monkeypatch.setattr(repositories.subprocess, "Popen", Mock(return_value=process))
+    deadline = time.monotonic() + 60
     with pytest.raises(RepositoryUnavailableError) as caught:
-        repositories._run_git(
-            ["ls-remote", "https://github.com/org/repo"], time.monotonic() + 60
-        )
+        repositories._run_git(["ls-remote", "https://github.com/org/repo"], deadline)
     assert caught.value.reason_code == reason
 
 
@@ -189,10 +188,9 @@ def test_git_timeout_terminates_children(monkeypatch):
     monkeypatch.setattr(repositories.subprocess, "Popen", Mock(return_value=process))
     terminate = Mock()
     monkeypatch.setattr(repositories.os, "killpg", terminate)
+    deadline = time.monotonic() + 60
     with pytest.raises(RepositoryUnavailableError) as caught:
-        repositories._run_git(
-            ["ls-remote", "https://github.com/org/repo"], time.monotonic() + 60
-        )
+        repositories._run_git(["ls-remote", "https://github.com/org/repo"], deadline)
     assert caught.value.reason_code == "REMOTE_TEMPORARY"
     terminate.assert_called_once()
 
