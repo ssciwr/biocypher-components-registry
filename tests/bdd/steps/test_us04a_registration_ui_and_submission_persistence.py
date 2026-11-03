@@ -15,7 +15,7 @@ scenarios("../features/us04a_registration_ui_and_submission_persistence.feature"
 
 @pytest.fixture
 def registration_context(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
     monkeypatch.setenv("GITHUB_OAUTH_CLIENT_ID", "fixture-client")
     monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "fixture-secret")
     return {

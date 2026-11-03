@@ -20,7 +20,7 @@ def test_registration_database_path_uses_environment_override(
 ) -> None:
     """Shared settings expose the deployment database path override."""
     database_path = tmp_path / "registry.sqlite3"
-    monkeypatch.setenv(settings.registry_db_path_env, str(database_path))
+    monkeypatch.setenv(settings.sqlite_database_path_env, str(database_path))
 
     assert get_registration_database_path() == database_path
 

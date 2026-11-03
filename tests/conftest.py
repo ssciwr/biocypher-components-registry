@@ -15,10 +15,9 @@ def isolated_application_environment(monkeypatch, tmp_path):
     from src.persistence.factory import close_stores
 
     close_stores()
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.delenv("POSTGRES_HOST", raising=False)
+    monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
     monkeypatch.delenv("REGISTRY_ALLOWED_REPOSITORY_HOSTS", raising=False)
-    monkeypatch.setenv("BIOCYPHER_REGISTRY_DB_PATH", str(tmp_path / "registry.sqlite3"))
+    monkeypatch.setenv("SQLITE_DATABASE_PATH", str(tmp_path / "registry.sqlite3"))
     for name in (
         "GITHUB_OAUTH_CLIENT_ID",
         "GITHUB_OAUTH_CLIENT_SECRET",

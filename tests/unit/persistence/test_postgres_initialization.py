@@ -44,14 +44,21 @@ def test_concurrent_fresh_schema_initialization_succeeds(postgres_schema_url):
 
 
 def test_cli_preflight_checks_connection_without_creating_tables(
-    postgres_schema_url, monkeypatch
+    postgres_schema_url,
 ):
     from sqlalchemy import create_engine, inspect
+    from sqlalchemy.engine import make_url
 
+    from src.core.settings import DatabaseBackend, DatabaseSettings
     from src.persistence.factory import check_database_connection
 
-    monkeypatch.setenv("DATABASE_URL", postgres_schema_url)
-    assert check_database_connection().startswith("PostgreSQL")
+    configured = DatabaseSettings(
+        backend=DatabaseBackend.POSTGRESQL,
+        postgres_url=make_url(postgres_schema_url),
+    )
+    assert check_database_connection(database_settings=configured).startswith(
+        "PostgreSQL"
+    )
     engine = create_engine(postgres_schema_url)
     try:
         assert inspect(engine).get_table_names() == []

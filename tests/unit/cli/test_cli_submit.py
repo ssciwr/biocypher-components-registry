@@ -12,7 +12,6 @@ runner = CliRunner()
 def test_list_registrations_command_shows_only_published_registration(
     tmp_path, monkeypatch
 ):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
     path = tmp_path / "registry.sqlite3"
     store = SQLiteRegistrationStore(path)
     accepted_source(store, "https://github.com/owner/published")
@@ -27,7 +26,6 @@ def test_list_registrations_command_shows_only_published_registration(
 
 
 def test_show_registration_events_command_shows_accepted_history(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
     path = tmp_path / "registry.sqlite3"
     store = SQLiteRegistrationStore(path)
     source = accepted_source(store, "https://github.com/owner/repo")
@@ -42,7 +40,6 @@ def test_show_registration_events_command_shows_accepted_history(tmp_path, monke
 
 
 def test_list_registry_entries_command_shows_canonical_entries(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
     path = tmp_path / "registry.sqlite3"
     accepted_source(SQLiteRegistrationStore(path), "https://github.com/owner/repo")
     result = runner.invoke(app, ["list-registry-entries", "--db-path", str(path)])
@@ -54,7 +51,6 @@ def test_list_registry_entries_command_shows_canonical_entries(tmp_path, monkeyp
 
 
 def test_seed_demo_adapters_command_is_idempotent(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
     from unittest.mock import Mock
 
     from src.core.auth.models import AuthSession

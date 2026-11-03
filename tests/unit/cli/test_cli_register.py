@@ -24,7 +24,7 @@ REPO = "https://github.com/example/example-adapter"
 
 @pytest.fixture
 def cli_environment(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_BACKEND", "sqlite")
     monkeypatch.setenv("GITHUB_OAUTH_CLIENT_ID", "fixture-client")
     monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "fixture-secret")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
@@ -124,7 +124,7 @@ def test_non_https_registration_rejected_before_authentication(
 
 def test_register_uses_configured_sqlite_path(cli_environment, monkeypatch):
     path, _ = cli_environment
-    monkeypatch.setenv("BIOCYPHER_REGISTRY_DB_PATH", str(path))
+    monkeypatch.setenv("SQLITE_DATABASE_PATH", str(path))
     remote_document(monkeypatch, sample_adapter_document())
     result = runner.invoke(cli.app, ["register", REPO])
     assert result.exit_code == 0, result.output

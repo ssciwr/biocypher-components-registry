@@ -185,7 +185,8 @@ def test_exec_env_strips_secrets(monkeypatch, cl):
     monkeypatch.setenv("BIOCYPHER_MCP_AUTH_HEADER", "Bearer abc")
     monkeypatch.setenv("ANTHROPIC_API_KEY_FILE", "/run/secrets/key")
     monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "oauth-secret")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db/registry")
+    monkeypatch.setenv("DATABASE_BACKEND", "postgresql")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "secret")
     env = cl._exec_env()
     assert set(env) <= set(cl.EXEC_ENV_ALLOWLIST)
 

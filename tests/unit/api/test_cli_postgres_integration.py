@@ -5,12 +5,14 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
+from sqlalchemy.engine import make_url
 from typer.testing import CliRunner
 
 import cli
 from src.api.app import create_app
 from src.core.adapter.discovery import AdapterDiscoveryResult
 from src.core.auth.models import AuthSession
+from src.core.settings import DatabaseBackend, DatabaseSettings
 from src.persistence.factory import build_auth_session_store, build_registration_store
 from tests.support.croissant_fixtures import sample_adapter_document
 
@@ -18,7 +20,14 @@ from tests.support.croissant_fixtures import sample_adapter_document
 def test_cli_and_api_share_docker_postgres_publication_and_ownership(
     postgres_schema_url, monkeypatch
 ):
-    monkeypatch.setenv("DATABASE_URL", postgres_schema_url)
+    configured = DatabaseSettings(
+        backend=DatabaseBackend.POSTGRESQL,
+        postgres_url=make_url(postgres_schema_url),
+    )
+    monkeypatch.setattr(
+        "src.persistence.factory.load_database_settings",
+        lambda database_path=None: configured,
+    )
     document = sample_adapter_document()
     document.pop("@id")
     monkeypatch.setattr(cli, "_authorize_cli", Mock(return_value=AuthSession("123")))
