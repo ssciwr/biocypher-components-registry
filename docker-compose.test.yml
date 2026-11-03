@@ -1,12 +1,22 @@
+# ===========================================================
+# BioCypher Registry PostgreSQL Integration Tests
+# ===========================================================
+
 name: biocypher-registry-tests
 
 services:
+  # ===========================================================
+  # Disposable PostgreSQL Test Database
+  # ===========================================================
   database:
     image: postgres:16-alpine
     container_name: biocypher-registry-test-database
     labels:
       io.biocypher.registry.test-database: "true"
     environment:
+      # ===========================================================
+      # Test Database Configuration
+      # ===========================================================
       POSTGRES_DB: registry_test
       POSTGRES_USER: registry_test
       POSTGRES_PASSWORD: registry_test

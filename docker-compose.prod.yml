@@ -51,7 +51,8 @@ services:
     init: true
     env_file: .env
     environment:
-      BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
+      DATABASE_BACKEND: sqlite
+      SQLITE_DATABASE_PATH: /app/data/registry.sqlite3
       AGENT_WORKSPACES_ROOT: /app/data/workspaces
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://registry.biocypher.org}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://registry.biocypher.org}

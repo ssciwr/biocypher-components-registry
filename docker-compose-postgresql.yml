@@ -22,8 +22,6 @@ services:
   # Tier 2: Backend Container (FastAPI + Uvicorn)
   # ===========================================================
   backend:
-    env_file:
-      - .env
     build:
       context: .
       dockerfile: Dockerfile
@@ -32,16 +30,45 @@ services:
     # Reaps processes orphaned by killed run_command process groups.
     init: true
     environment:
-      # PostgreSQL connection string
-      DATABASE_URL: ""
+      # ===========================================================
+      # Database Configuration
+      # ===========================================================
+      DATABASE_BACKEND: postgresql
       POSTGRES_HOST: database
       POSTGRES_PORT: "5432"
       POSTGRES_USER: ${POSTGRES_USER:-biocypher}
       POSTGRES_DB: ${POSTGRES_DB:-biocypher_registry}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+      # ===========================================================
+      # GitHub Authentication
+      # ===========================================================
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-}
+
+      # ===========================================================
+      # Frontend and API URLs
+      # ===========================================================
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+
+      # ===========================================================
+      # Repository Policy
+      # ===========================================================
+      REGISTRY_ALLOWED_REPOSITORY_HOSTS: ${REGISTRY_ALLOWED_REPOSITORY_HOSTS:-}
+
+      # ===========================================================
+      # Agentic Workspace
+      # ===========================================================
       # Agentic workspace API (src/api/routers/workspace.py): per-session
       # directories live on their own persisted volume.
       AGENT_WORKSPACES_ROOT: /app/data/workspaces
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-}
+      BIOCYPHER_MCP_URL: ${BIOCYPHER_MCP_URL:-}
+      BIOCYPHER_MCP_AUTH_HEADER: ${BIOCYPHER_MCP_AUTH_HEADER:-}
     ports:
       - "8000:8000"
     volumes:
