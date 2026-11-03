@@ -64,8 +64,8 @@ JSONLD_TYPE = "@type"
 
 _DB_PATH_HELP = (
     "SQLite database path for stored registrations. Defaults to "
-    f"{core_settings.registry_db_path_env} or "
-    f"{core_settings.default_registry_db_path}."
+    f"{core_settings.sqlite_database_path_env} or "
+    f"{core_settings.default_sqlite_database_path}."
 )
 
 _DEMO_ADAPTERS: list[dict[str, Any]] = [
