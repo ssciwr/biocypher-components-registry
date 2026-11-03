@@ -28,8 +28,10 @@ class ApiSettings:
     agent_api_prefix: str = field(
         default_factory=lambda: os.getenv(_AGENT_API_PREFIX_ENV, "/agent/api/v1")
     )
-    registry_db_path_env: str = core_settings.registry_db_path_env
-    default_registry_db_path: Path = core_settings.default_registry_db_path
+    sqlite_database_path_env: str = core_settings.sqlite_database_path_env
+    default_sqlite_database_path: Path = (
+        core_settings.default_sqlite_database_path
+    )
     github_oauth_client_id_env: str = "GITHUB_OAUTH_CLIENT_ID"
     github_oauth_client_secret_env: str = "GITHUB_OAUTH_CLIENT_SECRET"
     auth_session_secret_env: str = "AUTH_SESSION_SECRET"

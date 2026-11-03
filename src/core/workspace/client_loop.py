@@ -150,7 +150,8 @@ def optional_request_params() -> dict:
 
 # The only env vars run_command subprocesses inherit. An allowlist rather than
 # a secret denylist: the API process also holds OAuth/session secrets and
-# DATABASE_URL, and model-generated commands must see none of them.
+# DATABASE_BACKEND, SQLITE_DATABASE_PATH, POSTGRES_*, and model-generated
+# commands must see none of them.
 EXEC_ENV_ALLOWLIST = ("PATH", "LANG", "LC_ALL", "TZ")
 # Upper bound on the model-chosen run_command timeout.
 MAX_COMMAND_SECONDS = 600
