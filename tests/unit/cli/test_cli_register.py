@@ -78,7 +78,8 @@ def test_failed_registration_leaves_nothing_and_same_version_retry_succeeds(
     remote_document(monkeypatch, document)
     first = runner.invoke(cli.app, ["register", REPO, "--db-path", str(path)])
     assert first.exit_code == 1, first.output
-    assert "FAILED" in first.output and "license" in first.output
+    assert "FAILED" in first.output
+    assert "license" in first.output
     assert table_counts(SQLiteRegistrationStore(path)) == (0, 0, 0)
     remote_document(monkeypatch, sample_adapter_document())
     retry = runner.invoke(cli.app, ["register", REPO, "--db-path", str(path)])

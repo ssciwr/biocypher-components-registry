@@ -39,7 +39,8 @@ def test_cli_updates_published_adapter_by_public_id(cli_environment, monkeypatch
         cli.app, ["update", "example-adapter", "--db-path", str(path)]
     )
     assert result.exit_code == 0, result.output
-    assert "SUCCEEDED" in result.output and "2.0.0" in result.output
+    assert "SUCCEEDED" in result.output
+    assert "2.0.0" in result.output
     auth.assert_called_once()
     accepted = store.get_registration(registration.registration_id)
     assert accepted.metadata["version"] == "2.0.0"
@@ -57,7 +58,8 @@ def test_failed_cli_update_retains_published_metadata_and_records_failure(
         cli.app, ["update", "example-adapter", "--db-path", str(path)]
     )
     assert result.exit_code == 1, result.output
-    assert "FAILED" in result.output and "license" in result.output
+    assert "FAILED" in result.output
+    assert "license" in result.output
     assert "1.0.0" in result.output
     accepted = store.get_registration(registration.registration_id)
     assert accepted.metadata == registration.metadata

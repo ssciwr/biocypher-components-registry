@@ -39,8 +39,9 @@ def test_register_rejects_main_master_repository_alias(
     )
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     accepted_source(store, canonical)
+    actor = AuthSession(github_user_id="123")
     with pytest.raises(DuplicateRegistrationError):
-        register_adapter(alias, store, actor=AuthSession(github_user_id="123"))
+        register_adapter(alias, store, actor=actor)
 
 
 def test_legacy_unpublished_source_original_owner_can_recover(repository, tmp_path):
@@ -64,10 +65,10 @@ def test_cannot_claim_legacy_source_owned_by_another_identity(
 ):
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     original = historical_source(store, str(repository), owner=owner)
+    repository_location = str(repository)
+    actor = AuthSession(github_user_id="123")
     with pytest.raises(PermissionError):
-        register_adapter(
-            str(repository), store, actor=AuthSession(github_user_id="123")
-        )
+        register_adapter(repository_location, store, actor=actor)
     assert (
         store.get_registration(original.registration_id).current_registry_entry_id
         is None
@@ -140,9 +141,10 @@ def test_public_processing_requires_actor_before_store_access(operation):
     from src.core.registration.service import update_adapter
 
     store = Mock()
+    process = register_adapter if operation == "register" else update_adapter
+    identifier = (
+        "https://github.com/owner/repo" if operation == "register" else "example-adapter"
+    )
     with pytest.raises(PermissionError):
-        if operation == "register":
-            register_adapter("https://github.com/owner/repo", store, actor=None)
-        else:
-            update_adapter("example-adapter", store, actor=None)
+        process(identifier, store, actor=None)
     assert store.mock_calls == []

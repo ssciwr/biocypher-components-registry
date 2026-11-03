@@ -93,7 +93,8 @@ def test_entries_return_canonical_metadata_light_rows(client, store):
     assert row["adapter_version"] == "1.0.0"
     assert "metadata" not in row
     detail = client.get(f"/api/v1/registry/entries/{row['entry_id']}")
-    assert detail.status_code == 200 and detail.json() == row
+    assert detail.status_code == 200
+    assert detail.json() == row
     assert client.get("/api/v1/registry/entries/missing").status_code == 404
 
 

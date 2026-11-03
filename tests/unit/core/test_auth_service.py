@@ -120,7 +120,8 @@ def test_authorization_failure_never_checks_identity(http, error):
     ]
     with pytest.raises(GitHubAuthenticationError) as exc:
         authenticate(http)
-    assert TOKEN not in str(exc.value) and DEVICE not in str(exc.value)
+    assert TOKEN not in str(exc.value)
+    assert DEVICE not in str(exc.value)
     http.get.assert_not_called()
     http.delete.assert_not_called()
 
@@ -245,7 +246,8 @@ def test_provider_errors_explain_next_step_without_exposing_payload(
     callback = Mock()
     with pytest.raises(GitHubAuthenticationError, match=expected) as exc:
         authenticate(http, on_authorization=callback)
-    assert TOKEN not in str(exc.value) and DEVICE not in str(exc.value)
+    assert TOKEN not in str(exc.value)
+    assert DEVICE not in str(exc.value)
     callback.assert_not_called()
     http.get.assert_not_called()
     http.delete.assert_not_called()
