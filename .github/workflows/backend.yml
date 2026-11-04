@@ -60,20 +60,19 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked --group dev # NOSONAR: accepted; dev dependencies come from the locked uv.lock file in CI.
+        # Building remains required for the source-only jsonpath-rw dependency.
+        run: uv sync --locked --group dev # NOSONAR
 
       - name: Validate Docker Compose configurations
-        env:
-          POSTGRES_PASSWORD: ci-compose-validation
         run: |
           docker compose -f docker-compose-sqlite.yml config --quiet
-          docker compose -f docker-compose-postgresql.yml config --quiet
+          docker compose -f docker-compose-postgresql.yml config --no-interpolate --quiet
           docker compose -f docker-compose.test.yml config --quiet
 
       - name: Run tests
         env:
           REGISTRY_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-        run: uv run --locked pytest --cov --cov-branch --cov-report=xml # NOSONAR
+        run: .venv/bin/pytest --cov --cov-branch --cov-report=xml
 
       - name: Check coverage report
         run: ls -lh coverage.xml
