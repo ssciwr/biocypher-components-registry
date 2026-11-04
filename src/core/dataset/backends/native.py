@@ -10,7 +10,6 @@ from typing import Any
 from croissant_baker.files import discover_files as discover_baker_files
 from croissant_baker.handlers.utils import (
     compute_file_hash,
-    get_clean_record_name,
     sanitize_id,
 )
 
@@ -138,7 +137,8 @@ class NativeDatasetGenerator(DatasetGenerator):
         for index, inspection in enumerate(inspections):
             relative = self._relative_to_input(inspection.path, request.input_path)
             file_id = f"file_{index}"
-            record_set_id = sanitize_id(get_clean_record_name(inspection.path.name))
+            record_name = _record_name(inspection.path.name)
+            record_set_id = sanitize_id(record_name)
             file_size = str(inspection.path.stat().st_size)
             sha256 = compute_file_hash(inspection.path)
             distributions.append(
@@ -163,7 +163,7 @@ class NativeDatasetGenerator(DatasetGenerator):
             ]
             record_sets.append(
                 build_record_set(
-                    name=get_clean_record_name(inspection.path.name),
+                    name=record_name,
                     fields=fields,
                     record_set_id=record_set_id,
                     description=f"Records from {inspection.path.name}",
@@ -182,7 +182,6 @@ class NativeDatasetGenerator(DatasetGenerator):
             distributions=distributions,
             record_sets=record_sets,
         )
-
     def _relative_to_input(self, path: Path, input_path: str) -> str:
         """Return a path relative to the input root when possible."""
         input_root = Path(input_path).expanduser()
@@ -190,6 +189,14 @@ class NativeDatasetGenerator(DatasetGenerator):
             return str(path.relative_to(input_root))
         except ValueError:
             return str(path)
+
+
+def _record_name(filename: str) -> str:
+    """Preserve record IDs while handling a compression suffix explicitly."""
+    path = Path(filename)
+    if path.suffix.lower() in {".bz2", ".gz", ".xz"}:
+        path = Path(path.stem)
+    return path.stem
 
 
 def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:

@@ -7,6 +7,7 @@ from typing import Any
 
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.request import GenerationRequest, GenerationResult
+from src.core.shared.creators import parse_dataset_creator_string
 from src.core.shared.errors import GeneratorError
 
 
@@ -93,21 +94,18 @@ def build_croissant_baker_command(
 # identifier} creator into the pipe-delimited CLI value, from the pre-existing
 # string creator path. It's the mapping that increased it.
 def _creator_args(creator: str | dict[str, Any]) -> list[str]:
-    if not isinstance(creator, dict):
-        return ["--creator", creator] if creator else []
+    if isinstance(creator, dict):
+        name = str(creator.get("name") or "").strip()
+        email = str(creator.get("email") or "").strip()
+        url = str(creator.get("url") or "").strip()
+    else:
+        spec = parse_dataset_creator_string(creator)
+        if spec is None:
+            return []
+        name, email, url = spec.name, spec.email, spec.url
 
-    name = str(creator.get("name") or "").strip()
     if not name:
         return []
 
-    value = "|".join(
-        [
-            str(creator.get("creator_type") or "Person").strip(),
-            name,
-            str(creator.get("affiliation") or "").strip(),
-            str(creator.get("email") or "").strip(),
-            str(creator.get("url") or "").strip(),
-            str(creator.get("identifier") or "").strip(),
-        ]
-    )
+    value = ",".join([name, email, url]).rstrip(",")
     return ["--creator", value]
