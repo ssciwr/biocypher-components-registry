@@ -1,261 +1,148 @@
-from __future__ import annotations
+"""Duplicate protection and explicit recovery of historical unpublished sources."""
 
 import json
-import sqlite3
-from contextlib import closing
-from pathlib import Path
 
 import pytest
 
-from src.core.adapter.service import create_registration_request
+from src.core.auth.models import AuthSession
 from src.core.registration.errors import DuplicateRegistrationError
-from src.core.registration.service import finish_registration, submit_registration
+from src.core.registration.models import AttemptStatus
+from src.core.registration.service import register_adapter
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.croissant_fixtures import sample_adapter_document
+from tests.support.registration_fixtures import accepted_source, historical_source
 
 
-def _valid_adapter_document(
-    name: str = "Example Adapter",
-    version: str = "1.0.0",
-    adapter_id: str = "example-adapter",
-) -> dict:
-    return {
-        "@context": {
-            "@language": "en",
-            "@vocab": "https://schema.org/",
-            "citeAs": "cr:citeAs",
-            "column": "cr:column",
-            "conformsTo": "dct:conformsTo",
-            "cr": "http://mlcommons.org/croissant/",
-            "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-            "dct": "http://purl.org/dc/terms/",
-            "examples": {"@id": "cr:examples", "@type": "@json"},
-            "extract": "cr:extract",
-            "field": "cr:field",
-            "fileObject": "cr:fileObject",
-            "recordSet": "cr:recordSet",
-            "sc": "https://schema.org/",
-            "source": "cr:source",
-        },
-        "@type": "SoftwareSourceCode",
-        "@id": adapter_id,
-        "name": name,
-        "description": "Adapter description",
-        "conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
-        "version": version,
-        "license": "https://opensource.org/licenses/MIT",
-        "codeRepository": "https://example.org/repo",
-        "programmingLanguage": "Python",
-        "targetProduct": "BioCypher",
-        "creator": [
-            {
-                "@type": "sc:Person",
-                "name": "Example Creator",
-                "affiliation": "SSC",
-                "identifier": "https://orcid.org/0000-0000-0000-0000",
-            }
-        ],
-        "keywords": ["adapter", "biocypher"],
-        "hasPart": [
-            {
-                "@type": "sc:Dataset",
-                "name": "Example dataset",
-                "description": "Example dataset",
-                "conformsTo": "http://mlcommons.org/croissant/1.0",
-                "citeAs": "https://example.org/dataset",
-                "creator": [{"@type": "sc:Person", "name": "Example Creator"}],
-                "datePublished": "2024-01-01T00:00:00",
-                "license": "https://opensource.org/licenses/MIT",
-                "url": "https://example.org/dataset",
-                "version": "1.0.0",
-                "distribution": [
-                    {
-                        "@id": "file-1",
-                        "@type": "cr:FileObject",
-                        "name": "data.csv",
-                        "contentUrl": "data.csv",
-                        "encodingFormat": "text/csv",
-                        "sha256": "abc123",
-                    }
-                ],
-                "recordSet": [
-                    {
-                        "@id": "rs-1",
-                        "@type": "cr:RecordSet",
-                        "name": "records",
-                        "field": [
-                            {
-                                "@id": "rs-1/id",
-                                "@type": "cr:Field",
-                                "name": "id",
-                                "description": "Column 'id' from data.csv",
-                                "dataType": "cr:Int64",
-                                "source": {
-                                    "@id": "rs-1/id/source",
-                                    "fileObject": {"@id": "file-1"},
-                                    "extract": {"column": "id"},
-                                },
-                            }
-                        ],
-                    }
-                ],
-            }
-        ],
-    }
+@pytest.fixture
+def repository(tmp_path):
+    path = tmp_path / "repo"
+    path.mkdir()
+    (path / "croissant.jsonld").write_text(json.dumps(sample_adapter_document()))
+    return path
 
 
 @pytest.mark.parametrize(
-    ("main_url", "master_url", "canonical_url"),
+    "canonical, alias",
     [
+        ("https://github.com/owner/repo", "https://github.com/owner/repo/tree/master"),
         (
-            "https://github.com/biocypher/example-adapter/tree/main",
-            "https://github.com/biocypher/example-adapter/tree/master",
-            "https://github.com/biocypher/example-adapter",
-        ),
-        (
-            "https://gitlab.example.org/group/example-adapter/-/tree/main",
-            "https://gitlab.example.org/group/example-adapter/-/tree/master",
-            "https://gitlab.example.org/group/example-adapter",
+            "https://gitlab.example.org/group/repo",
+            "https://gitlab.example.org/group/repo/-/tree/master",
         ),
     ],
 )
-def test_submit_registration_rejects_main_master_branch_duplicate(
-    tmp_path: Path,
-    main_url: str,
-    master_url: str,
-    canonical_url: str,
-) -> None:
-    """Reject branch-specific URLs that resolve to the same repository root."""
-    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
-    first = submit_registration(main_url, store)
-
-    with pytest.raises(DuplicateRegistrationError):
-        submit_registration(master_url, store)
-    active_registrations = store.list_active_registrations()
-
-    assert first.repository_location == canonical_url
-    assert active_registrations[0].repository_location == canonical_url
-    assert len(active_registrations) == 1
-
-
-@pytest.mark.parametrize(
-    ("main_url", "master_url", "canonical_url"),
-    [
-        (
-            "https://github.com/biocypher/example-adapter/tree/main",
-            "https://github.com/biocypher/example-adapter/tree/master",
-            "https://github.com/biocypher/example-adapter",
-        ),
-        (
-            "https://gitlab.example.org/group/example-adapter/-/tree/main",
-            "https://gitlab.example.org/group/example-adapter/-/tree/master",
-            "https://gitlab.example.org/group/example-adapter",
-        ),
-    ],
-)
-def test_submit_registration_reuses_failed_registration_to_complete_reattempt_with(
-    tmp_path: Path,
-    main_url: str,
-    master_url: str,
-    canonical_url: str,
-) -> None:
-    """Reuse a failed registration if the user provides a url for one which has already failed later on in a "resubmission"
-    Test based on `test_submit_registration_rejects_main_master_branch_duplicate`.
-    """
-    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
-    first = submit_registration(main_url, store)
-    store.mark_registration_invalid(first.registration_id, ["Invalid metadata."], None)
-    second = submit_registration(master_url, store)
-    active_registrations = store.list_active_registrations()
-
-    assert second.registration_id == first.registration_id
-    assert first.repository_location == canonical_url
-    assert active_registrations[0].repository_location == canonical_url
-    assert len(active_registrations) == 1
-
-
-def test_sqlite_store_rejects_duplicate_valid_uniqueness_key(tmp_path: Path) -> None:
-    """Reject a second valid registration that reuses the same uniqueness key."""
-    database_path = tmp_path / "registry.sqlite3"
-    store = SQLiteRegistrationStore(database_path)
-    repo_1 = tmp_path / "repo-1"
-    repo_2 = tmp_path / "repo-2"
-    repo_1.mkdir()
-    repo_2.mkdir()
-    first = store.create_registration(create_registration_request(str(repo_1)))
-    second = store.create_registration(create_registration_request(str(repo_2)))
-
-    store.mark_registration_valid(
-        registration_id=first.registration_id,
-        metadata={
-            "@id": "omnipath-adapter",
-            "name": "OmniPath Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=None,
-        profile_version="v1",
-        uniqueness_key="omnipath-adapter::1.0.0",
-        observed_checksum="checksum-a",
+def test_register_rejects_main_master_repository_alias(
+    tmp_path, monkeypatch, canonical, alias
+):
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.example.org"
     )
-
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    accepted_source(store, canonical)
     with pytest.raises(DuplicateRegistrationError):
-        store.mark_registration_valid(
-            registration_id=second.registration_id,
-            metadata={
-                "@id": "omnipath-adapter",
-                "name": "OmniPath Adapter",
-                "version": "1.0.0",
-            },
-            metadata_path=None,
-            profile_version="v1",
-            uniqueness_key="omnipath-adapter::1.0.0",
-            observed_checksum="checksum-a",
+        register_adapter(alias, store, actor=AuthSession(github_user_id="123"))
+
+
+def test_legacy_unpublished_source_original_owner_can_recover(repository, tmp_path):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    original = historical_source(store, str(repository))
+    assert store.list_active_registrations() == []
+    outcome = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
+    )
+    assert outcome.attempt_status == AttemptStatus.SUCCEEDED
+    assert outcome.registration.registration_id == original.registration_id
+    assert len(store.list_active_registrations()) == 1
+    assert [
+        e.event_type for e in store.list_registration_events(original.registration_id)
+    ] == ["VALID_CREATED"]
+
+
+@pytest.mark.parametrize("owner", ["456", None, "0"])
+def test_cannot_claim_legacy_source_owned_by_another_identity(
+    repository, tmp_path, owner
+):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    original = historical_source(store, str(repository), owner=owner)
+    with pytest.raises(PermissionError):
+        register_adapter(
+            str(repository), store, actor=AuthSession(github_user_id="123")
         )
-
-    with closing(sqlite3.connect(database_path)) as connection:
-        duplicate_event = connection.execute(
-            """
-            SELECT source_id, event_type
-            FROM registration_events
-            WHERE source_id = ? AND event_type = 'DUPLICATE'
-            """,
-            (second.registration_id,),
-        ).fetchone()
-
-    assert duplicate_event == (second.registration_id, "DUPLICATE")
-
-
-def test_finish_registration_rejects_duplicate_valid_adapter(tmp_path: Path) -> None:
-    """Reject finishing a registration when names differ but adapter id plus version match."""
-    database_path = tmp_path / "registry.sqlite3"
-    store = SQLiteRegistrationStore(database_path)
-
-    repo_a = tmp_path / "repo-a"
-    repo_b = tmp_path / "repo-b"
-    repo_a.mkdir()
-    repo_b.mkdir()
-    (repo_a / "croissant.jsonld").write_text(
-        json.dumps(
-            _valid_adapter_document(
-                name="OmniPath Adapter",
-                adapter_id="omnipath-adapter",
-            )
-        ),
-        encoding="utf-8",
+    assert (
+        store.get_registration(original.registration_id).current_registry_entry_id
+        is None
     )
-    (repo_b / "croissant.jsonld").write_text(
-        json.dumps(
-            _valid_adapter_document(
-                name="omnipath adapter",
-                adapter_id="omnipath-adapter",
-            )
-        ),
-        encoding="utf-8",
+    assert store.list_registration_events(original.registration_id) == []
+
+
+def test_duplicate_canonical_identity_from_second_repository_is_not_saved(
+    repository, tmp_path
+):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    accepted_source(store, "https://github.com/owner/original")
+    outcome = register_adapter(
+        str(repository), store, actor=AuthSession(github_user_id="123")
     )
+    assert outcome.attempt_status == AttemptStatus.FAILED
+    assert store.get_registration_by_repository_location(str(repository)) is None
+    assert len(store.list_registry_entries()) == 1
 
-    first = submit_registration(str(repo_a), store)
-    second = submit_registration(str(repo_b), store)
 
-    finish_registration(first.registration_id, store)
-
+def test_acceptance_rejects_duplicate_uniqueness_key_transactionally(tmp_path):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    accepted_source(store, "https://github.com/owner/first")
     with pytest.raises(DuplicateRegistrationError):
-        finish_registration(second.registration_id, store)
+        accepted_source(store, "https://github.com/owner/second")
+    assert (
+        store.get_registration_by_repository_location("https://github.com/owner/second")
+        is None
+    )
+    assert len(store.list_registry_entries()) == 1
+
+
+@pytest.mark.parametrize(
+    "canonical, alias",
+    [
+        ("https://github.com/owner/repo", "https://github.com/owner/repo/tree/main"),
+        (
+            "https://gitlab.example.org/group/repo",
+            "https://gitlab.example.org/group/repo/-/tree/main",
+        ),
+    ],
+)
+def test_legacy_recovery_normalizes_repository_alias(
+    tmp_path, monkeypatch, canonical, alias
+):
+    from src.core.adapter.discovery import AdapterDiscoveryResult
+
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.example.org"
+    )
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    legacy = historical_source(store, canonical)
+    monkeypatch.setattr(
+        "src.core.registration.service.discover_remote_adapter",
+        lambda url: AdapterDiscoveryResult(
+            source=url, metadata=sample_adapter_document()
+        ),
+    )
+    outcome = register_adapter(alias, store, actor=AuthSession(github_user_id="123"))
+    assert outcome.attempt_status == AttemptStatus.SUCCEEDED
+    assert outcome.registration.registration_id == legacy.registration_id
+    assert outcome.registration.repository_location == canonical
+    assert len(store.list_active_registrations()) == 1
+
+
+@pytest.mark.parametrize("operation", ["register", "update"])
+def test_public_processing_requires_actor_before_store_access(operation):
+    from unittest.mock import Mock
+
+    from src.core.registration.service import update_adapter
+
+    store = Mock()
+    with pytest.raises(PermissionError):
+        if operation == "register":
+            register_adapter("https://github.com/owner/repo", store, actor=None)
+        else:
+            update_adapter("example-adapter", store, actor=None)
+    assert store.mock_calls == []

@@ -16,6 +16,8 @@ from src.core.workspace.service import Session, SessionManager
 from src.persistence.auth_store import AuthSessionStore
 from src.persistence.factory import build_auth_session_store, build_registration_store
 
+_INVALID_WORKSPACE_SESSION_DETAIL = "unknown session or invalid session token"
+
 # ===========================================================
 # Persistence Dependencies
 # ===========================================================
@@ -85,10 +87,10 @@ def get_workspace_session(
     if authorization and authorization.startswith("Bearer "):
         supplied = authorization[len("Bearer ") :].strip()
     if session is None or not supplied:
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     if session.owner_github_user_id != auth_session.github_user_id:
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     if not pysecrets.compare_digest(supplied, session.token):
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     session.mark_active()
     return session

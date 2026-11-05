@@ -1,8 +1,8 @@
-Feature: On-demand revalidation
+Feature: Retry manual adapter updates
 
-  Scenario: Revalidate a corrected invalid source immediately
-    Given an adapter is currently marked INVALID
-    And the maintainer corrects the metadata
-    When on-demand revalidation is triggered
-    Then the system reprocesses the adapter immediately
-    And the adapter status is updated to VALID
+  Scenario: Correct and retry a failed update immediately
+    Given a published adapter has a failed candidate update
+    And the maintainer corrects the candidate metadata
+    When the same manual update action is repeated
+    Then the corrected version is published immediately
+    And the accepted metadata and update history are consistent

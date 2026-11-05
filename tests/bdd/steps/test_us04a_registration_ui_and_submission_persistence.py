@@ -1,85 +1,75 @@
-from __future__ import annotations
-
-import sqlite3
-from contextlib import closing
-from pathlib import Path
-from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
-from cli import app
+import cli
+from src.core.adapter.discovery import AdapterDiscoveryResult
+from src.core.auth.models import AuthSession
+from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.croissant_fixtures import sample_adapter_document
 
 scenarios("../features/us04a_registration_ui_and_submission_persistence.feature")
 
 
-runner = CliRunner()
-
-
 @pytest.fixture
-def registration_context(tmp_path: Path) -> dict[str, Any]:
-    """Provide shared state for registration submission scenarios."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
+def registration_context(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("GITHUB_OAUTH_CLIENT_ID", "fixture-client")
+    monkeypatch.setenv("GITHUB_OAUTH_CLIENT_SECRET", "fixture-secret")
     return {
-        "database_path": database_path,
-        "repository_path": repository,
+        "database_path": tmp_path / "registry.sqlite3",
+        "repository": "https://github.com/example/adapter",
     }
 
 
-@given("the maintainer has a valid local adapter repository")
-def valid_local_repository(registration_context: dict[str, Any]) -> None:
-    """Create a valid local repository path for the submitted adapter."""
-    repository = registration_context["repository_path"]
-    repository.mkdir()
-    registration_context["repository_location"] = str(repository)
+@given("the maintainer has a repository with valid metadata")
+def valid_repository(registration_context, monkeypatch):
+    monkeypatch.setattr(
+        cli, "authenticate_github_device", Mock(return_value=AuthSession("123"))
+    )
+    monkeypatch.setattr(
+        "src.core.registration.service.discover_remote_adapter",
+        lambda url: AdapterDiscoveryResult(
+            source=url, metadata=sample_adapter_document()
+        ),
+    )
 
 
-@when("the maintainer stores a valid adapter registration from the CLI")
-def store_valid_adapter_registration_from_cli(
-    registration_context: dict[str, Any],
-) -> None:
-    """Persist the registration through the terminal command."""
-    result = runner.invoke(
-        app,
+@when("the maintainer registers the repository from the CLI")
+def register(registration_context):
+    registration_context["result"] = CliRunner().invoke(
+        cli.app,
         [
-            "submit-registration",
-            str(registration_context["repository_path"]),
+            "register",
+            registration_context["repository"],
             "--db-path",
             str(registration_context["database_path"]),
         ],
     )
-    registration_context["cli_result"] = result
 
 
-@then("the system stores the submission in the database")
-def submission_is_stored(registration_context: dict[str, Any]) -> None:
-    """Assert that the submitted registration is persisted in SQLite."""
-    with closing(sqlite3.connect(registration_context["database_path"])) as connection:
-        row = connection.execute(
-            """
-            SELECT submitted_adapter_name, repository_location, source_kind
-            FROM registration_sources
-            """
-        ).fetchone()
-
-    assert row is not None
-    assert len(row[0]) == 32
-    assert row[1:] == (
-        str(registration_context["repository_path"].resolve()),
-        "local",
+@then("the accepted adapter and verified owner are stored")
+def accepted(registration_context):
+    store = SQLiteRegistrationStore(registration_context["database_path"])
+    source = store.get_registration_by_repository_location(
+        registration_context["repository"]
     )
+    assert source is not None
+    assert source.adapter_name == "Example Adapter"
+    assert source.submitted_by_github_user_id == "123"
+    assert source.current_registry_entry_id is not None
+    assert len(store.list_registry_entries()) == 1
+    assert [
+        event.event_type
+        for event in store.list_registration_events(source.registration_id)
+    ] == ["VALID_CREATED"]
 
 
-@then("the submission receives a tracked registration status from the CLI")
-def submission_receives_status_from_cli(
-    registration_context: dict[str, Any],
-) -> None:
-    """Assert that the CLI reports the stored submission status."""
-    result = registration_context["cli_result"]
-
-    assert result.exit_code == 0
-    assert "Stored Registration" in result.output
-    assert "Registration stored" in result.output
-    assert "SUBMITTED" in result.output
+@then("the CLI reports the terminal successful attempt")
+def successful(registration_context):
+    result = registration_context["result"]
+    assert result.exit_code == 0, result.output
+    assert "SUCCEEDED" in result.output
+    assert "SUBMITTED" not in result.output

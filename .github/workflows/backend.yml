@@ -12,6 +12,7 @@ on:
       - "cli.py"
       - "pyproject.toml"
       - "uv.lock"
+      - "docker-compose.test.yml"
       - ".github/workflows/backend.yml"
   workflow_dispatch:
 
@@ -21,6 +22,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: registry_test
+          POSTGRES_USER: registry_test
+          POSTGRES_PASSWORD: registry_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --label io.biocypher.registry.test-database=true
+          --health-cmd "pg_isready -U registry_test -d registry_test"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 30
 
     steps:
       - name: Checkout repository
@@ -45,6 +61,8 @@ jobs:
         run: uv sync --locked --group dev # NOSONAR: accepted; dev dependencies come from the locked uv.lock file in CI.
 
       - name: Run tests
+        env:
+          REGISTRY_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: uv run --locked pytest --cov --cov-branch --cov-report=xml # NOSONAR
 
       - name: Check coverage report

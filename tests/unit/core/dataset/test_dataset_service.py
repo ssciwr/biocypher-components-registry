@@ -126,3 +126,35 @@ def test_distribution_metadata_prefers_file_object_entries() -> None:
     assert updated.document["distribution"][0]["name"] == "other.csv"
     assert updated.document["distribution"][1] == {"@type": "sc:Thing"}
     assert updated.document["distribution"][2]["name"] == "renamed.csv"
+
+
+def test_distribution_metadata_matches_file_by_content_url() -> None:
+    document = {
+        "distribution": [
+            {"@type": ["cr:FileObject"], "contentUrl": "https://example.org/data.csv"},
+            {"@type": "cr:FileObject", "name": "other.csv"},
+        ]
+    }
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document=document),
+        request=GenerationRequest(
+            input_path="data.csv", output_path="", filename="renamed.csv"
+        ),
+    )
+
+    assert updated.document["distribution"][0]["name"] == "renamed.csv"
+    assert updated.document["distribution"][1]["name"] == "other.csv"
+
+
+def test_distribution_metadata_preserves_empty_fallback_item() -> None:
+    document = {"distribution": [{}]}
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document=document),
+        request=GenerationRequest(
+            input_path="data.csv", output_path="", filename="renamed.csv"
+        ),
+    )
+
+    assert updated.document["distribution"] == [{"name": "renamed.csv"}]

@@ -5,9 +5,9 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.core.adapter.service import create_registration_request
-from src.core.registration.models import BatchRefreshSummary, RegistrationStatus
+from src.core.registration.models import BatchRefreshSummary
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
+from tests.support.registration_fixtures import accepted_source, historical_source
 
 
 def test_sqlite_store_creates_registration_table(tmp_path: Path) -> None:
@@ -32,49 +32,6 @@ def test_sqlite_store_creates_registration_table(tmp_path: Path) -> None:
     assert "registration_failures" not in tables
 
 
-def test_sqlite_store_persists_registration(tmp_path: Path) -> None:
-    """Persist a registration request and return the stored record."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-
-    stored = store.create_registration(request)
-
-    assert stored.status == RegistrationStatus.SUBMITTED
-    with closing(sqlite3.connect(database_path)) as connection:
-        source_row = connection.execute(
-            """
-            SELECT
-                submitted_adapter_name,
-                repository_location,
-                source_kind,
-                is_active
-            FROM registration_sources
-            """
-        ).fetchone()
-        event_row = connection.execute(
-            """
-            SELECT source_id, event_type
-            FROM registration_events
-            """
-        ).fetchone()
-
-    assert source_row is not None
-    assert len(source_row[0]) == 32
-    assert source_row[1:] == (
-        str(repository.resolve()),
-        "local",
-        1,
-    )
-    assert event_row is not None
-    assert event_row[0] == stored.registration_id
-    assert event_row[1] == "SUBMITTED"
-
-
 def test_sqlite_store_builds_sqlalchemy_sqlite_engine(tmp_path: Path) -> None:
     """Create a SQLAlchemy engine that targets the configured SQLite database."""
     database_path = tmp_path / "registry.sqlite3"
@@ -83,335 +40,6 @@ def test_sqlite_store_builds_sqlalchemy_sqlite_engine(tmp_path: Path) -> None:
 
     assert store.engine.url.drivername == "sqlite+pysqlite"
     assert store.engine.url.database == str(database_path)
-
-
-def test_sqlite_store_returns_registration_with_identifier_and_timestamp(
-    tmp_path: Path,
-) -> None:
-    """Return generated metadata for the stored registration record."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-
-    stored = store.create_registration(request)
-
-    assert stored.registration_id
-    assert isinstance(datetime.fromisoformat(stored.created_at.isoformat()), datetime)
-
-
-def test_sqlite_store_can_load_registration_by_identifier(tmp_path: Path) -> None:
-    """Load a previously stored registration from the database."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-
-    loaded = store.get_registration(created.registration_id)
-
-    assert loaded is not None
-    assert loaded.registration_id == created.registration_id
-    assert loaded.status == RegistrationStatus.SUBMITTED
-
-
-def test_sqlite_store_lists_active_registrations_with_check_state(
-    tmp_path: Path,
-) -> None:
-    """Return active registrations through the persistence port."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-
-    store.mark_registration_valid(
-        registration_id=created.registration_id,
-        metadata={
-            "@id": "example-adapter",
-            "name": "Example Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=str(repository / "croissant.jsonld"),
-        profile_version="v1",
-        uniqueness_key="example-adapter::1.0.0",
-        observed_checksum="checksum-1",
-    )
-
-    registrations = store.list_active_registrations()
-
-    assert len(registrations) == 1
-    assert registrations[0].registration_id == created.registration_id
-    assert registrations[0].status == RegistrationStatus.VALID
-    assert registrations[0].last_checked_at is not None
-    assert registrations[0].current_registry_entry_id is not None
-
-
-def test_sqlite_store_marks_registration_valid(tmp_path: Path) -> None:
-    """Persist approved metadata and mark a registration as valid."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-
-    updated = store.mark_registration_valid(
-        registration_id=created.registration_id,
-        metadata={
-            "@id": "example-adapter",
-            "name": "Example Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=str(repository / "croissant.jsonld"),
-        profile_version="v1",
-        uniqueness_key="example-adapter::1.0.0",
-        observed_checksum="checksum-1",
-    )
-
-    assert updated.status == RegistrationStatus.VALID
-    assert updated.metadata == {
-        "@id": "example-adapter",
-        "name": "Example Adapter",
-        "version": "1.0.0",
-    }
-    assert updated.metadata_path == str(repository / "croissant.jsonld")
-    assert updated.profile_version == "v1"
-    assert updated.updated_at is not None
-    assert updated.uniqueness_key == "example-adapter::1.0.0"
-
-    with closing(sqlite3.connect(database_path)) as connection:
-        entry_row = connection.execute(
-            """
-            SELECT source_id, adapter_name, uniqueness_key, is_active
-            FROM registry_entries
-            """
-        ).fetchone()
-        source_row = connection.execute(
-            """
-            SELECT current_registry_entry_id, updated_at
-            FROM registration_sources
-            WHERE id = ?
-            """,
-            (created.registration_id,),
-        ).fetchone()
-        event_row = connection.execute(
-            """
-            SELECT source_id, registry_entry_id, event_type, profile_version
-            FROM registration_events
-            WHERE source_id = ? AND event_type = 'VALID_CREATED'
-            """,
-            (created.registration_id,),
-        ).fetchone()
-
-    assert entry_row == (
-        created.registration_id,
-        "Example Adapter",
-        "example-adapter::1.0.0",
-        1,
-    )
-    assert source_row is not None
-    assert source_row[0]
-    assert event_row is not None
-    assert event_row[0] == created.registration_id
-    assert event_row[2] == "VALID_CREATED"
-    assert event_row[3] == "v1"
-    assert source_row[1] is not None
-
-    with closing(sqlite3.connect(database_path)) as connection:
-        checksum_row = connection.execute(
-            """
-            SELECT metadata_checksum
-            FROM registry_entries
-            WHERE uniqueness_key = 'example-adapter::1.0.0'
-            """
-        ).fetchone()
-        observed_checksum_row = connection.execute(
-            """
-            SELECT observed_checksum
-            FROM registration_events
-            WHERE source_id = ? AND event_type = 'VALID_CREATED'
-            """,
-            (created.registration_id,),
-        ).fetchone()
-
-    assert checksum_row == ("checksum-1",)
-    assert observed_checksum_row == ("checksum-1",)
-
-
-def test_sqlite_store_marks_registration_invalid_and_persists_errors(
-    tmp_path: Path,
-) -> None:
-    """Persist failed validation details and mark a registration as invalid."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-
-    updated = store.mark_registration_invalid(
-        registration_id=created.registration_id,
-        errors=["Missing required property: version"],
-        profile_version="v1",
-        metadata={"@id": "example-adapter", "name": "Example Adapter"},
-        metadata_path=str(repository / "croissant.jsonld"),
-        observed_checksum="checksum-invalid",
-    )
-
-    assert updated.status == RegistrationStatus.INVALID
-    assert updated.validation_errors == ["Missing required property: version"]
-    assert updated.profile_version == "v1"
-    assert updated.metadata == {"@id": "example-adapter", "name": "Example Adapter"}
-
-    with closing(sqlite3.connect(database_path)) as connection:
-        event_row = connection.execute(
-            """
-            SELECT source_id, event_type, profile_version, error_details
-            FROM registration_events
-            WHERE source_id = ? AND event_type = 'INVALID_SCHEMA'
-            """,
-            (created.registration_id,),
-        ).fetchone()
-
-    assert event_row is not None
-    assert event_row[0] == created.registration_id
-    assert event_row[1] == "INVALID_SCHEMA"
-    assert event_row[2] == "v1"
-    assert "Missing required property: version" in event_row[3]
-
-    with closing(sqlite3.connect(database_path)) as connection:
-        observed_checksum_row = connection.execute(
-            """
-            SELECT observed_checksum
-            FROM registration_events
-            WHERE source_id = ? AND event_type = 'INVALID_SCHEMA'
-            """,
-            (created.registration_id,),
-        ).fetchone()
-
-    assert observed_checksum_row == ("checksum-invalid",)
-
-
-def test_sqlite_store_lists_registration_events(tmp_path: Path) -> None:
-    """Return registration event history through the persistence port."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-    store.mark_registration_invalid(
-        registration_id=created.registration_id,
-        errors=["Missing required property: version"],
-        profile_version="v1",
-        metadata={"@id": "example-adapter", "name": "Example Adapter"},
-        metadata_path=str(repository / "croissant.jsonld"),
-        observed_checksum="checksum-invalid",
-    )
-
-    events = store.list_registration_events(created.registration_id)
-
-    assert [event.event_type for event in events] == ["SUBMITTED", "INVALID_SCHEMA"]
-    assert events[0].source_id == created.registration_id
-    assert events[1].source_id == created.registration_id
-    assert events[1].profile_version == "v1"
-    assert events[1].error_details == ["Missing required property: version"]
-    assert events[1].observed_checksum == "checksum-invalid"
-    assert events[1].started_at <= events[1].finished_at
-
-
-def test_sqlite_store_lists_active_registry_entries(tmp_path: Path) -> None:
-    """Return canonical valid registry entries through the persistence port."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-    store.mark_registration_valid(
-        registration_id=created.registration_id,
-        metadata={
-            "@id": "example-adapter",
-            "name": "Example Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=str(repository / "croissant.jsonld"),
-        profile_version="v1",
-        uniqueness_key="example-adapter::1.0.0",
-        observed_checksum="checksum-1",
-    )
-
-    entries = store.list_registry_entries()
-
-    assert len(entries) == 1
-    assert entries[0].source_id == created.registration_id
-    assert entries[0].adapter_name == "Example Adapter"
-    assert entries[0].adapter_version == "1.0.0"
-    assert entries[0].profile_version == "v1"
-    assert entries[0].uniqueness_key == "example-adapter::1.0.0"
-    assert entries[0].metadata_checksum == "checksum-1"
-    assert entries[0].metadata == {
-        "@id": "example-adapter",
-        "name": "Example Adapter",
-        "version": "1.0.0",
-    }
-    assert entries[0].is_active is True
-
-
-def test_sqlite_store_loads_registry_entry_by_identifier(tmp_path: Path) -> None:
-    """Return one canonical valid registry entry through the persistence port."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
-    )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-    store.mark_registration_valid(
-        registration_id=created.registration_id,
-        metadata={
-            "@id": "example-adapter",
-            "name": "Example Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=str(repository / "croissant.jsonld"),
-        profile_version="v1",
-        uniqueness_key="example-adapter::1.0.0",
-        observed_checksum="checksum-1",
-    )
-    entry_id = store.list_registry_entries()[0].entry_id
-
-    entry = store.get_registry_entry(entry_id)
-
-    assert entry is not None
-    assert entry.entry_id == entry_id
-    assert entry.source_id == created.registration_id
-    assert entry.adapter_name == "Example Adapter"
-    assert entry.uniqueness_key == "example-adapter::1.0.0"
-    assert entry.metadata == {
-        "@id": "example-adapter",
-        "name": "Example Adapter",
-        "version": "1.0.0",
-    }
 
 
 def test_sqlite_store_returns_none_for_unknown_registry_entry(tmp_path: Path) -> None:
@@ -458,35 +86,111 @@ def test_sqlite_store_returns_none_without_batch_refresh(tmp_path: Path) -> None
     assert store.get_latest_batch_refresh() is None
 
 
-def test_sqlite_store_get_registration_reconstructs_status_from_three_tables(
-    tmp_path: Path,
-) -> None:
-    """Rebuild one registration from source, entry, and event history only."""
-    database_path = tmp_path / "registry.sqlite3"
-    repository = tmp_path / "adapter-repo"
-    repository.mkdir()
-    request = create_registration_request(
-        repository_location=str(repository),
+def test_atomic_acceptance_persists_source_metadata_and_event(tmp_path):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    stored = accepted_source(
+        store,
+        "https://github.com/owner/repo",
+        owner="456",
+        license_value="MIT",
+        doi="10.1/example",
     )
-    store = SQLiteRegistrationStore(database_path)
-    created = store.create_registration(request)
-
-    store.mark_registration_valid(
-        registration_id=created.registration_id,
-        metadata={
-            "@id": "example-adapter",
-            "name": "Example Adapter",
-            "version": "1.0.0",
-        },
-        metadata_path=str(repository / "croissant.jsonld"),
-        profile_version="v1",
-        uniqueness_key="example-adapter::1.0.0",
-        observed_checksum="checksum-1",
+    assert stored.registration_id and stored.created_at
+    assert stored.submitted_by_github_user_id == "456"
+    assert stored.license_value == "MIT" and stored.doi == "10.1/example"
+    assert not hasattr(stored, "status")
+    loaded = store.get_registration(stored.registration_id)
+    assert loaded == stored
+    assert store.get_registration("missing") is None
+    assert (
+        store.get_registration_by_repository_location("https://github.com/owner/repo")
+        == stored
     )
+    entries = store.list_registry_entries()
+    assert len(entries) == 1
+    assert entries[0].source_id == stored.registration_id
+    assert entries[0].adapter_version == "1.0.0"
+    assert entries[0].metadata_checksum
+    assert store.get_registry_entry(entries[0].entry_id) == entries[0]
+    events = store.list_registration_events(stored.registration_id)
+    assert len(events) == 1 and events[0].event_type == "VALID_CREATED"
+    assert events[0].registry_entry_id == entries[0].entry_id
+    assert events[0].observed_checksum == entries[0].metadata_checksum
 
-    loaded = store.get_registration(created.registration_id)
 
-    assert loaded is not None
-    assert loaded.status == RegistrationStatus.VALID
-    assert loaded.adapter_id == "example-adapter"
-    assert loaded.uniqueness_key == "example-adapter::1.0.0"
+def test_failed_published_update_preserves_accepted_state_and_records_diagnostics(
+    tmp_path,
+):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    original = accepted_source(store, "https://github.com/owner/repo")
+    store.record_update_failure(
+        original.registration_id,
+        "INVALID_SCHEMA",
+        ["Missing license"],
+        "Metadata rejected",
+        datetime.now(UTC),
+    )
+    after = store.get_registration(original.registration_id)
+    assert after.metadata == original.metadata
+    assert after.current_registry_entry_id == original.current_registry_entry_id
+    assert after.last_checked_at is not None
+    assert not hasattr(after, "status")
+    event = store.list_registration_events(original.registration_id)[-1]
+    assert event.event_type == "INVALID_SCHEMA"
+    assert event.error_details == ["Missing license"]
+
+
+def test_unpublished_historical_sources_are_lookup_only(tmp_path):
+    store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
+    historical = historical_source(store, "https://github.com/owner/old")
+    published = accepted_source(store, "https://github.com/owner/new")
+    assert (
+        store.get_registration(historical.registration_id).current_registry_entry_id
+        is None
+    )
+    assert store.list_active_registration_ids() == [published.registration_id]
+    assert [item.registration_id for item in store.list_active_registrations()] == [
+        published.registration_id
+    ]
+    assert store.list_registration_events(historical.registration_id) == []
+
+
+def test_non_unique_integrity_failure_is_not_reported_as_concurrency(tmp_path):
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    store = SQLiteRegistrationStore(tmp_path / "broken.sqlite3")
+    with store.engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TRIGGER reject_entry BEFORE INSERT ON registry_entries "
+            "BEGIN SELECT RAISE(ABORT, 'test integrity violation'); END"
+        )
+    with pytest.raises(IntegrityError):
+        accepted_source(store, "https://github.com/owner/rejected")
+    assert (
+        store.get_registration_by_repository_location(
+            "https://github.com/owner/rejected"
+        )
+        is None
+    )
+    assert store.list_registry_entries() == []
+
+
+def test_unique_insert_conflict_still_reports_concurrent_registration(
+    tmp_path, monkeypatch
+):
+    import pytest
+
+    from src.core.registration.errors import DuplicateRegistrationError
+
+    store = SQLiteRegistrationStore(tmp_path / "race.sqlite3")
+    accepted_source(store, "https://github.com/owner/first")
+    # Simulate a competing insert becoming visible after the preflight lookup.
+    monkeypatch.setattr(store, "_registry_entry_by_uniqueness_key", lambda *args: None)
+    with pytest.raises(DuplicateRegistrationError, match="concurrently"):
+        accepted_source(store, "https://github.com/owner/second")
+    assert (
+        store.get_registration_by_repository_location("https://github.com/owner/second")
+        is None
+    )
+    assert len(store.list_registry_entries()) == 1

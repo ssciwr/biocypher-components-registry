@@ -32,3 +32,21 @@ def test_registration_store_factory_builds_sqlite_store(tmp_path: Path) -> None:
     store = build_registration_store(database_path)
 
     assert isinstance(store, SQLiteRegistrationStore)
+
+
+def test_store_is_reused_without_reinitializing_schema(tmp_path, monkeypatch):
+    from src.persistence.factory import build_auth_session_store
+
+    path = tmp_path / "registry.sqlite3"
+    first = build_registration_store(path)
+
+    def reject_schema_changes(*args):
+        raise AssertionError("Existing store must not initialize the schema again")
+
+    monkeypatch.setattr(
+        SQLiteRegistrationStore, "_initialize_database", reject_schema_changes
+    )
+    assert build_registration_store(path) is first
+    first_auth = build_auth_session_store(path)
+    assert build_auth_session_store(path) is first_auth
+    assert first_auth.engine is first.engine

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
 from src.persistence.registration_store_base import SQLAlchemyRegistrationStore
-from src.persistence.tables import metadata
+from src.persistence.schema import initialize_schema
 
 
 class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
@@ -29,28 +29,7 @@ class PostgreSQLRegistrationStore(SQLAlchemyRegistrationStore):
         self._initialize_database()
 
     def _initialize_database(self) -> None:
-        metadata.create_all(self.engine)
-        with self.engine.begin() as connection:
-            for column_name in (
-                "description",
-                "license_value",
-                "doi",
-                "cff_url",
-                "submitted_by_github_user_id",
-            ):
-                connection.execute(
-                    text(
-                        "ALTER TABLE registration_sources "
-                        f"ADD COLUMN IF NOT EXISTS {column_name} VARCHAR"
-                    )
-                )
-            connection.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS "
-                    "uq_registration_source_repository_location "
-                    "ON registration_sources (repository_location)"
-                )
-            )
+        initialize_schema(self.engine)
 
     def _build_engine(self) -> Engine:
         return create_engine(

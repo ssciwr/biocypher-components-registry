@@ -2,9 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { CheckIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet } from '../api/client'
 
-type RepositoryCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'blocked'
+type RepositoryCheckStatus = 'idle' | 'CHECKING' | 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE'
 type RepositoryCheckMode = 'croissant-file' | 'none'
-type CompletedRepositoryCheckStatus = Exclude<RepositoryCheckStatus, 'idle' | 'checking'>
+type CompletedRepositoryCheckStatus = Exclude<RepositoryCheckStatus, 'idle' | 'CHECKING'>
 
 type RepositoryUrlInputProps = Readonly<{
   checkMode?: RepositoryCheckMode
@@ -23,23 +23,24 @@ type CompletedRepositoryCheck = Readonly<{
   checkMode: RepositoryCheckMode
   repositoryUrl: string
   status: CompletedRepositoryCheckStatus
+  message: string
 }>
 
 const httpsUrlPattern = /^https:\/\/.+/i
 const pendingStatusIcon = <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
 const statusIcons: Record<RepositoryCheckStatus, ReactNode> = {
   idle: pendingStatusIcon,
-  checking: pendingStatusIcon,
-  found: <CheckIcon className="h-5 w-5" aria-hidden="true" />,
-  missing: <XMarkIcon className="h-5 w-5" aria-hidden="true" />,
-  blocked: <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />,
+  CHECKING: pendingStatusIcon,
+  FOUND: <CheckIcon className="h-5 w-5" aria-hidden="true" />,
+  NOT_FOUND: <XMarkIcon className="h-5 w-5" aria-hidden="true" />,
+  UNAVAILABLE: <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />,
 }
 const repositoryCheckDisplays: Record<RepositoryCheckStatus, { className: string; text: string }> = {
   idle: { className: 'text-blue-700', text: 'Checking Croissant file' },
-  checking: { className: 'text-blue-700', text: 'Checking Croissant file' },
-  found: { className: 'text-emerald-600', text: 'Croissant file found at repository root' },
-  missing: { className: 'text-red-600', text: "Croissant file not found at this repository link's root (Your repository may be private)" },
-  blocked: { className: 'text-red-600', text: 'Could not check Croissant file (Your repository may be private)' },
+  CHECKING: { className: 'text-blue-700', text: 'Checking Croissant file' },
+  FOUND: { className: 'text-emerald-600', text: 'Croissant file found at repository root' },
+  NOT_FOUND: { className: 'text-red-600', text: "Croissant file not found at repository root" },
+  UNAVAILABLE: { className: 'text-red-600', text: 'Could not check Croissant file (Your repository may be private)' },
 }
 
 /*
@@ -64,12 +65,12 @@ export function RepositoryUrlInput({
   if (canCheckRepositoryUrl) {
     status = completedCheck?.checkMode === checkMode && completedCheck.repositoryUrl === repositoryUrl
       ? completedCheck.status
-      : 'checking'
+      : 'CHECKING'
   }
   const statusDisplay = repositoryCheckDisplays[status]
 
   useEffect(() => {
-    onValidationChange?.(status === 'found')
+    onValidationChange?.(status === 'FOUND')
   }, [onValidationChange, status])
 
   useEffect(() => {
@@ -78,26 +79,44 @@ export function RepositoryUrlInput({
     }
 
     const controller = new AbortController()
+    let retryCount = 0
+    let timer: ReturnType<typeof setTimeout>
 
-    void checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet({
-      query: { repository_url: repositoryUrl },
-      signal: controller.signal,
-    })
-      .then((metadataResult) => {
+    async function checkRepository() {
+      try {
+        const response = await checkRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGet({
+          query: { repository_url: repositoryUrl },
+          signal: controller.signal,
+        })
         if (controller.signal.aborted) return
-        if (metadataResult.error || !metadataResult.data) {
-          setCompletedCheck({ checkMode, repositoryUrl, status: 'blocked' })
+        const result = response.data
+        const transient = !result || result.reason_code === 'REMOTE_TEMPORARY'
+        if (transient && retryCount < 2) {
+          retryCount += 1
+          timer = setTimeout(() => void checkRepository(), retryCount * 1000)
           return
         }
-        const checkStatus = metadataResult.data.has_croissant_file ? 'found' : 'missing'
-        setCompletedCheck({ checkMode, repositoryUrl, status: checkStatus })
-      })
-      .catch((requestError: unknown) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return
-        setCompletedCheck({ checkMode, repositoryUrl, status: 'blocked' })
-      })
+        setCompletedCheck({
+          checkMode, repositoryUrl,
+          status: result?.status ?? 'UNAVAILABLE',
+          message: result?.message ?? 'Could not check the repository. Edit the URL to try again.',
+        })
+      } catch {
+        if (controller.signal.aborted) return
+        if (retryCount < 2) {
+          retryCount += 1
+          timer = setTimeout(() => void checkRepository(), retryCount * 1000)
+          return
+        }
+        setCompletedCheck({ checkMode, repositoryUrl, status: 'UNAVAILABLE', message: 'Could not reach the server. Edit the URL to try again.' })
+      }
+    }
+    timer = setTimeout(() => void checkRepository(), 200)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
 
-    return () => controller.abort()
   }, [canCheckRepositoryUrl, checkMode, repositoryUrl])
 
   return (
@@ -105,9 +124,13 @@ export function RepositoryUrlInput({
       <span>{label}</span>
       <input
         className={inputClassName}
-        aria-invalid={canCheckRepositoryUrl && (status === 'missing' || status === 'blocked')}
+        aria-invalid={canCheckRepositoryUrl && (status === 'NOT_FOUND' || status === 'UNAVAILABLE')}
         maxLength={maxLength}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          setCompletedCheck(null)
+          onValidationChange?.(false)
+          onChange(event.target.value)
+        }}
         placeholder={placeholder}
         required={required}
         type="url"
@@ -119,7 +142,7 @@ export function RepositoryUrlInput({
           className={`inline-flex items-center gap-2 text-sm font-medium ${statusDisplay.className}`}
         >
           {statusIcons[status]}
-          {statusDisplay.text}
+          {status === 'UNAVAILABLE' ? completedCheck?.message ?? statusDisplay.text : statusDisplay.text}
         </span>
       ) : null}
     </label>

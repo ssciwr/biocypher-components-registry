@@ -60,10 +60,12 @@ def test_latest_adapter_uses_gitlab_repository_owner(
 
 def test_latest_adapter_uses_self_hosted_repository_owner(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """
     Keep maintainer display data for self-hosted repository URLs.
     """
+    monkeypatch.setenv("REGISTRY_ALLOWED_REPOSITORY_HOSTS", "institution.example.org")
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     create_adapter_entry(
         store,

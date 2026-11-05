@@ -1,17 +1,16 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AuthUser } from '../components/AppHeader'
 import { RepositoryUrlInput } from '../components/RepositoryUrlInput'
 import {
-  createRegistrationApiV1RegistrationsPost,
-  processRegistrationApiV1RegistrationsRegistrationIdProcessPost,
-  revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost,
-  type RegistrationCreateResponse,
-  type RegistrationProcessResponse,
-  type RegistrationRevalidateResponse,
+  type RegistrationAttemptResponse,
+  type ValidationCheckResponse,
 } from '../api/client'
 import { client } from '../api/client/client.gen'
 import { fetchCrossrefWork } from '../api/crossref'
+import { RegistrationRequestRejectedError, submitRegistrationStream } from '../api/registration'
+import { DiagnosticErrors, RegistrationValidationChecks } from '../components/RegistrationValidationChecks'
+import { registrationValidationDetails } from '../api/validationDiagnostics'
 
 type RegisterPageProps = Readonly<{
   authVerified: boolean
@@ -25,26 +24,19 @@ type RegistrationForm = {
   cffUrl: string
 }
 
-type RegistrationResponse = RegistrationCreateResponse | RegistrationProcessResponse | RegistrationRevalidateResponse
+type RegistrationResponse = RegistrationAttemptResponse
 
 type RegistrationResultPanelProps = Readonly<{
-  error: string | null
   isProcessing: boolean
-  onRevalidate: () => void
-  result: RegistrationResponse
+  isRetrying: boolean
+  onRetry: () => void
+  repositoryLocation: string
+  result: RegistrationResponse | null
+  checks: ValidationCheckResponse[]
+  error: string | null
 }>
 
-type RegistrationResultDisplay = Readonly<{
-  iconTone: string
-  text: string
-  title: string
-}>
-
-type InlineStatusDisplay = Readonly<{
-  className: string
-  icon: ReactNode
-  text: string
-}>
+type InlineStatusDisplay = Readonly<{ className: string; icon: ReactNode; text: string }>
 
 type DoiCheckStatus = 'idle' | 'checking' | 'found' | 'missing' | 'error'
 
@@ -62,10 +54,7 @@ const doiCheckDisplays: Record<DoiCheckStatus, InlineStatusDisplay> = {
   missing: { className: 'text-red-600', icon: failedStatusIcon, text: 'DOI not found in Crossref. Make sure it fits this format: 10.1000/182' },
   error: { className: 'text-red-600', icon: failedStatusIcon, text: 'Could not check DOI' },
 }
-const submitStatusText: Record<'processing' | 'submitting', string> = {
-  processing: 'Checking adapter',
-  submitting: 'Submitting...',
-}
+
 
 const emptyForm: RegistrationForm = {
   repositoryLocation: '',
@@ -75,23 +64,27 @@ const emptyForm: RegistrationForm = {
 }
 
 const nextSteps = [
-  {
-    title: 'Source is stored',
-    text: 'A registration source record is created',
-  },
-  {
-    title: 'Discovery checks root file',
-    text: 'The registry looks for croissant.jsonld',
-  },
-  {
-    title: 'Validation',
-    text: 'We ensure the croissant file is valid',
-  },
-  {
-    title: 'Review',
-    text: 'The BioCypher team will review your adapter submission',
-  },
+  { title: 'Check the repository', text: 'We check for croissant.jsonld at the repository root.' },
+  { title: 'Validate the metadata', text: 'Registration fetches the latest metadata and validates it.' },
+  { title: 'Publish accepted metadata', text: 'Your adapter is saved only after validation succeeds.' },
+  { title: 'Fix and retry if needed', text: 'Failed first registrations are not saved. Correct the reported issues and retry.' },
 ]
+
+const registrationFailureReasons: Record<string, string> = {
+  INVALID_JSON: 'Invalid JSON',
+  SCHEMA_INVALID: 'Schema validation failed',
+  MLCROISSANT_INVALID: 'Croissant validation failed',
+  SEMANTICS_INVALID: 'Invalid metadata structure',
+  METADATA_NOT_FOUND: 'Croissant file not found',
+  REPOSITORY_UNAVAILABLE: 'Repository unavailable',
+  REMOTE_TEMPORARY: 'Repository host temporarily unavailable',
+  DEFAULT_BRANCH_UNRESOLVED: 'Default branch could not be resolved',
+  GIT_FILTER_UNSUPPORTED: 'Repository host unsupported',
+  METADATA_TOO_LARGE: 'Metadata file too large',
+  ADAPTER_ID_CHANGED: 'Adapter identity changed',
+  VERSION_NOT_BUMPED: 'Version not changed',
+  DUPLICATE: 'Adapter already registered',
+}
 
 function registrationDoiValue(value: string) {
   const trimmed = value.trim()
@@ -119,116 +112,73 @@ function initialForm(): RegistrationForm {
 /*
  * AI-Generated. Based on the Penpot designs.
  */
-function registrationResultFeedbackDisplay(result: RegistrationResponse): RegistrationResultDisplay {
-  // AI-generated helper which groups semantically the relevant icon tone, title and text for registraiton feedback
-  if (result.status === 'VALID') {
-    return {
-      iconTone: 'bg-emerald-100 text-emerald-600',
-      text: `${result.adapter_name} was stored and validated by the registry.`,
-      title: 'Adapter registration successful',
-    }
-  }
 
-  if (result.status === 'INVALID') {
-    return {
-      iconTone: 'bg-red-100 text-red-600',
-      text: 'Please fix these issues in your GitHub repository, then revalidate.',
-      title: 'Sorry, your adapter is not currently valid.',
-    }
-  }
-
-  return {
-    iconTone: 'bg-amber-100 text-amber-700',
-    text: `${result.adapter_name} was stored. Processing feedback is shown below.`,
-    title: 'Registration submitted',
-  }
-}
-
-// Basically this shows errors or successful registration
 function RegistrationResultPanel({
-  error,
   isProcessing,
-  onRevalidate,
+  isRetrying,
+  onRetry,
+  repositoryLocation,
   result,
+  checks,
+  error,
 }: RegistrationResultPanelProps) {
-  const isValid = result.status === 'VALID'
-  const isInvalid = result.status === 'INVALID'
-  const resultDisplay = registrationResultFeedbackDisplay(result)
-  const validationErrors = ('validation_errors' in result ? result.validation_errors : null)?.filter(Boolean) ?? []
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const succeeded = result?.attempt_status === 'SUCCEEDED'
+  const failed = result?.attempt_status === 'FAILED'
+  const groupedDetails = checks.flatMap(check => registrationValidationDetails({ validation_errors: check.errors, validation_details: check.validation_details }))
+  const validationDetails = registrationValidationDetails(result).filter(detail => !groupedDetails.some(grouped => grouped.message.trim() === detail.message.trim()))
+  const showMessage = Boolean(result?.message.trim()) && ![...validationDetails, ...groupedDetails].some((detail) => detail.message.trim() === result?.message.trim())
+  const failureReason = registrationFailureReasons[result?.reason_code ?? ''] ?? 'Not registered'
+  const registrationStatus = error ? 'UNCONFIRMED - Registration outcome unknown' : isProcessing ? 'PROCESSING - Checking metadata' : succeeded ? 'SUCCEEDED - Registered' : `FAILED - ${failureReason}`
+  const repository = result?.repository_location ?? repositoryLocation
+  const title = error ? 'Registration outcome could not be confirmed' : isProcessing ? 'Checking your adapter...' : succeeded ? 'Adapter registered successfully' : 'Registration failed'
+  const iconTone = isProcessing ? 'bg-blue-100 text-blue-600' : succeeded ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [isProcessing, result])
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
+    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10" role="status" aria-busy={isProcessing}>
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div className="flex gap-4">
-          <span
-            className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${resultDisplay.iconTone}`}
-          >
-            {isValid ? (
-              <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />
-            ) : (
-              <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />
-            )}
+        <div className="flex items-start gap-4">
+          <span className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${iconTone}`}>
+            {isProcessing ? <ArrowPathIcon className="h-8 w-8 animate-spin" aria-hidden="true" /> : succeeded ? <CheckCircleIcon className="h-8 w-8" aria-hidden="true" /> : <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />}
           </span>
-          <span>
-            <h2 className="text-2xl font-bold text-slate-950">
-              {resultDisplay.title}
-            </h2>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-950 outline-none" ref={headingRef} tabIndex={-1}>{title}</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              {resultDisplay.text}
+              {error ? error : isProcessing ? 'Fetching and validating croissant.jsonld from your repository.' : succeeded ? result?.message : 'Your adapter has not been registered yet. Review the details, fix the issues in your repository, then retry.'}
             </p>
-          </span>
+          </div>
         </div>
-
-        {isInvalid ? (
-          <button
-            className="inline-flex h-12 min-w-40 cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-            disabled={isProcessing}
-            onClick={onRevalidate}
-            type="button"
-          >
-            {isProcessing ? 'Revalidating...' : 'Revalidate'}
-          </button>
+        {failed || (isProcessing && isRetrying) ? (
+          <div className="flex flex-wrap gap-3">
+            <button className="inline-flex h-12 min-w-40 cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={isProcessing} onClick={onRetry} type="button">
+              {isProcessing ? 'Retrying...' : 'Retry registration'}
+            </button>
+          </div>
         ) : null}
       </div>
-
       <dl className="mt-8 grid gap-4 border-t border-slate-100 pt-6 text-sm md:grid-cols-3">
-        <div>
-          <dt className="font-semibold text-slate-500">Status</dt>
-          <dd className="mt-1 font-bold text-slate-950">{result.status}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-500">Repository</dt>
-          <dd className="mt-1 break-all text-slate-950">{result.repository_location}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-500">Registration ID</dt>
-          <dd className="mt-1 break-all text-slate-950">{result.registration_id}</dd>
-        </div>
+        <div><dt className="font-semibold text-slate-500">Registration status</dt><dd className="mt-1 font-bold">{registrationStatus}</dd></div>
+        <div><dt className="font-semibold text-slate-500">Repository</dt><dd className="mt-1 break-all">{repository}</dd></div>
+        {failed ? <div><dt className="font-semibold text-slate-500">Reason code</dt><dd className="mt-1 break-words">{result.reason_code ?? 'Not provided'}</dd></div> : null}
+        {succeeded ? <div><dt className="font-semibold text-slate-500">Current version</dt><dd className="mt-1">{result?.published_version}</dd></div> : null}
       </dl>
-
-      {validationErrors.length > 0 ? (
-        <ul className="mt-6 grid gap-3">
-          {validationErrors.map((validationError, index) => (
-            <li
-              className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"
-              key={`${validationError}-${index}`}
-            >
-              {validationError}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {isInvalid && validationErrors.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          The backend marked this registration invalid without detailed validation errors.
-        </p>
-      ) : null}
-
-      {error ? (
-        <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {error}
-        </p>
+      {checks.length ? <RegistrationValidationChecks checks={checks} interrupted={Boolean(error)} /> : null}
+      {failed ? (
+        <div className="mt-6 grid gap-6 text-sm">
+          {showMessage ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-red-700">
+            <h3 className="font-semibold">Message</h3>
+            <p className="mt-1 whitespace-pre-wrap break-words">{result.message}</p>
+          </div> : null}
+          {validationDetails.length > 0 ? <div>
+            <h3 className="font-semibold text-slate-700">Validation errors ({validationDetails.length})</h3>
+            <div className="mt-3"><DiagnosticErrors details={validationDetails} /></div>
+          </div> : null}
+          {!showMessage && validationDetails.length === 0 && groupedDetails.length === 0 ? <p className="text-slate-600">No additional diagnostic information was returned.</p> : null}
+        </div>
       ) : null}
     </section>
   )
@@ -236,9 +186,14 @@ function RegistrationResultPanel({
 
 function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONAR: this page coordinates one registration workflow; splitting it is a larger UI refactor.
   const autoSubmitAttemptedRef = useRef(false)
+  const submissionRef = useRef<AbortController | null>(null)
+  const [checks, setChecks] = useState<ValidationCheckResponse[]>([])
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  useEffect(() => () => submissionRef.current?.abort(), [])
   const [form, setForm] = useState<RegistrationForm>(initialForm)
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
+  const [status, setStatus] = useState<'idle' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasCroissantFile, setHasCroissantFile] = useState(false)
   const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
@@ -249,9 +204,9 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
 
   const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
   const doiCheckDisplay = doiCheckDisplays[doiCheckStatus]
-  const canSubmitDirectly = Boolean(authUser)
+  const canSubmitDirectly = Boolean(authUser && authVerified)
   const idleSubmitButtonText = canSubmitDirectly ? 'Register adapter' : 'Sign in with GitHub'
-  const submitButtonText = status === 'idle' ? idleSubmitButtonText : submitStatusText[status]
+  const submitButtonText = status === 'idle' ? idleSubmitButtonText : isRetrying ? 'Retrying...' : 'Registering...'
   const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
 
   async function checkDoiOnBlur(value: string) {
@@ -275,77 +230,44 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
     }
   }
 
-  const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm) => {
-    if (!hasCroissantFile) return
-
+  const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm, retry = false) => {
+    if (!hasCroissantFile || submissionRef.current) return
+    const controller = new AbortController()
+    submissionRef.current = controller
     setError(null)
     setResult(null)
-
-    const doi = registrationDoiValue(registrationForm.doi)
-
-    setStatus('submitting')
+    setChecks([])
+    setUnconfirmed(false)
+    setIsRetrying(retry)
+    setStatus('processing')
     try {
-      const registrationResult = await createRegistrationApiV1RegistrationsPost({
-        body: {
-          repository_location: registrationForm.repositoryLocation,
-          license_value: registrationForm.licenseValue.trim() || undefined,
-          doi: doi || undefined,
-          cff_url: registrationForm.cffUrl.trim() || undefined,
-        },
-      })
-
-      const registrationError = registrationResult.error as unknown
-      if (registrationError || !registrationResult.data) {
-        const details = registrationError as { details?: string; detail?: string } | undefined
-        setStatus('idle')
-        setError(
-          typeof registrationError === 'string' && registrationError
-            ? registrationError
-            : details?.details || details?.detail || 'Registration failed.'
-        )
-        return
+      const outcome = await submitRegistrationStream({
+        repository_location: registrationForm.repositoryLocation,
+        license_value: registrationForm.licenseValue.trim() || undefined,
+        doi: registrationDoiValue(registrationForm.doi) || undefined,
+        cff_url: registrationForm.cffUrl.trim() || undefined,
+      }, controller.signal, setChecks)
+      if (controller.signal.aborted) return
+      setResult(outcome)
+      setChecks(outcome.validation_checks ?? [])
+      if (outcome.attempt_status === 'SUCCEEDED') {
+        globalThis.localStorage.removeItem(draftKey)
+        globalThis.localStorage.removeItem(submitAfterAuthKey)
       }
-
-      const registration = registrationResult.data
-      globalThis.localStorage.removeItem(draftKey)
-      globalThis.localStorage.removeItem(submitAfterAuthKey)
-      setStatus('processing')
-
-      const processRegistration = registration.status === 'INVALID'
-        ? revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost
-        : processRegistrationApiV1RegistrationsRegistrationIdProcessPost
-      const processResult = await processRegistration({
-        path: { registration_id: registration.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed processing request.
-      })
-
-      setStatus('idle')
-      const processError = processResult.error as unknown
-      if (processError || !processResult.data) {
-        const details = processError as { details?: string; detail?: string } | undefined
-        setResult(registration)
-        setError(
-          typeof processError === 'string' && processError
-            ? processError
-            : details?.details || details?.detail || 'Registration was saved, but processing failed.'
-        )
-        return
-      }
-
-      setResult(processResult.data)
     } catch (error) {
-      const details = error as { details?: string; detail?: string } | undefined
-      setStatus('idle')
-      setError(
-        typeof error === 'string' && error
-          ? error
-          : details?.details || details?.detail || 'Registration failed.'
-      )
+      if (controller.signal.aborted) return
+      setUnconfirmed(!(error instanceof RegistrationRequestRejectedError))
+      setError(error instanceof Error ? error.message : 'The connection ended before a final result arrived. Check the adapter list before trying again.')
+
+    } finally {
+      if (submissionRef.current === controller) submissionRef.current = null
+      if (!controller.signal.aborted) setStatus('idle')
     }
   }, [hasCroissantFile])
 
   useEffect(() => {
     if (!hasCroissantFile) return
-    if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
+    if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || unconfirmed || status !== 'idle') return
     if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
     globalThis.queueMicrotask(() => {
@@ -355,7 +277,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       void submitAuthenticatedRegistration(form)
     })
-  }, [authUser, authVerified, form, hasCroissantFile, result, status, submitAuthenticatedRegistration])
+  }, [authUser, authVerified, form, hasCroissantFile, result, status, submitAuthenticatedRegistration, unconfirmed])
 
   async function submitRegistration(event: { preventDefault: () => void }) {
     event.preventDefault()
@@ -363,7 +285,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
 
     const doi = registrationDoiValue(form.doi)
 
-    if (!authUser) {
+    if (!canSubmitDirectly) {
       globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
       globalThis.localStorage.setItem(submitAfterAuthKey, '1')
       globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
@@ -373,39 +295,6 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
     await submitAuthenticatedRegistration({ ...form, doi })
   }
 
-  async function revalidateRegistration() {
-    if (!result) return
-
-    setStatus('processing')
-    setError(null)
-    try {
-      const revalidateResult = await revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost({
-        path: { registration_id: result.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed revalidation request.
-      })
-
-      setStatus('idle')
-      const revalidateError = revalidateResult.error as unknown
-      if (revalidateError || !revalidateResult.data) {
-        const details = revalidateError as { details?: string; detail?: string } | undefined
-        setError(
-          typeof revalidateError === 'string' && revalidateError
-            ? revalidateError
-            : details?.details || details?.detail || 'Revalidation failed.'
-        )
-        return
-      }
-
-      setResult(revalidateResult.data)
-    } catch (error) {
-      const details = error as { details?: string; detail?: string } | undefined
-      setStatus('idle')
-      setError(
-        typeof error === 'string' && error
-          ? error
-          : details?.details || details?.detail || 'Revalidation failed.'
-      )
-    }
-  }
 
   return (
     <section className="bg-slate-100">
@@ -419,12 +308,17 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
           </span>
         </div>
 
-        {result ? (
+        {result || unconfirmed || status === 'processing' ? (
           <RegistrationResultPanel
-            error={error}
             isProcessing={status === 'processing'}
-            onRevalidate={() => void revalidateRegistration()}
+            isRetrying={isRetrying}
+            onRetry={() => {
+              if (status === 'idle' && canSubmitDirectly) void submitAuthenticatedRegistration(form, true)
+            }}
+            repositoryLocation={form.repositoryLocation.trim()}
             result={result}
+            checks={checks}
+            error={unconfirmed ? error : null}
           />
         ) : (
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_410px]">

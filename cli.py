@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import webbrowser
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -17,37 +22,34 @@ from src.core.adapter.discovery import (
     validate_discovered_adapter,
 )
 from src.core.adapter.service import create_registration_request
+from src.core.auth.service import GitHubAuthenticationError, authenticate_github_device
 from src.core.dataset.cli import app as dataset_app
 from src.core.registration.models import (
+    AttemptStatus,
     BatchRefreshRecord,
+    ProcessingOutcome,
     RegistrationEvent,
     RegistryEntry,
     StoredRegistration,
 )
 from src.core.registration.service import (
-    finish_registration as finish_registration_record,
-)
-from src.core.registration.service import (
     refresh_active_registrations as refresh_active_registrations_record,
 )
-from src.core.registration.service import (
-    revalidate_registration as revalidate_registration_record,
-)
-from src.core.registration.service import (
-    submit_registration as submit_registration_record,
-)
+from src.core.registration.service import register_adapter, update_adapter
 from src.core.settings import settings as core_settings
-from src.core.shared.constants import METADATA_FILENAME
+from src.core.shared.constants import (
+    CROISSANT_CONFORMS_TO_URL,
+    METADATA_FILENAME,
+    STANDARD_CONTEXT,
+)
 from src.core.shared.files import fetch_local_metadata, parse_json_metadata
 from src.core.validation import (
     validate_adapter_with_embedded_datasets,
     validate_dataset,
 )
 from src.core.validation.results import ValidationResult
-from src.persistence.factory import build_registration_store
-
-_DEFAULT_GITHUB_USER_ID = "0"
-_DEMO_GITHUB_USER_ID = "1"
+from src.persistence.errors import DatabaseSetupError
+from src.persistence.factory import build_registration_store, check_database_connection
 
 # ============================================================================
 # Constants
@@ -101,6 +103,7 @@ app = typer.Typer(
     name="biocypher-registry",
     help="Manage BioCypher adapter and dataset metadata.",
     no_args_is_help=True,
+    pretty_exceptions_show_locals=False,
 )
 console = Console()
 app.add_typer(dataset_app, name="dataset")
@@ -111,6 +114,7 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
     adapter_id = str(spec["adapter_id"])
     data_source = str(spec["data_source"])
     return {
+        "@context": STANDARD_CONTEXT,
         JSONLD_TYPE: "SoftwareSourceCode",
         "@id": adapter_id,
         "name": spec["adapter_name"],
@@ -126,17 +130,44 @@ def _demo_adapter_metadata(spec: dict[str, Any]) -> dict[str, Any]:
             {
                 JSONLD_TYPE: "sc:Dataset",
                 "name": data_source,
+                "conformsTo": CROISSANT_CONFORMS_TO_URL,
+                "citeAs": f"https://example.org/{adapter_id}",
+                "datePublished": "2026-01-01T00:00:00",
+                "creator": [{JSONLD_TYPE: "sc:Person", "name": "BioCypher demo user"}],
                 "description": f"Vague demo dataset backing the {spec['adapter_name']}.",
                 "version": "2026.1",
                 "license": "MIT",
                 "url": f"https://example.org/{adapter_id}",
+                "distribution": [
+                    {
+                        "@id": f"{adapter_id}-data",
+                        JSONLD_TYPE: "cr:FileObject",
+                        "name": "demo.csv",
+                        "contentUrl": f"https://example.org/{adapter_id}/demo.csv",
+                        "encodingFormat": "text/csv",
+                        "sha256": hashlib.sha256(b"source,target,score\n").hexdigest(),
+                    }
+                ],
                 "recordSet": [
                     {
-                        "name": f"{adapter_id}-records",
+                        JSONLD_TYPE: "cr:RecordSet",
+                        "@id": f"{adapter_id}-records",
+                        "name": "records",
                         "field": [
-                            {"name": "source", "description": "Source identifier"},
-                            {"name": "target", "description": "Target identifier"},
-                            {"name": "score", "description": "Demo confidence score"},
+                            {
+                                "@id": f"{adapter_id}-records/{name}",
+                                JSONLD_TYPE: "cr:Field",
+                                "name": name,
+                                "description": f"Demo {name} value",
+                                "dataType": "sc:Float"
+                                if name == "score"
+                                else "sc:Text",
+                                "source": {
+                                    "fileObject": {"@id": f"{adapter_id}-data"},
+                                    "extract": {"column": name},
+                                },
+                            }
+                            for name in ("source", "target", "score")
                         ],
                     }
                 ],
@@ -179,7 +210,7 @@ def _run_validation(metadata: dict[str, Any], kind: str) -> ValidationResult:
 def _validate_path(path: str, kind: str | None = None) -> None:
     try:
         metadata = _load_metadata(Path(path))
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -265,66 +296,6 @@ def _print_discovery_target(
     )
 
 
-def _print_submission_request(
-    adapter_name: str,
-    adapter_id: str,
-    repository_location: str,
-    repository_kind: str,
-    github_user_id: str,
-) -> None:
-    body = Text()
-    body.append(ADAPTER_LABEL, style=STYLE_SECTION_HEADING)
-    body.append(f"{adapter_name}\n\n", style="white")
-    body.append("Adapter ID\n", style="bold")
-    body.append(f"{adapter_id}\n\n", style="white")
-    body.append("Repository\n", style="bold")
-    body.append(f"{repository_location}\n\n", style="white")
-    body.append("Kind\n", style="bold")
-    body.append(f"{repository_kind}\n\n", style="white")
-    body.append("GitHub User ID\n", style="bold")
-    body.append(github_user_id, style="white")
-    console.print(
-        Panel(
-            body,
-            title="Registration Request",
-            border_style="cyan",
-            expand=False,
-        )
-    )
-
-
-def _print_registration_result(
-    registration_id: str,
-    adapter_name: str,
-    status: str,
-    profile_version: str | None,
-    metadata_path: str | None,
-    validation_errors: list[str] | None = None,
-) -> None:
-    body = Text()
-    body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
-    body.append(f"{registration_id}\n\n", style="white")
-    body.append(ADAPTER_LABEL, style="bold")
-    body.append(f"{adapter_name}\n\n", style="white")
-    body.append("Status\n", style="bold")
-    body.append(f"{status}\n\n", style="white")
-    body.append("Profile\n", style="bold")
-    body.append(f"{profile_version or 'n/a'}\n\n", style="white")
-    body.append("Metadata\n", style="bold")
-    body.append(metadata_path or METADATA_FILENAME, style="white")
-    if validation_errors:
-        body.append("\n\nErrors\n", style="bold")
-        body.append("\n".join(validation_errors), style="white")
-    console.print(
-        Panel(
-            body,
-            title="Registration Result",
-            border_style="cyan",
-            expand=False,
-        )
-    )
-
-
 def _print_batch_refresh_summary(
     active_sources: int,
     processed: int,
@@ -334,6 +305,7 @@ def _print_batch_refresh_summary(
     duplicate: int,
     rejected_same_version_changed: int,
     fetch_failed: int,
+    internal_failed: int = 0,
 ) -> None:
     table = Table(title="Batch Refresh Summary")
     table.add_column("Metric", style="cyan")
@@ -349,6 +321,7 @@ def _print_batch_refresh_summary(
         str(rejected_same_version_changed),
     )
     table.add_row("FETCH_FAILED", str(fetch_failed))
+    table.add_row("INTERNAL_FAILED", str(internal_failed))
     console.print(table)
 
 
@@ -378,37 +351,7 @@ def _print_latest_batch_refresh(refresh: BatchRefreshRecord) -> None:
         duplicate=refresh.duplicate,
         rejected_same_version_changed=refresh.rejected_same_version_changed,
         fetch_failed=refresh.fetch_failed,
-    )
-
-
-def _print_stored_registration(
-    registration_id: str,
-    adapter_name: str,
-    repository_location: str,
-    repository_kind: str,
-    status: str,
-    github_user_id: str,
-) -> None:
-    body = Text()
-    body.append("Registration ID\n", style=STYLE_SECTION_HEADING)
-    body.append(f"{registration_id}\n\n", style="white")
-    body.append(ADAPTER_LABEL, style="bold")
-    body.append(f"{adapter_name}\n\n", style="white")
-    body.append("Repository\n", style="bold")
-    body.append(f"{repository_location}\n\n", style="white")
-    body.append("Kind\n", style="bold")
-    body.append(f"{repository_kind}\n\n", style="white")
-    body.append("Status\n", style="bold")
-    body.append(f"{status}\n\n", style="white")
-    body.append("GitHub User ID\n", style="bold")
-    body.append(github_user_id, style="white")
-    console.print(
-        Panel(
-            body,
-            title="Stored Registration",
-            border_style="cyan",
-            expand=False,
-        )
+        internal_failed=refresh.internal_failed,
     )
 
 
@@ -419,7 +362,7 @@ def _print_registration_table(
     table = Table(title="Stored Registrations")
     table.add_column("Registration ID", style="cyan")
     table.add_column("Adapter")
-    table.add_column("Status")
+    table.add_column("Published Version")
     table.add_column("Latest Event")
     table.add_column("Kind")
     table.add_column("Last Checked")
@@ -427,7 +370,7 @@ def _print_registration_table(
         table.add_row(
             registration.registration_id,
             registration.adapter_name,
-            registration.status.value,
+            str((registration.metadata or {}).get("version", "n/a")),
             latest_event,
             registration.repository_kind,
             registration.last_checked_at.isoformat()
@@ -482,133 +425,137 @@ def _print_registry_entries(entries: list[RegistryEntry]) -> None:
 # ============================================================================
 
 
-def _resolve_github_user_id(github_user_id: str | None) -> str:
-    if github_user_id is None:
-        return _DEFAULT_GITHUB_USER_ID
-    normalized_user_id = github_user_id.strip()
-    return normalized_user_id or _DEFAULT_GITHUB_USER_ID
-
-
-@app.command(
-    "submit",
-    help=(
-        "Submit a repository location to create a registration "
-        "request for the registry workflow."
-    ),
-)
-def submit_cmd(
-    repository_location: str = typer.Argument(
-        ...,
-        help="Local repository path or supported repository URL.",
-    ),
-    github_user_id: str | None = typer.Option(
-        _DEFAULT_GITHUB_USER_ID,
-        "--github-user-id",
-        help="GitHub user id to attach to this registration.",
-    ),
-) -> None:
-    resolved_github_user_id = _resolve_github_user_id(github_user_id)
-    try:
-        request = create_registration_request(
-            repository_location=repository_location,
-            submitted_by_github_user_id=resolved_github_user_id,
+def _authorize_cli():
+    client_id = os.getenv(core_settings.github_oauth_client_id_env, "").strip()
+    client_secret = os.getenv(core_settings.github_oauth_client_secret_env, "").strip()
+    if not client_id or not client_secret:
+        raise GitHubAuthenticationError(
+            "GitHub OAuth client ID and secret are required."
         )
-    except (ValueError, OSError, typer.BadParameter) as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
 
-    _print_submission_request(
-        adapter_name=request.adapter_name,
-        adapter_id=request.adapter_id,
-        repository_location=request.repository_location,
-        repository_kind=request.repository_kind,
-        github_user_id=(request.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID),
+    def present(uri: str, code: str) -> None:
+        console.print(f"Open {uri} and enter code {code}", markup=False)
+        try:
+            webbrowser.open(uri)
+        except (OSError, webbrowser.Error):
+            console.print(
+                "Could not open a browser. Use the verification URL and code above."
+            )
+
+    return authenticate_github_device(
+        client_id=client_id, client_secret=client_secret, on_authorization=present
     )
-    console.print("[green]Registration request created[/green]")
+
+
+def _print_outcome(outcome: ProcessingOutcome) -> None:
+    console.print(outcome.attempt_status.value, markup=False)
+    console.print(outcome.message, markup=False)
+    if outcome.published_version:
+        console.print(f"Published version: {outcome.published_version}", markup=False)
+    if outcome.registration:
+        console.print(f"Adapter: {outcome.registration.adapter_id}", markup=False)
+    for error in dict.fromkeys(outcome.validation_errors):
+        if error != outcome.message and not outcome.message.startswith(error):
+            console.print(error, markup=False)
+    if outcome.attempt_status == AttemptStatus.FAILED:
+        raise typer.Exit(1)
+
+
+def _authorize_for_database(db_path=None):
+    try:
+        console.print(f"Database: {check_database_connection(db_path)}", markup=False)
+        actor = _authorize_cli()
+    except (GitHubAuthenticationError, DatabaseSetupError) as exc:
+        console.print(str(exc), markup=False)
+        raise typer.Exit(1) from None
+    except KeyboardInterrupt:
+        console.print("Authentication cancelled.")
+        raise typer.Exit(130) from None
+    return actor
+
+
+def _run_publish(operation, db_path=None) -> None:
+    actor = _authorize_for_database(db_path)
+    try:
+        outcome = operation(actor)
+    except (ValueError, PermissionError, LookupError, DatabaseSetupError) as exc:
+        console.print(str(exc), markup=False)
+        raise typer.Exit(1) from None
+    except KeyboardInterrupt:
+        console.print(
+            "Operation interrupted; outcome unconfirmed. Inspect the registry before retrying."
+        )
+        raise typer.Exit(130) from None
+    except Exception as exc:  # noqa: BLE001 - commit may have happened; redact provider details.
+        console.print(
+            f"Operation outcome unconfirmed ({type(exc).__name__}). "
+            "Inspect the registry before retrying.",
+            markup=False,
+        )
+        raise typer.Exit(1) from None
+    _print_outcome(outcome)
 
 
 @app.command(
-    "submit-registration",
-    help=("Submit and persist an adapter registration in the configured database."),
+    "register",
+    help="Authenticate with GitHub and register public HTTPS repository metadata.",
 )
-def submit_registration_cmd(
-    repository_location: str = typer.Argument(
-        ...,
-        help="Local repository path or supported repository URL.",
-    ),
-    db_path: str | None = typer.Option(
-        None,
-        "--db-path",
-        help=_DB_PATH_HELP,
-    ),
-    github_user_id: str | None = typer.Option(
-        _DEFAULT_GITHUB_USER_ID,
-        "--github-user-id",
-        help="GitHub user id to attach to this registration.",
+def register_cmd(
+    repository_location: str = typer.Argument(..., help="Public HTTPS repository URL."),
+    db_path: str | None = typer.Option(None, "--db-path", help=_DB_PATH_HELP),
+    license_value: str | None = typer.Option(None, "--license", "--license-value"),
+    doi: str | None = typer.Option(None, "--doi"),
+    cff_url: str | None = typer.Option(None, "--cff-url"),
+) -> None:
+    parsed = urlparse(repository_location)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise typer.BadParameter("Registration requires a public HTTPS repository URL.")
+    # Normalize before authentication; malformed repository inputs must not prompt.
+    try:
+        request = create_registration_request(repository_location)
+    except (ValueError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from None
+
+    def process(actor):
+        return register_adapter(
+            request.repository_location,
+            build_registration_store(db_path),
+            actor=actor,
+            license_value=license_value,
+            doi=doi,
+            cff_url=cff_url,
+            on_check=lambda check: console.print(
+                f"{check.name}: {check.status}", markup=False
+            ),
+        )
+
+    _run_publish(process, db_path=db_path)
+
+
+@app.command(
+    "update", help="Authenticate with GitHub and update an owned public adapter."
+)
+def update_cmd(
+    adapter_id: str = typer.Argument(..., help="Public adapter ID."),
+    db_path: str | None = typer.Option(None, "--db-path", help=_DB_PATH_HELP),
+    force_validation: bool = typer.Option(
+        False, "--force-validation", help="Validate even when metadata is unchanged."
     ),
 ) -> None:
-    resolved_github_user_id = _resolve_github_user_id(github_user_id)
-    try:
-        store = build_registration_store(db_path)
-        registration = submit_registration_record(
-            repository_location=repository_location,
-            store=store,
-            submitted_by_github_user_id=resolved_github_user_id,
-        )
-    except (ValueError, OSError, typer.BadParameter) as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
-
-    _print_stored_registration(
-        registration_id=registration.registration_id,
-        adapter_name=registration.adapter_name,
-        repository_location=registration.repository_location,
-        repository_kind=registration.repository_kind,
-        status=registration.status.value,
-        github_user_id=(
-            registration.submitted_by_github_user_id or _DEFAULT_GITHUB_USER_ID
+    if not adapter_id.strip():
+        raise typer.BadParameter("Adapter ID must not be blank.")
+    _run_publish(
+        lambda actor: update_adapter(
+            adapter_id.strip(),
+            build_registration_store(db_path),
+            actor=actor,
+            force_validation=force_validation,
+            on_check=lambda check: console.print(
+                f"{check.name}: {check.status}", markup=False
+            ),
         ),
+        db_path=db_path,
     )
-    console.print("[green]Registration stored[/green]")
-
-
-@app.command(
-    "finish-registration",
-    help=(
-        "Discover, validate, and persist one stored registration as VALID "
-        "using the configured database."
-    ),
-)
-def finish_registration_cmd(
-    registration_id: str = typer.Argument(..., help=REGISTRATION_ID_HELP),
-    db_path: str | None = typer.Option(
-        None,
-        "--db-path",
-        help=_DB_PATH_HELP,
-    ),
-) -> None:
-    try:
-        store = build_registration_store(db_path)
-        registration = finish_registration_record(
-            registration_id=registration_id,
-            store=store,
-        )
-    except (ValueError, OSError, typer.BadParameter) as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
-
-    _print_registration_result(
-        registration_id=registration.registration_id,
-        adapter_name=registration.adapter_name,
-        status=registration.status.value,
-        profile_version=registration.profile_version,
-        metadata_path=registration.metadata_path,
-        validation_errors=registration.validation_errors,
-    )
-    if registration.status.value == "INVALID":
-        console.print("[red]Registration finished with validation errors[/red]")
-        raise typer.Exit(code=1)
-    console.print("[green]Registration finished[/green]")
 
 
 @app.command(
@@ -623,11 +570,16 @@ def refresh_registry_cmd(
         "--db-path",
         help=_DB_PATH_HELP,
     ),
+    force_validation: bool = typer.Option(
+        False, "--force-validation", help="Validate unchanged metadata too."
+    ),
 ) -> None:
     try:
         store = build_registration_store(db_path)
-        summary = refresh_active_registrations_record(store=store)
-    except (ValueError, OSError, typer.BadParameter) as exc:
+        summary = refresh_active_registrations_record(
+            store=store, force_validation=force_validation
+        )
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -640,46 +592,9 @@ def refresh_registry_cmd(
         duplicate=summary.duplicate,
         rejected_same_version_changed=summary.rejected_same_version_changed,
         fetch_failed=summary.fetch_failed,
+        internal_failed=summary.internal_failed,
     )
     console.print("[green]Batch refresh finished[/green]")
-
-
-@app.command(
-    "revalidate-registration",
-    help="Reprocess one previously invalid or fetch-failed registration immediately.",
-)
-def revalidate_registration_cmd(
-    registration_id: str = typer.Argument(..., help=REGISTRATION_ID_HELP),
-    db_path: str | None = typer.Option(
-        None,
-        "--db-path",
-        help=_DB_PATH_HELP,
-    ),
-) -> None:
-    try:
-        store = build_registration_store(db_path)
-        registration = revalidate_registration_record(
-            registration_id=registration_id,
-            store=store,
-        )
-    except (ValueError, OSError, typer.BadParameter) as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
-
-    _print_registration_result(
-        registration_id=registration.registration_id,
-        adapter_name=registration.adapter_name,
-        status=registration.status.value,
-        profile_version=registration.profile_version,
-        metadata_path=registration.metadata_path,
-        validation_errors=registration.validation_errors,
-    )
-    if registration.status.value == "INVALID":
-        console.print(
-            "[red]Registration revalidation finished with validation errors[/red]"
-        )
-        raise typer.Exit(code=1)
-    console.print("[green]Registration revalidated[/green]")
 
 
 @app.command(
@@ -699,11 +614,11 @@ def list_registrations_cmd(
             (
                 registration,
                 store.get_latest_event_type(registration.registration_id)
-                or "SUBMITTED",
+                or "No recorded attempt",
             )
             for registration in store.list_active_registrations()
         ]
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -727,7 +642,7 @@ def show_registration_events_cmd(
         if store.get_registration(registration_id) is None:
             raise ValueError(f"Registration not found: {registration_id}")
         events = store.list_registration_events(registration_id)
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -745,6 +660,7 @@ def seed_demo_adapters_cmd(
         help=_DB_PATH_HELP,
     ),
 ) -> None:
+    actor = _authorize_for_database(db_path)
     try:
         store = build_registration_store(db_path)
         existing_keys = {
@@ -757,23 +673,26 @@ def seed_demo_adapters_cmd(
             if uniqueness_key in existing_keys:
                 skipped += 1
                 continue
-            registration = submit_registration_record(
+            metadata = _demo_adapter_metadata(spec)
+            validation = validate_adapter_with_embedded_datasets(metadata)
+            if not validation.is_valid:
+                raise ValueError(
+                    "Demo metadata failed validation: " + "; ".join(validation.errors)
+                )
+            request = create_registration_request(
                 repository_location=str(spec["repository_location"]),
-                store=store,
                 doi=spec.get("doi"),
-                submitted_by_github_user_id=_DEMO_GITHUB_USER_ID,
+                submitted_by_github_user_id=actor.github_user_id,
             )
-            store.mark_registration_valid(
-                registration_id=registration.registration_id,
-                metadata=_demo_adapter_metadata(spec),
-                metadata_path=METADATA_FILENAME,
-                profile_version="demo-v1",
-                uniqueness_key=uniqueness_key,
-                observed_checksum=f"demo-{uniqueness_key}",
+            checksum = hashlib.sha256(
+                json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            store.accept_candidate(
+                request, metadata, validation.profile_version, uniqueness_key, checksum
             )
             existing_keys.add(uniqueness_key)
             seeded += 1
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -797,7 +716,7 @@ def list_registry_entries_cmd(
     try:
         store = build_registration_store(db_path)
         entries = store.list_registry_entries()
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -820,7 +739,7 @@ def show_latest_refresh_cmd(
         refresh = store.get_latest_batch_refresh()
         if refresh is None:
             raise ValueError("No registry refresh has been recorded.")
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -855,7 +774,7 @@ def discover_cmd(
             discovered = discover_local_adapter(source)
             location_kind = "local repository"
         discovered = validate_discovered_adapter(discovered)
-    except (ValueError, OSError, typer.BadParameter) as exc:
+    except (ValueError, OSError, typer.BadParameter, DatabaseSetupError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
@@ -916,19 +835,8 @@ def validate_dataset_cmd(
     _validate_path(path, kind="dataset")
 
 
-@app.command("web", help="Launch the web interface.")
-def web_cmd(
-    host: str = typer.Option("127.0.0.1", help="Host to bind."),
-    port: int = typer.Option(8000, help="Port to bind."),
-    output_dir: str = typer.Option(".", help="Directory for generated files."),
-) -> None:
-    from src.core.web.server import run_server
-
-    console.print(f"[cyan]Serving web UI on http://{host}:{port}[/cyan]")
-    run_server(host=host, port=port, output_dir=output_dir)
-
-
 def main() -> None:
+    load_dotenv()
     app()
 
 
