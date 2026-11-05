@@ -18,8 +18,10 @@ def cl():
 @pytest.fixture
 def workspace(tmp_path, monkeypatch):
     """Point the file tools at a temporary workspace root."""
-    monkeypatch.setattr(client_loop, "FILE_ROOT", tmp_path)
-    return tmp_path
+    root = tmp_path / "workspace"
+    root.mkdir()
+    monkeypatch.setattr(client_loop, "FILE_ROOT", root)
+    return root
 
 
 @pytest.fixture
