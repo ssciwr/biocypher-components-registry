@@ -56,7 +56,7 @@ export const listLatestAdaptersApiV1AdaptersLatestGet = <ThrowOnError extends bo
 /**
  * Search public adapters
  *
- * Return public adapter cards whose title matches the search term.
+ * Return public adapter cards whose title or keywords match the search term, ignoring whitespace and letter case.
  */
 export const searchAdaptersApiV1AdaptersSearchGet = <ThrowOnError extends boolean = false>(options: Options<SearchAdaptersApiV1AdaptersSearchGetData, ThrowOnError>): RequestResult<SearchAdaptersApiV1AdaptersSearchGetResponses, SearchAdaptersApiV1AdaptersSearchGetErrors, ThrowOnError> => (options.client ?? client).get<SearchAdaptersApiV1AdaptersSearchGetResponses, SearchAdaptersApiV1AdaptersSearchGetErrors, ThrowOnError>({ url: '/api/v1/adapters/search', ...options });
 
