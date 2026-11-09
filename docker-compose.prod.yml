@@ -58,6 +58,13 @@ services:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://registry.biocypher.org}
     volumes:
       - biocypher-sqlite-data:/app/data
+    # ===========================================================
+    # Ephemeral Dataset Upload Scratch (RAM only)
+    # ===========================================================
+    # tmpfs pages can be swapped unless the host disables/encrypts swap.
+    # Upload sessions require exactly one backend replica and Uvicorn worker.
+    tmpfs:
+      - /run/biocypher-upload-scratch:rw,noexec,nosuid,nodev,size=268435456,mode=1777
     networks:
       - biocypher-network
 
