@@ -4,6 +4,25 @@ import mlcroissant as mlc
 
 from src.core.validation.adapter import validate_adapter
 from src.core.validation.dataset import validate_dataset, validate_embedded_dataset
+from src.core.validation.mlcroissant import (
+    validate_with_mlcroissant,
+    validate_with_mlcroissant_report,
+)
+from src.core.shared.constants import CROISSANT_1_0_CONTEXT
+
+
+def test_shared_context_is_croissant_1_0_compatible() -> None:
+    assert CROISSANT_1_0_CONTEXT["equivalentProperty"] == "cr:equivalentProperty"
+    croissant_1_1_only_terms = {
+        "annotation",
+        "arrayShape",
+        "containedIn",
+        "isArray",
+        "readLines",
+        "unArchive",
+        "value",
+    }
+    assert croissant_1_1_only_terms.isdisjoint(CROISSANT_1_0_CONTEXT)
 
 
 def test_validate_dataset_uses_mlcroissant_rules() -> None:
@@ -15,6 +34,52 @@ def test_validate_dataset_uses_mlcroissant_rules() -> None:
     assert any(
         "doesn't extend https://schema.org/Dataset" in err for err in result.errors
     )
+
+
+def test_mlcroissant_warning_is_not_relabelled_as_an_error(monkeypatch) -> None:
+    class DummyValidationError(mlc.ValidationError):
+        pass
+
+    def fail_dataset(_document):
+        raise DummyValidationError(
+            "Found the following 1 error(s) during the validation:\n"
+            "  -  Exact validator error.\n"
+            "Found the following 1 warning(s) during the validation:\n"
+            "  -  Recommended citation is missing."
+        )
+
+    monkeypatch.setattr("src.core.validation.mlcroissant.mlc.Dataset", fail_dataset)
+
+    errors = validate_with_mlcroissant({"@type": "sc:Dataset"})
+
+    assert errors == ["Exact validator error."]
+
+
+def test_mlcroissant_warnings_are_reported_without_failing_validation(
+    monkeypatch,
+) -> None:
+    class DummyIssues:
+        warnings = {"Recommended citation is missing."}
+
+    class DummyContext:
+        issues = DummyIssues()
+
+    class DummyMetadata:
+        ctx = DummyContext()
+
+    class DummyDataset:
+        metadata = DummyMetadata()
+
+    monkeypatch.setattr(
+        "src.core.validation.mlcroissant.mlc.Dataset", lambda _document: DummyDataset()
+    )
+
+    report = validate_with_mlcroissant_report(
+        {"@context": CROISSANT_1_0_CONTEXT, "@type": "sc:Dataset"}
+    )
+
+    assert report.errors == []
+    assert report.warnings == ["Recommended citation is missing."]
 
 
 def test_validate_adapter_combines_mlcroissant_and_schema_checks(monkeypatch) -> None:

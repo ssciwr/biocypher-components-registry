@@ -7,6 +7,7 @@ from jsonschema import Draft7Validator, ValidationError
 
 from src.core.shared.json_source import JSONSource
 from src.core.validation.adapter import validate_adapter_with_embedded_datasets
+from src.core.validation.mlcroissant import MLCroissantValidationReport
 from src.core.validation.schema_diagnostics import (
     expected_format,
     format_schema_error,
@@ -301,9 +302,123 @@ def test_missing_field_descriptions_resolve_local_refs_but_never_follow_remote_o
 
 def test_text_only_croissant_errors_are_preserved_without_invented_context(monkeypatch):
     monkeypatch.setattr(
-        "src.core.validation.adapter.validate_with_mlcroissant",
-        lambda _: ["Croissant problem"],
+        "src.core.validation.adapter.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport(["Croissant problem"], []),
     )
     result = validate_adapter_with_embedded_datasets(sample_adapter_document())
     assert "Croissant problem" in result.errors
     assert result.validation_details == []
+
+
+def test_adapter_schema_does_not_restrict_fields_owned_by_croissant_validator(
+    monkeypatch,
+) -> None:
+    document = sample_adapter_document()
+    document["hasPart"][0]["version"] = 3
+    document["hasPart"][0]["license"] = {
+        "@type": "sc:CreativeWork",
+        "name": "CC0",
+    }
+    document["hasPart"][0].pop("url", None)
+    monkeypatch.setattr(
+        "src.core.validation.adapter.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], []),
+    )
+    monkeypatch.setattr(
+        "src.core.validation.dataset.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], []),
+    )
+
+    result = validate_adapter_with_embedded_datasets(document)
+    schema_check = next(check for check in result.checks if check.name == "Adapter schema")
+
+    assert schema_check.is_valid
+    assert schema_check.errors == []
+
+
+def test_repeated_complete_file_error_is_attributed_to_dataset_once(monkeypatch) -> None:
+    document = sample_adapter_document()
+    finding = "Extract should define column, fileProperty, or jsonPath."
+    monkeypatch.setattr(
+        "src.core.validation.adapter.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([finding], []),
+    )
+    monkeypatch.setattr(
+        "src.core.validation.dataset.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([finding], []),
+    )
+
+    result = validate_adapter_with_embedded_datasets(document)
+    complete = next(
+        check
+        for check in result.validation_checks
+        if check.id == "croissant"
+    )
+    dataset = next(
+        check
+        for check in result.validation_checks
+        if check.parent_id == "datasets"
+    )
+
+    assert not result.is_valid
+    assert result.errors == [finding]
+    assert complete.status == "FAILED"
+    assert complete.errors == ()
+    assert "dataset cards" in complete.reason
+    assert dataset.errors == (finding,)
+
+
+def test_repeated_complete_file_warning_is_attributed_to_dataset_once(
+    monkeypatch,
+) -> None:
+    document = sample_adapter_document()
+    finding = "[Metadata(Example)] citeAs is recommended, but does not exist."
+    monkeypatch.setattr(
+        "src.core.validation.adapter.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], [finding]),
+    )
+    monkeypatch.setattr(
+        "src.core.validation.dataset.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], [finding]),
+    )
+
+    result = validate_adapter_with_embedded_datasets(document)
+    complete = next(
+        check for check in result.validation_checks if check.id == "croissant"
+    )
+    dataset = next(
+        check for check in result.validation_checks if check.parent_id == "datasets"
+    )
+
+    assert result.is_valid
+    assert result.warnings == [finding]
+    assert complete.status == "PASSED"
+    assert complete.warnings == ()
+    assert "dataset cards" in complete.reason
+    assert dataset.warnings == (finding,)
+
+
+def test_embedded_context_term_definitions_are_not_duplicate_graph_nodes(
+    monkeypatch,
+) -> None:
+    document = sample_adapter_document()
+    document["@context"] = {"data": {"@id": "cr:data", "@type": "@json"}}
+    document["hasPart"][0]["@context"] = {
+        "data": {"@id": "cr:data", "@type": "@json"}
+    }
+    monkeypatch.setattr(
+        "src.core.validation.adapter.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], []),
+    )
+    monkeypatch.setattr(
+        "src.core.validation.dataset.validate_with_mlcroissant_report",
+        lambda _: MLCroissantValidationReport([], []),
+    )
+
+    result = validate_adapter_with_embedded_datasets(document)
+    semantics = next(
+        check for check in result.checks if check.name == "Adapter semantics"
+    )
+
+    assert semantics.is_valid
+    assert semantics.errors == []

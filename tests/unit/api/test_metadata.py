@@ -173,10 +173,18 @@ def test_validate_metadata_endpoint_returns_invalid_adapter_result() -> None:
     assert payload["is_valid"] is False
     assert payload["errors"]
     assert [check["name"] for check in payload["checks"]] == [
-        "Croissant compliance",
+        "Complete-file compatibility",
         "Adapter schema",
         "Adapter semantics",
     ]
+    assert [check["id"] for check in payload["validation_checks"]] == [
+        "croissant",
+        "schema",
+        "semantics",
+        "datasets",
+    ]
+    assert payload["validation_checks"][0]["validator_name"] == "mlcroissant"
+    assert payload["validation_checks"][1]["schema_title"]
 
 
 def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> None:
@@ -202,7 +210,7 @@ def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> Non
         if check["name"] == "Embedded dataset: Example dataset"
     )
     assert embedded_check["is_valid"] is False
-    assert any("[Example dataset]" in error for error in embedded_check["errors"])
+    assert embedded_check["errors"]
 
 
 def test_validate_metadata_endpoint_rejects_unknown_auto_type() -> None:

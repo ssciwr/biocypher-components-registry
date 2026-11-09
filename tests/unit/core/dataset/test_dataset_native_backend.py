@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import ast
 import gzip
 import json
 from pathlib import Path
 
+import pytest
+
 from src.core.dataset.backends import native as native_backend
-from src.core.dataset.backends.native import NativeDatasetGenerator
+from src.core.dataset.backends.native import (
+    NativeDatasetBuilder,
+    NativeDatasetGenerator,
+)
 from src.core.dataset.request import GenerationRequest
+from src.core.shared.errors import InputDiscoveryError
 
 """
 Native backend is the Python metadata generator itself that manually creates the meta data in python
@@ -24,7 +31,7 @@ def test_native_generator_maps_api_creators_and_helper_fallbacks(
             "Legacy Creator,legacy@example.org,https://example.org",
         ]
     )
-    relative = NativeDatasetGenerator()._relative_to_input(
+    relative = NativeDatasetBuilder()._relative_to_input(
         tmp_path.parent / "outside.csv", str(tmp_path)
     )
 
@@ -71,11 +78,18 @@ def test_native_generator_builds_dataset_from_csv_and_tsv_gz(tmp_path: Path) -> 
     record_sets = {
         record_set["@id"]: record_set for record_set in document["recordSet"]
     }
-    assert {"people", "scores"} == set(record_sets)
-    assert record_sets["people"]["field"][0]["dataType"] == "cr:Int64"
+    assert set(record_sets) == {"people", "scores"}
+    assert record_sets["people"]["field"][0]["dataType"] == "sc:Integer"
     assert record_sets["people"]["field"][0]["@id"].startswith(
         record_sets["people"]["@id"]
     )
+    compressed = next(
+        item for item in document["distribution"] if item["name"] == "scores.tsv.gz"
+    )
+    assert compressed["encodingFormat"] == [
+        "text/tab-separated-values",
+        "application/gzip",
+    ]
 
 
 def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
@@ -92,3 +106,37 @@ def test_native_generator_reports_default_warnings(tmp_path: Path) -> None:
 
     assert "Missing license; using 'UNKNOWN'." in result.stderr
     assert "Missing dataset version; using '0.1.0'." in result.stderr
+
+
+def test_native_fails_instead_of_omitting_unsupported_folder_files(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "supported.csv").write_text("id\n1\n", encoding="utf-8")
+    (tmp_path / "unsupported.txt").write_text("not metadata", encoding="utf-8")
+    request = GenerationRequest(
+        input_path=str(tmp_path),
+        output_path=str(tmp_path / "dataset.jsonld"),
+        validate=False,
+    )
+
+    with pytest.raises(InputDiscoveryError, match="every selected file"):
+        NativeDatasetBuilder().generate(request)
+
+    assert not Path(request.output_path).exists()
+
+
+def test_native_reachable_sources_do_not_import_croissant_baker() -> None:
+    source_root = Path(native_backend.__file__).parents[1]
+    sources = [source_root / "backends" / "native.py"]
+    sources.extend(sorted((source_root / "formats").glob("*.py")))
+
+    imports: list[str] = []
+    for source in sources:
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+
+    assert not [name for name in imports if name.startswith("croissant_baker")]

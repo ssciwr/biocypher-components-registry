@@ -9,6 +9,11 @@ from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationRequest, GenerationResult
 from src.core.shared.constants import STANDARD_CONTEXT
 
+_COMPUTATIONAL_TOOL_1_0 = (
+    "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/"
+)
+_CROISSANT_1_0 = "http://mlcommons.org/croissant/1.0"
+
 
 def _valid_dataset_document() -> dict:
     return {
@@ -80,7 +85,13 @@ def test_native_adapter_generator_embeds_valid_dataset(tmp_path: Path) -> None:
     assert output_path.exists()
     assert result.document is not None
     assert result.document["@type"] == "SoftwareSourceCode"
+    assert result.document["dct:conformsTo"] == _COMPUTATIONAL_TOOL_1_0
+    assert (
+        result.document["@context"]["equivalentProperty"]
+        == "cr:equivalentProperty"
+    )
     assert result.document["hasPart"][0]["@type"] == "sc:Dataset"
+    assert result.document["hasPart"][0]["conformsTo"] == _CROISSANT_1_0
     assert "Validation completed!" in result.stdout
 
 
@@ -107,6 +118,40 @@ def test_native_adapter_generator_embeds_inline_dataset_document(
     assert result.document is not None
     assert result.document["hasPart"][0]["name"] == "Example dataset"
     assert output_path.exists()
+
+
+def test_native_adapter_generator_reports_invalid_uploaded_dataset_without_repair(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "adapter.jsonld"
+    invalid_dataset = _valid_dataset_document()
+    invalid_dataset["name"] = "Invalid uploaded dataset"
+    invalid_dataset["recordSet"][0]["field"][0]["source"]["extract"] = {
+        "column": ""
+    }
+    request = AdapterGenerationRequest(
+        output_path=str(output_path),
+        name="Two-dataset Adapter",
+        description="Adapter description",
+        version="1.0.0",
+        license_value="MIT",
+        code_repository="https://example.org/repo",
+        dataset_paths=[],
+        dataset_documents=[_valid_dataset_document(), invalid_dataset],
+        validate=True,
+        creators=["Person|Edwin Carreno"],
+        keywords=["adapter", "biocypher"],
+    )
+
+    result = NativeAdapterGenerator().generate(request)
+
+    assert result.document is not None
+    assert len(result.document["hasPart"]) == 2
+    assert result.document["hasPart"][1]["name"] == "Invalid uploaded dataset"
+    assert result.document["hasPart"][1]["recordSet"][0]["field"][0]["source"][
+        "extract"
+    ] == {"column": ""}
+    assert "Extract should have one of the following properties" in result.stderr
 
 
 def test_native_adapter_generator_normalizes_known_license_keyword(
