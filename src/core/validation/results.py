@@ -31,6 +31,7 @@ class ValidationCheck:
     name: str
     is_valid: bool
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     validation_details: list[ValidationDetail] = field(default_factory=list)
 
 
@@ -47,6 +48,7 @@ class ValidationCheckReport:
     description: str | None = None
     reason: str | None = None
     errors: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
     validation_details: tuple[ValidationDetail, ...] = ()
     parent_id: str | None = None
     dataset_index: int | None = None
@@ -65,6 +67,7 @@ class ValidationResult:
 
     is_valid: bool
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     checks: list[ValidationCheck] = field(default_factory=list)
     profile_version: str = ACTIVE_PROFILE_VERSION
     validation_details: list[ValidationDetail] = field(default_factory=list)

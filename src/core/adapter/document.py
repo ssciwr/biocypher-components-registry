@@ -2,56 +2,19 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from src.core.shared.constants import (
     CROISSANT_CONFORMS_TO_URL,
-    CROISSANT_NAMESPACE_IRI,
-    CROISSANT_RAI_NAMESPACE_IRI,
     DCT_CONFORMS_TO_KEY,
+    STANDARD_CONTEXT,
 )
 from src.core.shared.ids import slugify_identifier
 
 JSONLD_TYPE_KEY = "@type"
 
-ADAPTER_CONTEXT: dict[str, Any] = {
-    "@language": "en",
-    "@vocab": "https://schema.org/",
-    "sc": "https://schema.org/",
-    "cr": CROISSANT_NAMESPACE_IRI,
-    "rai": CROISSANT_RAI_NAMESPACE_IRI,
-    "dct": "http://purl.org/dc/terms/",
-    "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
-    "citeAs": "cr:citeAs",
-    "column": "cr:column",
-    "conformsTo": DCT_CONFORMS_TO_KEY,
-    "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
-    "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
-    "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
-    "extract": "cr:extract",
-    "field": "cr:field",
-    "fileProperty": "cr:fileProperty",
-    "fileObject": "cr:fileObject",
-    "fileSet": "cr:fileSet",
-    "format": "cr:format",
-    "includes": "cr:includes",
-    "isLiveDataset": "cr:isLiveDataset",
-    "jsonPath": "cr:jsonPath",
-    "key": "cr:key",
-    "md5": "cr:md5",
-    "parentField": "cr:parentField",
-    "path": "cr:path",
-    "recordSet": "cr:recordSet",
-    "references": "cr:references",
-    "regex": "cr:regex",
-    "repeated": "cr:repeated",
-    "replace": "cr:replace",
-    "samplingRate": "cr:samplingRate",
-    "separator": "cr:separator",
-    "source": "cr:source",
-    "subField": "cr:subField",
-    "transform": "cr:transform",
-}
+ADAPTER_CONTEXT: dict[str, Any] = STANDARD_CONTEXT
 
 
 def build_adapter_creator(
@@ -94,7 +57,7 @@ def build_adapter_document(
 ) -> dict[str, Any]:
     """Assemble a full adapter metadata document."""
     document: dict[str, Any] = {
-        "@context": ADAPTER_CONTEXT,
+        "@context": deepcopy(ADAPTER_CONTEXT),
         JSONLD_TYPE_KEY: "SoftwareSourceCode",
         DCT_CONFORMS_TO_KEY: "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
         "@id": adapter_id or slugify_identifier(name),

@@ -16,6 +16,7 @@ BOOLEAN_TYPE = "sc:Boolean"
 CSV_MIME = "text/csv"
 TSV_MIME = "text/tab-separated-values"
 PARQUET_MIME = "application/vnd.apache.parquet"
+GZIP_MIME = "application/gzip"
 
 
 class FormatHandler(ABC):
@@ -33,7 +34,7 @@ class FormatHandler(ABC):
 def inspect_delimited_file(
     path: Path,
     delimiter: str,
-    encoding_format: str,
+    encoding_format: str | list[str],
     compressed: bool = False,
     max_rows: int = 500,
     n_examples: int = 1,

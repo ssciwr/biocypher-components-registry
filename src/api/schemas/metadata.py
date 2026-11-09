@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.core.shared.constants import CROISSANT_CONFORMS_TO_URL, STANDARD_CONTEXT
 from src.core.validation.results import ValidationCheck, ValidationResult
+from src.api.schemas.registrations import (
+    ValidationCheckResponse,
+    ValidationDetailResponse,
+)
 
 # ===========================================================
 # =====================  OpenAPI Examples ===================
@@ -356,6 +360,7 @@ class MetadataValidationCheckResponse(BaseModel):
     name: str
     is_valid: bool
     errors: list[str]
+    warnings: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_check(
@@ -367,6 +372,7 @@ class MetadataValidationCheckResponse(BaseModel):
             name=check.name,
             is_valid=check.is_valid,
             errors=check.errors,
+            warnings=check.warnings,
         )
 
 
@@ -377,7 +383,10 @@ class MetadataValidationResponse(BaseModel):
     is_valid: bool
     profile_version: str
     errors: list[str]
+    warnings: list[str] = Field(default_factory=list)
     checks: list[MetadataValidationCheckResponse]
+    validation_details: list[ValidationDetailResponse] = Field(default_factory=list)
+    validation_checks: list[ValidationCheckResponse] = Field(default_factory=list)
 
     @classmethod
     def from_result(
@@ -392,9 +401,18 @@ class MetadataValidationResponse(BaseModel):
             is_valid=result.is_valid,
             profile_version=result.profile_version,
             errors=result.errors,
+            warnings=result.warnings,
             checks=[
                 MetadataValidationCheckResponse.from_check(check)
                 for check in result.checks
+            ],
+            validation_details=[
+                ValidationDetailResponse.model_validate(detail)
+                for detail in result.validation_details
+            ],
+            validation_checks=[
+                ValidationCheckResponse.model_validate(check)
+                for check in result.validation_checks
             ],
         )
 

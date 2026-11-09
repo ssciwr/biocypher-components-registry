@@ -2,54 +2,18 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from src.core.shared.constants import (
+    CROISSANT_1_0_CONTEXT,
     CROISSANT_CONFORMS_TO_URL,
-    CROISSANT_NAMESPACE_IRI,
-    CROISSANT_RAI_NAMESPACE_IRI,
     DCT_CONFORMS_TO_KEY,
 )
 
 JSONLD_TYPE_KEY = "@type"
 
-DATASET_CONTEXT: dict[str, Any] = {
-    "@language": "en",
-    "@vocab": "https://schema.org/",
-    "citeAs": "cr:citeAs",
-    "column": "cr:column",
-    "conformsTo": DCT_CONFORMS_TO_KEY,
-    "cr": CROISSANT_NAMESPACE_IRI,
-    "rai": CROISSANT_RAI_NAMESPACE_IRI,
-    "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
-    "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
-    "dct": "http://purl.org/dc/terms/",
-    "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
-    "extract": "cr:extract",
-    "field": "cr:field",
-    "fileProperty": "cr:fileProperty",
-    "fileObject": "cr:fileObject",
-    "fileSet": "cr:fileSet",
-    "format": "cr:format",
-    "includes": "cr:includes",
-    "isLiveDataset": "cr:isLiveDataset",
-    "jsonPath": "cr:jsonPath",
-    "key": "cr:key",
-    "md5": "cr:md5",
-    "parentField": "cr:parentField",
-    "path": "cr:path",
-    "recordSet": "cr:recordSet",
-    "references": "cr:references",
-    "regex": "cr:regex",
-    "repeated": "cr:repeated",
-    "replace": "cr:replace",
-    "samplingRate": "cr:samplingRate",
-    "sc": "https://schema.org/",
-    "separator": "cr:separator",
-    "source": "cr:source",
-    "subField": "cr:subField",
-    "transform": "cr:transform",
-}
+DATASET_CONTEXT: dict[str, Any] = CROISSANT_1_0_CONTEXT
 
 
 def build_creator(
@@ -83,7 +47,7 @@ def build_creator(
 
 def build_distribution_file(
     content_url: str,
-    encoding_format: str,
+    encoding_format: str | list[str],
     name: str,
     file_id: str,
     content_size: str = "",
@@ -164,7 +128,7 @@ def build_dataset_document(
 ) -> dict[str, Any]:
     """Assemble a full standalone dataset Croissant document."""
     document: dict[str, Any] = {
-        "@context": DATASET_CONTEXT,
+        "@context": deepcopy(DATASET_CONTEXT),
         JSONLD_TYPE_KEY: "sc:Dataset",
         "name": name,
         "description": description,

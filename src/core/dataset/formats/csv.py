@@ -1,14 +1,15 @@
-"""CSV file inspection using ``croissant-baker``'s metadata extraction helpers."""
+"""Independent inspector for plain CSV files."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from croissant_baker.handlers.csv_handler import CSVHandler
-from croissant_baker.sources import make_source
-
-from src.core.dataset.formats.base import CSV_MIME, FormatHandler
-from src.core.dataset.request import FileInspection, InferredField
+from src.core.dataset.formats.base import (
+    CSV_MIME,
+    FormatHandler,
+    inspect_delimited_file,
+)
+from src.core.dataset.request import FileInspection
 
 
 class CsvFormatHandler(FormatHandler):
@@ -20,14 +21,8 @@ class CsvFormatHandler(FormatHandler):
 
     def inspect(self, path: Path) -> FileInspection:
         """Inspect a CSV file and build a normalized schema snapshot."""
-        metadata = CSVHandler().extract(make_source(path))
-        fields = [
-            InferredField(name=column, data_type=metadata["column_types"][column])
-            for column in metadata["columns"]
-        ]
-        return FileInspection(
+        return inspect_delimited_file(
             path=path,
+            delimiter=",",
             encoding_format=CSV_MIME,
-            fields=fields,
-            examples_count=metadata.get("num_rows") or 0,
         )

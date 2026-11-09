@@ -51,6 +51,7 @@ class ValidationCheckResponse(BaseModel):
     description: str | None = None
     reason: str | None = None
     errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     validation_details: list[ValidationDetailResponse] = Field(default_factory=list)
     parent_id: str | None = None
     dataset_index: int | None = None

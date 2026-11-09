@@ -19,20 +19,20 @@ CROISSANT_CONFORMS_TO_URL = (
     "http://mlcommons.org/croissant/1.0"  # NOSONAR(S5332) required profile identifier.
 )
 
-STANDARD_CONTEXT = {
+CROISSANT_1_0_CONTEXT = {
     "@language": "en",
     "@vocab": "https://schema.org/",
     "sc": "https://schema.org/",
     "cr": CROISSANT_NAMESPACE_IRI,
     "rai": CROISSANT_RAI_NAMESPACE_IRI,
     "dct": "http://purl.org/dc/terms/",
-    "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
     "citeAs": "cr:citeAs",
     "column": "cr:column",
     "conformsTo": DCT_CONFORMS_TO_KEY,
     "data": {"@id": "cr:data", JSONLD_TYPE_KEY: "@json"},
     "dataType": {"@id": "cr:dataType", JSONLD_TYPE_KEY: "@vocab"},
     "examples": {"@id": "cr:examples", JSONLD_TYPE_KEY: "@json"},
+    "equivalentProperty": "cr:equivalentProperty",
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -58,6 +58,13 @@ STANDARD_CONTEXT = {
     "transform": "cr:transform",
 }
 
+# Adapter documents add a Bioschemas prefix while retaining the canonical
+# Croissant 1.0 terms used by their embedded dataset fragments.
+STANDARD_CONTEXT = {
+    **CROISSANT_1_0_CONTEXT,
+    "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
+}
+
 MANDATORY_FIELDS = (
     "name",
     "description",
@@ -72,6 +79,7 @@ DEFAULT_TARGET_PRODUCT = "BioCypher"
 
 __all__ = [
     "CROISSANT_CONFORMS_TO_URL",
+    "CROISSANT_1_0_CONTEXT",
     "CROISSANT_NAMESPACE_IRI",
     "CROISSANT_RAI_NAMESPACE_IRI",
     "DCT_CONFORMS_TO_KEY",

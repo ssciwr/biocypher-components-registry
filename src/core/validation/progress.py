@@ -29,7 +29,11 @@ class ValidationProgress:
             )
         checks.extend(
             [
-                ValidationCheckReport("croissant", "Croissant compliance"),
+                ValidationCheckReport(
+                    "croissant",
+                    "Complete-file compatibility",
+                    description="Validates the complete assembled adapter with mlcroissant.",
+                ),
                 ValidationCheckReport("schema", "Adapter schema"),
                 ValidationCheckReport(
                     "semantics",

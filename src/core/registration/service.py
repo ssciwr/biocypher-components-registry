@@ -331,7 +331,7 @@ class _CandidateProcessor:
         reason = "SCHEMA_INVALID"
         if failed == ["Adapter semantics"]:
             reason = "SEMANTICS_INVALID"
-        elif failed == ["Croissant compliance"]:
+        elif failed in (["Croissant compliance"], ["Complete-file compatibility"]):
             reason = "MLCROISSANT_INVALID"
         return self._failure(
             reason, list(validation.errors) or ["Metadata is invalid."]

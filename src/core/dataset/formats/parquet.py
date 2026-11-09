@@ -25,20 +25,20 @@ class ParquetFormatHandler(FormatHandler):
                 "Parquet support requires the 'pyarrow' package to be installed."
             ) from exc
 
-        table = pq.read_table(path)
+        parquet_file = pq.ParquetFile(path)
         fields = [
             InferredField(
                 name=field.name,
                 data_type=_map_arrow_type(str(field.type)),
                 examples=[],
             )
-            for field in table.schema
+            for field in parquet_file.schema_arrow
         ]
         return FileInspection(
             path=path,
             encoding_format=PARQUET_MIME,
             fields=fields,
-            examples_count=table.num_rows,
+            examples_count=parquet_file.metadata.num_rows,
         )
 
 
