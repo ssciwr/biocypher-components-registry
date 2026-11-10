@@ -1,4 +1,6 @@
 
+/// <reference types="cypress" />
+
 function pressEnter() {
   // Include the carriage-return text so Chromium performs native button activation.
   cy.then(() => Cypress.automation('remote:debugger:protocol', {
@@ -72,14 +74,15 @@ describe('registration validation breakdown', () => {
     cy.get('pre').should('contain', 'keywords')
     cy.get('[data-check-id="schema"]').should('contain', 'Failed')
     cy.contains('button', 'View details').should('not.exist')
-    cy.contains('button', 'Collapse checks').should('have.attr', 'aria-expanded', 'true').click()
-    cy.get('table').should('not.be.visible')
-    cy.contains('h3', 'Validation checks').should('be.visible')
-    cy.contains('3 failed checks').should('be.visible')
-    cy.contains('button', 'Expand checks').should('have.attr', 'aria-expanded', 'false').focus()
-    cy.focused().should('contain', 'Expand checks')
+    cy.contains('button', 'Collapse details').click()
+    cy.get('[data-check-id="schema"] button[aria-expanded="false"]').should('be.visible')
+    cy.get('#schema-details').should('not.be.visible')
+    cy.contains('h3', 'Validation report').should('be.visible')
+    cy.contains('button', 'Expand details').focus()
+    cy.focused().should('contain', 'Expand details')
     pressEnter()
-    cy.get('table').should('be.visible')
+    cy.get('[data-check-id="schema"] button[aria-expanded="true"]').should('be.visible')
+    cy.get('#schema-details').should('be.visible')
     cy.contains('The missing field has no existing line.').should('be.visible')
     cy.get('[data-check-id="schema"] li > p').should('have.length', 1)
   })
@@ -124,7 +127,6 @@ describe('registration validation breakdown', () => {
     cy.get('[data-check-id="file"]').should('contain', 'Unconfirmed')
     cy.contains('Registration failed').should('not.exist')
     cy.contains('button', 'Retry registration').should('not.exist')
-    cy.wait(500)
     cy.then(() => expect(posts).to.equal(1))
   })
 })

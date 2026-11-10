@@ -16,6 +16,7 @@ import type {
   DatasetDraft,
   DatasetDatasetManualField,
   DatasetMode,
+  DatasetSourceSelection,
   MetadataGeneratorForm,
 } from './types'
 
@@ -49,7 +50,7 @@ type DatasetBasicsStepProps = Readonly<{
   onDatasetCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
   onDatasetDraftChange: (field: keyof DatasetDraft, value: string) => void
   onDatasetModeChange: (mode: DatasetMode) => void
-  onDatasetSourceUpload: (file: File | null) => void
+  onDatasetSourceUpload: (selection: DatasetSourceSelection | null) => void
   onDatasetUpload: (file: File | null) => void
   onEditDatasetCreator: (id: string) => void
   onEditDataset: (id: string) => void
@@ -58,15 +59,28 @@ type DatasetBasicsStepProps = Readonly<{
 }>
 
 type DatasetDetailsStepProps = Readonly<{
+  datasetCreatorActionLabel: string
+  datasetCreatorDraft: CreatorDraft
   datasets: DatasetDraft[]
   datasetManualField: DatasetDatasetManualField
   hideOverview?: boolean
-  onAddManualField: () => void
+  isEditingDatasetCreator: boolean
+  onAddDatasetCreator: () => void
+  onAddManualField: (recordSetIndex?: number) => void
+  onDatasetCreatorDraftChange: (field: keyof CreatorDraft, value: string) => void
   onDatasetChange: (field: keyof DatasetDraft, value: string) => void
-  onFieldChange: (fieldId: string, field: keyof DatasetDatasetManualField, value: string) => void
+  onEditDatasetCreator: (id: string) => void
+  onDistributionChange: (
+    distributionIndex: number,
+    field: 'contentUrl' | 'encodingFormat' | 'filename' | 'md5' | 'sha256',
+    value: string,
+  ) => void
+  onFieldChange: (recordSetIndex: number | undefined, fieldId: string, field: keyof DatasetDatasetManualField, value: string) => void
   onManualFieldChange: (field: keyof DatasetDatasetManualField, value: string) => void
   onRemoveDataset: (id: string) => void
-  onRemoveField: (fieldId: string) => void
+  onRemoveDatasetCreator: (id: string) => void
+  onRemoveField: (recordSetIndex: number | undefined, fieldId: string) => void
+  onRecordSetNameChange: (recordSetIndex: number, value: string) => void
   onSelectDataset: (id: string) => void
   selectedDataset: DatasetDraft | undefined
   selectedDatasetId: string | null
@@ -145,6 +159,8 @@ export function AdapterDetailsStep({
           value={form.codeRepository}
         />
         <LicenseSelectInput
+          helpText="License that governs how the adapter software may be used, shared, and modified."
+          label="Adapter license"
           licenseOptions={licenseOptions}
           onChange={(license) => onFormChange('license', license)}
           required
@@ -211,6 +227,10 @@ export function DatasetBasicsStep({
   onRemoveDataset,
   onRemoveDatasetCreator,
 }: DatasetBasicsStepProps) {
+  const uploadedLicenseOptions = datasetDraft.license
+    && !licenseOptions.some((option) => option.value === datasetDraft.license)
+    ? [{ label: datasetDraft.licenseLabel || datasetDraft.license, value: datasetDraft.license }, ...licenseOptions]
+    : licenseOptions
   const sourceButtonBaseClass = 'grid min-h-28 cursor-pointer gap-2 rounded-xl border p-5 text-left'
   let generateButtonClass = `${sourceButtonBaseClass} border-slate-200 bg-white text-slate-950 hover:border-blue-300`
   let uploadButtonClass = generateButtonClass
@@ -261,34 +281,13 @@ export function DatasetBasicsStep({
         </div>
 
         {datasetDraft.mode === 'generate' ? (
-          <>
-            <DatasetGenerateEditor
-              draft={datasetDraft}
-              licenseOptions={licenseOptions}
-              onChange={onDatasetDraftChange}
-              onSourceFileChange={onDatasetSourceUpload}
-              sourceRequired={!datasets.length}
-            />
-            <div className="grid gap-4">
-              <h3 className="text-xl font-bold text-slate-950">Dataset creators</h3>
-              <SelectedItemList
-                emptyMessage="No creators yet"
-                getLabel={(creator) => creator.name}
-                getSubtitle={(creator) => creator.creatorType}
-                items={datasetDraft.creators}
-                onEdit={onEditDatasetCreator}
-                onRemove={onRemoveDatasetCreator}
-              />
-              <CreatorEditor
-                actionLabel={datasetCreatorActionLabel}
-                draft={datasetCreatorDraft}
-                isEditing={isEditingDatasetCreator}
-                nameInputName="dataset-creator-name"
-                onAdd={onAddDatasetCreator}
-                onChange={onDatasetCreatorDraftChange}
-              />
-            </div>
-          </>
+          <DatasetGenerateEditor
+            draft={datasetDraft}
+            licenseOptions={licenseOptions}
+            onChange={onDatasetDraftChange}
+            onSourceFileChange={onDatasetSourceUpload}
+            sourceRequired={!datasets.length}
+          />
         ) : (
           <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
             <FileInput
@@ -303,8 +302,40 @@ export function DatasetBasicsStep({
                 {datasetDraft.uploadedFileName}
               </p>
             ) : null}
+            {datasetDraft.uploadedDocument ? (
+              <DatasetGenerateEditor
+                draft={datasetDraft}
+                licenseOptions={uploadedLicenseOptions}
+                onChange={onDatasetDraftChange}
+                onSourceFileChange={onDatasetSourceUpload}
+                requirePublicationFields={false}
+                showDistribution={false}
+                showSource={false}
+              />
+            ) : null}
           </div>
         )}
+        {datasetDraft.mode === 'generate' || datasetDraft.uploadedDocument ? (
+          <div className="grid gap-4">
+            <h3 className="text-xl font-bold text-slate-950">Dataset creators</h3>
+            <SelectedItemList
+              emptyMessage="No creators yet"
+              getLabel={(creator) => creator.name}
+              getSubtitle={(creator) => creator.creatorType}
+              items={datasetDraft.creators}
+              onEdit={onEditDatasetCreator}
+              onRemove={onRemoveDatasetCreator}
+            />
+            <CreatorEditor
+              actionLabel={datasetCreatorActionLabel}
+              draft={datasetCreatorDraft}
+              isEditing={isEditingDatasetCreator}
+              nameInputName="dataset-creator-name"
+              onAdd={onAddDatasetCreator}
+              onChange={onDatasetCreatorDraftChange}
+            />
+          </div>
+        ) : null}
       </div>
     </MetadataSection>
   )
@@ -312,15 +343,24 @@ export function DatasetBasicsStep({
 
 // Step 3, within this step the user toggles between datasets from Step 2 (it does not occur "for each" step 2 dataset)
 export function DatasetDetailsStep({
+  datasetCreatorActionLabel,
+  datasetCreatorDraft,
   datasets,
   datasetManualField,
   hideOverview = false,
+  isEditingDatasetCreator,
+  onAddDatasetCreator,
   onAddManualField,
+  onDatasetCreatorDraftChange,
   onDatasetChange,
+  onEditDatasetCreator,
+  onDistributionChange,
   onFieldChange,
   onManualFieldChange,
   onRemoveDataset,
+  onRemoveDatasetCreator,
   onRemoveField,
+  onRecordSetNameChange,
   onSelectDataset,
   selectedDataset,
   selectedDatasetId,
@@ -341,16 +381,45 @@ export function DatasetDetailsStep({
           />
         )}
         {selectedDataset ? (
-          <DatasetDetailsEditor
-            dataset={selectedDataset}
-            datasetManualField={datasetManualField}
-            licenseOptions={licenseOptions}
-            onAddManualField={onAddManualField}
-            onChange={onDatasetChange}
-            onFieldChange={onFieldChange}
-            onManualFieldChange={onManualFieldChange}
-            onRemoveField={onRemoveField}
-          />
+          <div className="grid min-w-0 gap-6">
+            {selectedDataset.mode === 'upload' ? (
+              <p className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                Showing metadata from {selectedDataset.uploadedFileName || 'the uploaded Croissant file'}.
+                Only fields you explicitly edit are changed; unrepresented Croissant properties remain untouched.
+              </p>
+            ) : null}
+            <DatasetDetailsEditor
+              dataset={selectedDataset}
+              datasetManualField={datasetManualField}
+              licenseOptions={licenseOptions}
+              onAddManualField={onAddManualField}
+              onChange={onDatasetChange}
+              onFieldChange={onFieldChange}
+              onDistributionChange={onDistributionChange}
+              onManualFieldChange={onManualFieldChange}
+              onRemoveField={onRemoveField}
+              onRecordSetNameChange={onRecordSetNameChange}
+            />
+            <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="text-xl font-bold text-slate-950">Dataset creators</h3>
+              <SelectedItemList
+                emptyMessage="No creators yet"
+                getLabel={(creator) => creator.name}
+                getSubtitle={(creator) => creator.creatorType}
+                items={selectedDataset.creators}
+                onEdit={onEditDatasetCreator}
+                onRemove={onRemoveDatasetCreator}
+              />
+              <CreatorEditor
+                actionLabel={datasetCreatorActionLabel}
+                draft={datasetCreatorDraft}
+                isEditing={isEditingDatasetCreator}
+                nameInputName="dataset-details-creator-name"
+                onAdd={onAddDatasetCreator}
+                onChange={onDatasetCreatorDraftChange}
+              />
+            </div>
+          </div>
         ) : null}
       </div>
     </MetadataSection>

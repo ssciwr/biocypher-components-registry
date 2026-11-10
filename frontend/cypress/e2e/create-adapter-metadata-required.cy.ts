@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 /*
 Basic smoke test and frotnend html form input required validation confirmation - confirm step 1 can be completed and that saves to the local draft
 Cover required first-step metadata fields and first creator draft commit.

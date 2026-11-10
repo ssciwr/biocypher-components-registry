@@ -480,72 +480,6 @@ export type AuthMeResponse = {
 };
 
 /**
- * Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post
- */
-export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
-    /**
-     * File
-     */
-    file: Blob | File;
-    /**
-     * Generator
-     */
-    generator?: 'auto' | 'croissant-baker' | 'native';
-    /**
-     * Validate
-     */
-    validate?: boolean;
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Description
-     */
-    description?: string | null;
-    /**
-     * Url
-     */
-    url?: string | null;
-    /**
-     * License
-     */
-    license?: string | null;
-    /**
-     * Citation
-     */
-    citation?: string | null;
-    /**
-     * Content Url
-     */
-    content_url?: string | null;
-    /**
-     * Dataset Version
-     */
-    dataset_version?: string | null;
-    /**
-     * Date Published
-     */
-    date_published?: string | null;
-    /**
-     * Encoding Format
-     */
-    encoding_format?: string | null;
-    /**
-     * Filename
-     */
-    filename?: string | null;
-    /**
-     * Sha256
-     */
-    sha256?: string | null;
-    /**
-     * Creators Json
-     */
-    creators_json?: string;
-};
-
-/**
  * DatasetMetadataGenerateResponse
  *
  * Response returned after generating dataset metadata.
@@ -620,6 +554,10 @@ export type MetadataValidationCheckResponse = {
      * Errors
      */
     errors: Array<string>;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
 };
 
 /**
@@ -667,9 +605,21 @@ export type MetadataValidationResponse = {
      */
     errors: Array<string>;
     /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+    /**
      * Checks
      */
     checks: Array<MetadataValidationCheckResponse>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Validation Checks
+     */
+    validation_checks?: Array<ValidationCheckResponse>;
 };
 
 /**
@@ -814,7 +764,7 @@ export type RegistrationDetailResponse = {
     /**
      * Repository Kind
      */
-    repository_kind: 'local' | 'remote' | string;
+    repository_kind: string;
     /**
      * Created At
      */
@@ -961,7 +911,7 @@ export type RegistrationListItemResponse = {
     /**
      * Repository Kind
      */
-    repository_kind: 'local' | 'remote' | string;
+    repository_kind: string;
     /**
      * Created At
      */
@@ -1221,6 +1171,245 @@ export type RegistryRegistrationResponse = {
 };
 
 /**
+ * UploadArtifactResponse
+ *
+ * Verification result for one raw artifact upload.
+ */
+export type UploadArtifactResponse = {
+    /**
+     * Entry Id
+     */
+    entry_id: string;
+    /**
+     * Artifact Size
+     */
+    artifact_size: number;
+    /**
+     * Artifact Sha256
+     */
+    artifact_sha256: string;
+    /**
+     * Complete Entries
+     */
+    complete_entries: number;
+    /**
+     * Total Entries
+     */
+    total_entries: number;
+};
+
+/**
+ * UploadDeleteResponse
+ *
+ * Idempotent deletion acknowledgement.
+ */
+export type UploadDeleteResponse = {
+    /**
+     * Deleted
+     */
+    deleted?: boolean;
+};
+
+/**
+ * UploadFinalizeAcceptedResponse
+ */
+export type UploadFinalizeAcceptedResponse = {
+    /**
+     * Status
+     */
+    status: 'finalize_queued' | 'processing' | 'complete' | 'failed';
+    /**
+     * Next Poll Ms
+     */
+    next_poll_ms?: number;
+};
+
+/**
+ * UploadFinalizeResponse
+ *
+ * Privacy-reconciled Croissant metadata returned synchronously.
+ */
+export type UploadFinalizeResponse = {
+    /**
+     * Metadata
+     */
+    metadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Generator
+     */
+    generator: 'croissant-baker' | 'native';
+    validation: MetadataValidationResponse;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+};
+
+/**
+ * UploadGenerationRequest
+ *
+ * Metadata overrides used once all artifacts have arrived.
+ */
+export type UploadGenerationRequest = {
+    /**
+     * Generator
+     */
+    generator?: 'auto' | 'croissant-baker' | 'native';
+    /**
+     * Validate
+     */
+    validate?: boolean;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * License
+     */
+    license?: string | null;
+    /**
+     * Citation
+     */
+    citation?: string | null;
+    /**
+     * Dataset Version
+     */
+    dataset_version?: string | null;
+    /**
+     * Date Published
+     */
+    date_published?: string | null;
+    /**
+     * Creators
+     */
+    creators: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * UploadInventoryEntryRequest
+ *
+ * One file selected by the browser and its planned artifact.
+ */
+export type UploadInventoryEntryRequest = {
+    /**
+     * Entry Id
+     */
+    entry_id: string;
+    /**
+     * Relative Path
+     */
+    relative_path: string;
+    /**
+     * Original Size
+     */
+    original_size: number;
+    /**
+     * Logical Format
+     */
+    logical_format: 'csv' | 'tsv';
+    /**
+     * Compression
+     */
+    compression?: 'gzip' | null;
+    /**
+     * Artifact Mode
+     */
+    artifact_mode: 'complete' | 'sample';
+    /**
+     * Strategy
+     */
+    strategy: string;
+    /**
+     * Artifact Size
+     */
+    artifact_size: number;
+    /**
+     * Content Url
+     */
+    content_url?: string | null;
+};
+
+/**
+ * UploadSessionCreateRequest
+ *
+ * Complete immutable source inventory sent before any artifact body.
+ */
+export type UploadSessionCreateRequest = {
+    /**
+     * Source Kind
+     */
+    source_kind: 'file' | 'folder';
+    /**
+     * Source Name
+     */
+    source_name: string;
+    /**
+     * Entries
+     */
+    entries: Array<UploadInventoryEntryRequest>;
+    generation?: UploadGenerationRequest;
+};
+
+/**
+ * UploadSessionCreateResponse
+ *
+ * Capability and fixed limits returned for a new session.
+ */
+export type UploadSessionCreateResponse = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Max Artifact Bytes
+     */
+    max_artifact_bytes: number;
+    /**
+     * Expires In Seconds
+     */
+    expires_in_seconds: number;
+    /**
+     * Kind
+     */
+    kind?: 'session';
+};
+
+/**
+ * UploadSessionStatusResponse
+ */
+export type UploadSessionStatusResponse = {
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Next Poll Ms
+     */
+    next_poll_ms?: number;
+    result?: UploadFinalizeResponse | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
  * ValidationCheckResponse
  *
  * A validation stage, its provenance, and its inline diagnostic information.
@@ -1250,6 +1439,10 @@ export type ValidationCheckResponse = {
      * Errors
      */
     errors?: Array<string>;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
     /**
      * Validation Details
      */
@@ -1570,6 +1763,14 @@ export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostData = {
 
 export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors = {
     /**
+     * Only the submitting GitHub account can update this adapter.
+     */
+    403: unknown;
+    /**
+     * The registration changed while the update was processing.
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1672,20 +1873,74 @@ export type ValidateMetadataApiV1MetadataValidatePostResponses = {
 export type ValidateMetadataApiV1MetadataValidatePostResponse = ValidateMetadataApiV1MetadataValidatePostResponses[keyof ValidateMetadataApiV1MetadataValidatePostResponses];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData = {
-    body: BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost;
+    /**
+     * DatasetMetadataGenerateForm
+     *
+     * Multipart form fields for standalone dataset metadata generation.
+     */
+    body?: {
+        /**
+         * Generator
+         */
+        generator?: 'auto' | 'croissant-baker' | 'native';
+        /**
+         * Validate
+         */
+        validate?: boolean;
+        /**
+         * Name
+         */
+        name?: string | null;
+        /**
+         * Description
+         */
+        description?: string | null;
+        /**
+         * Url
+         */
+        url?: string | null;
+        /**
+         * License
+         */
+        license?: string | null;
+        /**
+         * Citation
+         */
+        citation?: string | null;
+        /**
+         * Content Url
+         */
+        content_url?: string | null;
+        /**
+         * Dataset Version
+         */
+        dataset_version?: string | null;
+        /**
+         * Date Published
+         */
+        date_published?: string | null;
+        /**
+         * Encoding Format
+         */
+        encoding_format?: string | null;
+        /**
+         * Filename
+         */
+        filename?: string | null;
+        /**
+         * Sha256
+         */
+        sha256?: string | null;
+        /**
+         * Creators Json
+         */
+        creators_json?: string;
+        file: Blob | File;
+    };
     path?: never;
     query?: never;
     url: '/api/v1/metadata/datasets/generate';
 };
-
-export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostError = GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors[keyof GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostResponses = {
     /**
@@ -1721,6 +1976,191 @@ export type GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses = 
 
 export type GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponse = GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses[keyof GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses];
 
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostData = {
+    body: UploadSessionCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions';
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * The session or scratch-byte admission limit is full.
+     */
+    429: unknown;
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostError = CreateUploadSessionApiV1MetadataUploadSessionsPostErrors[keyof CreateUploadSessionApiV1MetadataUploadSessionsPostErrors];
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: UploadSessionCreateResponse;
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostResponse = CreateUploadSessionApiV1MetadataUploadSessionsPostResponses[keyof CreateUploadSessionApiV1MetadataUploadSessionsPostResponses];
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Artifact-Sha256
+         */
+        'X-Artifact-SHA256'?: string | null;
+        /**
+         * X-Original-Sha256
+         */
+        'X-Original-SHA256'?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+        /**
+         * Entry Id
+         */
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}/artifacts/{entry_id}';
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutError = UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors[keyof UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors];
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadArtifactResponse;
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponse = UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses[keyof UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses];
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}/finalize';
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostError = FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors[keyof FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors];
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: UploadFinalizeAcceptedResponse;
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponse = FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses[keyof FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses];
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}';
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteError = DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors[keyof DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors];
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadDeleteResponse;
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponse = DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses[keyof DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses];
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}';
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetError = GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors[keyof GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors];
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadSessionStatusResponse;
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponse = GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses[keyof GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses];
+
 export type ListRegistrationsApiV1RegistrationsGetData = {
     body?: never;
     path?: never;
@@ -1745,6 +2185,10 @@ export type CreateRegistrationApiV1RegistrationsPostData = {
 };
 
 export type CreateRegistrationApiV1RegistrationsPostErrors = {
+    /**
+     * The signed-in GitHub account cannot claim this source.
+     */
+    403: unknown;
     /**
      * The repository is already registered.
      */
@@ -1992,6 +2436,10 @@ export type GetValidationSchemaApiV1SchemasVersionGetData = {
 };
 
 export type GetValidationSchemaApiV1SchemasVersionGetErrors = {
+    /**
+     * Unknown registry schema version.
+     */
+    404: unknown;
     /**
      * Validation Error
      */

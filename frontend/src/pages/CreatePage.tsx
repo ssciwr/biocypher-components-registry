@@ -1,16 +1,6 @@
 import { useState } from 'react'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/react/24/outline'
-import { metadataDraftStorageKey } from './createMetadata/storage'
-
-const metadataDraftTextFields = [
-  'adapterId',
-  'codeRepository',
-  'description',
-  'keywords',
-  'license',
-  'name',
-  'version',
-] as const
+import { hasMeaningfulMetadataDraft, metadataDraftStorageKey } from './createMetadata/storage'
 
 
 function hasSavedMetadataDraft() {
@@ -20,14 +10,7 @@ function hasSavedMetadataDraft() {
       return false
     }
 
-    const draft = JSON.parse(savedDraft) as Record<string, unknown>
-    const hasTextValue = metadataDraftTextFields.some((field) => {
-      const value = draft[field]
-      return typeof value === 'string' && Boolean(value.trim())
-    })
-    return hasTextValue
-      || (Array.isArray(draft.creators) && draft.creators.length > 0)
-      || (Array.isArray(draft.datasets) && draft.datasets.length > 0)
+    return hasMeaningfulMetadataDraft(JSON.parse(savedDraft))
   } catch (storageError) {
     console.warn('Could not check saved metadata draft.', storageError)
     return false
