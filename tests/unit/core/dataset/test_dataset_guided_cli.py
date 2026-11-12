@@ -131,3 +131,30 @@ def test_format_command_preview_uses_multiline_shell_layout() -> None:
         "--validate\n"
         "```"
     )
+
+
+def test_croissant_baker_generator_stages_single_file_as_directory(
+    tmp_path, monkeypatch
+) -> None:
+    import subprocess
+    from pathlib import Path
+
+    from src.core.dataset.backends.croissant_baker import CroissantBakerGenerator
+    from src.core.dataset.request import GenerationRequest
+
+    source = tmp_path / "data.csv"
+    source.write_text("id\n1\n", encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        input_dir = Path(command[command.index("--input") + 1])
+        seen["is_dir"] = input_dir.is_dir()
+        seen["files"] = [p.name for p in input_dir.iterdir()]
+        return subprocess.CompletedProcess(command, 0, "ok", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    CroissantBakerGenerator().generate(
+        GenerationRequest(input_path=str(source), output_path=str(tmp_path / "o.json"))
+    )
+
+    assert seen == {"is_dir": True, "files": ["data.csv"]}
