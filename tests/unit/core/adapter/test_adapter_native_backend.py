@@ -86,10 +86,7 @@ def test_native_adapter_generator_embeds_valid_dataset(tmp_path: Path) -> None:
     assert result.document is not None
     assert result.document["@type"] == "SoftwareSourceCode"
     assert result.document["dct:conformsTo"] == _COMPUTATIONAL_TOOL_1_0
-    assert (
-        result.document["@context"]["equivalentProperty"]
-        == "cr:equivalentProperty"
-    )
+    assert result.document["@context"]["equivalentProperty"] == "cr:equivalentProperty"
     assert result.document["hasPart"][0]["@type"] == "sc:Dataset"
     assert result.document["hasPart"][0]["conformsTo"] == _CROISSANT_1_0
     assert "Validation completed!" in result.stdout
@@ -126,9 +123,7 @@ def test_native_adapter_generator_reports_invalid_uploaded_dataset_without_repai
     output_path = tmp_path / "adapter.jsonld"
     invalid_dataset = _valid_dataset_document()
     invalid_dataset["name"] = "Invalid uploaded dataset"
-    invalid_dataset["recordSet"][0]["field"][0]["source"]["extract"] = {
-        "column": ""
-    }
+    invalid_dataset["recordSet"][0]["field"][0]["source"]["extract"] = {"column": ""}
     request = AdapterGenerationRequest(
         output_path=str(output_path),
         name="Two-dataset Adapter",

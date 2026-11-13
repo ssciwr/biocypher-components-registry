@@ -62,9 +62,7 @@ def load_database_settings(
     if backend is DatabaseBackend.SQLITE:
         configured_path = database_path
         if configured_path is None:
-            configured_path = _required_environment(
-                settings.sqlite_database_path_env
-            )
+            configured_path = _required_environment(settings.sqlite_database_path_env)
         return DatabaseSettings(
             backend=backend,
             sqlite_database_path=Path(configured_path),

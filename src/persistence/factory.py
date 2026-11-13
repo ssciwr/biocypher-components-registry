@@ -58,9 +58,7 @@ def build_registration_store(
             try:
                 if configured.backend is DatabaseBackend.POSTGRESQL:
                     assert configured.postgres_url is not None
-                    _stores[key] = PostgreSQLRegistrationStore(
-                        configured.postgres_url
-                    )
+                    _stores[key] = PostgreSQLRegistrationStore(configured.postgres_url)
                 else:
                     assert configured.sqlite_database_path is not None
                     _stores[key] = SQLiteRegistrationStore(

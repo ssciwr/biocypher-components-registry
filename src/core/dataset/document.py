@@ -8,7 +8,6 @@ from typing import Any
 from src.core.shared.constants import (
     CROISSANT_1_0_CONTEXT,
     CROISSANT_CONFORMS_TO_URL,
-    DCT_CONFORMS_TO_KEY,
 )
 
 JSONLD_TYPE_KEY = "@type"

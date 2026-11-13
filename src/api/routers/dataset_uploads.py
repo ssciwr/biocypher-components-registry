@@ -222,8 +222,13 @@ async def delete_upload_session(
     """Cancel a session and idempotently delete every scratch artifact."""
     _no_store(response)
     session = _authorize(manager, session_id, authorization)
-    if session.state in {UploadSessionState.FINALIZE_QUEUED, UploadSessionState.PROCESSING}:
-        raise HTTPException(409, "Generation cannot be cancelled after finalization starts.")
+    if session.state in {
+        UploadSessionState.FINALIZE_QUEUED,
+        UploadSessionState.PROCESSING,
+    }:
+        raise HTTPException(
+            409, "Generation cannot be cancelled after finalization starts."
+        )
     await manager.destroy(session_id)
     return UploadDeleteResponse()
 
