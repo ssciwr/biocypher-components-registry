@@ -20,7 +20,7 @@ USER root
 # commands as sandbox and nothing else; env_reset + umask_override give every
 # command a clean environment and group-writable files.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git sudo \
+    && apt-get install -y --no-install-recommends git sudo util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system apiuser \
     && groupadd --system workspace \
@@ -47,19 +47,19 @@ USER apiuser
 COPY --chown=apiuser:apiuser pyproject.toml ./
 COPY --chown=apiuser:apiuser uv.lock ./
 COPY --chown=apiuser:apiuser README.md ./
-RUN uv sync --frozen --no-dev --no-install-project
+# jsonpath-rw 1.4.0 is available only as an sdist. Its exact artifact and
+# SHA-256 are pinned in uv.lock, so this source build is intentional and reviewed.
+RUN uv sync --frozen --no-dev --no-install-project  # NOSONAR
 # ====
 
 # ==== Application source ====
 COPY --chown=apiuser:apiuser src/api ./src/api
 COPY --chown=apiuser:apiuser src/core ./src/core
 COPY --chown=apiuser:apiuser src/persistence ./src/persistence
-RUN uv sync --frozen --no-dev
 # ====
 
 # ==== Container entrypoint ====
-COPY --chown=apiuser:apiuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod 555 /usr/local/bin/docker-entrypoint.sh
+COPY --chown=root:root --chmod=0555 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 USER apiuser
 # ====

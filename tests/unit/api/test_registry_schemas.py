@@ -11,7 +11,6 @@ from src.api.schemas.registry import (
 from src.core.registration.models import (
     BatchRefreshRecord,
     BatchRefreshSummary,
-    RegistrationStatus,
     RegistryEntry,
     StoredRegistration,
 )
@@ -79,7 +78,6 @@ def test_registry_source_row_response_maps_from_registration() -> None:
         adapter_id="example-adapter",
         repository_location="https://github.com/example/example-adapter",
         repository_kind="remote",
-        status=RegistrationStatus.VALID,
         created_at=created_at,
         profile_version="v1",
         updated_at=updated_at,
@@ -93,7 +91,6 @@ def test_registry_source_row_response_maps_from_registration() -> None:
 
     assert response.registration_id == "reg-1"
     assert response.adapter_name == "Example Adapter"
-    assert response.status == RegistrationStatus.VALID
     assert response.latest_event_type == "VALID_CREATED"
     assert response.profile_version == "v1"
     assert response.uniqueness_key == "example-adapter::1.0.0"

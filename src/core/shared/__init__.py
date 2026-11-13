@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.core.shared.constants import (
+    CROISSANT_1_0_CONTEXT,
     CROISSANT_CONFORMS_TO_URL,
     DEFAULT_PROFILE_URL,
     DEFAULT_PROGRAMMING_LANGUAGE,
@@ -42,6 +43,7 @@ from src.core.shared.ids import slugify_identifier
 from src.core.shared.licenses import normalize_license_url
 
 __all__ = [
+    "CROISSANT_1_0_CONTEXT",
     "CROISSANT_CONFORMS_TO_URL",
     "DEFAULT_PROFILE_URL",
     "DEFAULT_PROGRAMMING_LANGUAGE",

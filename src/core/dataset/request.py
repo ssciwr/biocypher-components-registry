@@ -44,7 +44,7 @@ class FileInspection:
     """Stores normalized schema details extracted from one source file."""
 
     path: Path
-    encoding_format: str
+    encoding_format: str | list[str]
     fields: list[InferredField]
     examples_count: int = 0
 

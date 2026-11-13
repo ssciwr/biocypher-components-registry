@@ -12,6 +12,9 @@ on:
       - "cli.py"
       - "pyproject.toml"
       - "uv.lock"
+      - "docker-compose-sqlite.yml"
+      - "docker-compose-postgresql.yml"
+      - "docker-compose.test.yml"
       - ".github/workflows/backend.yml"
   workflow_dispatch:
 
@@ -21,6 +24,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: registry_test
+          POSTGRES_USER: registry_test
+          POSTGRES_PASSWORD: registry_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --label io.biocypher.registry.test-database=true
+          --health-cmd "pg_isready -U registry_test -d registry_test"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 30
 
     steps:
       - name: Checkout repository
@@ -42,10 +60,19 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked --group dev # NOSONAR: accepted; dev dependencies come from the locked uv.lock file in CI.
+        # Building remains required for the source-only jsonpath-rw dependency.
+        run: uv sync --locked --group dev # NOSONAR
+
+      - name: Validate Docker Compose configurations
+        run: |
+          docker compose -f docker-compose-sqlite.yml config --quiet
+          docker compose -f docker-compose-postgresql.yml config --no-interpolate --quiet
+          docker compose -f docker-compose.test.yml config --quiet
 
       - name: Run tests
-        run: uv run --locked pytest --cov --cov-branch --cov-report=xml # NOSONAR
+        env:
+          REGISTRY_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: .venv/bin/pytest --cov --cov-branch --cov-report=xml
 
       - name: Check coverage report
         run: ls -lh coverage.xml

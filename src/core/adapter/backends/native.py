@@ -158,13 +158,13 @@ class NativeAdapterGenerator(AdapterGenerator):
         *,
         source: str = "uploaded dataset metadata",
     ) -> dict[str, Any]:
-        """Validate and normalize one inline dataset document."""
-        result = validate_dataset(document)
-        if not result.is_valid:
-            raise GeneratorError(
-                f"Dataset metadata is not a valid Croissant dataset: {source}. "
-                + "; ".join(result.errors)
-            )
+        """Normalize an uploaded document without repairing or rejecting it.
+
+        Uploaded Croissant metadata is user-owned input. Adapter generation keeps
+        it intact so the final adapter-level validation report can identify the
+        uploaded dataset and report every validator error in context.
+        """
+        del source  # Retained for the file-loading call site's diagnostic contract.
         return _normalise_embedded_dataset(document)
 
 

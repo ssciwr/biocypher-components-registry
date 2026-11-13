@@ -41,9 +41,12 @@ def test_api_routes_use_configured_version_prefix() -> None:
 
 def test_registration_database_path_uses_default_setting(monkeypatch) -> None:
     """Default registration database path comes from centralized settings."""
-    monkeypatch.delenv(settings.registry_db_path_env, raising=False)
+    monkeypatch.setenv(
+        settings.sqlite_database_path_env,
+        str(settings.default_sqlite_database_path),
+    )
 
-    assert get_registration_database_path() == settings.default_registry_db_path
+    assert get_registration_database_path() == settings.default_sqlite_database_path
 
 
 def test_registration_database_path_uses_environment_override(
@@ -52,6 +55,6 @@ def test_registration_database_path_uses_environment_override(
 ) -> None:
     """The registry database path can be overridden for deployment."""
     database_path = tmp_path / "registry.sqlite3"
-    monkeypatch.setenv(settings.registry_db_path_env, str(database_path))
+    monkeypatch.setenv(settings.sqlite_database_path_env, str(database_path))
 
     assert get_registration_database_path() == database_path

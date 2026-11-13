@@ -10,7 +10,8 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.engine import Engine
 
 from src.core.auth.models import AuthSession
-from src.persistence.tables import auth_sessions_table, metadata
+from src.persistence.schema import initialize_schema
+from src.persistence.tables import auth_sessions_table
 
 
 class AuthSessionStore:
@@ -27,7 +28,7 @@ class AuthSessionStore:
                 self.engine.dispose()
 
     def _initialize_database(self) -> None:
-        metadata.create_all(self.engine)
+        initialize_schema(self.engine)
 
     def create_session(
         self,

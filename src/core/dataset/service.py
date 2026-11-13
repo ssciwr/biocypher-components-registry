@@ -18,6 +18,10 @@ from src.core.dataset.backends.croissant_baker import (
 from src.core.dataset.request import GenerationRequest, GenerationResult
 from src.core.shared.errors import GeneratorError
 
+_JSONLD_TYPE_KEY = "@type"
+_CROISSANT_FILE_OBJECT_TYPE = "cr:FileObject"
+_FILE_OBJECT_TYPES = (_CROISSANT_FILE_OBJECT_TYPE, "FileObject")
+
 
 def ensure_supported_generator(generator: str) -> str:
     """Validate that the requested dataset generator is registered."""
@@ -114,43 +118,59 @@ def _result_document(result: GenerationResult) -> dict[str, Any] | None:
 def _first_distribution(document: dict[str, Any], input_path: str) -> dict[str, Any]:
     distribution = document.get("distribution")
     if isinstance(distribution, list):
-        fallback: dict[str, Any] | None = None
-        file_object: dict[str, Any] | None = None
-        input_name = Path(input_path).expanduser().name
-        for item in distribution:
-            if not isinstance(item, dict):
-                continue
-            if fallback is None:
-                fallback = item
-            item_type = item.get("@type")
-            is_file_object = item_type in ("cr:FileObject", "FileObject")
-            if isinstance(item_type, list):
-                is_file_object = any(
-                    value in ("cr:FileObject", "FileObject") for value in item_type
-                )
-            if not is_file_object:
-                continue
-            if item.get("name") == input_name:
-                return item
-            content_url = str(item.get("contentUrl") or "")
-            if Path(urlparse(content_url).path).name == input_name:
-                return item
-            if file_object is None:
-                file_object = item
-        if file_object is not None:
-            return file_object
-        if fallback is not None:
-            return fallback
-        file_object: dict[str, Any] = {"@type": "cr:FileObject"}
+        selected = _select_distribution_item(distribution, input_path)
+        if selected is not None:
+            return selected
+        file_object: dict[str, Any] = {
+            _JSONLD_TYPE_KEY: _CROISSANT_FILE_OBJECT_TYPE,
+        }
         distribution.insert(0, file_object)
         return file_object
 
     if isinstance(distribution, dict):
         return distribution
 
-    file_object = {"@type": "cr:FileObject"}
+    file_object = {_JSONLD_TYPE_KEY: _CROISSANT_FILE_OBJECT_TYPE}
     document["distribution"] = [file_object]
     return file_object
+
+
+def _select_distribution_item(
+    distribution: list[Any],
+    input_path: str,
+) -> dict[str, Any] | None:
+    """Choose the best existing distribution item for the input file."""
+    input_name = Path(input_path).expanduser().name
+    fallback = None
+    file_object = None
+    for item in distribution:
+        if not isinstance(item, dict):
+            continue
+        if fallback is None:
+            fallback = item
+        if not _is_file_object(item):
+            continue
+        if _matches_input_file(item, input_name):
+            return item
+        if file_object is None:
+            file_object = item
+    if file_object is not None:
+        return file_object
+    return fallback
+
+
+def _is_file_object(item: dict[str, Any]) -> bool:
+    item_type = item.get(_JSONLD_TYPE_KEY)
+    if isinstance(item_type, list):
+        return any(value in _FILE_OBJECT_TYPES for value in item_type)
+    return item_type in _FILE_OBJECT_TYPES
+
+
+def _matches_input_file(item: dict[str, Any], input_name: str) -> bool:
+    if item.get("name") == input_name:
+        return True
+    content_url = str(item.get("contentUrl") or "")
+    return Path(urlparse(content_url).path).name == input_name
 
 
 # AI-Generated.

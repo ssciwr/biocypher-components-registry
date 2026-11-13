@@ -163,6 +163,11 @@ export type AdapterDetailResponse = {
      * Can Delete
      */
     can_delete?: boolean;
+    /**
+     * Can Update
+     */
+    can_update?: boolean;
+    latest_attempt?: RegistrationAttemptResponse | null;
 };
 
 /**
@@ -456,6 +461,13 @@ export type AdapterMetadataResponse = {
 };
 
 /**
+ * AttemptStatus
+ *
+ * Terminal processing outcomes; loading messages are frontend-only.
+ */
+export type AttemptStatus = 'SUCCEEDED' | 'FAILED';
+
+/**
  * AuthMeResponse
  *
  * Browser-safe signed-in state.
@@ -465,72 +477,6 @@ export type AuthMeResponse = {
      * Authenticated
      */
     authenticated: boolean;
-};
-
-/**
- * Body_generate_dataset_metadata_api_v1_metadata_datasets_generate_post
- */
-export type BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost = {
-    /**
-     * File
-     */
-    file: Blob | File;
-    /**
-     * Generator
-     */
-    generator?: 'auto' | 'croissant-baker' | 'native';
-    /**
-     * Validate
-     */
-    validate?: boolean;
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Description
-     */
-    description?: string | null;
-    /**
-     * Url
-     */
-    url?: string | null;
-    /**
-     * License
-     */
-    license?: string | null;
-    /**
-     * Citation
-     */
-    citation?: string | null;
-    /**
-     * Content Url
-     */
-    content_url?: string | null;
-    /**
-     * Dataset Version
-     */
-    dataset_version?: string | null;
-    /**
-     * Date Published
-     */
-    date_published?: string | null;
-    /**
-     * Encoding Format
-     */
-    encoding_format?: string | null;
-    /**
-     * Filename
-     */
-    filename?: string | null;
-    /**
-     * Sha256
-     */
-    sha256?: string | null;
-    /**
-     * Creators Json
-     */
-    creators_json?: string;
 };
 
 /**
@@ -608,6 +554,10 @@ export type MetadataValidationCheckResponse = {
      * Errors
      */
     errors: Array<string>;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
 };
 
 /**
@@ -655,9 +605,78 @@ export type MetadataValidationResponse = {
      */
     errors: Array<string>;
     /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+    /**
      * Checks
      */
     checks: Array<MetadataValidationCheckResponse>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Validation Checks
+     */
+    validation_checks?: Array<ValidationCheckResponse>;
+};
+
+/**
+ * RegistrationAttemptResponse
+ *
+ * One terminal attempt, with accepted state kept separate from errors.
+ */
+export type RegistrationAttemptResponse = {
+    attempt_status: AttemptStatus;
+    /**
+     * Registration Id
+     */
+    registration_id?: string | null;
+    /**
+     * Adapter Id
+     */
+    adapter_id?: string | null;
+    /**
+     * Adapter Name
+     */
+    adapter_name?: string | null;
+    /**
+     * Repository Location
+     */
+    repository_location?: string | null;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
+    /**
+     * Update Applied
+     */
+    update_applied?: boolean;
+    /**
+     * Reason Code
+     */
+    reason_code?: string | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Validation Errors
+     */
+    validation_errors?: Array<string>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Validation Checks
+     */
+    validation_checks?: Array<ValidationCheckResponse>;
+    /**
+     * Profile Version
+     */
+    profile_version?: string | null;
 };
 
 /**
@@ -693,60 +712,27 @@ export type RegistrationCreateRequest = {
 };
 
 /**
- * RegistrationCreateResponse
- *
- * Response returned after creating an adapter registration.
- */
-export type RegistrationCreateResponse = {
-    /**
-     * Registration Id
-     */
-    registration_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Repository Location
-     */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-};
-
-/**
  * RegistrationCroissantFilePresentCheckResponse
  *
  * Response model for a remote croissant.jsonld presence check.
  */
 export type RegistrationCroissantFilePresentCheckResponse = {
+    /**
+     * Status
+     */
+    status: 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE';
+    /**
+     * Repository Url
+     */
+    repository_url: string;
+    /**
+     * Reason Code
+     */
+    reason_code?: string | null;
+    /**
+     * Message
+     */
+    message: string;
     /**
      * Has Croissant File
      */
@@ -778,12 +764,15 @@ export type RegistrationDetailResponse = {
     /**
      * Repository Kind
      */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
+    repository_kind: string;
     /**
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
     /**
      * License Value
      */
@@ -800,6 +789,7 @@ export type RegistrationDetailResponse = {
      * Submitted By Github User Id
      */
     submitted_by_github_user_id?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Metadata Path
      */
@@ -921,12 +911,15 @@ export type RegistrationListItemResponse = {
     /**
      * Repository Kind
      */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
+    repository_kind: string;
     /**
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
     /**
      * License Value
      */
@@ -943,6 +936,7 @@ export type RegistrationListItemResponse = {
      * Submitted By Github User Id
      */
     submitted_by_github_user_id?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Profile Version
      */
@@ -970,161 +964,30 @@ export type RegistrationListResponse = {
 };
 
 /**
- * RegistrationProcessResponse
+ * RegistrationStreamEvent
  *
- * Response returned after processing one registration.
+ * SSE data envelope; exactly one terminal result or error ends a stream.
  */
-export type RegistrationProcessResponse = {
+export type RegistrationStreamEvent = {
     /**
-     * Registration Id
+     * Type
      */
-    registration_id: string;
+    type: 'snapshot' | 'check' | 'result' | 'error';
     /**
-     * Adapter Name
+     * Checks
      */
-    adapter_name: string;
+    checks?: Array<ValidationCheckResponse>;
+    check?: ValidationCheckResponse | null;
+    result?: RegistrationAttemptResponse | null;
     /**
-     * Adapter Id
+     * Status Code
      */
-    adapter_id: string;
+    status_code?: number | null;
     /**
-     * Repository Location
+     * Detail
      */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-    /**
-     * Metadata Path
-     */
-    metadata_path?: string | null;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Profile Version
-     */
-    profile_version?: string | null;
-    /**
-     * Updated At
-     */
-    updated_at?: string | null;
-    /**
-     * Uniqueness Key
-     */
-    uniqueness_key?: string | null;
-    /**
-     * Validation Errors
-     */
-    validation_errors?: Array<string> | null;
+    detail?: string | null;
 };
-
-/**
- * RegistrationRevalidateResponse
- *
- * Response returned after revalidating one registration.
- */
-export type RegistrationRevalidateResponse = {
-    /**
-     * Registration Id
-     */
-    registration_id: string;
-    /**
-     * Adapter Name
-     */
-    adapter_name: string;
-    /**
-     * Adapter Id
-     */
-    adapter_id: string;
-    /**
-     * Repository Location
-     */
-    repository_location: string;
-    /**
-     * Repository Kind
-     */
-    repository_kind: 'local' | 'remote' | string;
-    status: RegistrationStatus;
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * License Value
-     */
-    license_value?: string | null;
-    /**
-     * Doi
-     */
-    doi?: string | null;
-    /**
-     * Cff Url
-     */
-    cff_url?: string | null;
-    /**
-     * Submitted By Github User Id
-     */
-    submitted_by_github_user_id?: string | null;
-    /**
-     * Metadata Path
-     */
-    metadata_path?: string | null;
-    /**
-     * Metadata
-     */
-    metadata?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Profile Version
-     */
-    profile_version?: string | null;
-    /**
-     * Updated At
-     */
-    updated_at?: string | null;
-    /**
-     * Uniqueness Key
-     */
-    uniqueness_key?: string | null;
-    /**
-     * Validation Errors
-     */
-    validation_errors?: Array<string> | null;
-};
-
-/**
- * RegistrationStatus
- *
- * Tracked states for a stored registration request.
- */
-export type RegistrationStatus = 'SUBMITTED' | 'VALID' | 'INVALID';
 
 /**
  * RegistryEntryListResponse
@@ -1233,45 +1096,9 @@ export type RegistryRefreshLatestResponse = {
      */
     rejected_same_version_changed: number;
     /**
-     * Fetch Failed
+     * Internal Failed
      */
-    fetch_failed: number;
-};
-
-/**
- * RegistryRefreshResponse
- *
- * Response returned after refreshing active registration sources.
- */
-export type RegistryRefreshResponse = {
-    /**
-     * Active Sources
-     */
-    active_sources: number;
-    /**
-     * Processed
-     */
-    processed: number;
-    /**
-     * Valid Created
-     */
-    valid_created: number;
-    /**
-     * Unchanged
-     */
-    unchanged: number;
-    /**
-     * Invalid
-     */
-    invalid: number;
-    /**
-     * Duplicate
-     */
-    duplicate: number;
-    /**
-     * Rejected Same Version Changed
-     */
-    rejected_same_version_changed: number;
+    internal_failed: number;
     /**
      * Fetch Failed
      */
@@ -1316,7 +1143,6 @@ export type RegistryRegistrationResponse = {
      * Repository Location
      */
     repository_location: string;
-    status: RegistrationStatus;
     /**
      * Latest Event Type
      */
@@ -1325,6 +1151,11 @@ export type RegistryRegistrationResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Published Version
+     */
+    published_version?: string | null;
+    latest_attempt?: RegistrationAttemptResponse | null;
     /**
      * Updated At
      */
@@ -1337,6 +1168,369 @@ export type RegistryRegistrationResponse = {
      * Uniqueness Key
      */
     uniqueness_key?: string | null;
+};
+
+/**
+ * UploadArtifactResponse
+ *
+ * Verification result for one raw artifact upload.
+ */
+export type UploadArtifactResponse = {
+    /**
+     * Entry Id
+     */
+    entry_id: string;
+    /**
+     * Artifact Size
+     */
+    artifact_size: number;
+    /**
+     * Artifact Sha256
+     */
+    artifact_sha256: string;
+    /**
+     * Complete Entries
+     */
+    complete_entries: number;
+    /**
+     * Total Entries
+     */
+    total_entries: number;
+};
+
+/**
+ * UploadDeleteResponse
+ *
+ * Idempotent deletion acknowledgement.
+ */
+export type UploadDeleteResponse = {
+    /**
+     * Deleted
+     */
+    deleted?: boolean;
+};
+
+/**
+ * UploadFinalizeAcceptedResponse
+ */
+export type UploadFinalizeAcceptedResponse = {
+    /**
+     * Status
+     */
+    status: 'finalize_queued' | 'processing' | 'complete' | 'failed';
+    /**
+     * Next Poll Ms
+     */
+    next_poll_ms?: number;
+};
+
+/**
+ * UploadFinalizeResponse
+ *
+ * Privacy-reconciled Croissant metadata returned synchronously.
+ */
+export type UploadFinalizeResponse = {
+    /**
+     * Metadata
+     */
+    metadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Generator
+     */
+    generator: 'croissant-baker' | 'native';
+    validation: MetadataValidationResponse;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+};
+
+/**
+ * UploadGenerationRequest
+ *
+ * Metadata overrides used once all artifacts have arrived.
+ */
+export type UploadGenerationRequest = {
+    /**
+     * Generator
+     */
+    generator?: 'auto' | 'croissant-baker' | 'native';
+    /**
+     * Validate
+     */
+    validate?: boolean;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Url
+     */
+    url?: string | null;
+    /**
+     * License
+     */
+    license?: string | null;
+    /**
+     * Citation
+     */
+    citation?: string | null;
+    /**
+     * Dataset Version
+     */
+    dataset_version?: string | null;
+    /**
+     * Date Published
+     */
+    date_published?: string | null;
+    /**
+     * Creators
+     */
+    creators: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * UploadInventoryEntryRequest
+ *
+ * One file selected by the browser and its planned artifact.
+ */
+export type UploadInventoryEntryRequest = {
+    /**
+     * Entry Id
+     */
+    entry_id: string;
+    /**
+     * Relative Path
+     */
+    relative_path: string;
+    /**
+     * Original Size
+     */
+    original_size: number;
+    /**
+     * Logical Format
+     */
+    logical_format: 'csv' | 'tsv';
+    /**
+     * Compression
+     */
+    compression?: 'gzip' | null;
+    /**
+     * Artifact Mode
+     */
+    artifact_mode: 'complete' | 'sample';
+    /**
+     * Strategy
+     */
+    strategy: string;
+    /**
+     * Artifact Size
+     */
+    artifact_size: number;
+    /**
+     * Content Url
+     */
+    content_url?: string | null;
+};
+
+/**
+ * UploadSessionCreateRequest
+ *
+ * Complete immutable source inventory sent before any artifact body.
+ */
+export type UploadSessionCreateRequest = {
+    /**
+     * Source Kind
+     */
+    source_kind: 'file' | 'folder';
+    /**
+     * Source Name
+     */
+    source_name: string;
+    /**
+     * Entries
+     */
+    entries: Array<UploadInventoryEntryRequest>;
+    generation?: UploadGenerationRequest;
+};
+
+/**
+ * UploadSessionCreateResponse
+ *
+ * Capability and fixed limits returned for a new session.
+ */
+export type UploadSessionCreateResponse = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Max Artifact Bytes
+     */
+    max_artifact_bytes: number;
+    /**
+     * Expires In Seconds
+     */
+    expires_in_seconds: number;
+    /**
+     * Kind
+     */
+    kind?: 'session';
+};
+
+/**
+ * UploadSessionStatusResponse
+ */
+export type UploadSessionStatusResponse = {
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Next Poll Ms
+     */
+    next_poll_ms?: number;
+    result?: UploadFinalizeResponse | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
+ * ValidationCheckResponse
+ *
+ * A validation stage, its provenance, and its inline diagnostic information.
+ */
+export type ValidationCheckResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Status
+     */
+    status: 'PENDING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'NOT_RUN';
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Errors
+     */
+    errors?: Array<string>;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+    /**
+     * Validation Details
+     */
+    validation_details?: Array<ValidationDetailResponse>;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
+     * Dataset Index
+     */
+    dataset_index?: number | null;
+    /**
+     * Dataset Name
+     */
+    dataset_name?: string | null;
+    /**
+     * Profile Version
+     */
+    profile_version?: string | null;
+    /**
+     * Schema Title
+     */
+    schema_title?: string | null;
+    /**
+     * Schema Id
+     */
+    schema_id?: string | null;
+    /**
+     * Schema Dialect
+     */
+    schema_dialect?: string | null;
+    /**
+     * Validator Name
+     */
+    validator_name?: string | null;
+    /**
+     * Validator Version
+     */
+    validator_version?: string | null;
+};
+
+/**
+ * ValidationDetailResponse
+ *
+ * Response-only context supplied by a metadata validator.
+ */
+export type ValidationDetailResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Json Path
+     */
+    json_path?: string | null;
+    /**
+     * Requirement
+     */
+    requirement?: string | null;
+    /**
+     * Expected Format
+     */
+    expected_format?: string | null;
+    /**
+     * Location Description
+     */
+    location_description?: string | null;
+    /**
+     * Source File
+     */
+    source_file?: string | null;
+    /**
+     * Source Url
+     */
+    source_url?: string | null;
+    /**
+     * Line
+     */
+    line?: number | null;
+    /**
+     * Column
+     */
+    column?: number | null;
+    /**
+     * Location Kind
+     */
+    location_kind?: 'value' | 'containing_object' | null;
 };
 
 /**
@@ -1555,6 +1749,44 @@ export type GetAdapterApiV1AdaptersAdapterIdGetResponses = {
 
 export type GetAdapterApiV1AdaptersAdapterIdGetResponse = GetAdapterApiV1AdaptersAdapterIdGetResponses[keyof GetAdapterApiV1AdaptersAdapterIdGetResponses];
 
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostData = {
+    body?: never;
+    path: {
+        /**
+         * Adapter Id
+         */
+        adapter_id: string;
+    };
+    query?: never;
+    url: '/api/v1/adapters/{adapter_id}/update';
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors = {
+    /**
+     * Only the submitting GitHub account can update this adapter.
+     */
+    403: unknown;
+    /**
+     * The registration changed while the update was processing.
+     */
+    409: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostError = UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors[keyof UpdateAdapterApiV1AdaptersAdapterIdUpdatePostErrors];
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RegistrationAttemptResponse;
+};
+
+export type UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponse = UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses[keyof UpdateAdapterApiV1AdaptersAdapterIdUpdatePostResponses];
+
 export type EndorseAdapterApiV1AdaptersAdapterIdEndorsePostData = {
     body?: never;
     path: {
@@ -1641,20 +1873,74 @@ export type ValidateMetadataApiV1MetadataValidatePostResponses = {
 export type ValidateMetadataApiV1MetadataValidatePostResponse = ValidateMetadataApiV1MetadataValidatePostResponses[keyof ValidateMetadataApiV1MetadataValidatePostResponses];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData = {
-    body: BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost;
+    /**
+     * DatasetMetadataGenerateForm
+     *
+     * Multipart form fields for standalone dataset metadata generation.
+     */
+    body?: {
+        /**
+         * Generator
+         */
+        generator?: 'auto' | 'croissant-baker' | 'native';
+        /**
+         * Validate
+         */
+        validate?: boolean;
+        /**
+         * Name
+         */
+        name?: string | null;
+        /**
+         * Description
+         */
+        description?: string | null;
+        /**
+         * Url
+         */
+        url?: string | null;
+        /**
+         * License
+         */
+        license?: string | null;
+        /**
+         * Citation
+         */
+        citation?: string | null;
+        /**
+         * Content Url
+         */
+        content_url?: string | null;
+        /**
+         * Dataset Version
+         */
+        dataset_version?: string | null;
+        /**
+         * Date Published
+         */
+        date_published?: string | null;
+        /**
+         * Encoding Format
+         */
+        encoding_format?: string | null;
+        /**
+         * Filename
+         */
+        filename?: string | null;
+        /**
+         * Sha256
+         */
+        sha256?: string | null;
+        /**
+         * Creators Json
+         */
+        creators_json?: string;
+        file: Blob | File;
+    };
     path?: never;
     query?: never;
     url: '/api/v1/metadata/datasets/generate';
 };
-
-export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostError = GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors[keyof GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostErrors];
 
 export type GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostResponses = {
     /**
@@ -1690,6 +1976,191 @@ export type GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses = 
 
 export type GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponse = GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses[keyof GenerateAdapterMetadataApiV1MetadataAdaptersGeneratePostResponses];
 
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostData = {
+    body: UploadSessionCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions';
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * The session or scratch-byte admission limit is full.
+     */
+    429: unknown;
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostError = CreateUploadSessionApiV1MetadataUploadSessionsPostErrors[keyof CreateUploadSessionApiV1MetadataUploadSessionsPostErrors];
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: UploadSessionCreateResponse;
+};
+
+export type CreateUploadSessionApiV1MetadataUploadSessionsPostResponse = CreateUploadSessionApiV1MetadataUploadSessionsPostResponses[keyof CreateUploadSessionApiV1MetadataUploadSessionsPostResponses];
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Artifact-Sha256
+         */
+        'X-Artifact-SHA256'?: string | null;
+        /**
+         * X-Original-Sha256
+         */
+        'X-Original-SHA256'?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+        /**
+         * Entry Id
+         */
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}/artifacts/{entry_id}';
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutError = UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors[keyof UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors];
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadArtifactResponse;
+};
+
+export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponse = UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses[keyof UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutResponses];
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}/finalize';
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostError = FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors[keyof FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostErrors];
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: UploadFinalizeAcceptedResponse;
+};
+
+export type FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponse = FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses[keyof FinalizeUploadSessionApiV1MetadataUploadSessionsSessionIdFinalizePostResponses];
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}';
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteError = DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors[keyof DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors];
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadDeleteResponse;
+};
+
+export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponse = DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses[keyof DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteResponses];
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/v1/metadata/upload-sessions/{session_id}';
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetError = GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors[keyof GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetErrors];
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: UploadSessionStatusResponse;
+};
+
+export type GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponse = GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses[keyof GetUploadSessionStatusApiV1MetadataUploadSessionsSessionIdGetResponses];
+
 export type ListRegistrationsApiV1RegistrationsGetData = {
     body?: never;
     path?: never;
@@ -1715,6 +2186,14 @@ export type CreateRegistrationApiV1RegistrationsPostData = {
 
 export type CreateRegistrationApiV1RegistrationsPostErrors = {
     /**
+     * The signed-in GitHub account cannot claim this source.
+     */
+    403: unknown;
+    /**
+     * The repository is already registered.
+     */
+    409: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -1724,12 +2203,41 @@ export type CreateRegistrationApiV1RegistrationsPostError = CreateRegistrationAp
 
 export type CreateRegistrationApiV1RegistrationsPostResponses = {
     /**
+     * Processing failed; no first-registration records were saved.
+     */
+    200: RegistrationAttemptResponse;
+    /**
      * Successful Response
      */
-    201: RegistrationCreateResponse;
+    201: RegistrationAttemptResponse;
 };
 
 export type CreateRegistrationApiV1RegistrationsPostResponse = CreateRegistrationApiV1RegistrationsPostResponses[keyof CreateRegistrationApiV1RegistrationsPostResponses];
+
+export type StreamRegistrationApiV1RegistrationsStreamPostData = {
+    body: RegistrationCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/registrations/stream';
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostError = StreamRegistrationApiV1RegistrationsStreamPostErrors[keyof StreamRegistrationApiV1RegistrationsStreamPostErrors];
+
+export type StreamRegistrationApiV1RegistrationsStreamPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RegistrationStreamEvent;
+};
+
+export type StreamRegistrationApiV1RegistrationsStreamPostResponse = StreamRegistrationApiV1RegistrationsStreamPostResponses[keyof StreamRegistrationApiV1RegistrationsStreamPostResponses];
 
 export type CheckRegistrationCroissantFilePresenceApiV1RegistrationsCroissantFilePresentCheckGetData = {
     body?: never;
@@ -1821,82 +2329,16 @@ export type GetRegistrationApiV1RegistrationsRegistrationIdGetResponses = {
 
 export type GetRegistrationApiV1RegistrationsRegistrationIdGetResponse = GetRegistrationApiV1RegistrationsRegistrationIdGetResponses[keyof GetRegistrationApiV1RegistrationsRegistrationIdGetResponses];
 
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostData = {
-    body?: never;
-    path: {
-        /**
-         * Registration Id
-         */
-        registration_id: string;
-    };
-    query?: never;
-    url: '/api/v1/registrations/{registration_id}/process';
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostError = ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors[keyof ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostErrors];
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: RegistrationProcessResponse;
-};
-
-export type ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponse = ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses[keyof ProcessRegistrationApiV1RegistrationsRegistrationIdProcessPostResponses];
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostData = {
-    body?: never;
-    path: {
-        /**
-         * Registration Id
-         */
-        registration_id: string;
-    };
-    query?: never;
-    url: '/api/v1/registrations/{registration_id}/revalidate';
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostError = RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors[keyof RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostErrors];
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses = {
-    /**
-     * Successful Response
-     */
-    200: RegistrationRevalidateResponse;
-};
-
-export type RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponse = RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses[keyof RevalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePostResponses];
-
 export type ListRegistryRegistrationsApiV1RegistryRegistrationsGetData = {
     body?: never;
     path?: never;
     query?: {
         /**
-         * Status
-         *
-         * Filter registry registrations by public registration status.
-         */
-        status?: RegistrationStatus | null;
-        /**
          * Latest Event
          *
          * Filter by latest registration event type, such as VALID_CREATED, INVALID_SCHEMA, or FETCH_FAILED.
          */
-        latest_event?: 'SUBMITTED' | 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'REVALIDATED' | null;
+        latest_event?: 'VALID_CREATED' | 'UNCHANGED' | 'DUPLICATE' | 'REJECTED_SAME_VERSION_CHANGED' | 'INVALID_SCHEMA' | 'INVALID_MLCROISSANT' | 'INVALID_BOTH' | 'FETCH_FAILED' | 'SCHEMA_INVALID' | 'SEMANTICS_INVALID' | 'MLCROISSANT_INVALID' | 'INVALID_JSON' | 'METADATA_NOT_FOUND' | 'REPOSITORY_UNAVAILABLE' | 'REMOTE_TEMPORARY' | 'DEFAULT_BRANCH_UNRESOLVED' | 'METADATA_TOO_LARGE' | 'VERSION_NOT_BUMPED' | 'ADAPTER_ID_CHANGED' | null;
     };
     url: '/api/v1/registry/registrations';
 };
@@ -1981,18 +2423,40 @@ export type GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses = {
 
 export type GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponse = GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses[keyof GetLatestRegistryRefreshApiV1RegistryRefreshesLatestGetResponses];
 
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostData = {
+export type GetValidationSchemaApiV1SchemasVersionGetData = {
     body?: never;
-    path?: never;
+    path: {
+        /**
+         * Version
+         */
+        version: string;
+    };
     query?: never;
-    url: '/api/v1/registry/refreshes';
+    url: '/api/v1/schemas/{version}';
 };
 
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponses = {
+export type GetValidationSchemaApiV1SchemasVersionGetErrors = {
     /**
+     * Unknown registry schema version.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetValidationSchemaApiV1SchemasVersionGetError = GetValidationSchemaApiV1SchemasVersionGetErrors[keyof GetValidationSchemaApiV1SchemasVersionGetErrors];
+
+export type GetValidationSchemaApiV1SchemasVersionGetResponses = {
+    /**
+     * Response Get Validation Schema Api V1 Schemas  Version  Get
+     *
      * Successful Response
      */
-    200: RegistryRefreshResponse;
+    200: {
+        [key: string]: unknown;
+    };
 };
 
-export type CreateRegistryRefreshApiV1RegistryRefreshesPostResponse = CreateRegistryRefreshApiV1RegistryRefreshesPostResponses[keyof CreateRegistryRefreshApiV1RegistryRefreshesPostResponses];
+export type GetValidationSchemaApiV1SchemasVersionGetResponse = GetValidationSchemaApiV1SchemasVersionGetResponses[keyof GetValidationSchemaApiV1SchemasVersionGetResponses];

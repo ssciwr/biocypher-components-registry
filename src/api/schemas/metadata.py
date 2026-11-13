@@ -7,6 +7,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.api.schemas.registrations import (
+    ValidationCheckResponse,
+    ValidationDetailResponse,
+)
 from src.core.shared.constants import CROISSANT_CONFORMS_TO_URL, STANDARD_CONTEXT
 from src.core.validation.results import ValidationCheck, ValidationResult
 
@@ -19,17 +23,18 @@ ADAPTER_DEMO_INPUT_PATH = "/srv/biocypher/examples/adapter-demo"
 PEOPLE_DEMO_URL = "https://example.org/people-demo"
 MIT_LICENSE_URL = "https://opensource.org/licenses/MIT"
 PEOPLE_CSV_FILENAME = "people.csv"
+JSONLD_TYPE_KEY = "@type"
 
 METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
     "kind": "dataset",
     "metadata": {
         "@context": deepcopy(STANDARD_CONTEXT),
-        "@type": "sc:Dataset",
+        JSONLD_TYPE_KEY: "sc:Dataset",
         "name": "People Demo Dataset",
         "description": "Small CSV dataset used to verify validation.",
         "conformsTo": CROISSANT_CONFORMS_TO_URL,
         "citeAs": PEOPLE_DEMO_URL,
-        "creator": {"@type": "sc:Person", "name": "Dataset Creator"},
+        "creator": {JSONLD_TYPE_KEY: "sc:Person", "name": "Dataset Creator"},
         "datePublished": "2026-04-17",
         "license": MIT_LICENSE_URL,
         "url": PEOPLE_DEMO_URL,
@@ -37,7 +42,7 @@ METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
         "distribution": [
             {
                 "@id": PEOPLE_CSV_FILENAME,
-                "@type": "cr:FileObject",
+                JSONLD_TYPE_KEY: "cr:FileObject",
                 "name": PEOPLE_CSV_FILENAME,
                 "contentUrl": PEOPLE_CSV_FILENAME,
                 "encodingFormat": "text/csv",
@@ -47,12 +52,12 @@ METADATA_VALIDATE_DATASET_EXAMPLE: dict[str, Any] = {
         "recordSet": [
             {
                 "@id": "people-records",
-                "@type": "cr:RecordSet",
+                JSONLD_TYPE_KEY: "cr:RecordSet",
                 "name": "records",
                 "field": [
                     {
                         "@id": "people-records/id",
-                        "@type": "cr:Field",
+                        JSONLD_TYPE_KEY: "cr:Field",
                         "name": "id",
                         "description": "Identifier column.",
                         "dataType": "sc:Text",
@@ -239,6 +244,27 @@ class DatasetMetadataGeneratePayload(_GeneratedDatasetFields):
         return _required_text(value, field_name="Input path")
 
 
+class DatasetMetadataGenerateForm(BaseModel):
+    """Multipart form fields for standalone dataset metadata generation."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    generator: Literal["auto", "croissant-baker", "native"] = "auto"
+    run_validation: bool = Field(default=True, alias="validate")
+    name: str | None = None
+    description: str | None = None
+    url: str | None = None
+    license_value: str | None = Field(default=None, alias="license")
+    citation: str | None = None
+    content_url: str | None = None
+    dataset_version: str | None = None
+    date_published: str | None = None
+    encoding_format: str | None = None
+    filename: str | None = None
+    sha256: str | None = None
+    creators_json: str = "[]"
+
+
 class AdapterEmbeddedDatasetGenerateRequest(_GeneratedDatasetFields):
     """Generated dataset input embedded in an adapter metadata request."""
 
@@ -334,6 +360,7 @@ class MetadataValidationCheckResponse(BaseModel):
     name: str
     is_valid: bool
     errors: list[str]
+    warnings: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_check(
@@ -345,6 +372,7 @@ class MetadataValidationCheckResponse(BaseModel):
             name=check.name,
             is_valid=check.is_valid,
             errors=check.errors,
+            warnings=check.warnings,
         )
 
 
@@ -355,7 +383,10 @@ class MetadataValidationResponse(BaseModel):
     is_valid: bool
     profile_version: str
     errors: list[str]
+    warnings: list[str] = Field(default_factory=list)
     checks: list[MetadataValidationCheckResponse]
+    validation_details: list[ValidationDetailResponse] = Field(default_factory=list)
+    validation_checks: list[ValidationCheckResponse] = Field(default_factory=list)
 
     @classmethod
     def from_result(
@@ -370,9 +401,18 @@ class MetadataValidationResponse(BaseModel):
             is_valid=result.is_valid,
             profile_version=result.profile_version,
             errors=result.errors,
+            warnings=result.warnings,
             checks=[
                 MetadataValidationCheckResponse.from_check(check)
                 for check in result.checks
+            ],
+            validation_details=[
+                ValidationDetailResponse.model_validate(detail)
+                for detail in result.validation_details
+            ],
+            validation_checks=[
+                ValidationCheckResponse.model_validate(check)
+                for check in result.validation_checks
             ],
         )
 

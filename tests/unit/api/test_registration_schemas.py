@@ -13,7 +13,6 @@ from src.api.schemas.registrations import (
 )
 from src.core.registration.models import (
     RegistrationEvent,
-    RegistrationStatus,
     StoredRegistration,
 )
 
@@ -62,7 +61,6 @@ def test_registration_create_response_maps_from_stored_registration() -> None:
         adapter_id="example-adapter",
         repository_location="https://github.com/example/example-adapter",
         repository_kind="remote",
-        status=RegistrationStatus.SUBMITTED,
         created_at=created_at,
         license_value="MIT",
         doi="10.5281/zenodo.1234567",
@@ -72,7 +70,6 @@ def test_registration_create_response_maps_from_stored_registration() -> None:
 
     assert response.registration_id == "reg-1"
     assert response.adapter_name == "Example Adapter"
-    assert response.status == RegistrationStatus.SUBMITTED
     assert response.created_at == created_at
     assert response.license_value == "MIT"
     assert response.doi == "10.5281/zenodo.1234567"
@@ -88,7 +85,6 @@ def test_registration_detail_response_maps_optional_registration_fields() -> Non
         adapter_id="example-adapter",
         repository_location="https://github.com/example/example-adapter",
         repository_kind="remote",
-        status=RegistrationStatus.VALID,
         created_at=created_at,
         license_value="MIT",
         doi="10.5281/zenodo.1234567",

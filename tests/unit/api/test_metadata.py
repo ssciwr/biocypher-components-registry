@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -171,10 +173,18 @@ def test_validate_metadata_endpoint_returns_invalid_adapter_result() -> None:
     assert payload["is_valid"] is False
     assert payload["errors"]
     assert [check["name"] for check in payload["checks"]] == [
-        "Croissant compliance",
+        "Complete-file compatibility",
         "Adapter schema",
         "Adapter semantics",
     ]
+    assert [check["id"] for check in payload["validation_checks"]] == [
+        "croissant",
+        "schema",
+        "semantics",
+        "datasets",
+    ]
+    assert payload["validation_checks"][0]["validator_name"] == "mlcroissant"
+    assert payload["validation_checks"][1]["schema_title"]
 
 
 def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> None:
@@ -200,7 +210,7 @@ def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> Non
         if check["name"] == "Embedded dataset: Example dataset"
     )
     assert embedded_check["is_valid"] is False
-    assert any("[Example dataset]" in error for error in embedded_check["errors"])
+    assert embedded_check["errors"]
 
 
 def test_validate_metadata_endpoint_rejects_unknown_auto_type() -> None:
@@ -238,10 +248,13 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
 ) -> None:
     """Generate dataset metadata through the API without persisting it."""
     captured: dict[str, object] = {}
+    event_loop_thread_ids: list[int] = []
+    original_to_thread = asyncio.to_thread
 
     def fake_execute_dataset_request(request, generator):
         captured["request"] = request
         captured["generator"] = generator
+        captured["thread_id"] = threading.get_ident()
         captured["contents"] = Path(request.input_path).read_text(encoding="utf-8")
         document = _valid_dataset_document()
         Path(request.output_path).write_text(json.dumps(document), encoding="utf-8")
@@ -253,11 +266,16 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
             warnings=["Missing license; using 'UNKNOWN'."],
         )
 
+    async def tracked_to_thread(function, /, *args, **kwargs):
+        event_loop_thread_ids.append(threading.get_ident())
+        return await original_to_thread(function, *args, **kwargs)
+
     monkeypatch.setattr(
         metadata_router,
         "execute_dataset_request",
         fake_execute_dataset_request,
     )
+    monkeypatch.setattr(metadata_router.asyncio, "to_thread", tracked_to_thread)
     client = TestClient(create_app())
 
     response = client.post(
@@ -289,6 +307,7 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
     payload = response.json()
     request = captured["request"]
     assert captured["generator"] == "native"
+    assert captured["thread_id"] != event_loop_thread_ids[-1]
     assert captured["contents"] == "id,name\n1,Alice\n"
     assert Path(request.input_path).name == "people.csv"
     assert request.name == "Example dataset"

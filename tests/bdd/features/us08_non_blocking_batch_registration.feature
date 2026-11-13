@@ -1,20 +1,20 @@
-Feature: Non-blocking batch registration
+Feature: Non-blocking batch updates of published registrations
 
-  Scenario: Batch run completes with mixed outcomes
-    Given active sources include valid and invalid adapters
-    When the batch registration workflow runs
-    Then remaining adapters are still processed
-    And the run completes with mixed outcomes
+  Scenario: Batch run completes with mixed update outcomes
+    Given published sources include unchanged and invalid update candidates
+    When the batch update workflow runs
+    Then all published sources are processed
+    And the batch reports the unchanged and invalid outcomes
 
   Scenario: Fetch failure does not block the batch
-    Given one active source cannot be fetched and another is valid
-    When the batch registration workflow runs
-    Then remaining adapters are still processed
-    And the run records a FETCH_FAILED outcome
+    Given one published source cannot be fetched and another is unchanged
+    When the batch update workflow runs
+    Then all published sources are processed
+    And the fetch failure is recorded while accepted metadata is retained
 
-  Scenario: Corrected metadata can be reprocessed on demand
-    Given an active source previously failed validation
-    And the metadata is corrected before the next scheduled run
-    When the batch registration workflow runs
-    Then the source is reprocessed immediately
-    And the registry records a VALID_CREATED outcome for the corrected source
+  Scenario: Corrected metadata can be processed by the next batch
+    Given a published source has a failed update
+    And its metadata is corrected before the next batch run
+    When the batch update workflow runs
+    Then the corrected version is published
+    And a VALID_CREATED outcome is recorded for the corrected version

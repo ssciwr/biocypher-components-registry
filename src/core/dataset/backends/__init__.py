@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from src.core.dataset.backends.auto_select import (
     AutoDatasetGenerator,
-    select_generator_for_request,
+    select_generator,
 )
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.backends.croissant_baker import (
@@ -47,5 +47,5 @@ __all__ = [
     "build_croissant_baker_command",
     "list_generators",
     "resolve_generator",
-    "select_generator_for_request",
+    "select_generator",
 ]

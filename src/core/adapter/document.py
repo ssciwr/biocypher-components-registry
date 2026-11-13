@@ -2,48 +2,19 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
+from src.core.shared.constants import (
+    CROISSANT_CONFORMS_TO_URL,
+    DCT_CONFORMS_TO_KEY,
+    STANDARD_CONTEXT,
+)
 from src.core.shared.ids import slugify_identifier
 
-ADAPTER_CONTEXT: dict[str, Any] = {
-    "@language": "en",
-    "@vocab": "https://schema.org/",
-    "sc": "https://schema.org/",
-    "cr": "http://mlcommons.org/croissant/",
-    "rai": "http://mlcommons.org/croissant/RAI/",
-    "dct": "http://purl.org/dc/terms/",
-    "bsc": "https://bioschemas.org/profiles/Dataset/1.0-RELEASE/",
-    "citeAs": "cr:citeAs",
-    "column": "cr:column",
-    "conformsTo": "dct:conformsTo",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
-    "examples": {"@id": "cr:examples", "@type": "@json"},
-    "extract": "cr:extract",
-    "field": "cr:field",
-    "fileProperty": "cr:fileProperty",
-    "fileObject": "cr:fileObject",
-    "fileSet": "cr:fileSet",
-    "format": "cr:format",
-    "includes": "cr:includes",
-    "isLiveDataset": "cr:isLiveDataset",
-    "jsonPath": "cr:jsonPath",
-    "key": "cr:key",
-    "md5": "cr:md5",
-    "parentField": "cr:parentField",
-    "path": "cr:path",
-    "recordSet": "cr:recordSet",
-    "references": "cr:references",
-    "regex": "cr:regex",
-    "repeated": "cr:repeated",
-    "replace": "cr:replace",
-    "samplingRate": "cr:samplingRate",
-    "separator": "cr:separator",
-    "source": "cr:source",
-    "subField": "cr:subField",
-    "transform": "cr:transform",
-}
+JSONLD_TYPE_KEY = "@type"
+
+ADAPTER_CONTEXT: dict[str, Any] = STANDARD_CONTEXT
 
 
 def build_adapter_creator(
@@ -60,7 +31,7 @@ def build_adapter_creator(
         if str(creator_type).strip().lower() == "organization"
         else "Person"
     )
-    creator: dict[str, Any] = {"@type": normalized_type, "name": name}
+    creator: dict[str, Any] = {JSONLD_TYPE_KEY: normalized_type, "name": name}
     if affiliation:
         creator["affiliation"] = affiliation
     if email:
@@ -86,9 +57,9 @@ def build_adapter_document(
 ) -> dict[str, Any]:
     """Assemble a full adapter metadata document."""
     document: dict[str, Any] = {
-        "@context": ADAPTER_CONTEXT,
-        "@type": "SoftwareSourceCode",
-        "dct:conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
+        "@context": deepcopy(ADAPTER_CONTEXT),
+        JSONLD_TYPE_KEY: "SoftwareSourceCode",
+        DCT_CONFORMS_TO_KEY: "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
         "@id": adapter_id or slugify_identifier(name),
         "name": name,
         "description": description,
@@ -113,7 +84,7 @@ def build_dataset_distribution_file(
 ) -> dict[str, Any]:
     """Build a dataset distribution file entry for embedded metadata."""
     document: dict[str, Any] = {
-        "@type": "cr:FileObject",
+        JSONLD_TYPE_KEY: "cr:FileObject",
         "@id": file_id,
         "name": name,
         "contentUrl": content_url,
@@ -137,7 +108,7 @@ def build_dataset_field(
 ) -> dict[str, Any]:
     """Build a field node for an embedded dataset record set."""
     field: dict[str, Any] = {
-        "@type": "cr:Field",
+        JSONLD_TYPE_KEY: "cr:Field",
         "@id": f"{record_set_id}/{name}",
         "name": name,
         "description": description,
@@ -167,8 +138,8 @@ def build_embedded_dataset_document(
 ) -> dict[str, Any]:
     """Build a dataset fragment suitable for embedding under ``hasPart``."""
     document: dict[str, Any] = {
-        "@type": "sc:Dataset",
-        "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
+        JSONLD_TYPE_KEY: "sc:Dataset",
+        DCT_CONFORMS_TO_KEY: CROISSANT_CONFORMS_TO_URL,
         "name": name,
         "description": description,
         "version": version,
@@ -197,7 +168,7 @@ def build_embedded_record_set(
 ) -> dict[str, Any]:
     """Build a record set node for an embedded dataset fragment."""
     record_set: dict[str, Any] = {
-        "@type": "cr:RecordSet",
+        JSONLD_TYPE_KEY: "cr:RecordSet",
         "@id": record_set_id,
         "name": name,
         "field": fields,

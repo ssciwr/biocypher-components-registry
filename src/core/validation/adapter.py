@@ -13,35 +13,82 @@ from __future__ import annotations
 
 from typing import Any
 
-import jsonschema
 import jsonschema.validators
 
-from src.core.schema.profile import load_active_schema
+from src.core.schema import profile
 from src.core.validation.dataset import validate_embedded_dataset
-from src.core.validation.mlcroissant import validate_with_mlcroissant
-from src.core.validation.results import ValidationCheck, ValidationResult
+from src.core.validation.mlcroissant import validate_with_mlcroissant_report
+from src.core.validation.progress import ValidationProgress, croissant_validator_info
+from src.core.validation.results import (
+    ValidationCheck,
+    ValidationCheckReport,
+    ValidationResult,
+)
+from src.core.validation.schema_diagnostics import (
+    format_schema_error,
+    schema_validation_details,
+)
 
 
-def validate_adapter(data: dict[str, Any]) -> ValidationResult:
+def validate_adapter(
+    data: dict[str, Any], *, progress: ValidationProgress | None = None
+) -> ValidationResult:
     """Validate adapter metadata against the active adapter schema."""
-    schema = load_active_schema()
+    progress = progress or ValidationProgress()
+    profile_version = profile.ACTIVE_PROFILE_VERSION
+    schema = profile.load_schema(profile_version)
 
     validator_cls = jsonschema.validators.validator_for(schema)
     validator = validator_cls(schema)
 
-    mlcroissant_errors = validate_with_mlcroissant(data)
-    schema_errors = [_format_error(err) for err in validator.iter_errors(data)]
+    progress.update("croissant", status="RUNNING", **croissant_validator_info())
+    mlcroissant_report = validate_with_mlcroissant_report(data)
+    mlcroissant_errors = mlcroissant_report.errors
+    progress.update(
+        "croissant",
+        status="FAILED" if mlcroissant_errors else "PASSED",
+        errors=tuple(mlcroissant_errors),
+        warnings=tuple(mlcroissant_report.warnings),
+    )
+    progress.update(
+        "schema",
+        status="RUNNING",
+        profile_version=profile_version,
+        schema_title=schema.get("title"),
+        schema_id=schema.get("$id"),
+        schema_dialect=schema.get("$schema"),
+        validator_name="jsonschema",
+    )
+    raw_schema_errors = _actionable_schema_errors(validator.iter_errors(data))
+    schema_errors = [format_schema_error(err) for err in raw_schema_errors]
+    schema_details = schema_validation_details(
+        raw_schema_errors, schema, getattr(data, "json_source", None)
+    )
+    progress.update(
+        "schema",
+        status="FAILED" if schema_errors else "PASSED",
+        errors=tuple(schema_errors),
+        validation_details=tuple(schema_details),
+    )
+    progress.update("semantics", status="RUNNING")
     semantic_errors = _semantic_errors(data)
+    progress.update(
+        "semantics",
+        status="FAILED" if semantic_errors else "PASSED",
+        errors=tuple(semantic_errors),
+    )
     checks = [
         ValidationCheck(
-            name="Croissant compliance",
+            name="Complete-file compatibility",
             is_valid=len(mlcroissant_errors) == 0,
             errors=mlcroissant_errors,
+            warnings=mlcroissant_report.warnings,
         ),
         ValidationCheck(
             name="Adapter schema",
             is_valid=len(schema_errors) == 0,
             errors=schema_errors,
+            validation_details=schema_details,
         ),
         ValidationCheck(
             name="Adapter semantics",
@@ -58,8 +105,28 @@ def validate_adapter(data: dict[str, Any]) -> ValidationResult:
     return ValidationResult(
         is_valid=all(check.is_valid for check in checks),
         errors=errors,
+        warnings=mlcroissant_report.warnings,
         checks=checks,
+        profile_version=profile_version,
+        validation_checks=progress.reports,
+        validation_details=[
+            detail for check in checks for detail in check.validation_details
+        ],
     )
+
+
+def _actionable_schema_errors(errors) -> list:
+    """Replace noisy union summaries with their location-specific leaf errors."""
+    actionable = []
+    for error in errors:
+        nested = _actionable_schema_errors(error.context)
+        descendants = [
+            child
+            for child in nested
+            if len(child.absolute_path) > len(error.absolute_path)
+        ]
+        actionable.extend(descendants or [error])
+    return actionable
 
 
 def validate(data: dict[str, Any]) -> ValidationResult:
@@ -67,7 +134,9 @@ def validate(data: dict[str, Any]) -> ValidationResult:
     return validate_adapter(data)
 
 
-def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationResult:
+def validate_adapter_with_embedded_datasets(
+    data: dict[str, Any], *, progress: ValidationProgress | None = None
+) -> ValidationResult:
     """Validate adapter metadata and each embedded dataset fragment.
 
     This is the registry-level adapter validation contract used by user-facing
@@ -75,47 +144,191 @@ def validate_adapter_with_embedded_datasets(data: dict[str, Any]) -> ValidationR
     dataset checks together so the API, CLI, and registration workflow
     agree on what a valid adapter means.
     """
-    adapter_result = validate_adapter(data)
-    embedded_checks = _embedded_dataset_checks(data)
+    progress = progress or ValidationProgress(include_datasets=True)
+    if not any(check.id == "datasets" for check in progress.reports):
+        progress.put(ValidationCheckReport("datasets", "Embedded datasets"))
+    adapter_result = validate_adapter(data, progress=progress)
+    embedded_checks = _embedded_dataset_checks(data, progress)
+    _attribute_complete_file_findings(adapter_result, embedded_checks, progress)
+    _complete_dataset_group(progress)
     checks = [*adapter_result.checks, *embedded_checks]
-    errors = [error for check in checks for error in check.errors]
+    errors = _unique_errors(error for check in checks for error in check.errors)
+    warnings = _unique_errors(warning for check in checks for warning in check.warnings)
 
     return ValidationResult(
         is_valid=all(check.is_valid for check in checks),
         errors=errors,
+        warnings=warnings,
         checks=checks,
         profile_version=adapter_result.profile_version,
+        validation_checks=progress.reports,
+        validation_details=[
+            detail for check in checks for detail in check.validation_details
+        ],
     )
 
 
-def _embedded_dataset_checks(data: dict[str, Any]) -> list[ValidationCheck]:
+def _embedded_dataset_checks(
+    data: dict[str, Any], progress: ValidationProgress
+) -> list[ValidationCheck]:
     """Validate each embedded dataset as a standalone Croissant dataset."""
     has_part = data.get("hasPart")
     if isinstance(has_part, dict):
         has_part = [has_part]
-    if not isinstance(has_part, list):
+    if not isinstance(has_part, list) or not has_part:
+        progress.update(
+            "datasets",
+            status="NOT_RUN",
+            reason="No embedded dataset objects are available. See the adapter schema result.",
+        )
         return []
 
+    progress.update("datasets", status="RUNNING")
+    for index, dataset in enumerate(has_part):
+        label = (
+            str(dataset.get("name") or f"Dataset {index + 1}")
+            if isinstance(dataset, dict)
+            else f"Dataset {index + 1}"
+        )
+        progress.put(
+            ValidationCheckReport(
+                id=f"dataset:{index}",
+                name=label,
+                parent_id="datasets",
+                dataset_index=index,
+                dataset_name=label,
+            )
+        )
     checks: list[ValidationCheck] = []
     for index, dataset in enumerate(has_part, start=1):
+        check_id = f"dataset:{index - 1}"
         if not isinstance(dataset, dict):
+            progress.update(
+                check_id,
+                status="NOT_RUN",
+                reason="This hasPart item is not an object. See the adapter schema result.",
+            )
             continue
+        progress.update(check_id, status="RUNNING", **croissant_validator_info())
         label = str(dataset.get("name") or f"dataset[{index}]")
         result = validate_embedded_dataset(dataset)
+        progress.update(
+            check_id,
+            status="PASSED" if result.is_valid else "FAILED",
+            errors=tuple(result.errors),
+            warnings=tuple(result.warnings),
+            validation_details=tuple(result.validation_details),
+        )
         checks.append(
             ValidationCheck(
                 name=f"Embedded dataset: {label}",
                 is_valid=result.is_valid,
-                errors=[f"[{label}] {error}" for error in result.errors],
+                errors=list(result.errors),
+                warnings=list(result.warnings),
             )
         )
     return checks
 
 
-def _format_error(error: jsonschema.ValidationError) -> str:
-    path = " → ".join(str(p) for p in error.absolute_path)
-    location = f"[{path}] " if path else ""
-    return f"{location}{error.message}"
+def _attribute_complete_file_findings(
+    adapter_result: ValidationResult,
+    embedded_checks: list[ValidationCheck],
+    progress: ValidationProgress,
+) -> None:
+    """Show dataset findings on their dataset card instead of twice.
+
+    The complete assembled document is still validated by mlcroissant. When the
+    same finding is produced by an independent dataset validation, the complete
+    file check remains failed but delegates the diagnostic to that dataset.
+    """
+    complete_check = next(
+        (
+            check
+            for check in adapter_result.checks
+            if check.name == "Complete-file compatibility"
+        ),
+        None,
+    )
+    if complete_check is None:
+        return
+
+    dataset_error_keys = {
+        _error_key(error) for check in embedded_checks for error in check.errors
+    }
+    unique_complete_errors = [
+        error
+        for error in complete_check.errors
+        if _error_key(error) not in dataset_error_keys
+    ]
+    dataset_warning_keys = {
+        _error_key(warning) for check in embedded_checks for warning in check.warnings
+    }
+    unique_complete_warnings = [
+        warning
+        for warning in complete_check.warnings
+        if _error_key(warning) not in dataset_warning_keys
+    ]
+    attributed_error_count = len(complete_check.errors) - len(unique_complete_errors)
+    attributed_warning_count = len(complete_check.warnings) - len(
+        unique_complete_warnings
+    )
+    if not attributed_error_count and not attributed_warning_count:
+        return
+
+    complete_check.errors = unique_complete_errors
+    complete_check.warnings = unique_complete_warnings
+    reason = None
+    if attributed_error_count:
+        reason = (
+            "The complete assembled file failed because of dataset findings "
+            "reported on the dataset cards below."
+            if not unique_complete_errors
+            else "Dataset-specific findings are reported on their dataset cards below."
+        )
+    elif attributed_warning_count:
+        reason = "Dataset-specific warnings are reported on their dataset cards below."
+    progress.update(
+        "croissant",
+        errors=tuple(unique_complete_errors),
+        warnings=tuple(unique_complete_warnings),
+        reason=reason,
+    )
+
+
+def _error_key(error: str) -> str:
+    """Normalize validator whitespace for stable duplicate detection."""
+    return " ".join(error.split())
+
+
+def _unique_errors(errors) -> list[str]:
+    """Preserve diagnostic order while removing repeated validator findings."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for error in errors:
+        key = _error_key(error)
+        if key not in seen:
+            seen.add(key)
+            unique.append(error)
+    return unique
+
+
+def _complete_dataset_group(progress: ValidationProgress) -> None:
+    """Finalize the group, giving failed checks precedence over skipped checks."""
+    children = [check for check in progress.reports if check.parent_id == "datasets"]
+    if not children:
+        return
+    status = "PASSED"
+    if any(check.status == "FAILED" for check in children):
+        status = "FAILED"
+    elif any(check.status == "NOT_RUN" for check in children):
+        status = "NOT_RUN"
+    progress.update(
+        "datasets",
+        status=status,
+        reason="Some dataset checks could not run. See their results below."
+        if status == "NOT_RUN"
+        else None,
+    )
 
 
 def _semantic_errors(data: dict[str, Any]) -> list[str]:
@@ -146,6 +359,10 @@ def _collect_id_occurrences(
     if isinstance(node, dict):
         _record_node_id(node, path, occurrences)
         for key, value in node.items():
+            if key == "@context":
+                # Context term definitions describe JSON-LD vocabulary. They are
+                # not graph nodes and may legitimately repeat in embedded documents.
+                continue
             child_path = f"{path}.{key}" if path else key
             _collect_id_occurrences(value, child_path, occurrences)
     elif isinstance(node, list):

@@ -2,6 +2,18 @@ export type CreatorType = 'Person' | 'Organization'
 export type DatasetMode = 'generate' | 'upload'
 export type MetadataStep = 1 | 2 | 3 | 4
 
+export type UploadedDatasetEditableField =
+  | 'citation'
+  | 'creators'
+  | 'datePublished'
+  | 'datasetVersion'
+  | 'description'
+  | 'distributions'
+  | 'fields'
+  | 'license'
+  | 'name'
+  | 'url'
+
 export type SelectOption<TValue extends string = string> = Readonly<{
   disabled?: boolean
   label: string
@@ -15,6 +27,7 @@ export type CreatorDraft = {
   email: string
   name: string
   orcid: string
+  uploadedIndex?: number
   url: string
 }
 
@@ -26,22 +39,56 @@ export type DatasetDraft = {
   datePublished: string
   datasetVersion: string
   description: string
+  distributions: DatasetDistributionDraft[]
   encodingFormat: string
   fields: DatasetDatasetManualField[]
   filename: string
   input: string
   license: string
+  licenseLabel: string
   manualFields: DatasetDatasetManualField[]
   mode: DatasetMode
   name: string
   path: string
   recordSetName: string
+  recordSets: DatasetRecordSetDraft[]
   sha256: string
-  sourceFile?: File
+  sourceSelection?: DatasetSourceSelection
   sourceFileName: string
   uploadedDocument?: Record<string, unknown>
+  uploadedDirtyFields: UploadedDatasetEditableField[]
   uploadedFileName: string
   url: string
+}
+
+export type DatasetRecordSetDraft = {
+  fields: DatasetDatasetManualField[]
+  id: string
+  name: string
+  sourceFileLabel: string
+  uploadedIndex: number
+}
+
+export type DatasetDistributionDraft = {
+  containedInLabel: string
+  contentUrl: string
+  encodingFormat: string
+  filename: string
+  id: string
+  md5: string
+  sha256: string
+  uploadedIndex: number
+}
+
+export type DatasetSourceSelection = {
+  entries: DatasetSourceEntry[]
+  kind: 'file' | 'folder'
+  name: string
+}
+
+export type DatasetSourceEntry = {
+  file: File
+  relativePath: string
 }
 
 export type DatasetDatasetManualField = {
@@ -52,6 +99,7 @@ export type DatasetDatasetManualField = {
   fieldId: string
   name: string
   source?: unknown
+  uploadedIndex?: number
 }
 
 export type MetadataGeneratorForm = {

@@ -27,6 +27,16 @@ class MetadataDiscoveryError(Exception):
     """Raised when ``croissant.jsonld`` cannot be uniquely located or loaded."""
 
 
+class RepositoryUnavailableError(MetadataDiscoveryError):
+    """A repository could not be inspected; absence has not been established."""
+
+    def __init__(
+        self, message: str, reason_code: str = "REPOSITORY_UNAVAILABLE"
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
 class MetadataFileNotFoundError(FileNotFoundError, MetadataDiscoveryError):
     """Raised when no croissant.jsonld can be found for a repository."""
 
@@ -37,6 +47,21 @@ class AmbiguousMetadataFileError(ValueError, MetadataDiscoveryError):
 
 class InvalidMetadataJSONError(ValueError, MetadataDiscoveryError):
     """Raised when croissant.jsonld contains invalid JSON."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+        source_file: str | None = None,
+        source_url: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.line = line
+        self.column = column
+        self.source_file = source_file
+        self.source_url = source_url
 
 
 class RemoteResourceNotFoundError(FileNotFoundError):
@@ -57,7 +82,9 @@ class InvalidRepoURLError(ValueError):
 
     def __init__(self, repo_url: str) -> None:
         self.repo_url = repo_url
-        super().__init__(f"Invalid repository URL: {repo_url}")
+        super().__init__(
+            "Invalid repository URL. Use an approved HTTPS repository host without embedded credentials."
+        )
 
 
 class MetadataNotFoundError(RemoteResourceNotFoundError):
