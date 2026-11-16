@@ -221,9 +221,7 @@ def _ensure_public_value(
         return
 
     for nested in nested_values:
-        _ensure_public_value(
-            nested, scratch=scratch, artifact_hashes=artifact_hashes
-        )
+        _ensure_public_value(nested, scratch=scratch, artifact_hashes=artifact_hashes)
 
 
 def _ensure_public_string(
@@ -233,10 +231,6 @@ def _ensure_public_string(
     if not isinstance(value, str):
         return
     if _is_private_value(value, scratch):
-        raise UploadSessionError(
-            "Generated metadata contains a private scratch value."
-        )
+        raise UploadSessionError("Generated metadata contains a private scratch value.")
     if value in artifact_hashes:
-        raise UploadSessionError(
-            "Generated metadata contains an artifact identity."
-        )
+        raise UploadSessionError("Generated metadata contains an artifact identity.")

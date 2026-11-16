@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import yaml
+
 from src.core.settings import DatabaseBackend, load_database_settings
 
 

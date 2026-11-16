@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import mlcroissant as mlc
 
+from src.core.shared.constants import CROISSANT_1_0_CONTEXT
 from src.core.validation.adapter import validate_adapter
 from src.core.validation.dataset import validate_dataset, validate_embedded_dataset
 from src.core.validation.mlcroissant import (
     validate_with_mlcroissant,
     validate_with_mlcroissant_report,
 )
-from src.core.shared.constants import CROISSANT_1_0_CONTEXT
 
 
 def test_shared_context_is_croissant_1_0_compatible() -> None:

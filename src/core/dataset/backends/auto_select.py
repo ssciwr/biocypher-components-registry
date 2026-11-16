@@ -80,9 +80,7 @@ def _discover_files(request: GenerationRequest) -> list[Path]:
     return sorted(
         path
         for path in input_path.rglob("*")
-        if path.is_file()
-        and not path.is_symlink()
-        and path.resolve() != excluded_path
+        if path.is_file() and not path.is_symlink() and path.resolve() != excluded_path
     )
 
 

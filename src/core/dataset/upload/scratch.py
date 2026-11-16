@@ -47,9 +47,7 @@ def _mount_candidates(
     return candidates
 
 
-def _mount_candidate(
-    line: str, resolved: Path
-) -> tuple[int, str, set[str]] | None:
+def _mount_candidate(line: str, resolved: Path) -> tuple[int, str, set[str]] | None:
     """Parse one applicable Linux mountinfo line."""
     before, separator, after = line.partition(" - ")
     if not separator:

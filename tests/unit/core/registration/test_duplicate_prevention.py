@@ -143,7 +143,9 @@ def test_public_processing_requires_actor_before_store_access(operation):
     store = Mock()
     process = register_adapter if operation == "register" else update_adapter
     identifier = (
-        "https://github.com/owner/repo" if operation == "register" else "example-adapter"
+        "https://github.com/owner/repo"
+        if operation == "register"
+        else "example-adapter"
     )
     with pytest.raises(PermissionError):
         process(identifier, store, actor=None)

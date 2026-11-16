@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from src.core.dataset.backends.auto_select import AutoDatasetGenerator
 from src.core.dataset import process as process_module
+from src.core.dataset.backends.auto_select import AutoDatasetGenerator
 from src.core.dataset.process import run_bounded_process
 from src.core.dataset.request import GenerationRequest
+from src.core.dataset.upload import reconciliation as reconciliation_module
 from src.core.dataset.upload.capabilities import validate_capability
 from src.core.dataset.upload.errors import UploadSessionError
 from src.core.dataset.upload.limits import MAX_ARTIFACT_BYTES, MAX_DIAGNOSTIC_BYTES
-from src.core.dataset.upload import reconciliation as reconciliation_module
 from src.core.dataset.upload.models import (
     UploadGenerationOptions,
     UploadInventoryEntry,

@@ -4,8 +4,7 @@ import json
 
 import pytest
 
-from src.core.dataset.backends import auto_select
-from src.core.dataset.backends import list_generators, resolve_generator
+from src.core.dataset.backends import auto_select, list_generators, resolve_generator
 from src.core.dataset.backends.auto_select import (
     AutoDatasetGenerator,
     select_generator,
@@ -117,7 +116,9 @@ def test_auto_keeps_baker_for_mixed_native_and_non_native_inputs(
     assert isinstance(generator, CroissantBakerGenerator)
 
 
-def test_auto_does_not_fallback_after_baker_execution_failure(monkeypatch, tmp_path) -> None:
+def test_auto_does_not_fallback_after_baker_execution_failure(
+    monkeypatch, tmp_path
+) -> None:
     request = GenerationRequest(
         input_path=str(tmp_path / "records.csv"),
         output_path=str(tmp_path / "metadata.jsonld"),

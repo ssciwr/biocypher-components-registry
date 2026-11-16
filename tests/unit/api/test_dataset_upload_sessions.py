@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from src.api.routers import dataset_uploads
 from src.api.app import create_app
+from src.api.routers import dataset_uploads
 from src.core.dataset.request import GenerationResult
 from src.core.dataset.upload import service as upload_service
 from src.core.dataset.upload.service import UploadSessionManager
@@ -59,7 +58,9 @@ def test_upload_session_streams_reconciles_and_cleans_up(
         processing_order.append("croissant-validation")
         return real_validate(document)
 
-    monkeypatch.setattr(dataset_uploads, "reconcile_generated_metadata", tracked_reconcile)
+    monkeypatch.setattr(
+        dataset_uploads, "reconcile_generated_metadata", tracked_reconcile
+    )
     monkeypatch.setattr(dataset_uploads, "validate_dataset", tracked_validate)
 
     def generated_result(*, request, generator, **_kwargs):

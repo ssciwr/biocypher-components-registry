@@ -59,7 +59,9 @@ class UploadSessionManager:
         self._global_bytes = 0
         self._lock = asyncio.Lock()
         self.generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
-        self._generation_queue: asyncio.Queue[tuple[UploadSession, Callable[[UploadSession], Awaitable[object]]]] = asyncio.Queue()
+        self._generation_queue: asyncio.Queue[
+            tuple[UploadSession, Callable[[UploadSession], Awaitable[object]]]
+        ] = asyncio.Queue()
         self._generation_worker: asyncio.Task[None] | None = None
 
     def start(self) -> None:
@@ -99,14 +101,26 @@ class UploadSessionManager:
                     item.session_id
                     for item in self._sessions.values()
                     if item.active_operations == 0
-                    and item.state in {UploadSessionState.CREATED, UploadSessionState.UPLOADING, UploadSessionState.READY}
+                    and item.state
+                    in {
+                        UploadSessionState.CREATED,
+                        UploadSessionState.UPLOADING,
+                        UploadSessionState.READY,
+                    }
                     and (
-                        (item.state == UploadSessionState.CREATED and item.created_at < now - SESSION_START_TTL_SECONDS)
-                        or (item.state != UploadSessionState.CREATED and item.last_active < cutoff)
+                        (
+                            item.state == UploadSessionState.CREATED
+                            and item.created_at < now - SESSION_START_TTL_SECONDS
+                        )
+                        or (
+                            item.state != UploadSessionState.CREATED
+                            and item.last_active < cutoff
+                        )
                     )
                 ]
                 expired_results = [
-                    item.session_id for item in self._sessions.values()
+                    item.session_id
+                    for item in self._sessions.values()
                     if item.terminal_result is not None
                     and item.terminal_result.completed_at < now - RESULT_TTL_SECONDS
                 ]
@@ -152,7 +166,9 @@ class UploadSessionManager:
             self._global_bytes += requested_bytes
             return session, token
 
-    def _validate_request(self, source_kind: str, inventory: list[UploadInventoryEntry]) -> None:
+    def _validate_request(
+        self, source_kind: str, inventory: list[UploadInventoryEntry]
+    ) -> None:
         if source_kind not in {"file", "folder"}:
             raise UploadSessionError("source_kind must be 'file' or 'folder'.")
         if not inventory:
@@ -348,9 +364,7 @@ class UploadSessionManager:
         artifact_sha256: str,
     ) -> int:
         """Stream, bound, verify, and atomically publish one artifact body."""
-        part = destination.with_name(
-            destination.name + f".part-{secrets.token_hex(6)}"
-        )
+        part = destination.with_name(destination.name + f".part-{secrets.token_hex(6)}")
         count = 0
         digest = hashlib.sha256()
         try:
@@ -409,8 +423,12 @@ class UploadSessionManager:
     async def begin_processing(self, session: UploadSession) -> None:
         """Atomically require a complete inventory and lock finalization."""
         async with session.lock:
-            if session.state in {UploadSessionState.FINALIZE_QUEUED, UploadSessionState.PROCESSING,
-                                 UploadSessionState.COMPLETE, UploadSessionState.FAILED}:
+            if session.state in {
+                UploadSessionState.FINALIZE_QUEUED,
+                UploadSessionState.PROCESSING,
+                UploadSessionState.COMPLETE,
+                UploadSessionState.FAILED,
+            }:
                 return
             if not session.is_ready:
                 raise UploadSessionError(
@@ -419,12 +437,19 @@ class UploadSessionManager:
             session.state = UploadSessionState.FINALIZE_QUEUED
             session.mark_active()
 
-    async def enqueue_generation(self, session: UploadSession,
-                                 callback: Callable[[UploadSession], Awaitable[object]]) -> bool:
+    async def enqueue_generation(
+        self,
+        session: UploadSession,
+        callback: Callable[[UploadSession], Awaitable[object]],
+    ) -> bool:
         """Atomically enqueue the session once; repeated finalization is a no-op."""
         async with session.lock:
-            if session.state in {UploadSessionState.FINALIZE_QUEUED, UploadSessionState.PROCESSING,
-                                 UploadSessionState.COMPLETE, UploadSessionState.FAILED}:
+            if session.state in {
+                UploadSessionState.FINALIZE_QUEUED,
+                UploadSessionState.PROCESSING,
+                UploadSessionState.COMPLETE,
+                UploadSessionState.FAILED,
+            }:
                 return False
             if not session.is_ready:
                 raise UploadSessionError(
@@ -450,7 +475,9 @@ class UploadSessionManager:
                     result = UploadTerminalResult(value=value)
                     state = UploadSessionState.COMPLETE
                 except Exception:
-                    result = UploadTerminalResult(error="Dataset generation failed. Verify the selected CSV/TSV source and metadata.")
+                    result = UploadTerminalResult(
+                        error="Dataset generation failed. Verify the selected CSV/TSV source and metadata."
+                    )
                     state = UploadSessionState.FAILED
                 await self._release_artifacts(session)
                 async with session.lock:
@@ -462,7 +489,9 @@ class UploadSessionManager:
 
     async def _release_artifacts(self, session: UploadSession) -> None:
         async with self._lock:
-            self._global_bytes = max(0, self._global_bytes - session.received_bytes - session.reserved_bytes)
+            self._global_bytes = max(
+                0, self._global_bytes - session.received_bytes - session.reserved_bytes
+            )
             session.received_bytes = session.reserved_bytes = 0
         await self._remove_session_tree(session)
 
@@ -477,7 +506,11 @@ class UploadSessionManager:
             await self.destroy(session_id)
 
     def _artifact_sessions(self) -> list[UploadSession]:
-        return [s for s in self._sessions.values() if s.terminal_result is None and s.state != UploadSessionState.CLOSING]
+        return [
+            s
+            for s in self._sessions.values()
+            if s.terminal_result is None and s.state != UploadSessionState.CLOSING
+        ]
 
     async def destroy(self, session_id: str) -> None:
         """Forget one session and remove all partial and completed artifacts."""
@@ -585,5 +618,3 @@ def _remove_partial_file(path: Path) -> None:
     """Best-effort removal for a failed partial artifact."""
     with suppress(OSError):
         path.unlink()
-
-

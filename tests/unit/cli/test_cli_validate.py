@@ -127,7 +127,10 @@ def test_validate_adapter_command_validates_embedded_datasets(tmp_path: Path) ->
 
     assert result.exit_code == 1
     assert "Embedded dataset: Example dataset" in result.output
-    assert "The current JSON-LD doesn't extend https://schema.org/Dataset." in result.output
+    assert (
+        "The current JSON-LD doesn't extend https://schema.org/Dataset."
+        in result.output
+    )
     assert "INVALID" in result.output
 
 

@@ -42,7 +42,9 @@ def generate_native_in_bounded_process(request: GenerationRequest) -> Generation
     try:
         document = json.loads(Path(request.output_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise GeneratorError("Native generation did not produce valid JSON-LD.") from exc
+        raise GeneratorError(
+            "Native generation did not produce valid JSON-LD."
+        ) from exc
     return GenerationResult(
         output_path=request.output_path,
         stdout=result.stdout,

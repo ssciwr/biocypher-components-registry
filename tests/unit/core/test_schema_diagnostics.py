@@ -330,13 +330,17 @@ def test_adapter_schema_does_not_restrict_fields_owned_by_croissant_validator(
     )
 
     result = validate_adapter_with_embedded_datasets(document)
-    schema_check = next(check for check in result.checks if check.name == "Adapter schema")
+    schema_check = next(
+        check for check in result.checks if check.name == "Adapter schema"
+    )
 
     assert schema_check.is_valid
     assert schema_check.errors == []
 
 
-def test_repeated_complete_file_error_is_attributed_to_dataset_once(monkeypatch) -> None:
+def test_repeated_complete_file_error_is_attributed_to_dataset_once(
+    monkeypatch,
+) -> None:
     document = sample_adapter_document()
     finding = "Extract should define column, fileProperty, or jsonPath."
     monkeypatch.setattr(
@@ -350,14 +354,10 @@ def test_repeated_complete_file_error_is_attributed_to_dataset_once(monkeypatch)
 
     result = validate_adapter_with_embedded_datasets(document)
     complete = next(
-        check
-        for check in result.validation_checks
-        if check.id == "croissant"
+        check for check in result.validation_checks if check.id == "croissant"
     )
     dataset = next(
-        check
-        for check in result.validation_checks
-        if check.parent_id == "datasets"
+        check for check in result.validation_checks if check.parent_id == "datasets"
     )
 
     assert not result.is_valid
@@ -403,9 +403,7 @@ def test_embedded_context_term_definitions_are_not_duplicate_graph_nodes(
 ) -> None:
     document = sample_adapter_document()
     document["@context"] = {"data": {"@id": "cr:data", "@type": "@json"}}
-    document["hasPart"][0]["@context"] = {
-        "data": {"@id": "cr:data", "@type": "@json"}
-    }
+    document["hasPart"][0]["@context"] = {"data": {"@id": "cr:data", "@type": "@json"}}
     monkeypatch.setattr(
         "src.core.validation.adapter.validate_with_mlcroissant_report",
         lambda _: MLCroissantValidationReport([], []),

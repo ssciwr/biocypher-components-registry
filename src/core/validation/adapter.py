@@ -153,9 +153,7 @@ def validate_adapter_with_embedded_datasets(
     _complete_dataset_group(progress)
     checks = [*adapter_result.checks, *embedded_checks]
     errors = _unique_errors(error for check in checks for error in check.errors)
-    warnings = _unique_errors(
-        warning for check in checks for warning in check.warnings
-    )
+    warnings = _unique_errors(warning for check in checks for warning in check.warnings)
 
     return ValidationResult(
         is_valid=all(check.is_valid for check in checks),
@@ -263,9 +261,7 @@ def _attribute_complete_file_findings(
         if _error_key(error) not in dataset_error_keys
     ]
     dataset_warning_keys = {
-        _error_key(warning)
-        for check in embedded_checks
-        for warning in check.warnings
+        _error_key(warning) for check in embedded_checks for warning in check.warnings
     }
     unique_complete_warnings = [
         warning
