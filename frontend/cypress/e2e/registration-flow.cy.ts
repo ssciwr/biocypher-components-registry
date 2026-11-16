@@ -54,14 +54,21 @@ describe('automatic pre-flight and synchronous registration', () => {
 
   it('ignores an older successful response after the URL changes', () => {
     let oldCheckStarted = false
+    let oldCheckReplied = false
+    let releaseOldCheck = () => {}
     cy.intercept('GET', '**/registrations/croissant-file-present-check*', (request) => {
       if (request.query.repository_url === repositoryUrl) {
         oldCheckStarted = true
-        request.reply({ delay: 1800, body: found })
-      } else {
-        request.alias = 'newCheck'
-        request.reply({ ...found, status: 'NOT_FOUND', has_croissant_file: false })
+        return new Promise<void>((resolve) => {
+          releaseOldCheck = () => {
+            request.reply(found)
+            oldCheckReplied = true
+            resolve()
+          }
+        })
       }
+      request.alias = 'newCheck'
+      request.reply({ ...found, status: 'NOT_FOUND', has_croissant_file: false })
     })
     cy.visit('/register')
     repositoryInput().type(repositoryUrl, { delay: 0 })
@@ -69,8 +76,9 @@ describe('automatic pre-flight and synchronous registration', () => {
     repositoryInput().clear().type(`${repositoryUrl}-other`, { delay: 0 })
     cy.wait('@newCheck')
     cy.contains('Croissant file not found at repository root').should('be.visible')
-    // Wait beyond the old response delay to prove it cannot re-enable submission.
-    cy.wait(1900)
+    // Deliver the stale response only now to prove it cannot re-enable submission.
+    cy.then(() => releaseOldCheck())
+    cy.wrap(null).should(() => expect(oldCheckReplied).to.equal(true))
     cy.contains('button', 'Register adapter').should('be.disabled')
     cy.contains('Croissant file not found at repository root').should('be.visible')
   })

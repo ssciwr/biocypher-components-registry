@@ -21,20 +21,21 @@ export async function prepareDatasetDrafts(
   onCapacityWait: (wait: DatasetCapacityWait | null) => void,
   generateDataset: GenerateDataset = generateDatasetFromSelection,
   index = 0,
-  prepared: PreparedDatasets = { datasets: [], warnings: [] },
+  prepared?: PreparedDatasets,
 ): Promise<PreparedDatasets> {
+  const accumulator = prepared ?? { datasets: [], warnings: [] }
   const dataset = sourceDatasets[index]
-  if (!dataset) return prepared
+  if (!dataset) return accumulator
 
   if (dataset.uploadedDocument) {
-    prepared.datasets.push(dataset)
+    accumulator.datasets.push(dataset)
   } else {
     if (!dataset.sourceSelection) {
       throw new Error('Select a source dataset file or folder first.')
     }
     const result = await generateDataset(dataset, { onCapacityWait })
-    prepared.warnings.push(...result.warnings)
-    prepared.datasets.push(datasetUIStateDraftFromCroissantFile(result.metadata, dataset))
+    accumulator.warnings.push(...result.warnings)
+    accumulator.datasets.push(datasetUIStateDraftFromCroissantFile(result.metadata, dataset))
   }
 
   return prepareDatasetDrafts(
@@ -42,6 +43,6 @@ export async function prepareDatasetDrafts(
     onCapacityWait,
     generateDataset,
     index + 1,
-    prepared,
+    accumulator,
   )
 }

@@ -113,13 +113,13 @@ function AdapterListView() {
 
         <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
           {adapters === null ? (
-            <div className="col-span-full flex justify-center text-slate-500" role="status">
+            <output className="col-span-full flex justify-center text-slate-500">
               <ArrowPathIcon className="h-6 w-6 animate-spin" aria-hidden="true" /><br />
               <span className="sr-only">Searching adapters...</span>
-            </div>
+            </output>
           ) : null}
           {!loadError && adapters?.length === 0 ? (
-            <p className="col-span-full text-center text-slate-500" role="status">No Adapters found</p>
+            <output className="col-span-full text-center text-slate-500">No Adapters found</output>
           ) : null}
           {adapters?.map((adapter) => (
             <article
@@ -154,14 +154,28 @@ function AdapterListView() {
   )
 }
 
+function updateLabel(attempt: NonNullable<AdapterDetail['latest_attempt']>) {
+  if (attempt.attempt_status === 'FAILED') return 'Update failed'
+  return attempt.update_applied ? 'Update successful' : 'Already up to date'
+}
+
+// Messages can repeat, so the key combines the text with its occurrence number.
+function keyedMessages(messages: string[]) {
+  const seen = new Map<string, number>()
+  return messages.map((message) => {
+    const occurrence = (seen.get(message) ?? 0) + 1
+    seen.set(message, occurrence)
+    return { message, key: `${message}#${occurrence}` }
+  })
+}
+
 function AdapterUpdateStatus({ attempt }: Readonly<{ attempt: NonNullable<AdapterDetail['latest_attempt']> }>) {
   const failed = attempt.attempt_status === 'FAILED'
-  const status = failed ? 'Update failed' : attempt.update_applied ? 'Update successful' : 'Already up to date'
-  const errors = attempt.validation_errors ?? []
+  const errors = keyedMessages(attempt.validation_errors ?? [])
 
   return (
-    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm" role="status">
-      <p><strong>Update status:</strong> {status}</p>
+    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+      <output className="block"><strong>Update status:</strong> {updateLabel(attempt)}</output>
       <p><strong>Current version:</strong> {attempt.published_version ?? 'None'}</p>
       {failed ? (
         <>
@@ -173,7 +187,7 @@ function AdapterUpdateStatus({ attempt }: Readonly<{ attempt: NonNullable<Adapte
           {errors.length > 0 ? (
             <details className="mt-2">
               <summary>Update details</summary>
-              <ul>{errors.map((message, index) => <li key={index}>{message}</li>)}</ul>
+              <ul>{errors.map(({ message, key }) => <li key={key}>{message}</li>)}</ul>
             </details>
           ) : <p className="mt-2">{attempt.message}</p>}
         </>
@@ -453,7 +467,7 @@ bc.run()`}
                   {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
                 </button> : null}
                 </div>
-                {isUpdating ? <p className="mt-3 text-sm text-blue-700" role="status">Checking for updates...</p> : null}
+                {isUpdating ? <output className="mt-3 block text-sm text-blue-700">Checking for updates...</output> : null}
                 {!isUpdating && adapter.latest_attempt ? (
                   <AdapterUpdateStatus attempt={adapter.latest_attempt} />
                 ) : null}

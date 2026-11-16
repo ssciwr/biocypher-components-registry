@@ -51,13 +51,10 @@ export async function submitRegistrationStream(
     },
   })
 
-  const iterator = stream[Symbol.asyncIterator]()
-  try {
-    while (!(await iterator.next()).done) {
-      if (result || terminalError) break
-    }
-  } finally {
-    await iterator.return()
+  // Events are handled by onSseEvent; iteration only drives the stream, and break closes it.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for await (const _event of stream) {
+    if (result || terminalError) break
   }
   if (terminalError) throw terminalError
   if (!result) throw new Error(unconfirmedMessage)

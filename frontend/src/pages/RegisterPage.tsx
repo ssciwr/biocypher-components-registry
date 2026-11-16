@@ -113,6 +113,85 @@ function initialForm(): RegistrationForm {
  * AI-Generated. Based on the Penpot designs.
  */
 
+type ResultPhase = 'unconfirmed' | 'processing' | 'succeeded' | 'failed'
+
+type ResultView = Readonly<{ status: string; title: string; text: string | undefined; tone: string; icon: ReactNode }>
+
+function resultPhase(error: string | null, isProcessing: boolean, succeeded: boolean): ResultPhase {
+  if (error) return 'unconfirmed'
+  if (isProcessing) return 'processing'
+  return succeeded ? 'succeeded' : 'failed'
+}
+
+function resultView(phase: ResultPhase, error: string | null, result: RegistrationResponse | null): ResultView {
+  switch (phase) {
+    case 'unconfirmed':
+      return {
+        status: 'UNCONFIRMED - Registration outcome unknown',
+        title: 'Registration outcome could not be confirmed',
+        text: error ?? undefined,
+        tone: 'bg-red-100 text-red-600',
+        icon: <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />,
+      }
+    case 'processing':
+      return {
+        status: 'PROCESSING - Checking metadata',
+        title: 'Checking your adapter...',
+        text: 'Fetching and validating croissant.jsonld from your repository.',
+        tone: 'bg-blue-100 text-blue-600',
+        icon: <ArrowPathIcon className="h-8 w-8 animate-spin" aria-hidden="true" />,
+      }
+    case 'succeeded':
+      return {
+        status: 'SUCCEEDED - Registered',
+        title: 'Adapter registered successfully',
+        text: result?.message,
+        tone: 'bg-emerald-100 text-emerald-600',
+        icon: <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />,
+      }
+    case 'failed':
+      return {
+        status: `FAILED - ${registrationFailureReasons[result?.reason_code ?? ''] ?? 'Not registered'}`,
+        title: 'Registration failed',
+        text: 'Your adapter has not been registered yet. Review the details, fix the issues in your repository, then retry.',
+        tone: 'bg-red-100 text-red-600',
+        icon: <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />,
+      }
+  }
+}
+
+function resultDiagnostics(result: RegistrationResponse | null, checks: ValidationCheckResponse[]) {
+  const groupedDetails = checks.flatMap(check => registrationValidationDetails({ validation_errors: check.errors, validation_details: check.validation_details }))
+  const groupedMessages = new Set(groupedDetails.map(detail => detail.message.trim()))
+  const validationDetails = registrationValidationDetails(result).filter(detail => !groupedMessages.has(detail.message.trim()))
+  const message = result?.message.trim() ?? ''
+  const isDuplicated = [...validationDetails, ...groupedDetails].some(detail => detail.message.trim() === message)
+  return { groupedDetails, validationDetails, showMessage: Boolean(message) && !isDuplicated }
+}
+
+type FailureDetailsProps = Readonly<{
+  message: string
+  showMessage: boolean
+  validationDetails: ReturnType<typeof resultDiagnostics>['validationDetails']
+  hasGroupedDetails: boolean
+}>
+
+function FailureDetails({ message, showMessage, validationDetails, hasGroupedDetails }: FailureDetailsProps) {
+  return (
+    <div className="mt-6 grid gap-6 text-sm">
+      {showMessage ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-red-700">
+        <h3 className="font-semibold">Message</h3>
+        <p className="mt-1 whitespace-pre-wrap break-words">{message}</p>
+      </div> : null}
+      {validationDetails.length > 0 ? <div>
+        <h3 className="font-semibold text-slate-700">Validation errors ({validationDetails.length})</h3>
+        <div className="mt-3"><DiagnosticErrors details={validationDetails} /></div>
+      </div> : null}
+      {!showMessage && validationDetails.length === 0 && !hasGroupedDetails ? <p className="text-slate-600">No additional diagnostic information was returned.</p> : null}
+    </div>
+  )
+}
+
 function RegistrationResultPanel({
   isProcessing,
   isRetrying,
@@ -125,31 +204,24 @@ function RegistrationResultPanel({
   const headingRef = useRef<HTMLHeadingElement>(null)
   const succeeded = result?.attempt_status === 'SUCCEEDED'
   const failed = result?.attempt_status === 'FAILED'
-  const groupedDetails = checks.flatMap(check => registrationValidationDetails({ validation_errors: check.errors, validation_details: check.validation_details }))
-  const validationDetails = registrationValidationDetails(result).filter(detail => !groupedDetails.some(grouped => grouped.message.trim() === detail.message.trim()))
-  const showMessage = Boolean(result?.message.trim()) && ![...validationDetails, ...groupedDetails].some((detail) => detail.message.trim() === result?.message.trim())
-  const failureReason = registrationFailureReasons[result?.reason_code ?? ''] ?? 'Not registered'
-  const registrationStatus = error ? 'UNCONFIRMED - Registration outcome unknown' : isProcessing ? 'PROCESSING - Checking metadata' : succeeded ? 'SUCCEEDED - Registered' : `FAILED - ${failureReason}`
+  const { groupedDetails, validationDetails, showMessage } = resultDiagnostics(result, checks)
+  const view = resultView(resultPhase(error, isProcessing, succeeded), error, result)
   const repository = result?.repository_location ?? repositoryLocation
-  const title = error ? 'Registration outcome could not be confirmed' : isProcessing ? 'Checking your adapter...' : succeeded ? 'Adapter registered successfully' : 'Registration failed'
-  const iconTone = isProcessing ? 'bg-blue-100 text-blue-600' : succeeded ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
 
   useEffect(() => {
     headingRef.current?.focus()
   }, [isProcessing, result])
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10" role="status" aria-busy={isProcessing}>
+    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10" aria-busy={isProcessing}>
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-4">
-          <span className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${iconTone}`}>
-            {isProcessing ? <ArrowPathIcon className="h-8 w-8 animate-spin" aria-hidden="true" /> : succeeded ? <CheckCircleIcon className="h-8 w-8" aria-hidden="true" /> : <ExclamationTriangleIcon className="h-8 w-8" aria-hidden="true" />}
+          <span className={`flex h-14 w-14 flex-none items-center justify-center rounded-full ${view.tone}`}>
+            {view.icon}
           </span>
           <div>
-            <h2 className="text-2xl font-bold text-slate-950 outline-none" ref={headingRef} tabIndex={-1}>{title}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              {error ? error : isProcessing ? 'Fetching and validating croissant.jsonld from your repository.' : succeeded ? result?.message : 'Your adapter has not been registered yet. Review the details, fix the issues in your repository, then retry.'}
-            </p>
+            <h2 className="text-2xl font-bold text-slate-950 outline-none" ref={headingRef} tabIndex={-1}>{view.title}</h2>
+            <output className="mt-3 block max-w-2xl text-sm leading-6 text-slate-600">{view.text}</output>
           </div>
         </div>
         {failed || (isProcessing && isRetrying) ? (
@@ -161,25 +233,13 @@ function RegistrationResultPanel({
         ) : null}
       </div>
       <dl className="mt-8 grid gap-4 border-t border-slate-100 pt-6 text-sm md:grid-cols-3">
-        <div><dt className="font-semibold text-slate-500">Registration status</dt><dd className="mt-1 font-bold">{registrationStatus}</dd></div>
+        <div><dt className="font-semibold text-slate-500">Registration status</dt><dd className="mt-1 font-bold">{view.status}</dd></div>
         <div><dt className="font-semibold text-slate-500">Repository</dt><dd className="mt-1 break-all">{repository}</dd></div>
         {failed ? <div><dt className="font-semibold text-slate-500">Reason code</dt><dd className="mt-1 break-words">{result.reason_code ?? 'Not provided'}</dd></div> : null}
         {succeeded ? <div><dt className="font-semibold text-slate-500">Current version</dt><dd className="mt-1">{result?.published_version}</dd></div> : null}
       </dl>
       {checks.length ? <RegistrationValidationChecks checks={checks} interrupted={Boolean(error)} /> : null}
-      {failed ? (
-        <div className="mt-6 grid gap-6 text-sm">
-          {showMessage ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-red-700">
-            <h3 className="font-semibold">Message</h3>
-            <p className="mt-1 whitespace-pre-wrap break-words">{result.message}</p>
-          </div> : null}
-          {validationDetails.length > 0 ? <div>
-            <h3 className="font-semibold text-slate-700">Validation errors ({validationDetails.length})</h3>
-            <div className="mt-3"><DiagnosticErrors details={validationDetails} /></div>
-          </div> : null}
-          {!showMessage && validationDetails.length === 0 && groupedDetails.length === 0 ? <p className="text-slate-600">No additional diagnostic information was returned.</p> : null}
-        </div>
-      ) : null}
+      {failed ? <FailureDetails message={result.message} showMessage={showMessage} validationDetails={validationDetails} hasGroupedDetails={groupedDetails.length > 0} /> : null}
     </section>
   )
 }
@@ -206,7 +266,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   const doiCheckDisplay = doiCheckDisplays[doiCheckStatus]
   const canSubmitDirectly = Boolean(authUser && authVerified)
   const idleSubmitButtonText = canSubmitDirectly ? 'Register adapter' : 'Sign in with GitHub'
-  const submitButtonText = status === 'idle' ? idleSubmitButtonText : isRetrying ? 'Retrying...' : 'Registering...'
+  let submitButtonText = idleSubmitButtonText
+  if (status !== 'idle') submitButtonText = isRetrying ? 'Retrying...' : 'Registering...'
   const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
 
   async function checkDoiOnBlur(value: string) {
