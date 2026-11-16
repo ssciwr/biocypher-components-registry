@@ -387,6 +387,29 @@ def test_generate_dataset_metadata_endpoint_requires_file() -> None:
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("people.csv", "people.csv"),
+        ("../../etc/passwd", "passwd"),
+        ("..\\..\\evil.csv", "evil.csv"),
+        ("/abs/path/data.tsv", "data.tsv"),
+        ("..", "dataset-upload"),
+        (".", "dataset-upload"),
+        (None, "dataset-upload"),
+        (".hidden", "hidden"),
+    ],
+)
+def test_resolve_upload_path_stays_inside_directory(
+    tmp_path: Path, filename: str | None, expected: str
+) -> None:
+    """Keep sanitized upload paths inside the destination directory."""
+    resolved = metadata_router._resolve_upload_path(tmp_path, filename)
+
+    assert resolved.parent == tmp_path.resolve()
+    assert resolved.name == expected
+
+
 # Covers compact helper edges for metadata upload/generation routing.
 def test_metadata_helpers_handle_parse_edges_and_file_fallback(tmp_path: Path) -> None:
     output_path = tmp_path / "metadata.jsonld"

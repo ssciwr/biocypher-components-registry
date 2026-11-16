@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -36,6 +37,7 @@ from src.core.validation import (
 from src.core.validation.results import ValidationResult
 
 router = APIRouter()
+_UNSAFE_FILENAME_CHARS = re.compile(r"[^\w.\- ]")
 _DATASET_METADATA_FORM_SCHEMA = DatasetMetadataGenerateForm.model_json_schema(
     by_alias=True
 )
@@ -133,7 +135,7 @@ def _generate_dataset_metadata_from_upload(
     """Copy the upload and generate metadata outside the event loop."""
     with TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
-        input_path = temporary_path / Path(file.filename or "dataset-upload").name
+        input_path = _resolve_upload_path(temporary_path, file.filename)
         with input_path.open("wb") as handle:
             shutil.copyfileobj(file.file, handle)
 
@@ -309,6 +311,20 @@ def _execute_dataset_metadata_generation(
         warnings=result.warnings,
         validation=validation,
     )
+
+
+def _resolve_upload_path(directory: Path, filename: str | None) -> Path:
+    """Build a sanitized destination for an upload that stays inside directory."""
+    # Treat backslashes as separators so Windows-style client paths are stripped too.
+    base_name = Path((filename or "").replace("\\", "/")).name
+    safe_name = _UNSAFE_FILENAME_CHARS.sub("_", base_name).lstrip(".")
+    candidate = (directory / (safe_name or "dataset-upload")).resolve()
+    if candidate.parent != directory.resolve():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upload filename.",
+        )
+    return candidate
 
 
 # Works for Adapter or Dataset creators equally well
