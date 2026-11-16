@@ -4,6 +4,7 @@ import hashlib
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
@@ -177,8 +178,9 @@ def test_full_admission_capacity_returns_retry_after(
     assert "capacity" in response.json()["detail"].lower()
 
 
+@pytest.mark.parametrize("error_type", [RuntimeError, KeyError])
 def test_generation_failure_hides_diagnostics_and_deletes_session(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, caplog, error_type: type[Exception]
 ) -> None:
     manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
     manager.start()
@@ -203,7 +205,7 @@ def test_generation_failure_hides_diagnostics_and_deletes_session(
     assert uploaded.status_code == 200
 
     def fail_generation(**_kwargs):
-        raise RuntimeError("raw baker stderr containing a secret")
+        raise error_type("raw baker stderr containing a secret")
 
     monkeypatch.setattr(
         "src.api.routers.dataset_uploads.execute_dataset_request", fail_generation
@@ -224,5 +226,6 @@ def test_generation_failure_hides_diagnostics_and_deletes_session(
         time.sleep(0.01)
     assert polled.json()["status"] == "failed"
     assert "raw baker stderr" not in polled.text
+    assert "raw baker stderr" in caplog.text
     assert not (tmp_path / session["session_id"]).exists()
     client.__exit__(None, None, None)

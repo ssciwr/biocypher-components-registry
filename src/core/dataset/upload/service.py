@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import os
 import re
 import secrets
@@ -39,7 +40,12 @@ from src.core.dataset.upload.models import (
 from src.core.dataset.upload.paths import normalize_relative_path, validate_unique_paths
 from src.core.dataset.upload.scratch import prepare_scratch_root, remove_scratch_tree
 
+logger = logging.getLogger(__name__)
+
 _ENTRY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_GENERATION_FAILED = (
+    "Dataset generation failed. Verify the selected CSV/TSV source and metadata."
+)
 
 
 class UploadSessionManager:
@@ -474,10 +480,20 @@ class UploadSessionManager:
                     value = await callback(session)
                     result = UploadTerminalResult(value=value)
                     state = UploadSessionState.COMPLETE
-                except Exception:
-                    result = UploadTerminalResult(
-                        error="Dataset generation failed. Verify the selected CSV/TSV source and metadata."
+                except (OSError, RuntimeError, ValueError):
+                    logger.warning(
+                        "Dataset generation failed: session_id=%s",
+                        session.session_id,
+                        exc_info=True,
                     )
+                    result = UploadTerminalResult(error=_GENERATION_FAILED)
+                    state = UploadSessionState.FAILED
+                except Exception:
+                    logger.exception(
+                        "Unexpected dataset generation error: session_id=%s",
+                        session.session_id,
+                    )
+                    result = UploadTerminalResult(error=_GENERATION_FAILED)
                     state = UploadSessionState.FAILED
                 await self._release_artifacts(session)
                 async with session.lock:
