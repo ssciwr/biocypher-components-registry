@@ -14,7 +14,7 @@ Key capabilities:
 - **Multiple Interfaces**: CLI, Web UI, and REST API
 - **Update History**: Recorded outcomes for published adapter updates; failed first registrations are not stored
 - **Duplicate Prevention**: Enforced uniqueness by adapter id and metadata version
-- **On-Demand Revalidation**: Fix and reprocess failed registrations
+- **Manual Updates**: Refresh published adapters after correcting or changing repository metadata
 
 The project contains:
 
@@ -28,9 +28,12 @@ The project contains:
 - Python 3.12+ (the Docker image uses Python 3.13)
 - [uv](https://docs.astral.sh/uv/) for Python dependency management
 - Node.js 24+ and pnpm for frontend development
-- Docker and Docker Compose, optional
+- Docker and Docker Compose, optional for running the application; required for local PostgreSQL integration tests
 
 ## Backend Setup
+
+The dataset generator selection and verified format capabilities are documented in
+[Dataset generation backends](docs/dataset_backends.md).
 
 Install Python dependencies:
 
@@ -58,14 +61,21 @@ uv run pytest
 Run a specific test file:
 
 ```bash
-uv run pytest tests/unit/test_cli_submit.py
+uv run pytest tests/unit/cli/test_cli_register.py
 ```
 
-The synchronous-processing tests also run against PostgreSQL when `REGISTRY_TEST_POSTGRES_URL` is set to a test database URL. Each case creates and removes its own uniquely named schema; existing tables are not cleared. For example:
+Run the complete backend suite with the disposable Docker PostgreSQL database:
 
 ```bash
-REGISTRY_TEST_POSTGRES_URL=postgresql://registry@localhost/registry_test uv run pytest tests/unit/core/registration/test_synchronous_processing.py
+docker compose -f docker-compose.test.yml up -d --wait database
+REGISTRY_TEST_POSTGRES_CONTAINER=biocypher-registry-test-database uv run pytest -ra
+docker compose -f docker-compose.test.yml down
 ```
+
+Only PostgreSQL cases skip when the variable is unset, Docker is unavailable, or
+the selected container is missing or stopped. SQLite and independent tests still
+run. Invalid container configuration and database/test failures remain errors.
+For VS Code, set the variable in `python.envFile` (normally `.env`).
 
 ## CLI Usage
 
@@ -75,18 +85,24 @@ Show available commands:
 uv run cli.py --help
 ```
 
-Submit an adapter registration (persisted to the configured database):
+Register a public HTTPS repository containing a root-level `croissant.jsonld`:
 
 ```bash
-uv run cli.py submit-registration --name "My Adapter" /path/to/adapter-repo
-uv run cli.py submit-registration --name "My Adapter" https://github.com/user/adapter-repo
+uv run cli.py register https://github.com/user/adapter-repo
 ```
 
-Process a submitted registration:
+Update an adapter registered by your GitHub account:
 
 ```bash
-uv run cli.py finish-registration <registration-id>
+uv run cli.py update <adapter-id>
+uv run cli.py update <adapter-id> --force-validation
 ```
+
+Configure `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` in `.env` and
+enable device flow for the OAuth app. Each command opens GitHub device
+authentication and displays a code. The temporary user token is revoked before
+processing and is never saved. The CLI calls shared services and the configured
+database directly; the API and frontend do not need to be running.
 
 Inspect registrations and events:
 
@@ -96,12 +112,11 @@ uv run cli.py show-registration-events <registration-id>
 uv run cli.py list-registry-entries
 ```
 
-Refresh or revalidate registrations:
+Refresh all published registrations and inspect the last batch summary:
 
 ```bash
 uv run cli.py refresh-registry
 uv run cli.py show-latest-refresh
-uv run cli.py revalidate-registration <registration-id>
 ```
 
 Discover a single adapter `croissant.jsonld` from a local path or GitHub URL and validate it:
@@ -116,12 +131,6 @@ Validate metadata directly:
 uv run cli.py validate /path/to/croissant.jsonld
 uv run cli.py validate-adapter /path/to/croissant.jsonld
 uv run cli.py validate-dataset /path/to/croissant.jsonld
-```
-
-Build a registration request without persisting it:
-
-```bash
-uv run cli.py submit /path/to/adapter-repo
 ```
 
 ### Metadata Generation Commands
@@ -157,96 +166,208 @@ For more information on the agentic workspace, consult its [dedicated documentat
 
 ## REST API
 
-Start the FastAPI application:
+The REST API is a FastAPI delivery layer over the reusable core services. All
+registry routes use the `/api/v1` prefix. Exact request fields, response models,
+status codes, and examples are generated from the running application and should
+not be duplicated manually here.
+
+### API Documentation and Source of Truth
+
+Start the backend with a development database:
 
 ```bash
 uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-Useful local URLs:
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI JSON: http://localhost:8000/openapi.json
-
-All routes below are served under the `/api/v1` prefix.
-
-| Method | Path | Description |
+| Documentation | URL | Use |
 | --- | --- | --- |
-| GET | `/health` | API liveness check |
-| GET | `/adapters` | List public adapters derived from canonical registry entries |
-| GET | `/adapters/latest` | List latest public adapter cards |
-| GET | `/adapters/search` | Search public adapter cards |
-| GET | `/adapters/{adapter_id}` | Get one public adapter |
-| GET | `/adapters/{adapter_id}/metadata` | Get full Croissant metadata for one adapter |
-| POST | `/adapters/{adapter_id}/endorse` | Endorse one adapter as the signed-in GitHub user |
-| POST | `/registrations` | Fetch, validate, and save an accepted first registration synchronously |
-| POST | `/registrations/stream` | Register once with live validation progress through server-sent events |
-| GET | `/schemas/{version}` | Read a deployed BioCypher adapter schema, such as `v1` |
-| POST | `/adapters/{adapter_id}/update` | Update a published adapter as its submitting GitHub user |
-| GET | `/registrations/croissant-file-present-check` | Check whether a remote repository exposes `croissant.jsonld` |
-| GET | `/registrations` | List active registrations |
-| GET | `/registrations/{registration_id}` | Get one registration detail |
-| GET | `/registrations/{registration_id}/events` | List event history for one registration |
-| POST | `/registrations/{registration_id}/process` | Discover, validate, and persist a submitted registration |
-| POST | `/registrations/{registration_id}/revalidate` | Retry a staged source or failed published update with full validation |
-| GET | `/registry/registrations` | List registry registration rows with public status and latest event |
-| GET | `/registry/entries` | List canonical valid registry entries |
-| GET | `/registry/entries/{entry_id}` | Get one canonical valid registry entry |
-| GET | `/registry/refreshes/latest` | Get the latest persisted batch refresh summary |
-| POST | `/registry/refreshes` | Process all active registrations once |
-| POST | `/metadata/validate` | Validate inline adapter or dataset metadata without persisting it |
-| POST | `/metadata/datasets/generate` | Generate dataset Croissant metadata from an uploaded source file |
-| POST | `/metadata/adapters/generate` | Generate adapter Croissant metadata from existing/generated datasets |
+| Swagger UI | http://localhost:8000/docs | Browse operations and schemas; execute local requests with **Try it out**. |
+| ReDoc | http://localhost:8000/redoc | Read the generated contract in a reference-oriented layout. |
+| OpenAPI JSON | http://localhost:8000/openapi.json | Automate contract checks and generate clients. |
 
-Example requests:
+The live OpenAPI document is authoritative. In Swagger, expand an operation to
+inspect its parameters, request body, responses, errors, and component schemas.
+**Try it out** calls the running service and can change its configured database.
+Swagger does not bypass authentication: protected operations require the normal
+GitHub browser session cookie.
+
+Regenerate the checked-in OpenAPI document and TypeScript client after a backend
+contract change:
 
 ```bash
-curl http://localhost:8000/api/v1/health
-curl http://localhost:8000/api/v1/registrations
-
-curl -X POST http://localhost:8000/api/v1/registrations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "adapter_name": "my-adapter",
-    "repository_location": "/path/to/repo",
-    "license_value": "MIT",
-    "doi": "10.5281/zenodo.1234567"
-  }'
-
-curl http://localhost:8000/api/v1/registry/registrations
-curl -X POST http://localhost:8000/api/v1/registry/refreshes
-curl http://localhost:8000/api/v1/adapters
+cd frontend
+pnpm run openapi-ts
 ```
 
-### Registration and manual updates
+### Service Overview
 
-- **Register:** Sign in with GitHub and enter your repository URL. The form checks for a root-level `croissant.jsonld`; registration then fetches fresh metadata from the default branch and validates it before saving.
-- **Review validation:** The collapsible **Validation checks** section shows results for file retrieval/JSON parsing, Croissant compliance, the adapter schema, semantic checks, and each embedded dataset. Errors include available file positions, JSON paths, and expected formats. The schema viewer exposes the applied BioCypher schema version (currently **v1**, using **JSON Schema Draft 7**).
-- **Fix and retry:** Failed first browser registrations create no database records. Correct the reported issues in your repository, then click **Retry registration**. You may keep the same metadata version for this retry.
-- **Update:** Only the submitting GitHub account can update a published adapter. Changed metadata must preserve the adapter identity and use a new, unused version. Failed updates retain the accepted metadata and record the failure; fix the issues and click **Update** again. Unchanged metadata is reported as **Already up to date**.
+| API service | Prefix | System responsibility | Core boundary |
+| --- | --- | --- | --- |
+| Authentication | `/api/v1/auth` | GitHub identity and local browser sessions | `src/core/auth`, `AuthSessionStore` |
+| Health | `/api/v1/health` | Process liveness | API-only |
+| Adapters | `/api/v1/adapters` | Public catalog, ownership updates, endorsements, and deletion | Adapter catalog plus registration services |
+| Registrations | `/api/v1/registrations` | Repository preflight, atomic registration, progress, and history | `src/core/registration` |
+| Registry | `/api/v1/registry` | Published sources, canonical entries, and refresh summaries | `RegistrationStore` query boundary |
+| Metadata | `/api/v1/metadata` | Validation, metadata generation, and ephemeral browser uploads | Dataset, adapter, validation, and upload services |
+| Schemas | `/api/v1/schemas` | Deployed BioCypher validation schemas | `src/core/schema` |
 
-If the connection ends before a final registration result arrives, the outcome is **Unconfirmed**. Check the adapter list before trying again; processing may already have completed. Registration does not automatically resubmit.
+```mermaid
+flowchart LR
+    Client["Client"] --> API["FastAPI"]
 
-Batch refresh is manual through `refresh-registry` or `POST /api/v1/registry/refreshes`; scheduled refreshes are not implemented.
+    subgraph Routes["API services"]
+        direction TB
+        Auth["Auth"]
+        Catalog["Adapters"]
+        Reg["Registration"]
+        Registry["Registry"]
+        Meta["Metadata"]
+        Schema["Schemas"]
+    end
 
-The agentic workspace routes below are served under the `/agent/api/v1`
-prefix (kept distinct from `/api/v1` — see [docs/API.md](docs/API.md) for
-auth, SSE event shapes, and full error-code tables).
+    subgraph Core["Core services"]
+        direction TB
+        AuthCore["Auth core"]
+        CatalogCore["Catalog core"]
+        RegCore["Registration core"]
+        Store["Store port"]
+        MetaCore["Metadata core"]
+        SchemaCore["Schema core"]
+    end
 
-| Method | Path | Description |
-| --- | --- | --- |
-| POST | `/sessions` | Create a workspace session (allocates a directory, opens the MCP connection) |
-| GET | `/sessions/{id}` | Get session state (model, `has_key`, `busy`, `error`, tools) |
-| DELETE | `/sessions/{id}` | End a session and destroy its workspace |
-| POST | `/sessions/{id}/key` | Attach a BYOK Anthropic API key/token to the session |
-| POST | `/sessions/{id}/messages` | Send a chat message and start a turn |
-| POST | `/sessions/{id}/interrupt` | Interrupt the running or queued turn |
-| GET | `/sessions/{id}/events` | SSE stream of turn/tool/usage/filesystem events |
-| GET | `/sessions/{id}/files` | List one workspace directory level |
-| GET | `/sessions/{id}/file` | Read one workspace file (with ETag) |
-| PUT | `/sessions/{id}/file` | Create or overwrite one workspace file (optional `If-Match`) |
-| DELETE | `/sessions/{id}/file` | Delete one workspace file or directory |
+    API --> Auth
+    API --> Catalog
+    API --> Reg
+    API --> Registry
+    API --> Meta
+    API --> Schema
+
+    Auth --> AuthCore
+    Catalog --> CatalogCore
+    Reg --> RegCore
+    Registry --> Store
+    Meta --> MetaCore
+    Schema --> SchemaCore
+
+    AuthCore --> Persistence["DB adapters"]
+    CatalogCore --> Store
+    RegCore --> Store
+    Store --> Persistence
+    Persistence --> Database[("Database")]
+```
+
+### Authentication Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/auth/me` | Required | Return the signed-in GitHub identity. |
+| POST | `/api/v1/auth/logout` | Session if present | Delete the local browser session and cookie. |
+
+The browser sign-in flow also uses `GET /api/v1/auth/github/start` and
+`GET /api/v1/auth/github/callback`. These redirects intentionally use
+`include_in_schema=False`, so they do not appear in Swagger.
+
+### Health Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/health` | Public | Confirm that the API process is alive. |
+
+### Adapter Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/adapters` | Public | List public adapters from canonical registry entries. |
+| GET | `/api/v1/adapters/latest` | Public | List the latest public adapter cards. |
+| GET | `/api/v1/adapters/search` | Public | Search public adapter cards. |
+| GET | `/api/v1/adapters/{adapter_id}` | Public | Read one adapter and its published versions. |
+| GET | `/api/v1/adapters/{adapter_id}/metadata` | Public | Read the latest accepted Croissant metadata. |
+| POST | `/api/v1/adapters/{adapter_id}/endorse` | Required | Endorse an adapter as the signed-in GitHub user. |
+| POST | `/api/v1/adapters/{adapter_id}/update` | Owner | Fetch and process an update from the registered source. |
+| DELETE | `/api/v1/adapters/{adapter_id}` | Owner | Delete an adapter and its registration data. |
+
+### Registration Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/registrations/croissant-file-present-check` | Public | Check for root-level `croissant.jsonld` in a remote repository. |
+| POST | `/api/v1/registrations` | Required | Fetch, validate, and atomically accept a first registration. |
+| POST | `/api/v1/registrations/stream` | Required | Run the same registration with validation progress over SSE. |
+| GET | `/api/v1/registrations` | Public | List accepted registration sources. |
+| GET | `/api/v1/registrations/{registration_id}` | Public | Read one registration and its latest attempt. |
+| GET | `/api/v1/registrations/{registration_id}/events` | Public | Read its persisted event history. |
+
+Failed first registrations create no records and can be corrected and retried
+with the same version. Published updates preserve accepted metadata on failure.
+An SSE connection ending without a terminal result is unconfirmed; clients must
+inspect accepted state instead of automatically repeating the POST.
+
+### Registry Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/registry/registrations` | Public | List published sources with accepted and latest-attempt state. |
+| GET | `/api/v1/registry/entries` | Public | List canonical valid registry entries. |
+| GET | `/api/v1/registry/entries/{entry_id}` | Public | Read one canonical entry. |
+| GET | `/api/v1/registry/refreshes/latest` | Public | Read the latest persisted batch-refresh summary. |
+
+Batch refresh is a trusted CLI-only mutation (`uv run cli.py refresh-registry`);
+there is no HTTP batch-trigger route or scheduler.
+
+### Metadata Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/v1/metadata/validate` | Public | Validate inline adapter or dataset metadata. |
+| POST | `/api/v1/metadata/datasets/generate` | Public | Generate dataset metadata from one multipart file upload. |
+| POST | `/api/v1/metadata/adapters/generate` | Public | Generate adapter metadata from existing or generated datasets. |
+| POST | `/api/v1/metadata/upload-sessions` | Public | Declare a browser-prepared inventory and create an ephemeral session. |
+| PUT | `/api/v1/metadata/upload-sessions/{session_id}/artifacts/{entry_id}` | Bearer session token | Stream and verify one bounded artifact. |
+| POST | `/api/v1/metadata/upload-sessions/{session_id}/finalize` | Bearer session token | Queue generation, reconciliation, and validation. |
+| GET | `/api/v1/metadata/upload-sessions/{session_id}` | Bearer session token | Poll state and retrieve the terminal result. |
+| DELETE | `/api/v1/metadata/upload-sessions/{session_id}` | Bearer session token | Cancel or release the ephemeral session. |
+
+The browser workflow accepts UTF-8 CSV/TSV data, including `.csv.gz` and
+`.tsv.gz`, with at most 1,000 files, 1 MiB per prepared artifact, and 50 MiB per
+session. Dataset bytes are kept out of the registry database and persistent
+volumes. See [Dataset generation backends](docs/dataset_backends.md) for the
+selection, sampling, reconciliation, and resource contracts.
+
+### Schema Service
+
+| Method | Endpoint | Authentication | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/schemas/{version}` | Public | Return a deployed BioCypher adapter JSON Schema, such as `v1`. |
+
+### Shared API Behavior
+
+- FastAPI validation failures use `422`; operation-specific errors use the
+  documented status and response shown in Swagger.
+- Registration progress uses Server-Sent Events. Upload artifacts use raw
+  request bodies; other control-plane operations use JSON.
+- List endpoints omit full Croissant documents. Use adapter metadata or detail
+  endpoints for full accepted metadata.
+- Backward-compatible changes remain under `/api/v1`; incompatible contracts
+  require a future major path.
+- API routes translate HTTP concerns and delegate business rules to core
+  services; they do not access SQLAlchemy tables directly.
+
+### Hidden and Optional APIs
+
+- OAuth start/callback redirects are implemented but hidden from OpenAPI with
+  `include_in_schema=False`.
+- Agentic-workspace routes use `/agent/api/v1` and are absent from Swagger when
+  `agentic_api_active` is disabled. Their separate authentication, SSE, and
+  file contracts are documented in [Agentic Workspace API](docs/API.md).
+- Batch refresh is available through the CLI, not an HTTP mutation endpoint.
+
+### Complete Endpoint Index
+
+The service tables above list every operation in the active `/api/v1` Swagger
+contract, grouped by responsibility. Use http://localhost:8000/docs for exact
+models and interactive requests, or http://localhost:8000/openapi.json for a
+machine-readable flat index. When these tables and the live contract disagree,
+the live OpenAPI document is authoritative and this chapter must be updated.
 
 ## Frontend Setup
 
@@ -273,34 +394,65 @@ pnpm run build
 pnpm run ui-tests
 ```
 
-The frontend consumes the backend through the `/api/v1` API. Set `VITE_API_BASE_URL` when the backend is not served from the local default.
+The frontend consumes `/api/v1` through the browser-reachable API origin set by
+`VITE_API_BASE_URL`. During local development this is normally
+`http://localhost:8000`. In production, the frontend and API paths normally
+share one HTTPS Nginx origin; Nginx forwards those paths to the private FastAPI
+service using `BACKEND_INTERNAL_URL`. FastAPI itself is not directly exposed.
 
 ## Database Configuration
 
-The backend uses SQLite by default.
+For CLI commands, choose one configuration below in your root `.env` file.
+The CLI reads it automatically. Keep your authentication and other settings.
+
+### SQLite
+
+Select SQLite and set its host-local path:
+
+```dotenv
+DATABASE_BACKEND=sqlite
+SQLITE_DATABASE_PATH=registry.sqlite3
+```
+
+`SQLITE_DATABASE_PATH` is the **SQLite file path**. Here, the file is
+`registry.sqlite3` in the directory where you run the command. You can use an
+absolute path such as `/home/you/registry.sqlite3` instead. The file is created
+if missing; no database server or Docker container is needed.
 
 ```bash
 uv run cli.py list-registrations
 ```
 
-Set a custom SQLite database path:
+### PostgreSQL
+
+Set a host and the PostgreSQL credentials:
+
+```dotenv
+DATABASE_BACKEND=postgresql
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=biocypher
+POSTGRES_DB=biocypher_registry
+POSTGRES_PASSWORD=your-database-password
+```
+
+Use your existing database credentials, or choose them when creating a fresh
+database. SQLite settings are ignored when PostgreSQL is selected.
+
+Start the local PostgreSQL container, then run the same CLI command:
 
 ```bash
-export BIOCYPHER_REGISTRY_DB_PATH=/path/to/custom.db
+docker compose -f docker-compose-postgresql.yml up -d --wait database
 uv run cli.py list-registrations
 ```
 
-Use PostgreSQL by setting `DATABASE_URL`:
+For an existing PostgreSQL server, use its host/port and skip the Docker command.
+The API and frontend do not need to be running.
 
-```bash
-export DATABASE_URL=postgresql://user:password@localhost:5432/biocypher_registry
-uv run cli.py list-registrations
-```
+For a containerized backend, choose the SQLite or PostgreSQL Compose file below;
+Compose sets the container's database connection automatically.
 
-Database selection:
-
-- `DATABASE_URL` set: PostgreSQL
-- otherwise: SQLite
+Switching databases does not copy existing records.
 
 ## Docker Compose
 
@@ -342,7 +494,7 @@ biocypher-components-registry/
 
 GitHub Actions workflows are stored in `.github/workflows/`.
 
-- `backend.yml`: installs Python dependencies with uv and runs `uv run pytest` with coverage, uploaded to Codecov. Triggered on pull requests touching `src/`, `tests/`, `cli.py`, or dependency files.
+- `backend.yml`: starts a PostgreSQL 16 Docker container on the GitHub runner, supplies its ID through `REGISTRY_TEST_POSTGRES_CONTAINER`, and runs pytest with coverage uploaded to Codecov. The test container and database are removed after the job. Triggered by backend/test/dependency/Compose/workflow pull-request changes.
 - `frontend.yml`: installs frontend dependencies with pnpm, then runs lint, build, and Cypress UI tests. Triggered on pull requests touching `frontend/`.
 - `validate_schema.yml`: validates the sample `data/in/adapter_collectri/collectri.json` Croissant file against the schema using the `ssciwr/validate-croissant-schema` action.
 
@@ -364,16 +516,21 @@ pnpm run ui-tests
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string | unset; SQLite is used |
-| `BIOCYPHER_REGISTRY_DB_PATH` | SQLite database file path | `registry.sqlite3` |
-| `POSTGRES_DB` | PostgreSQL database name (Docker Compose only) | `biocypher_registry` |
-| `POSTGRES_USER` | PostgreSQL user (Docker Compose only) | `biocypher` |
-| `POSTGRES_PASSWORD` | PostgreSQL password (Docker Compose only) | required; no default |
-| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app Client ID for browser sign-in | required for sign-in; no default |
-| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret; backend only | required for sign-in; no default |
+| `DATABASE_BACKEND` | Explicit database backend: `sqlite` or `postgresql` | `sqlite` in `.env.example` |
+| `SQLITE_DATABASE_PATH` | SQLite file path used when SQLite is selected | `registry.sqlite3` |
+| `POSTGRES_HOST` | PostgreSQL hostname used when PostgreSQL is selected | `127.0.0.1` in `.env.example` |
+| `POSTGRES_PORT` | PostgreSQL port | `5432` |
+| `POSTGRES_DB` | PostgreSQL database name | `biocypher_registry` |
+| `POSTGRES_USER` | PostgreSQL user | `biocypher` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | required when using PostgreSQL components or Compose |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app Client ID for browser and CLI authentication | required for sign-in; no default |
+| `GITHUB_OAUTH_CLIENT_SECRET` | OAuth app secret used by the API and CLI; never expose to the frontend | required for sign-in; no default |
 | `AUTH_SESSION_SECRET` | Separate secret used to sign and verify OAuth state; backend only | required for sign-in; no default |
 | `FRONTEND_BASE_URL` | Frontend URL used for sign-in redirects and allowed origins | `http://localhost:5173` |
-| `VITE_API_BASE_URL` | Public backend base URL used by the frontend and to construct OAuth callbacks; omit `/api/v1` | `http://localhost:8000` in local development |
+| `VITE_API_BASE_URL` | Browser-reachable API origin used by React and to construct OAuth callbacks; omit `/api/v1`. It normally equals the Nginx site origin in production. | `http://localhost:8000` in local development |
+| `BACKEND_INTERNAL_URL` | Private Nginx-to-FastAPI address on the container network; never browser-visible | `http://backend:8000` |
+| `REGISTRY_ALLOWED_REPOSITORY_HOSTS` | Allowed repository hosts; explicitly approve self-hosted authorities | `github.com,gitlab.com` |
+| `REGISTRY_TEST_POSTGRES_CONTAINER` | Labeled Docker PostgreSQL test container name or ID | unset; PostgreSQL cases skip |
 
 ## Troubleshooting
 

@@ -79,7 +79,7 @@ Step-by-step manual test for both Anthropic and LiteLLM, and the quantitative mo
 
 The backend only speaks the Anthropic Messages API. Other providers are reached through a [LiteLLM](https://docs.litellm.ai/docs/anthropic_unified) proxy that translates `/v1/messages` to the provider's API — no backend code changes.
 
-1. Add `OPENAI_API_KEY` and `LITELLM_MASTER_KEY` to `.env` (see `.envsample`). Edit the model aliases in `deploy/litellm/config.yaml` as needed.
+1. Add `OPENAI_API_KEY` and `LITELLM_MASTER_KEY` to `.env` (see `.env.example`). Edit the model aliases in `deploy/litellm/config.yaml` as needed.
 2. Start with the overlay:
 
         docker compose -f docker-compose-sqlite.yml -f docker-compose.litellm.yml up
