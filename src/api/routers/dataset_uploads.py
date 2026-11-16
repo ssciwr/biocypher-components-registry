@@ -252,7 +252,7 @@ def _generate_and_reconcile(
     )
     requested_generator = options.generator
     if requested_generator == "auto":
-        selected, _ = select_generator()
+        selected, _ = select_generator(request)
         generator_name = selected.name
     else:
         generator_name = requested_generator

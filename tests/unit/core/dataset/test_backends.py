@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from src.core.dataset.backends import auto_select
 from src.core.dataset.backends import list_generators, resolve_generator
 from src.core.dataset.backends.auto_select import (
     AutoDatasetGenerator,
@@ -15,8 +16,13 @@ from src.core.dataset.backends.croissant_baker import (
     _read_scan_warnings,
 )
 from src.core.dataset.backends.native import NativeDatasetGenerator
+from src.core.dataset.formats.csv import CsvFormatHandler
 from src.core.dataset.request import GenerationRequest
-from src.core.shared.errors import UnsupportedGeneratorError
+from src.core.shared.errors import UnsupportedFormatError, UnsupportedGeneratorError
+
+
+class NativeOnlyCsvFormatHandler(CsvFormatHandler):
+    croissant_baker_supported = False
 
 
 def test_generation_request_validates_by_default() -> None:
@@ -42,11 +48,93 @@ def test_resolve_generator_raises_for_unknown_name() -> None:
         resolve_generator("missing")
 
 
-def test_auto_selects_croissant_baker_as_the_primary_backend() -> None:
-    generator, reason = select_generator()
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "records.csv",
+        "records.tsv",
+        "records.csv.gz",
+        "records.tsv.gz",
+        "records.parquet",
+    ],
+)
+def test_auto_prefers_croissant_baker_for_shared_formats(
+    tmp_path, filename: str
+) -> None:
+    input_path = tmp_path / filename
+    input_path.touch()
+    request = GenerationRequest(
+        input_path=str(input_path),
+        output_path=str(tmp_path / "metadata.jsonld"),
+    )
+
+    generator, reason = select_generator(request)
 
     assert isinstance(generator, CroissantBakerGenerator)
-    assert "primary backend" in reason
+    assert "preferred backend" in reason
+
+
+def test_auto_selects_native_for_a_native_only_format(tmp_path, monkeypatch) -> None:
+    input_path = tmp_path / "records.native-only"
+    input_path.touch()
+    request = GenerationRequest(
+        input_path=str(input_path),
+        output_path=str(tmp_path / "metadata.jsonld"),
+    )
+    native_only_handler = NativeOnlyCsvFormatHandler()
+    monkeypatch.setattr(
+        auto_select,
+        "resolve_format_handler",
+        lambda _path: native_only_handler,
+    )
+
+    generator, reason = select_generator(request)
+
+    assert isinstance(generator, NativeDatasetGenerator)
+    assert "Croissant Baker does not support" in reason
+
+
+def test_auto_keeps_baker_for_mixed_native_and_non_native_inputs(
+    tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "records.native-only").touch()
+    (tmp_path / "notes.txt").touch()
+    request = GenerationRequest(
+        input_path=str(tmp_path),
+        output_path=str(tmp_path / "metadata.jsonld"),
+    )
+
+    def resolve_native_handler(path):
+        if path.name.endswith(".native-only"):
+            return native_only_handler
+        raise UnsupportedFormatError(f"Unsupported file: {path.name}")
+
+    native_only_handler = NativeOnlyCsvFormatHandler()
+    monkeypatch.setattr(auto_select, "resolve_format_handler", resolve_native_handler)
+
+    generator, _ = select_generator(request)
+
+    assert isinstance(generator, CroissantBakerGenerator)
+
+
+def test_auto_does_not_fallback_after_baker_execution_failure(monkeypatch, tmp_path) -> None:
+    request = GenerationRequest(
+        input_path=str(tmp_path / "records.csv"),
+        output_path=str(tmp_path / "metadata.jsonld"),
+    )
+
+    class FailingBaker:
+        name = "croissant-baker"
+
+        def generate(self, _request):
+            raise RuntimeError("Baker failed.")
+
+    monkeypatch.setattr(
+        auto_select, "select_generator", lambda _request: (FailingBaker(), "test")
+    )
+
+    with pytest.raises(RuntimeError, match="Baker failed"):
+        AutoDatasetGenerator().generate(request)
 
 
 @pytest.mark.parametrize("outcome", ["described", "linked", "referenced"])

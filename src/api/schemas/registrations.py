@@ -174,7 +174,7 @@ class RegistrationCreateResponse(BaseModel):
     adapter_name: str
     adapter_id: str
     repository_location: str
-    repository_kind: Literal["local", "remote"] | str
+    repository_kind: str
     created_at: datetime
     published_version: str | None = None
     license_value: str | None = None

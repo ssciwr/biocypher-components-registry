@@ -6,6 +6,7 @@ import csv
 import gzip
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import ClassVar
 
 from src.core.dataset.request import FileInspection, InferredField
 
@@ -21,6 +22,8 @@ GZIP_MIME = "application/gzip"
 
 class FormatHandler(ABC):
     """Interface implemented by concrete file format inspectors."""
+
+    croissant_baker_supported: ClassVar[bool] = True
 
     @abstractmethod
     def supports(self, path: Path) -> bool:
