@@ -11,12 +11,21 @@ from src.core.dataset.backends.native import NativeDatasetBuilder
 from src.core.dataset.request import GenerationRequest
 
 
+def _resolve_request_path(value: str) -> Path:
+    """Accept only request files created by the parent in the scratch cwd."""
+    scratch = Path.cwd().resolve()
+    path = (scratch / value).resolve()
+    if path.parent != scratch or not path.name.startswith(".native-request-"):
+        raise SystemExit("Invalid request path.")
+    return path
+
+
 def main() -> None:
     """Load a tmpfs request and execute the independent native backend."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--request", required=True)
     arguments = parser.parse_args()
-    request_path = Path(arguments.request)
+    request_path = _resolve_request_path(arguments.request)
     payload = json.loads(request_path.read_text(encoding="utf-8"))
     request_path.unlink()
     result = NativeDatasetBuilder().generate(GenerationRequest(**payload))

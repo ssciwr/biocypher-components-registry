@@ -95,9 +95,11 @@ def test_atomic_acceptance_persists_source_metadata_and_event(tmp_path):
         license_value="MIT",
         doi="10.1/example",
     )
-    assert stored.registration_id and stored.created_at
+    assert stored.registration_id
+    assert stored.created_at
     assert stored.submitted_by_github_user_id == "456"
-    assert stored.license_value == "MIT" and stored.doi == "10.1/example"
+    assert stored.license_value == "MIT"
+    assert stored.doi == "10.1/example"
     assert not hasattr(stored, "status")
     loaded = store.get_registration(stored.registration_id)
     assert loaded == stored
@@ -113,7 +115,8 @@ def test_atomic_acceptance_persists_source_metadata_and_event(tmp_path):
     assert entries[0].metadata_checksum
     assert store.get_registry_entry(entries[0].entry_id) == entries[0]
     events = store.list_registration_events(stored.registration_id)
-    assert len(events) == 1 and events[0].event_type == "VALID_CREATED"
+    assert len(events) == 1
+    assert events[0].event_type == "VALID_CREATED"
     assert events[0].registry_entry_id == entries[0].entry_id
     assert events[0].observed_checksum == entries[0].metadata_checksum
 

@@ -163,12 +163,14 @@ def test_inventory_accepts_1000_files_and_rejects_1001(tmp_path: Path) -> None:
             scratch_root=tmp_path / "rejected", require_tmpfs=False
         )
         rejected.start()
+        entries = [_entry(f"e-{index}", f"{index}.csv") for index in range(1001)]
+        generation = UploadGenerationOptions()
         with pytest.raises(UploadSessionError, match="at most 1000"):
             await rejected.create(
                 source_kind="folder",
                 source_name="dataset",
-                entries=[_entry(f"e-{index}", f"{index}.csv") for index in range(1001)],
-                generation=UploadGenerationOptions(),
+                entries=entries,
+                generation=generation,
             )
 
     asyncio.run(exercise())
@@ -407,12 +409,14 @@ def test_upload_service_fails_closed_without_tmpfs(tmp_path: Path) -> None:
         manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=True)
         manager.start()
         assert manager.enabled is False
+        entries = [_entry("entry-1", "data.csv")]
+        generation = UploadGenerationOptions()
         with pytest.raises(UploadSessionError, match="tmpfs"):
             await manager.create(
                 source_kind="file",
                 source_name="data.csv",
-                entries=[_entry("entry-1", "data.csv")],
-                generation=UploadGenerationOptions(),
+                entries=entries,
+                generation=generation,
             )
 
     asyncio.run(exercise())
@@ -436,12 +440,14 @@ def test_global_budget_is_reserved_atomically_and_failed_part_is_removed(
             entries=[_entry("one", "one.csv", size=3)],
             generation=UploadGenerationOptions(),
         )
+        entries = [_entry("two", "two.csv", size=3)]
+        generation = UploadGenerationOptions()
         with pytest.raises(UploadSessionError, match="scratch capacity"):
             await manager.create(
                 source_kind="file",
                 source_name="two.csv",
-                entries=[_entry("two", "two.csv", size=3)],
-                generation=UploadGenerationOptions(),
+                entries=entries,
+                generation=generation,
             )
         value = b"abc"
         digest = hashlib.sha256(value).hexdigest()
@@ -460,11 +466,12 @@ def test_global_budget_is_reserved_atomically_and_failed_part_is_removed(
             entries=[_entry("two", "two.csv", size=3)],
             generation=UploadGenerationOptions(),
         )
+        body = chunks(value)
         with pytest.raises(UploadSessionError, match="verification failed"):
             await manager.upload_artifact(
                 session=second,
                 entry_id="two",
-                body=chunks(value),
+                body=body,
                 content_length=3,
                 artifact_sha256="b" * 64,
                 original_sha256="b" * 64,
@@ -494,12 +501,14 @@ def test_failed_artifact_can_be_retried_only_as_a_complete_body(
         content = b"abc"
         digest = hashlib.sha256(content).hexdigest()
 
+        body = chunks(content[:1])
+        content_length = len(content)
         with pytest.raises(UploadSessionError, match="byte count"):
             await manager.upload_artifact(
                 session=session,
                 entry_id="entry-1",
-                body=chunks(content[:1]),
-                content_length=len(content),
+                body=body,
+                content_length=content_length,
                 artifact_sha256=digest,
                 original_sha256=digest,
             )
@@ -562,11 +571,12 @@ def test_completed_artifact_replay_is_idempotent_and_conflicts_are_rejected(
         assert replayed is uploaded
 
         conflicting_digest = hashlib.sha256(b"xyz").hexdigest()
+        body = chunks(b"xyz")
         with pytest.raises(UploadSessionError, match="already uploaded"):
             await manager.upload_artifact(
                 session=session,
                 entry_id="entry-1",
-                body=chunks(b"xyz"),
+                body=body,
                 content_length=3,
                 artifact_sha256=conflicting_digest,
                 original_sha256=conflicting_digest,

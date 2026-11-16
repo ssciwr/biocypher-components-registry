@@ -45,7 +45,6 @@ _NO_STORE = "no-store, max-age=0"
 
 @router.post(
     "/metadata/upload-sessions",
-    response_model=UploadSessionCreateResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
         429: {
@@ -102,7 +101,11 @@ async def create_upload_session(
 
 @router.put(
     "/metadata/upload-sessions/{session_id}/artifacts/{entry_id}",
-    response_model=UploadArtifactResponse,
+    responses={
+        400: {"description": "Invalid Content-Length or missing SHA-256 headers."},
+        411: {"description": "Content-Length is required."},
+        415: {"description": "Content-Encoding is not supported."},
+    },
 )
 async def upload_artifact(
     session_id: str,
@@ -152,7 +155,6 @@ async def upload_artifact(
 
 @router.post(
     "/metadata/upload-sessions/{session_id}/finalize",
-    response_model=UploadFinalizeAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def finalize_upload_session(
@@ -187,10 +189,7 @@ async def finalize_upload_session(
         _raise_upload_http(exc)
 
 
-@router.get(
-    "/metadata/upload-sessions/{session_id}",
-    response_model=UploadSessionStatusResponse,
-)
+@router.get("/metadata/upload-sessions/{session_id}")
 async def get_upload_session_status(
     session_id: str,
     response: Response,
@@ -211,7 +210,10 @@ async def get_upload_session_status(
 
 
 @router.delete(
-    "/metadata/upload-sessions/{session_id}", response_model=UploadDeleteResponse
+    "/metadata/upload-sessions/{session_id}",
+    responses={
+        409: {"description": "Generation cannot be cancelled after finalization."}
+    },
 )
 async def delete_upload_session(
     session_id: str,

@@ -37,12 +37,14 @@ def test_admission_uses_reserved_bytes_and_releases_them(
             entries=[_entry("one", 6)],
             generation=UploadGenerationOptions(),
         )
+        entries = [_entry("two", 5)]
+        generation = UploadGenerationOptions()
         with pytest.raises(UploadSessionError) as error:
             await manager.create(
                 source_kind="file",
                 source_name="two",
-                entries=[_entry("two", 5)],
-                generation=UploadGenerationOptions(),
+                entries=entries,
+                generation=generation,
             )
         assert error.value.status_code == 429
         assert error.value.retry_after == 15
@@ -78,12 +80,14 @@ def test_many_small_sessions_fit_without_waiting_queue(
             )
             sessions.append(session)
         assert len(sessions) == 100
+        entries = [_entry("overflow", 1)]
+        generation = UploadGenerationOptions()
         with pytest.raises(UploadSessionError) as error:
             await manager.create(
                 source_kind="file",
                 source_name="overflow",
-                entries=[_entry("overflow", 1)],
-                generation=UploadGenerationOptions(),
+                entries=entries,
+                generation=generation,
             )
         assert error.value.status_code == 429
         await manager.shutdown()
