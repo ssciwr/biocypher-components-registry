@@ -2,13 +2,23 @@
 
 Updated: 2026-05-29
 
+Status: Implemented. This document records the design rationale and the
+implemented browser and CLI authentication flows.
+
 ## Goal
 
-Add "Sign in with GitHub" to the React frontend and FastAPI backend without giving the app unnecessary GitHub permissions. For the first pass, authentication should establish the user's GitHub identity and local session only. Registry browsing stays public; submit/workspace routes can be gated after this is reviewed.
+Provide "Sign in with GitHub" in the React frontend and FastAPI backend without
+giving the app unnecessary GitHub permissions. Authentication establishes the
+user's GitHub identity and a local session. Registry browsing stays public;
+publication and workspace operations require a session, and adapter mutations
+enforce ownership where applicable.
 
 ## Current Repo Fit
 
-The backend is a FastAPI app assembled in `src/api/app.py` with routers under `src/api/routers/`. Settings are currently dataclass-based in `src/api/settings.py` and `src/core/settings.py`. Persistence uses shared SQLAlchemy table definitions in `src/persistence/tables.py`, with SQLite/PostgreSQL store implementations. There is no existing auth router, user table, session table, CORS setup, or cookie/session middleware.
+The backend is a FastAPI app assembled in `src/api/app.py` with routers under
+`src/api/routers/`. Authentication routes live in `src/api/routers/auth.py`, and
+database-backed sessions use `src/persistence/auth_store.py` plus the shared
+SQLAlchemy tables. SQLite and PostgreSQL use the same persistence contract.
 
 The frontend can keep the sticky top bar and make the "Sign in with GitHub" button a normal link to the backend OAuth start endpoint:
 
@@ -35,9 +45,9 @@ Use GitHub's OAuth web application flow:
 
 Scopes: use no extra scope or just `read:user`; the registration workflow uses the GitHub login and does not collect email.
 
-## Backend Shape
+## Implemented Backend Shape
 
-Add `src/api/routers/auth.py`:
+`src/api/routers/auth.py` provides:
 
 - `GET /auth/github/start`
 - `GET /auth/github/callback`
@@ -72,7 +82,7 @@ Cookie defaults:
 - `Secure=True` in production, `False` locally.
 - Short expiry, e.g. 7 days, with logout revocation.
 
-## Frontend Shape
+## Implemented Frontend Shape
 
 Keep the top bar sticky. Change the sign-in link to:
 
@@ -86,9 +96,11 @@ After callback redirect, use a small `useEffect` in the app shell or auth provid
 credentials: 'include'
 ```
 
-Do not wire access control into the three homepage action cards yet. They can remain `href="#"` until routes exist.
+The application shell reads `/api/v1/auth/me`, includes credentials on API
+requests, and exposes sign-in and sign-out actions. Protected backend routes
+remain the authorization boundary.
 
-## Implementation Order
+## Historical Implementation Order
 
 1. Add auth settings and `auth.py` router.
 2. Add minimal session table and persistence functions for create/read/revoke.
@@ -102,7 +114,8 @@ Do not wire access control into the three homepage action cards yet. They can re
 
 - We need one GitHub OAuth App per deployed base URL, or the callback URL must exactly match each environment's backend callback route.
 - If frontend and backend run on different hosts in production, CORS and cookie settings need explicit review.
-- If registration submissions should be attributable, add `submitted_by_github_user_id` later rather than mixing auth changes into the first sign-in pass.
+- Registration and update submissions are attributed to the verified GitHub
+  identity; ownership checks protect adapter mutations.
 - If we need GitHub org/team authorization, that is a second feature using GitHub organization membership APIs and should not be bundled into basic sign-in.
 
 ## Sources
@@ -110,3 +123,38 @@ Do not wire access control into the three homepage action cards yet. They can re
 - GitHub OAuth web application flow: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 - GitHub OAuth scopes: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
 - GitHub REST API authenticated user: https://docs.github.com/en/rest/users/users#get-the-authenticated-user
+
+## CLI Registration and Update Authentication
+
+The browser proposal above is retained as the baseline sign-in design. The
+registration changes add a separate CLI device flow using the same verified
+GitHub identity model. They do not replace the browser cookie session or change
+workspace authentication.
+
+`cli.py register` and `cli.py update` call shared core services and the configured
+database directly; neither a running API nor browser cookies are required.
+
+1. Load `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` from the existing
+   environment or `.env`. Enable device flow for the GitHub OAuth app.
+2. Check the selected database before starting authorization.
+3. Request device authorization and display GitHub's verification URL and code.
+4. Poll within the server-provided interval/deadline, respecting pending and
+   slowdown responses and handling cancellation.
+5. Fetch the account and verify its stable positive numeric GitHub user ID.
+6. Revoke the individual temporary user token before registration/update starts.
+   A failed or unconfirmed revocation prevents processing.
+7. Pass only the verified account identity to the registration service.
+
+The temporary token is never stored in configuration or the database. Shared
+identity verification lives in `src/core/auth/service.py`; browser identity
+lookup also uses that verification logic, while retaining its OAuth/session flow.
+
+First registration derives adapter identity/name from metadata and records the
+verified owner only after acceptance. Published adapter updates require that
+account to own every source for the adapter identity. A new source/version
+cannot claim an identity already owned by another account. Ownership is checked
+again during atomic acceptance to handle concurrent registrations.
+
+Batch refresh remains trusted CLI maintenance; these changes do not introduce
+an administrator role or a public batch-trigger endpoint. Organization/team
+authorization remains a separate future decision.

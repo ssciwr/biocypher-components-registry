@@ -25,13 +25,18 @@ Initial endpoint direction:
 POST /api/v1/registrations
 GET /api/v1/registrations
 GET /api/v1/registrations/{registration_id}
-POST /api/v1/registrations/{registration_id}/process
-POST /api/v1/registrations/{registration_id}/revalidate
+POST /api/v1/registrations/stream
+POST /api/v1/adapters/{adapter_id}/update
+GET /api/v1/schemas/{version}
 GET /api/v1/registry/registrations
-POST /api/v1/registry/refreshes
 GET /api/v1/registry/refreshes/latest
 GET /api/v1/registry/entries
 ```
+
+Registration now validates and accepts in one operation. Its response separates
+the terminal attempt from the published version. Failed first attempts create
+no records; failed updates preserve accepted metadata. Batch refresh is a trusted
+CLI operation, with only its latest summary exposed for HTTP reads.
 
 The API layer should stay thin:
 

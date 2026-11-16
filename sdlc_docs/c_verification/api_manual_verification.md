@@ -2,6 +2,30 @@
 
 This checklist verifies the current FastAPI contract manually with HTTPie.
 
+## Consult Swagger First
+
+Before using the command-line examples below, inspect the API contract generated
+by the exact backend revision being verified:
+
+```text
+Swagger UI:   http://localhost:8000/docs
+ReDoc:        http://localhost:8000/redoc
+OpenAPI JSON: http://localhost:8000/openapi.json
+```
+
+Expand an operation in Swagger to inspect its parameters, request body,
+responses, status codes, and component schemas. **Try it out** sends the request
+to the running backend. Mutating operations use its configured database, so use
+a disposable development database.
+
+Swagger does not bypass authorization. GitHub-protected operations require the
+normal authenticated browser session cookie. OAuth redirect routes marked with
+`include_in_schema=False` are intentionally absent from Swagger. Optional
+agentic-workspace routes appear only when their router is enabled.
+
+If an HTTPie example disagrees with the generated contract, treat the live
+OpenAPI document as authoritative and update this guide.
+
 ## Assumptions
 
 - The API server is running at `http://127.0.0.1:8000`.
@@ -20,12 +44,18 @@ uv run uvicorn src.api.app:app --reload
 Or start the API server with Docker Compose:
 
 ```bash
-docker compose up --build backend
+docker compose -f docker-compose-sqlite.yml up --build backend
 ```
 
-When using Docker Compose, the development SQLite database is stored on the host
-at `.docker-data/backend/registry.sqlite3` and mounted into the container as
-`/app/data/registry.sqlite3`.
+When using SQLite Compose, the database is `/app/data/registry.sqlite3` in the
+`biocypher-sqlite-data` named volume. Host-local demo paths are only visible to a
+host API process unless explicitly mounted into the container.
+
+For registration/update requests, sign in through the existing browser GitHub
+flow and supply its local session cookie to HTTPie. In the examples,
+`SESSION_COOKIE` means the full cookie pair `bcr_session=<local-session-token>`.
+Use the same hostname as the signed-in browser. Public reads and standalone
+metadata utilities do not require this cookie.
 
 ## 1. Health
 
@@ -187,13 +217,14 @@ Expected result:
 
 ## 4. Dataset Metadata Generation
 
-Generate dataset metadata from a server-side input path:
+Generate dataset metadata from one local CSV file using the standalone multipart
+endpoint. Replace `./people.csv` with an existing UTF-8 CSV file:
 
 ```bash
-http POST :8000/api/v1/metadata/datasets/generate \
-  input_path=/tmp/biocypher-api-dataset-demo \
+http --form POST :8000/api/v1/metadata/datasets/generate \
+  file@./people.csv \
   generator=native \
-  validate:=true \
+  validate=true \
   name="People Demo Dataset" \
   description="Small CSV dataset used to verify generation." \
   url=https://example.org/people-demo \
@@ -201,7 +232,7 @@ http POST :8000/api/v1/metadata/datasets/generate \
   citation=https://example.org/people-demo \
   dataset_version=1.0.0 \
   date_published=2026-04-17 \
-  creators:='["Person|Dataset Creator"]'
+  creators_json='[{"name":"Dataset Creator","creator_type":"Person"}]'
 ```
 
 Expected result:
@@ -257,102 +288,92 @@ Expected result:
 
 ## 6. Registration Workflow
 
-Submit the local demo adapter repository:
+With a signed-in session, submit the local demo repository to the host API:
 
 ```bash
 http POST :8000/api/v1/registrations \
-  adapter_name="Manual Example Adapter" \
+  Cookie:"$SESSION_COOKIE" \
   repository_location=/tmp/biocypher-api-manual-adapter
 ```
 
 Expected result:
 
-- HTTP `201`
-- Response includes `registration_id`
-- `status` is `SUBMITTED`
+- HTTP `201`, terminal `attempt_status: SUCCEEDED`
+- `registration_id`, metadata-derived `adapter_id` and name
+- `published_version: 1.0.0`
+- one accepted source, canonical entry and `VALID_CREATED` event
+- no separate process request
 
-Save the returned `registration_id` and process it:
+Save the returned identifiers. Repeating the same accepted repository returns
+`409`; updating it uses the owned adapter action in section 9. Without sign-in,
+publication returns `401`.
+
+For a separate first-registration run, choose the streaming alternative before
+the repository is accepted:
 
 ```bash
-http POST :8000/api/v1/registrations/<registration_id>/process
+http --stream POST :8000/api/v1/registrations/stream \
+  Cookie:"$SESSION_COOKIE" \
+  repository_location=/tmp/biocypher-api-manual-adapter
 ```
 
-Expected result:
+Expect `snapshot`, `check` and one terminal `result` or `error`, with heartbeat
+comments. Only the terminal result confirms persistence. A disconnected client
+must inspect the catalog before another submission, without automatic retries.
 
-- HTTP `200`
-- `status` is usually `VALID` for the demo document
-- Response includes validation profile/version details
-
-Read the registration detail:
+Inspect accepted state and history:
 
 ```bash
 http GET :8000/api/v1/registrations/<registration_id>
-```
-
-Read the registration event history:
-
-```bash
 http GET :8000/api/v1/registrations/<registration_id>/events
-```
-
-List all active registrations:
-
-```bash
 http GET :8000/api/v1/registrations
+http GET :8000/api/v1/schemas/v1
 ```
+
+Read responses separate `published_version` and `latest_attempt`, with no
+lifecycle `status`. The schema response has `application/schema+json`; an unknown
+version returns `404`.
+
+For a rejection test, use an unregistered copy with invalid JSON or missing
+required metadata. Expect HTTP `200`, `attempt_status: FAILED`, no registration
+identifier and available validation errors/positions/checks. Confirm no source,
+entry or event was saved. Correcting the file allows retry with the same version.
+Do not confuse a rejected new source with an update of an already accepted one.
 
 ## 7. Registry Operations
 
-Run a batch refresh over all active registrations:
+Run a trusted batch refresh against the same configured database through the CLI:
 
 ```bash
-http POST :8000/api/v1/registry/refreshes
+uv run cli.py refresh-registry
+uv run cli.py show-latest-refresh
 ```
 
-Expected result:
-
-- HTTP `200`
-- Response includes `active_sources`, `processed`, `valid_created`,
-  `unchanged`, `invalid`, `duplicate`, `rejected_same_version_changed`, and
-  `fetch_failed`
-
-Read the latest refresh:
+The API has no batch-trigger route. Read its latest completed summary:
 
 ```bash
 http GET :8000/api/v1/registry/refreshes/latest
 ```
 
-List registry registrations:
+Expect run ID/timestamps and `active_sources`, `processed`, `valid_created`,
+`unchanged`, `invalid`, `duplicate`, `rejected_same_version_changed`,
+`fetch_failed` and `internal_failed`. With no completed refresh, expect `404`.
+
+List published sources and filter the latest persisted event:
 
 ```bash
 http GET :8000/api/v1/registry/registrations
+http GET :8000/api/v1/registry/registrations latest_event==INVALID_SCHEMA
+http GET :8000/api/v1/registry/registrations latest_event==missing
 ```
 
-Filter registry registrations:
+The last request returns `422`. The former lifecycle `status` filter is removed.
+Rows retain the accepted version even when their latest update failed.
 
-```bash
-http GET :8000/api/v1/registry/registrations status==VALID
-```
-
-```bash
-http GET :8000/api/v1/registry/registrations status==INVALID latest_event==INVALID_SCHEMA
-```
-
-Unsupported filter values should return `422`:
-
-```bash
-http GET :8000/api/v1/registry/registrations status==missing
-```
-
-List canonical registry entries:
+Read canonical entry summaries without full metadata:
 
 ```bash
 http GET :8000/api/v1/registry/entries
-```
-
-Read one canonical registry entry:
-
-```bash
 http GET :8000/api/v1/registry/entries/<entry_id>
 ```
 
@@ -370,10 +391,10 @@ Read one adapter detail:
 http GET :8000/api/v1/adapters/<adapter_id>
 ```
 
-Read full metadata for one adapter version:
+Read the latest accepted metadata for one adapter:
 
 ```bash
-http GET :8000/api/v1/adapters/<adapter_id>/versions/<version>/metadata
+http GET :8000/api/v1/adapters/<adapter_id>/metadata
 ```
 
 For the demo document, likely values are:
@@ -383,19 +404,38 @@ adapter_id = manual-example-adapter
 version = 1.0.0
 ```
 
-## 9. Revalidation
+## 9. Manual Updates and Retries
 
-Revalidation is only available for registrations whose current status is
-`INVALID` or whose latest event is `FETCH_FAILED`.
+Update the demo metadata version to a different unused label while preserving
+its adapter identity, then call the owner-authorized action:
 
 ```bash
-http POST :8000/api/v1/registrations/<registration_id>/revalidate
+http POST :8000/api/v1/adapters/<adapter_id>/update Cookie:"$SESSION_COOKIE"
 ```
 
 Expected result:
 
-- HTTP `200` when the registration is eligible for revalidation
-- HTTP `400` when the registration is not eligible
+- unchanged metadata: `SUCCEEDED`, existing published version, no replacement
+- accepted changed metadata: `SUCCEEDED`, new published version, `update_applied: true`
+- invalid candidate: `FAILED`, accepted version/metadata retained, failure event
+- changed content reusing the current version: `FAILED`, `VERSION_NOT_BUMPED`
+- a different account: `403`; an unknown adapter: `404`
+
+Labels need not increase semantically; they must be different and unused for a
+changed candidate. Correct an invalid update and repeat Update to retry. Correct
+a rejected first registration and submit its repository again; no failed-source
+revalidation endpoint exists.
+
+The CLI supports the same owner-authorized operation with separate device
+authentication:
+
+```bash
+uv run cli.py update <adapter-id>
+uv run cli.py update <adapter-id> --force-validation
+```
+
+Confirm failed update attempts do not change the public metadata endpoint and
+remain visible in source event history.
 
 ## 10. Cleanup
 

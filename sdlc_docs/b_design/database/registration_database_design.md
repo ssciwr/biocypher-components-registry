@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the proposed database design and registration lifecycle for the BioCypher components registry.
+This document defines the database design and registration publication workflow for the BioCypher components registry.
 
 This document describes the database schema and persistence rules. Python code
 that communicates with the database should live under `src/persistence`, while
@@ -19,7 +19,7 @@ The design supports:
   - `mlcroissant` compliance
   - registry schema/profile validation
 - canonical storage of valid registry entries
-- history tracking for every registration attempt
+- history tracking for accepted registrations and subsequent update attempts
 - duplicate detection
 - change detection using checksums
 
@@ -28,10 +28,10 @@ The design supports:
 The database system should:
 
 - separate canonical valid entries from processing history
-- keep a full audit trail of checks, validations, and outcomes
+- retain terminal update outcomes while returning rejected first attempts without records
 - avoid silently replacing canonical entries with changed content for the same version
 - detect unchanged files efficiently using checksums
-- support future migration from SQLite to PostgreSQL
+- preserve the same acceptance contract for SQLite and PostgreSQL
 
 ## Core Rules
 
@@ -45,8 +45,9 @@ A `croissant.jsonld` file becomes a canonical registry entry only if it passes:
 If either validation fails:
 
 - the canonical valid entry must remain unchanged
-- the failure must be recorded in history
-- the maintainer may be notified
+- a published source records the failed update in history
+- a failed first registration returns errors without creating a source or event
+- notifications remain future work
 
 ### Duplicate policy
 
@@ -67,11 +68,18 @@ Why `adapter_id` instead of `adapter_name`:
 - it avoids duplicate misses caused by spaces, capitalization, or minor naming variants
 - names like `OmniPath Adapter`, `Omnipath adapter`, and `omnipath adapter` resolve to the same adapter identity
 
-Only one canonical valid entry may exist for a given uniqueness key.
+Only one canonical valid entry may exist for a given uniqueness key. Repository
+locations are also unique after normalization. Missing metadata `@id` falls back
+to the metadata name consistently across registration, reads and updates.
+
+The submitting GitHub identity owns its source. Updates require ownership of
+every published source for that adapter identity. Acceptance checks identity
+ownership within the write transaction, preventing competing accounts from
+claiming different versions of the same identity.
 
 ### Change detection policy
 
-The system computes a checksum of the retrieved `croissant.jsonld`.
+The system computes a checksum of normalized metadata JSON from the retrieved `croissant.jsonld`.
 
 If the checksum is unchanged:
 
@@ -89,13 +97,15 @@ If the file changed but still uses the same `adapter_id + version`, the recommen
 
 - do not silently replace the canonical valid entry
 - reject the update
-- require the maintainer to bump the version
+- require a different, unused version label; semantic-version ordering is not enforced
 
 This preserves reproducibility and avoids silently changing the meaning of an already published adapter version.
 
 ## Proposed Tables
 
-The recommended design uses **three tables**.
+Registration uses **three core tables**, described below. The separate
+`registry_refreshes` table stores batch summaries; authentication and endorsement
+tables retain their existing responsibilities.
 
 ## Table 1: `registration_sources`
 
@@ -105,7 +115,10 @@ Suggested columns:
 
 - `id`
 - `submitted_adapter_name`
-- `repository_location`
+- `description`
+- `license_value`, `doi`, `cff_url`
+- `submitted_by_github_user_id`
+- `repository_location` (unique)
 - `source_kind`
 - `is_active`
 - `created_at`
@@ -128,7 +141,6 @@ Suggested columns:
 - `id`
 - `source_id`
 - `adapter_name`
-- `adapter_version`
 - `profile_version`
 - `uniqueness_key`
 - `metadata_checksum`
@@ -147,7 +159,7 @@ Purpose:
 
 ## Table 3: `registration_events`
 
-This table stores the history of every processing attempt.
+This table stores accepted first registrations and subsequent terminal update attempts.
 
 Suggested columns:
 
@@ -169,27 +181,31 @@ Suggested columns:
 Purpose:
 
 - provide an append-only audit trail
-- support debugging, notifications, reporting, and future revalidation
+- support debugging, reporting and future operational integrations
 
 ## Recommended Event Types
 
-Suggested event types:
+Current success events include:
 
-- `SUBMITTED`
-- `FETCH_FAILED`
-- `UNCHANGED`
 - `VALID_CREATED`
-- `INVALID_MLCROISSANT`
-- `INVALID_SCHEMA`
-- `INVALID_BOTH`
-- `REJECTED_SAME_VERSION_CHANGED`
-- `DUPLICATE`
-- `REVALIDATED`
+- `UNCHANGED`
+
+Failed updates record retrieval/validation reasons or conflicts, including
+`FETCH_FAILED`, `INVALID_JSON`, `INVALID_MLCROISSANT`, `INVALID_SCHEMA`,
+`REJECTED_SAME_VERSION_CHANGED`, `DUPLICATE` and `ADAPTER_ID_CHANGED`.
+Other retrieval and semantic reason codes can also appear; readers should
+preserve unknown event names when displaying history.
+
+Historical `SUBMITTED` and `REVALIDATED` values are not emitted by the current
+workflow. Events describe attempts, not registration lifecycle status.
+First-registration rejections create no event. Public attempt responses use
+`SUCCEEDED` or `FAILED` separately from `published_version`.
 
 ## Conceptual Relationship Diagram
 
 ```mermaid
 erDiagram
+    REGISTRATION_SOURCES ||--o{ REGISTRY_ENTRIES : publishes
     REGISTRATION_SOURCES ||--o{ REGISTRATION_EVENTS : produces
     REGISTRATION_SOURCES ||--o| REGISTRY_ENTRIES : current_entry
     REGISTRY_ENTRIES ||--o{ REGISTRATION_EVENTS : referenced_by
@@ -211,7 +227,6 @@ erDiagram
         string id PK
         string source_id FK
         string adapter_name
-        string adapter_version
         string profile_version
         string uniqueness_key UK
         string metadata_checksum
@@ -239,57 +254,55 @@ erDiagram
     }
 ```
 
+The relationships above are logical store-managed references; the current
+SQLAlchemy tables do not declare foreign-key constraints. An accepted source
+can have multiple historical entries; `current_registry_entry_id` selects its
+current accepted metadata. Version is read from `metadata_json`, not a separate
+`adapter_version` column.
+
 ## Registration Lifecycle
 
 The user-facing registration flow is:
 
-1. user submits a repository source
-2. source is stored in `registration_sources`
-3. processing retrieves `croissant.jsonld`
-4. checksum is computed
-5. validations are executed
-6. canonical registry is updated only when both validations pass
-7. a history event is stored for every attempt
+1. authenticate the submitting GitHub identity
+2. normalize the repository source and reject an already accepted repository
+3. retrieve current root metadata from its default branch (or a local source)
+4. parse JSON, compute the checksum and validate all required stages
+5. enforce canonical identity/version uniqueness and ownership
+6. commit source, canonical entry, current-entry pointer and `VALID_CREATED`
+   event in one transaction
+7. return the terminal result after persistence
+
+Rejected first attempts return actionable diagnostics and create no records.
+Corrected first attempts may reuse the same version. Published updates instead
+retain accepted metadata on failure and append their terminal history.
 
 ## Registration Process Flow
 
 ```mermaid
 flowchart TD
-    A[Start: active submitted source] --> B[Retrieve croissant.jsonld]
-    B -->|Fail| C[Store FETCH_FAILED event]
-    C --> Z[End]
-
-    B --> D[Compute checksum]
-    D --> E{Checksum changed?}
-
-    E -->|No| F[Store UNCHANGED event]
-    F --> Z
-
-    E -->|Yes| G[Run mlcroissant validation]
-    G --> H[Run schema/profile validation]
-    H --> I{Both pass?}
-
-    I -->|No| J[Store invalid event with errors]
-    J --> K[Keep existing valid registry entry]
-    K --> L[Notify maintainer if configured]
-    L --> Z
-
-    I -->|Yes| M[Build uniqueness key: adapter id plus version]
-    M --> N{Valid registry entry exists for key?}
-
-    N -->|No| O[Create new canonical registry entry]
-    O --> P[Store VALID_CREATED event]
-    P --> Z
-
-    N -->|Yes| Q{Checksum same as canonical entry?}
-    Q -->|Yes| R[Store UNCHANGED event]
-    R --> Z
-
-    Q -->|No| S[Reject replacement for same version]
-    S --> T[Store REJECTED_SAME_VERSION_CHANGED event]
-    T --> U[Notify maintainer to bump version]
-    U --> Z
+    A[Authenticated repository candidate] --> B[Retrieve and parse croissant.jsonld]
+    B -->|Failure| F[Build failed attempt and diagnostics]
+    B --> C[Compute checksum]
+    C --> D{Published and unchanged?}
+    D -->|Yes, validation not forced| U[Keep entry and record UNCHANGED]
+    D -->|No or forced validation| V[Run compliance, profile, semantics and dataset checks]
+    V -->|Failure| F
+    V -->|Pass| R[Check identity, owner and version rules]
+    R -->|Reject| F
+    R -->|Accept| T[Atomically commit accepted source, entry and success event]
+    F --> P{Previously published source?}
+    P -->|Yes| H[Record failure and retain accepted metadata]
+    P -->|No| N[Return diagnostics without source, entry or event]
+    U --> Z[Return terminal attempt and published version]
+    T --> Z
+    H --> Z
+    N --> Z
 ```
+
+Acceptance handles uniqueness and ownership races inside the transaction. A
+streamed progress check is not confirmation of publication; only the terminal
+result follows persistence.
 
 ## Decision Rules
 
@@ -317,7 +330,7 @@ Behavior:
 
 - store invalid event
 - keep the existing valid entry unchanged
-- send notification if configured
+- expose the failed update in history; notification delivery is future work
 
 ### Case 4: new entry
 
@@ -325,13 +338,16 @@ Behavior:
 
 - validate
 - if valid, create canonical entry
-- if invalid, store failure event only
+- if invalid or otherwise rejected, return diagnostics without records
+- if valid and accepted, commit source, entry and success event atomically
 
 ## Recommended Operational Behavior
 
 ### Polling
 
-The system may periodically iterate through all active rows in `registration_sources`.
+Manual CLI `refresh-registry` iterates active published sources. Each source
+is processed independently and one failure does not stop the batch. Scheduling,
+retry backoff and notification delivery are not implemented.
 
 For each source:
 
@@ -342,7 +358,7 @@ For each source:
 
 ### Notifications
 
-Notifications are useful for:
+Future notifications would be useful for:
 
 - failed validation after file changed
 - repeated fetch failures
@@ -358,21 +374,26 @@ Notifications are not needed for:
 This design is suitable because it:
 
 - protects the canonical registry from invalid updates
-- keeps complete processing history
+- retains accepted publication history and subsequent terminal update attempts
 - supports professional traceability and reproducibility
 - uses checksum-driven polling to avoid unnecessary work
 - maps well to SQLAlchemy Core and later PostgreSQL migration
 
 ## Migration Notes
 
-The current implementation already uses SQLAlchemy Core for registration persistence.
+SQLite and PostgreSQL share SQLAlchemy tables and the same registration store
+contract. Initialization creates the current schema for fresh databases under
+startup locking; it does not migrate historical schemas automatically.
 
-A future migration path could proceed as follows:
+An existing deployment needs an explicit migration/export plan before upgrading.
+Preserve atomic acceptance, canonical uniqueness, owner identity, checksums,
+current-entry pointers and event history across any such migration.
 
-1. keep the service interface stable
-2. keep registration store/query ports in `src/core`
-3. keep SQLAlchemy tables and concrete database adapters in `src/persistence`
-4. introduce the three-table structure in SQLAlchemy table metadata
-5. keep SQLite for local development
-6. add PostgreSQL configuration for production
-7. preserve checksum-based processing and uniqueness enforcement across both backends
+Manual batch refreshes persist identifiers, timestamps and counters in
+`registry_refreshes`: `active_sources`, `processed`, `valid_created`, `unchanged`,
+`invalid`, `duplicate`, `rejected_same_version_changed`, `fetch_failed` and
+`internal_failed`. The API exposes only the latest summary for reading.
+
+Tests use temporary SQLite databases and isolated schemas in a specifically
+labeled disposable PostgreSQL container. They do not target a developer's live
+application database.

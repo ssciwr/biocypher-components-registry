@@ -5,6 +5,26 @@ considered proper requirements.
 
 ---
 
+## Registration implementation update
+
+The dated ideas below are retained as requirements history. The current
+registration implementation refines steps 4–9 and 11:
+
+- A verified maintainer submits a repository; discovery and validation complete
+  before its first source, canonical entry and success event are committed.
+- Failed first registrations return diagnostics without storing an invalid
+  source or event. The maintainer fixes the repository and submits it again.
+- Published adapters retain accepted metadata when an update fails; update
+  outcomes remain in their event history.
+- Owners can update their adapters immediately. Batch refresh remains a manual
+  CLI operation; automatic scheduling, backoff and notifications are future work.
+- Batch summaries distinguish accepted, unchanged, invalid, duplicate,
+  version-conflict, fetch-failure and internal-failure outcomes.
+
+See the corresponding user stories and registration database design for the
+current acceptance rules. Metadata generation, MCP retrieval and the broader
+frontend goals remain as described in the original requirements.
+
 ## [date] 30.06.2025
 
 ### Description of the workflow.
@@ -53,15 +73,15 @@ considered proper requirements.
 | 1             | US-01      |
 | 2             | US-02      |
 | 3             | US-03      |
-| 4             | US-04      |
-| 5             | US-04a     |
-| 6             | US-05      |
-| 7             | US-06      |
-| 8             | US-07      |
-| 9             | US-08      |
-| 10            | US-09      |
-| 11            | US-10      |
-| 12            | US-11      |
+| 4             | US-04, US-04a |
+| 5             | US-05      |
+| 6             | US-06, US-06a |
+| 7             | US-07      |
+| 8             | US-08      |
+| 9             | US-09      |
+| 10            | US-10      |
+| 11            | US-11      |
+| 12            | US-12      |
 
 
 ### Check gate
@@ -76,9 +96,9 @@ considered proper requirements.
 | US-04a        | Registration UI and submission persistence |
 | US-05         | Persist valid adapter records              |
 | US-06         | Prevent duplicates                         |
-| US-07         | Persist invalid status and errors          |
-| US-08         | Non-blocking batch registration            |
-| US-09         | On-demand revalidation                     |
+| US-07         | Actionable validation errors and update history          |
+| US-08         | Non-blocking batch refresh            |
+| US-09         | On-demand retries and adapter updates                     |
 | US-10         | MCP metadata discovery and retrieval       |
 | US-11         | Run summary reporting                      |
 | US-12         | React front-end migration                  |

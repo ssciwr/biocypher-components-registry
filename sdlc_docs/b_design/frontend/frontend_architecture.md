@@ -2,27 +2,33 @@
 
 ## Purpose
 
-This document defines a target architecture for introducing a professional React-based frontend that replaces the current server-rendered frontend responsibilities while continuing to reuse the existing backend business logic.
+This document describes the implemented React/FastAPI boundary and the rules
+that keep frontend concerns separate from backend business logic.
 
 The design is intended to:
 
 - preserve the current core implementation work
 - avoid duplicating business rules in the frontend
 - establish a stable API boundary between UI and backend
-- support an incremental migration from the current web layer
-- keep the backend delivery mechanism flexible for a future move to FastAPI or Flask
+- use generated clients derived from the deployed FastAPI contract
+- keep future deployment or repository changes from altering business rules
 
 ## Architectural Direction
 
-The frontend should evolve into a dedicated React application that consumes backend APIs instead of relying on server-rendered HTML pages.
+The dedicated React application consumes the FastAPI JSON and SSE endpoints.
+“HTTP API” below names the logical contract. Local development uses HTTP on
+localhost; production browser traffic uses HTTPS to Nginx, which proxies to
+FastAPI over private HTTP. See the
+[deployment transport conventions](../deployment.md#transport-conventions).
 
 The backend should be split conceptually into:
 
 1. a framework-agnostic core service layer
 2. a thin HTTP/API adapter layer
-3. persistence adapters such as SQLite now and PostgreSQL later
+3. persistence adapters for SQLite and PostgreSQL
 
-This ensures the current backend logic remains reusable even if the project later replaces the current HTTP server with FastAPI or Flask.
+This keeps the backend logic reusable independently of UI and deployment
+changes.
 
 ## Design Goals
 
@@ -33,78 +39,81 @@ The frontend architecture should:
 - keep all validation, duplicate detection, status transitions, and persistence rules in the backend
 - expose explicit JSON contracts for UI interactions
 - minimize coupling between the UI and the backend framework
-- support current SQLite-based development without blocking future backend evolution
+- support both configured persistence backends through one store boundary
 
-## Target Layered Architecture
+## Implemented Layered Architecture
 
 ```mermaid
 flowchart LR
-    U[User Browser]
-    R[React Frontend]
-    A[API Layer<br/>HTTP + JSON]
-    C[Core Services<br/>registration, validation, discovery, generation]
-    S[src/persistence<br/>SQLite/PostgreSQL adapters]
-    DB[(SQLite Database)]
-    EXT[External Sources<br/>local repos / GitHub repos]
+    U["Browser"]
+    R["React"]
+    A["FastAPI"]
+    C["Core services"]
+    P["Store port"]
+    S["DB adapter"]
+    DB[("Selected DB")]
+    Remote["Remote Git"]
+    Local["Local source"]
 
     U --> R
-    R --> A
+    R -->|"HTTP API"| A
     A --> C
-    C --> S
+    C --> P
+    P --> S
     S --> DB
-    C --> EXT
+    C -->|"HTTPS"| Remote
+    Local -->|"File access"| C
 ```
 
-## Backend Separation for Future FastAPI/Flask Migration
+`Selected DB` is SQLite or PostgreSQL. A remote Git repository is fetched over
+HTTPS; a server-local source is read from the backend filesystem and is not a
+browser-local repository.
 
-The backend framework should be treated as a replaceable shell around stable application behavior.
+## Backend Separation
+
+React communicates with the backend through FastAPI. FastAPI owns HTTP routing,
+schemas, and error mapping, then delegates business behavior to framework-free
+core services. Replacing the delivery framework would not require rewriting the
+core, but FastAPI is the implemented and supported HTTP layer.
 
 ```mermaid
 flowchart TB
-    subgraph Frontend
-        R[React App]
+    subgraph Frontend["Frontend"]
+        R["React app"]
     end
 
-    subgraph Backend Shell
-        H1[Current HTTP Server]
-        H2[Future FastAPI]
-        H3[Future Flask]
+    subgraph Delivery["HTTP delivery"]
+        API["FastAPI"]
+        Schema["API schemas"]
     end
 
-    subgraph Stable Application Core
-        API[Request/Response Contracts]
-        SRV[Core Service Layer]
-        STORE[Store Interface]
+    subgraph Core["Application core"]
+        Service["Core services"]
+        Port["Store port"]
+        Service --> Port
     end
 
-    subgraph Persistence
-        SQLITE[src/persistence<br/>SQLite Store]
-        FUTUREDB[src/persistence<br/>Future PostgreSQL Store]
+    subgraph Persistence["Persistence"]
+        SQLite["SQLite adapter"]
+        Postgres["PostgreSQL adapter"]
     end
 
-    R --> API
-    H1 --> API
-    H2 --> API
-    H3 --> API
-
-    API --> SRV
-    SRV --> STORE
-    STORE --> SQLITE
-    STORE --> FUTUREDB
+    R -->|"HTTP API"| API
+    API -->|"Uses"| Schema
+    API -->|"Calls"| Service
+    Port --> SQLite
+    Port --> Postgres
 ```
 
-## Current vs Proposed Frontend Responsibility
+## Frontend and Backend Responsibility
 
-Today, the current web server combines UI rendering and workflow handling. The target design moves UI concerns into React and keeps backend logic behind explicit APIs.
+React owns presentation and interaction state. FastAPI translates HTTP
+contracts, while core services and persistence own application behavior and
+durable state.
 
 ```mermaid
 flowchart LR
-    subgraph Current
-        UI1[Server-rendered pages]
-        UI1 --> BL1[Backend logic mixed with UI routing]
-    end
-
-    subgraph Proposed
+    subgraph Current system
         UI2[React UI]
         API2[Thin API layer]
         BL2[Backend business logic]
@@ -123,23 +132,30 @@ sequenceDiagram
     participant API
     participant Service as Core Service
     participant Store as Store Interface
-    participant Persistence as src/persistence
-    participant DB as SQLite/PostgreSQL DB
-    participant Repo as Repo/GitHub Source
+    participant DB as Selected DB
+    participant Source
 
     User->>React: Submit registration or run action
     React->>API: JSON request
     API->>Service: Call use-case function
-    Service->>Store: Call persistence port
-    Store->>Persistence: Use configured adapter
-    Persistence->>DB: Read or write rows
-    Service->>Repo: Discover metadata if needed
-    Service->>Store: Persist result and events through port
-    Store->>Persistence: Use configured adapter
-    Persistence->>DB: Update source, entry, and event records
+    Service->>Source: Retrieve candidate metadata
+    Source-->>Service: Candidate document
+    Service->>Service: Validate candidate and acceptance rules
+    Service->>Store: Atomically accept or record a published update outcome
+    Store->>DB: Execute transaction
+    DB-->>Store: Persistence result
+    Store-->>Service: Publication outcome
+    Service-->>API: Terminal result
     API-->>React: JSON response
     React-->>User: Updated UI state
 ```
+
+First-registration failures return diagnostics without source, entry or event
+records. Registration progress can stream before the terminal result, but only
+that final result confirms publication. UI clients must not automatically repeat
+a disconnected publication POST. See the frontend API contract for these
+registration-specific details; the other architecture guidance remains the
+original baseline.
 
 ## Suggested Module Layout
 
@@ -163,10 +179,13 @@ flowchart TB
             VAL[Validation]
             ADP[Adapter Discovery/Generation]
             SHARED[Shared Utilities]
+            PORT[Store Port]
         end
 
         subgraph persistence
-            SQLITE[src/persistence\nSQLite Store]
+            SQLITE[SQLite Adapter]
+            PG[PostgreSQL Adapter]
+            DB[(Selected DB)]
         end
     end
 
@@ -178,7 +197,11 @@ flowchart TB
     ROUTES --> REG
     ROUTES --> VAL
     ROUTES --> ADP
-    REG --> SQLITE
+    REG --> PORT
+    PORT --> SQLITE
+    PORT --> PG
+    SQLITE --> DB
+    PG --> DB
 ```
 
 ## Recommended API Boundary
@@ -217,56 +240,41 @@ The React frontend should not own:
 
 The backend should remain responsible for:
 
-- adapter registration request creation
+- synchronous registration acceptance and terminal attempt results
 - metadata discovery from local or remote repositories
 - adapter and dataset validation
 - duplicate detection and uniqueness enforcement
 - canonical registry entry persistence
 - registration event history
-- batch refresh and revalidation workflows
+- manual batch refresh and owner-authorized adapter updates
 
-## Migration Strategy
+## Implementation Status and Remaining Options
 
-The recommended migration path is incremental.
+Implemented:
 
-### Phase 1: Stabilize backend interfaces
+- React owns the browser workflows under `frontend/`.
+- FastAPI exposes request/response models around shared core services.
+- The checked-in OpenAPI document generates the TypeScript client.
+- SQLite and PostgreSQL implement the shared persistence boundary.
 
-- keep `src/core` as the source of truth for business behavior
-- add API-style request and response models around the existing services
-- avoid coupling new frontend work to server-rendered templates
-
-### Phase 2: Introduce React frontend
-
-- create a new React application for registration and registry operations
-- connect it to the thin API layer
-- implement the current main workflows in the new UI
-
-### Phase 3: Replace legacy frontend responsibilities
-
-- migrate existing server-rendered pages one workflow at a time
-- keep legacy pages only as temporary compatibility surfaces
-- retire server-rendered frontend code when React fully covers the workflows
-
-### Phase 4: Optional backend framework migration
-
-- move the API adapter layer to FastAPI or Flask if desired
-- preserve the service layer and persistence logic
-- keep the React frontend unchanged except for deployment or configuration details
+Optional future changes include splitting deployment units or repositories.
+Those changes should preserve the API, core-service, and persistence boundaries
+rather than introduce a second implementation of business rules.
 
 ## Key Architectural Rules
 
 - Business rules must remain in backend services, not in React components.
 - UI-to-backend integration should be contract-based and JSON-oriented.
-- The HTTP framework should be replaceable without rewriting core services.
+- FastAPI route handlers must stay thin enough that core services remain reusable.
 - The React frontend should be framework-agnostic with respect to backend implementation details.
-- The migration should preserve existing SQLite-backed functionality during development.
+- SQLite and PostgreSQL behavior should remain compatible at the store boundary.
 
 ## Expected Benefits
 
 - clearer separation of concerns
 - better maintainability of frontend and backend code
 - easier frontend modernization without backend rewrites
-- lower risk for future FastAPI or Flask adoption
+- generated transport types that track the FastAPI contract
 - improved long-term testability and extensibility
 
 ## Relation to User Stories
@@ -274,7 +282,7 @@ The recommended migration path is incremental.
 This design primarily supports:
 
 - `US-04a` Registration UI and submission persistence
-- `US-08` Non-blocking batch registration
-- `US-09` On-demand revalidation
+- `US-08` Non-blocking batch refresh
+- `US-09` On-demand retries and adapter updates
 - `US-11` Run summary reporting
 - `US-12` React front-end migration

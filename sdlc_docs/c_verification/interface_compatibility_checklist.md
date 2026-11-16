@@ -2,8 +2,9 @@
 
 ## Purpose
 
-This checklist tracks whether the FastAPI API, CLI, and temporary legacy web UI
-deliver the same project behavior through shared core services.
+This checklist tracks whether the FastAPI API and CLI deliver the same
+project behavior through shared core services. Registration UI references now
+refer to React; metadata-generation design references retain their original scope.
 
 The goal is not for every interface to expose every operation. The goal is that
 when two interfaces expose the same operation, they call the same core contract
@@ -21,12 +22,13 @@ CLI
   src/core/dataset/cli.py
   src/core/adapter/cli.py
 
-Legacy web UI
-  src/core/web
+Registration UI
+  frontend/src/pages/RegisterPage.tsx
+  frontend/src/pages/AdaptersPage.tsx
 ```
 
-`src/core/web` is temporary. New reusable behavior should be moved into core
-services or query helpers before the future frontend consumes it.
+The original metadata/legacy-web inventory below remains design context.
+Registration uses the React/API boundary and shared service contract described here.
 
 ## Compatibility Principles
 
@@ -43,32 +45,36 @@ services or query helpers before the future frontend consumes it.
 
 ## Compatibility Matrix
 
-| Capability | API | CLI | Legacy Web UI | Shared Core Boundary | Current Status |
+| Capability | API | CLI | UI / Baseline Reference | Shared Core Boundary | Current Status |
 | --- | --- | --- | --- | --- | --- |
 | Health check | `GET /api/v1/health` | None | None | API-only | Compatible, API-only |
-| Create registration | `POST /api/v1/registrations` | `submit-registration` | `POST /register` | `submit_registration` | Compatible |
-| Process registration | `POST /api/v1/registrations/{id}/process` | `finish-registration` | `POST /register/process` | `finish_registration` | Compatible |
-| Revalidate registration | `POST /api/v1/registrations/{id}/revalidate` | `revalidate-registration` | `POST /register/revalidate` | `revalidate_registration` | Compatible |
-| Batch refresh | `POST /api/v1/registry/refreshes` | `refresh-registry` | `POST /registry/refresh` | `refresh_active_registrations` | Compatible |
+| Create registration | `POST /api/v1/registrations` or `/registrations/stream` | `register` | Registration form | `register_adapter` | Atomic acceptance, verified owner |
+| Owned update | `POST /api/v1/adapters/{adapter_id}/update` | `update` | Adapter Update action | `update_adapter` | Shared ownership and acceptance rules |
+| Batch refresh | No HTTP mutation route | `refresh-registry` | No browser trigger | `refresh_active_registrations` | Trusted maintenance operation |
 | Latest refresh summary | `GET /api/v1/registry/refreshes/latest` | `show-latest-refresh` | `GET /registry` summary panel | `RegistrationStore.get_latest_batch_refresh` | Compatible |
 | List registrations | `GET /api/v1/registrations` and `GET /api/v1/registry/registrations` | `list-registrations` | `GET /registry` | `RegistrationStore.list_active_registrations` | Mostly compatible |
 | Registration detail | `GET /api/v1/registrations/{id}` | No direct detail command | `GET /register?registration_id=...` | `RegistrationStore.get_registration` | Partial CLI gap |
 | Registration events | `GET /api/v1/registrations/{id}/events` | `show-registration-events` | registration detail page | `RegistrationStore.list_registration_events` | Compatible |
 | Registry entries | `GET /api/v1/registry/entries` | `list-registry-entries` | registration detail current entry block | `RegistrationStore.list_registry_entries` | Partial web gap |
 | Registry entry detail | `GET /api/v1/registry/entries/{entry_id}` | No direct command | registration detail current entry block | `RegistrationStore.get_registry_entry` | Partial CLI gap |
-| Public adapter catalog | `GET /api/v1/adapters` | Removed old aggregated-file `list` command | Future frontend only | `RegistrationStore.list_registry_entries` | CLI gap |
-| Public adapter detail | `GET /api/v1/adapters/{adapter_id}` | Removed old aggregated-file `inspect` command | Future frontend only | `RegistrationStore.list_registry_entries` | CLI gap |
-| Public adapter metadata | `GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata` | Removed old aggregated-file `inspect` command | Future frontend only | `RegistrationStore.list_registry_entries` | CLI gap |
+| Public adapter catalog | `GET /api/v1/adapters` | Removed old aggregated-file `list` command | React adapter page | `RegistrationStore.list_registry_entries` | Implemented in API/UI; CLI gap |
+| Public adapter detail | `GET /api/v1/adapters/{adapter_id}` | Removed old aggregated-file `inspect` command | React adapter detail modal | `RegistrationStore.list_registry_entries` | Implemented in API/UI; CLI gap |
+| Public adapter metadata | `GET /api/v1/adapters/{adapter_id}/metadata` | Removed old aggregated-file `inspect` command | React adapter detail modal | `RegistrationStore.list_registry_entries` | Implemented in API/UI; CLI gap |
 | Metadata validation | `POST /api/v1/metadata/validate` | `validate`, `validate-adapter`, `validate-dataset` | generation result validation only | `validate_adapter_with_embedded_datasets`, `validate_dataset` | Mostly compatible |
-| Dataset metadata generation | `POST /api/v1/metadata/datasets/generate` | `dataset direct/config/guided` | No standalone dataset route | `src.core.dataset.service.execute_request` | Partial web gap |
+| Dataset metadata generation | `POST /api/v1/metadata/datasets/generate` | `dataset direct/config/guided` | Create-metadata workflow | `src.core.dataset.service.execute_request` | Shared generation; transport differs |
+| Browser dataset generation | Upload-session create/upload/finalize/status/delete routes | None | Create-metadata file/folder selection | `UploadSessionManager` + dataset service | Browser-specific transport over shared generation |
 | Adapter metadata generation | `POST /api/v1/metadata/adapters/generate` | `adapter direct/config/guided` | metadata generation form | `src.core.adapter.service.execute_request` | Compatible with duplicated mapping |
 
 ## Current Findings
 
 ### Healthy Areas
 
-- Registration submission, processing, revalidation, and batch refresh already
-  call shared core services from all relevant interfaces.
+- First registration, owned adapter updates and manual batch refresh call shared
+  core services. Failed first attempts leave no records; failed updates preserve
+  accepted metadata and append terminal history.
+- Browser publication uses its existing session. CLI publication verifies a
+  GitHub device-flow identity, revokes its temporary token and calls services
+  directly against the same configured database.
 - Adapter registration validation uses the shared registry-level validation
   contract, including embedded dataset validation.
 - API and CLI metadata validation both resolve adapter and dataset validation
@@ -81,9 +87,9 @@ services or query helpers before the future frontend consumes it.
 ### Resolved In Current Cleanup
 
 - Database path wiring is centralized in `src/core/settings.py`.
-- API, CLI, and legacy web store construction now goes through
+- API and CLI store construction goes through
   `src/persistence/factory.py`.
-- CLI registry commands can use `BIOCYPHER_REGISTRY_DB_PATH` when `--db-path` is
+- CLI registry commands can use `SQLITE_DATABASE_PATH` when `--db-path` is
   not supplied.
 - The old aggregated-file CLI commands `list`, `inspect`, and `export` were
   removed to avoid presenting `unified_adapters_metadata.jsonld` as the current
@@ -91,13 +97,15 @@ services or query helpers before the future frontend consumes it.
 
 ### Remaining Gaps And Duplication
 
-- Registry overview rows are assembled separately in API routes, CLI table
-  formatting, and legacy web helpers.
-- Adapter catalog grouping is implemented in the API route only.
+- Registry overview presentation remains separate between API models and CLI
+  table formatting; accepted state and latest attempts must stay consistent.
+- Public catalog grouping remains in API routes; canonical identity and latest
+  entry selection are shared through `src/core/adapter/catalog.py`.
 - Metadata generation request mapping exists separately in API schemas/routes,
-  CLI parsing, YAML config readers, and legacy web form normalization.
-- API has dedicated public adapter catalog endpoints. CLI and legacy web UI do
-  not yet expose equivalent registry-backed catalog operations.
+  CLI parsing, YAML config readers, and React form normalization.
+- API has dedicated public adapter catalog endpoints consumed by the React
+  adapter page. CLI does not yet expose equivalent registry-backed catalog
+  operations.
 
 ## Refactoring Checklist
 
@@ -120,30 +128,43 @@ services or query helpers before the future frontend consumes it.
   where it does not leak HTTP, Typer, or HTML concerns into core.
 - Add compatibility tests that compare API responses with the equivalent core
   or CLI-visible behavior for key workflows.
-- Keep the legacy web UI as a thin caller of shared core/query functions until
-  the React frontend replaces it.
+- Keep React workflow mapping in frontend modules and move only reusable
+  generation behavior into core helpers; do not couple core to browser types.
 
 ### Later
 
-- Introduce PostgreSQL by implementing the same registration store/query ports
-  already used by SQLite.
-- Add frontend contract tests against the FastAPI OpenAPI schema once the React
-  frontend starts consuming the API.
+- Keep SQLite/PostgreSQL parity through the shared registration store port
+  and tests against the disposable PostgreSQL environment.
+- Keep the generated frontend client synchronized with FastAPI OpenAPI and
+  retain contract coverage for the browser upload workflow.
 - Decide whether public adapter catalog operations should become first-class
   CLI commands.
 
 ## Suggested Next Implementation Step
 
-Start with configuration and store construction:
+Verify registration changes through shared service, API and CLI scenarios:
 
-```text
-src/core/config.py or src/core/settings.py
-  shared registry database path setting
+1. Accept a valid first candidate atomically; reject invalid metadata without
+   source, entry or event rows, then retry successfully with the same version.
+2. Reject duplicate repositories/identity-version keys and conflicting owners,
+   including concurrent writes and normalized repository aliases.
+3. Preserve accepted metadata on failed updates; require identity preservation
+   and a different unused label for changed candidates.
+4. Check streamed progress, diagnostics/schema provenance and unconfirmed
+   disconnect behavior without automatic resubmission.
+5. Verify CLI device authorization/revocation, shared database selection and
+   per-source isolation with separate fetch/internal batch counters.
 
-src/persistence/factory.py
-  build_registration_store(database_path: Path | str | None = None)
+```bash
+docker compose -f docker-compose.test.yml up -d --wait database
+REGISTRY_TEST_POSTGRES_CONTAINER=biocypher-registry-test-database uv run pytest -ra
+docker compose -f docker-compose.test.yml down
 ```
 
-Then update API dependencies, CLI commands, and legacy web helpers to use the
-same store construction path. This is a small change with a useful payoff: it
-removes duplicated database wiring before deeper read-model refactoring.
+SQLite tests run without Docker. PostgreSQL cases use the labeled disposable
+container and isolated schemas; unavailable infrastructure skips only those
+cases. Database configuration errors and test failures remain errors.
+
+Further read-model consolidation can follow the existing short/medium-term
+checklist. Agentic workspace behavior has a separate contract and is outside
+this registration change.

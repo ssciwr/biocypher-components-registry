@@ -10,7 +10,7 @@ It complements the project-wide architecture document at
 
 - `src/api`: FastAPI HTTP delivery layer
 - `src/core`: reusable application and domain logic
-- `src/persistence`: database adapters such as SQLite now and PostgreSQL later
+- `src/persistence`: database adapters such as SQLite and PostgreSQL
 - future backend delivery adapters such as MCP or scheduled workers
 
 Detailed persistence guidance is documented in
@@ -25,9 +25,19 @@ The backend should:
 - keep API route handlers thin
 - keep persistence adapters behind store/query interfaces
 - preserve existing SQLite-backed behavior during migration
-- support future PostgreSQL, MCP, and worker/scheduler delivery paths
+- support SQLite/PostgreSQL parity and future MCP and worker/scheduler delivery paths
+
+The ports-and-adapters boundary currently applies to persistence: registration
+services depend on store/query interfaces implemented by SQLite and PostgreSQL
+adapters. Git repository access and GitHub identity HTTP calls are concrete
+infrastructure dependencies inside core in the current MVP.
 
 ## Layer Diagram
+
+This is a logical dependency view. `JSON / SSE` does not prescribe a network
+scheme: local clients use localhost HTTP, while production browsers use public
+HTTPS through Nginx and Nginx forwards private HTTP to FastAPI. See the
+[deployment transport conventions](../deployment.md#transport-conventions).
 
 ```mermaid
 flowchart TB
@@ -41,12 +51,12 @@ flowchart TB
 
         Services["src/core\nregistration, validation, generation, registry reads"]
         StorePort["Store/query interfaces"]
-        StoreImpl["src/persistence\nSQLite store now\nPostgreSQL store later"]
+        StoreImpl["src/persistence\nSQLite/PostgreSQL stores"]
     end
 
     DB[("Registry database")]
 
-    Client -->|"HTTP JSON /api/v1"| Routes
+    Client -->|"JSON / SSE"| Routes
     Routes --> Schemas
     Routes --> Dependencies
     Routes --> Errors
@@ -62,8 +72,9 @@ Allowed:
 
 ```text
 src/api -> src/core
-src/core -> src/core shared modules and declared ports
-src/persistence -> src/core ports and persistence models where needed
+registration core -> registration store/query ports
+repository and authentication core -> concrete Git and HTTPS infrastructure
+src/persistence -> registration store/query ports and persistence models where needed
 src/persistence -> SQLAlchemy, filesystem, network where needed
 future MCP adapter -> src/core read/application services
 future worker -> src/core services
@@ -88,7 +99,7 @@ src/api/
   OpenAPI, and HTTP error mapping.
 
 src/core/registration/
-  registration submission, processing, revalidation, refresh, event history,
+  atomic first registration, owned updates, refresh, event history,
   duplicate policy, checksum behavior, and registry persistence/query ports.
 
 src/core/validation/
@@ -123,13 +134,19 @@ cases.
 Commands:
 
 ```text
-submit_registration
-process_registration
-revalidate_registration
+register_adapter
+update_adapter
+update_registration
 refresh_active_registrations
 generate_adapter_metadata
 generate_dataset_metadata
 ```
+
+First registration returns diagnostics without persistence on failure. Accepted
+first registrations commit the source, canonical entry and success event
+together. Updates retain published metadata on failure and append history.
+Browser and CLI publication pass a verified GitHub identity into these services;
+the CLI has no dependency on the HTTP server.
 
 Queries:
 
