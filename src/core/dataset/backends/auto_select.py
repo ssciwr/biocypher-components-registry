@@ -56,8 +56,7 @@ def select_generator(
         ):
             return (
                 NativeDatasetGenerator(),
-                "native supports every selected file and Croissant Baker does not "
-                "support at least one of them.",
+                "Croissant Baker does not support every selected file.",
             )
 
     return (

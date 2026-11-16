@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import mlcroissant as mlc
 
 from src.core.shared.constants import CROISSANT_1_0_CONTEXT
@@ -59,7 +61,7 @@ def test_mlcroissant_warnings_are_reported_without_failing_validation(
     monkeypatch,
 ) -> None:
     class DummyIssues:
-        warnings = {"Recommended citation is missing."}
+        warnings: ClassVar[set[str]] = {"Recommended citation is missing."}
 
     class DummyContext:
         issues = DummyIssues()

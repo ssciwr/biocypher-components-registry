@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from typing import ClassVar
 
 import pytest
 
@@ -34,7 +35,9 @@ def test_parquet_inspection_reads_schema_metadata_without_loading_table(
     parquet_path.write_bytes(b"fixture")
 
     class FakeParquetFile:
-        schema_arrow = [SimpleNamespace(name="id", type="int64")]
+        schema_arrow: ClassVar[list[SimpleNamespace]] = [
+            SimpleNamespace(name="id", type="int64")
+        ]
         metadata = SimpleNamespace(num_rows=12)
 
         def __init__(self, path: Path) -> None:
