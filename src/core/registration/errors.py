@@ -7,3 +7,7 @@ DUPLICATE_REPOSITORY_URL_MESSAGE = "This repository url already exists in the sy
 
 class DuplicateRegistrationError(ValueError):
     """Raised when a registration would duplicate an existing adapter/source."""
+
+
+class ConcurrentRegistrationChangeError(ValueError):
+    """The registration changed or was deleted while metadata was being fetched."""

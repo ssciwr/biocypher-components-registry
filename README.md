@@ -12,7 +12,7 @@ Key capabilities:
 - **Dual Database Support**: SQLite (development) and PostgreSQL (production)
 - **Batch Processing**: Non-blocking registry refresh with isolated error handling
 - **Multiple Interfaces**: CLI, Web UI, and REST API
-- **Event Sourcing**: Complete audit trail of all registration attempts
+- **Update History**: Recorded outcomes for published adapter updates; failed first registrations are not stored
 - **Duplicate Prevention**: Enforced uniqueness by adapter id and metadata version
 - **On-Demand Revalidation**: Fix and reprocess failed registrations
 
@@ -59,6 +59,12 @@ Run a specific test file:
 
 ```bash
 uv run pytest tests/unit/test_cli_submit.py
+```
+
+The synchronous-processing tests also run against PostgreSQL when `REGISTRY_TEST_POSTGRES_URL` is set to a test database URL. Each case creates and removes its own uniquely named schema; existing tables are not cleared. For example:
+
+```bash
+REGISTRY_TEST_POSTGRES_URL=postgresql://registry@localhost/registry_test uv run pytest tests/unit/core/registration/test_synchronous_processing.py
 ```
 
 ## CLI Usage
@@ -115,7 +121,7 @@ uv run cli.py validate-dataset /path/to/croissant.jsonld
 Build a registration request without persisting it:
 
 ```bash
-uv run cli.py submit --name "My Adapter" /path/to/adapter-repo
+uv run cli.py submit /path/to/adapter-repo
 ```
 
 ### Metadata Generation Commands
@@ -174,13 +180,16 @@ All routes below are served under the `/api/v1` prefix.
 | GET | `/adapters/{adapter_id}` | Get one public adapter |
 | GET | `/adapters/{adapter_id}/metadata` | Get full Croissant metadata for one adapter |
 | POST | `/adapters/{adapter_id}/endorse` | Endorse one adapter as the signed-in GitHub user |
-| POST | `/registrations` | Submit an adapter registration |
+| POST | `/registrations` | Fetch, validate, and save an accepted first registration synchronously |
+| POST | `/registrations/stream` | Register once with live validation progress through server-sent events |
+| GET | `/schemas/{version}` | Read a deployed BioCypher adapter schema, such as `v1` |
+| POST | `/adapters/{adapter_id}/update` | Update a published adapter as its submitting GitHub user |
 | GET | `/registrations/croissant-file-present-check` | Check whether a remote repository exposes `croissant.jsonld` |
 | GET | `/registrations` | List active registrations |
 | GET | `/registrations/{registration_id}` | Get one registration detail |
 | GET | `/registrations/{registration_id}/events` | List event history for one registration |
 | POST | `/registrations/{registration_id}/process` | Discover, validate, and persist a submitted registration |
-| POST | `/registrations/{registration_id}/revalidate` | Reprocess one invalid or fetch-failed registration |
+| POST | `/registrations/{registration_id}/revalidate` | Retry a staged source or failed published update with full validation |
 | GET | `/registry/registrations` | List registry registration rows with public status and latest event |
 | GET | `/registry/entries` | List canonical valid registry entries |
 | GET | `/registry/entries/{entry_id}` | Get one canonical valid registry entry |
@@ -209,6 +218,17 @@ curl http://localhost:8000/api/v1/registry/registrations
 curl -X POST http://localhost:8000/api/v1/registry/refreshes
 curl http://localhost:8000/api/v1/adapters
 ```
+
+### Registration and manual updates
+
+- **Register:** Sign in with GitHub and enter your repository URL. The form checks for a root-level `croissant.jsonld`; registration then fetches fresh metadata from the default branch and validates it before saving.
+- **Review validation:** The collapsible **Validation checks** section shows results for file retrieval/JSON parsing, Croissant compliance, the adapter schema, semantic checks, and each embedded dataset. Errors include available file positions, JSON paths, and expected formats. The schema viewer exposes the applied BioCypher schema version (currently **v1**, using **JSON Schema Draft 7**).
+- **Fix and retry:** Failed first browser registrations create no database records. Correct the reported issues in your repository, then click **Retry registration**. You may keep the same metadata version for this retry.
+- **Update:** Only the submitting GitHub account can update a published adapter. Changed metadata must preserve the adapter identity and use a new, unused version. Failed updates retain the accepted metadata and record the failure; fix the issues and click **Update** again. Unchanged metadata is reported as **Already up to date**.
+
+If the connection ends before a final registration result arrives, the outcome is **Unconfirmed**. Check the adapter list before trying again; processing may already have completed. Registration does not automatically resubmit.
+
+Batch refresh is manual through `refresh-registry` or `POST /api/v1/registry/refreshes`; scheduled refreshes are not implemented.
 
 The agentic workspace routes below are served under the `/agent/api/v1`
 prefix (kept distinct from `/api/v1` — see [docs/API.md](docs/API.md) for
@@ -349,6 +369,11 @@ pnpm run ui-tests
 | `POSTGRES_DB` | PostgreSQL database name (Docker Compose only) | `biocypher_registry` |
 | `POSTGRES_USER` | PostgreSQL user (Docker Compose only) | `biocypher` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (Docker Compose only) | required; no default |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app Client ID for browser sign-in | required for sign-in; no default |
+| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret; backend only | required for sign-in; no default |
+| `AUTH_SESSION_SECRET` | Separate secret used to sign and verify OAuth state; backend only | required for sign-in; no default |
+| `FRONTEND_BASE_URL` | Frontend URL used for sign-in redirects and allowed origins | `http://localhost:5173` |
+| `VITE_API_BASE_URL` | Public backend base URL used by the frontend and to construct OAuth callbacks; omit `/api/v1` | `http://localhost:8000` in local development |
 
 ## Troubleshooting
 
