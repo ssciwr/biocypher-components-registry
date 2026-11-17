@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.121,<1",
-    "croissant-baker @ git+https://github.com/MIT-LCP/croissant-baker.git@main",
+    "croissant-baker>=0.8.0",
     "mcp>=2.0,<3",
     "mlcroissant>=1.0.22",
     "jsonschema>=4.23.0",
