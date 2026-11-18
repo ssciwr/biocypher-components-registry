@@ -729,7 +729,7 @@ function validSelectionIndex(datasetId: string, selectedDatasetId: string, index
 }
 
 function fieldsForDataset(dataset: DatasetDraft, selectedRecordSetIndex: number) {
-  return dataset.mode === 'upload'
+  return dataset.recordSets.length > 0
     ? dataset.recordSets[selectedRecordSetIndex]?.fields ?? []
     : [...dataset.fields, ...dataset.manualFields]
 }
@@ -739,7 +739,7 @@ function recordSetOptionLabel(recordSet: DatasetDraft['recordSets'][number], ind
   return `${name} (${recordSet.fields.length} fields)`
 }
 
-function UploadedDistributionMetadata({
+function DistributionMetadataEditor({
   dataset,
   onDistributionChange,
   onSelect,
@@ -778,10 +778,10 @@ function UploadedDistributionMetadata({
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <TextInput helpText={contentUrlHelp} label="Content URL" maxLength={500} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'contentUrl', value)} value={selectedDistribution.contentUrl} />
-        <TextInput label="Filename" maxLength={160} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'filename', value)} value={selectedDistribution.filename} />
-        <TextInput label="Encoding format" maxLength={120} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'encodingFormat', value)} value={selectedDistribution.encodingFormat} />
-        <TextInput helpText="Preferred checksum for stable, versioned dataset files. Enter the value exactly as published by the dataset provider." label="SHA-256" maxLength={200} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'sha256', value)} value={selectedDistribution.sha256} />
-        <TextInput helpText="Legacy checksum accepted by Croissant. Existing hexadecimal or encoded values are preserved as supplied." label="MD5" maxLength={200} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'md5', value)} value={selectedDistribution.md5} />
+        <TextInput label="Filename" readOnly={dataset.mode === 'generate'} maxLength={160} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'filename', value)} value={selectedDistribution.filename} />
+        <TextInput label="Encoding format" readOnly={dataset.mode === 'generate'} maxLength={120} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'encodingFormat', value)} value={selectedDistribution.encodingFormat} />
+        <TextInput helpText="Preferred checksum for stable, versioned dataset files. Enter the value exactly as published by the dataset provider." label="SHA-256" readOnly={dataset.mode === 'generate'} maxLength={200} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'sha256', value)} value={selectedDistribution.sha256} />
+        <TextInput helpText="Legacy checksum accepted by Croissant. Existing hexadecimal or encoded values are preserved as supplied." label="MD5" readOnly={dataset.mode === 'generate'} maxLength={200} onChange={(value) => onDistributionChange(selectedDistributionIndex, 'md5', value)} value={selectedDistribution.md5} />
       </div>
     </div>
   )
@@ -812,13 +812,13 @@ export function DatasetDetailsEditor({
   )
   const selectedRecordSet = dataset.recordSets[selectedRecordSetIndex]
   const fields = fieldsForDataset(dataset, selectedRecordSetIndex)
-  const editedRecordSetIndex = dataset.mode === 'upload' ? selectedRecordSetIndex : undefined
+  const editedRecordSetIndex = selectedRecordSet ? selectedRecordSetIndex : undefined
   const recordSetName = selectedRecordSet?.name ?? ''
   const datasetName = dataset.name.trim() || 'Untitled dataset'
   const datasetNameLabel = datasetName.length > 16 ? `${datasetName.slice(0, 16)}...` : datasetName
 
   function changeRecordSetName(value: string) {
-    if (dataset.mode === 'upload') onRecordSetNameChange(selectedRecordSetIndex, value)
+    if (selectedRecordSet) onRecordSetNameChange(selectedRecordSetIndex, value)
     else onChange('recordSetName', value)
   }
 
@@ -897,15 +897,15 @@ export function DatasetDetailsEditor({
         </div>
       </div>
 
-      {dataset.mode === 'upload' ? (
+      {dataset.mode === 'upload' || dataset.distributions.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-4">
             <h3 className="text-xl font-bold text-slate-950">Distribution metadata</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Select and edit one file description at a time. Unchanged Croissant properties are preserved.
+              Select and edit one file description at a time. Dataset metadata above is shared across all files.
             </p>
           </div>
-          <UploadedDistributionMetadata
+          <DistributionMetadataEditor
             dataset={dataset}
             onDistributionChange={onDistributionChange}
             onSelect={(index) => setDistributionSelection({ datasetId: dataset.id, index })}
@@ -962,7 +962,7 @@ export function DatasetDetailsEditor({
           <h3 className="text-xl font-bold text-slate-950">Field entries</h3>
         </div>
         <div className="grid gap-5 p-5">
-          {dataset.mode === 'upload' && dataset.recordSets.length > 1 ? (
+          {dataset.recordSets.length > 1 ? (
             <SelectInput
               label="Record set"
               onChange={(value) => setRecordSetSelection({ datasetId: dataset.id, index: Number(value) })}
@@ -973,7 +973,7 @@ export function DatasetDetailsEditor({
               value={String(selectedRecordSetIndex)}
             />
           ) : null}
-          {dataset.mode === 'upload' && selectedRecordSet ? (
+          {selectedRecordSet ? (
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
               <span><strong>{selectedRecordSet.fields.length}</strong> fields</span>
               {selectedRecordSet.sourceFileLabel ? (
@@ -986,7 +986,7 @@ export function DatasetDetailsEditor({
             maxLength={120}
             onChange={changeRecordSetName}
             required
-            value={dataset.mode === 'upload' ? recordSetName : dataset.recordSetName}
+            value={selectedRecordSet ? recordSetName : dataset.recordSetName}
           />
 
           {fields.length ? (

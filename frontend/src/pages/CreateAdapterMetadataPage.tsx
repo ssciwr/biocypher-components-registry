@@ -720,7 +720,9 @@ function CreateAdapterMetadataPage() {
       fields: recordSetIndex === undefined
         ? updateFieldList(dataset.fields, fieldId, fieldName, value)
         : dataset.fields,
-      manualFields: updateFieldList(dataset.manualFields, fieldId, fieldName, value),
+      manualFields: recordSetIndex === undefined
+        ? updateFieldList(dataset.manualFields, fieldId, fieldName, value)
+        : dataset.manualFields,
       recordSets: recordSetIndex === undefined
         ? dataset.recordSets
         : dataset.recordSets.map((recordSet, index) => index === recordSetIndex
@@ -791,8 +793,8 @@ function CreateAdapterMetadataPage() {
   function removeSelectedField(recordSetIndex: number | undefined, fieldId: string) {
     updateSelectedDatasetDraft((dataset) => ({
       ...dataset,
-      fields: dataset.fields.filter((field) => field.id !== fieldId),
-      manualFields: dataset.manualFields.filter((field) => field.id !== fieldId),
+      fields: recordSetIndex === undefined ? dataset.fields.filter((field) => field.id !== fieldId) : dataset.fields,
+      manualFields: recordSetIndex === undefined ? dataset.manualFields.filter((field) => field.id !== fieldId) : dataset.manualFields,
       recordSets: recordSetIndex === undefined
         ? dataset.recordSets
         : dataset.recordSets.map((recordSet, index) => index === recordSetIndex

@@ -110,14 +110,18 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
 
   const existingDistributions = recordList(document.distribution)
   const distribution = buildDistribution(dataset, existingDistributions[0])
-  if (distribution) {
+  if (dataset.distributions.length) {
+    document.distribution = mergeDistributions(dataset, document.distribution)
+  } else if (distribution) {
     document.distribution = [distribution, ...existingDistributions.slice(1)]
   }
 
   const fields = [...dataset.fields, ...dataset.manualFields]
     .filter((field) => field.name.trim())
     .map((field) => datasetManualFieldToCroissantField(field, dataset))
-  if (fields.length) {
+  if (dataset.recordSets.length) {
+    document.recordSet = mergeRecordSets(dataset, document.recordSet)
+  } else if (fields.length) {
     const existingRecordSets = recordList(document.recordSet)
     const existingRecordSet = existingRecordSets[0] ?? {}
     const recordSetName = dataset.recordSetName.trim() || `${dataset.name || 'Dataset'} records`
@@ -158,13 +162,13 @@ function uploadedDatasetDraftToDocument(
   if (dirty.has('fields')) {
     edits.push({
       path: ['recordSet'],
-      value: mergeUploadedRecordSets(dataset, original.recordSet),
+      value: mergeRecordSets(dataset, original.recordSet),
     })
   }
   if (dirty.has('distributions')) {
     edits.push({
       path: ['distribution'],
-      value: mergeUploadedDistributions(dataset, original.distribution),
+      value: mergeDistributions(dataset, original.distribution),
     })
   }
 
@@ -205,7 +209,7 @@ function addCreatorsEdit(
   }
 }
 
-function mergeUploadedDistributions(dataset: DatasetDraft, originalValue: unknown): unknown {
+function mergeDistributions(dataset: DatasetDraft, originalValue: unknown): unknown {
   const originals = Array.isArray(originalValue) ? originalValue : [originalValue]
   const distributions = dataset.distributions.map((distribution) => {
     const original = originals[distribution.uploadedIndex]
@@ -241,9 +245,9 @@ function applyDistributionTextEdit(
   else delete document[property]
 }
 
-function mergeUploadedRecordSets(dataset: DatasetDraft, originalValue: unknown): unknown {
+function mergeRecordSets(dataset: DatasetDraft, originalValue: unknown): unknown {
   const originals = Array.isArray(originalValue) ? originalValue : [originalValue]
-  const recordSets = dataset.recordSets.map((recordSet) => mergeUploadedRecordSet(
+  const recordSets = dataset.recordSets.map((recordSet) => mergeRecordSet(
     dataset,
     recordSet,
     isRecord(originals[recordSet.uploadedIndex]) ? originals[recordSet.uploadedIndex] : undefined,
@@ -251,7 +255,7 @@ function mergeUploadedRecordSets(dataset: DatasetDraft, originalValue: unknown):
   return !Array.isArray(originalValue) && recordSets.length === 1 ? recordSets[0] : recordSets
 }
 
-function mergeUploadedRecordSet(
+function mergeRecordSet(
   dataset: DatasetDraft,
   draft: DatasetRecordSetDraft,
   originalRecordSet?: Record<string, unknown>,
@@ -265,10 +269,32 @@ function mergeUploadedRecordSet(
     const originalField = field.uploadedIndex === undefined
       ? undefined
       : originalFields[field.uploadedIndex]
-    if (!isRecord(originalField)) return datasetManualFieldToCroissantField(
-      field,
-      { ...dataset, recordSetName: draft.name },
-    )
+    if (!isRecord(originalField)) {
+      const addedField = datasetManualFieldToCroissantField(
+        { ...field, fieldId: field.fieldId || `${draft.id || localId(draft.name)}/${field.name.trim()}` },
+        { ...dataset, recordSetName: draft.name },
+      )
+      if (field.source === undefined) {
+        // Infer from this table, never from the first distribution in the dataset.
+        const references = new Map<string, Record<string, unknown>>()
+        for (const sibling of originalFields) {
+          if (!isRecord(sibling) || !isRecord(sibling.source)) continue
+          for (const property of ['fileObject', 'fileSet']) {
+            const reference = sibling.source[property]
+            if (isRecord(reference) && textValue(reference['@id'])) {
+              references.set(`${property}:${textValue(reference['@id'])}`, { [property]: reference })
+            }
+          }
+        }
+        if (references.size === 1) {
+          addedField.source = { ...references.values().next().value, extract: { column: field.name.trim() } }
+        } else {
+          // An empty or multi-source table needs an explicit source, not a guessed first file.
+          delete addedField.source
+        }
+      }
+      return addedField
+    }
     return mergeUploadedField(field, originalField)
   })
 
@@ -388,6 +414,9 @@ export function datasetUIStateDraftFromCroissantFile(
   const distributions = distributionsFromCroissant(document.distribution)
   const recordSets = recordSetsFromCroissant(document.recordSet)
   const isUploaded = dataset.mode === 'upload'
+  if (!isUploaded && distributions.length === 1 && dataset.contentUrl.trim()) {
+    distributions[0] = { ...distributions[0]!, contentUrl: dataset.contentUrl }
+  }
 
   return {
     ...dataset,

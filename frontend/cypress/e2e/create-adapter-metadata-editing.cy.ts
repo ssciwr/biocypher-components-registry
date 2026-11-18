@@ -39,7 +39,7 @@ function visitGenerator() {
   })
 }
 
-function interceptDatasetGeneration() {
+function interceptDatasetGeneration(metadata: Record<string, unknown> = generatedDatasetMetadata) {
   cy.intercept('POST', '**/api/v1/metadata/upload-sessions', {
     statusCode: 201,
     body: {
@@ -66,7 +66,7 @@ function interceptDatasetGeneration() {
     body: {
       status: 'complete',
       next_poll_ms: 1000,
-      result: { metadata: generatedDatasetMetadata, warnings: [] },
+      result: { metadata, warnings: [] },
     },
   }).as('datasetGenerationStatus')
 }
@@ -209,7 +209,84 @@ describe('adapter metadata generator editing', () => {
       })
     })
 
-    cy.contains('people (2 files)').should('be.visible')
+    cy.contains('people (2 of 2 files included)').should('be.visible')
+  })
+
+  it('edits both generated folder resources independently and exports the selected table edits', () => {
+    const columns = [
+      ['item_id_a', 'item_id_b', 'mode', 'action', 'a_is_acting', 'score'],
+      ['chemical', 'protein', 'experimental', 'prediction', 'database', 'textmining', 'combined_score'],
+    ]
+    const metadata = {
+      ...generatedDatasetMetadata, name: 'STITCH',
+      distribution: ['actions', 'links'].map(name => ({
+        '@id': `${name}-file`, '@type': 'cr:FileObject', name: `${name}.tsv`,
+        contentUrl: `https://example.org/${name}.tsv`, encodingFormat: 'text/tab-separated-values', sha256: 'a'.repeat(64),
+      })),
+      recordSet: ['actions', 'links'].map((name, index) => ({
+        '@id': name, '@type': 'cr:RecordSet', name,
+        field: columns[index]!.map(column => ({
+          '@id': `${name}/${column}`, name: column, description: column,
+          dataType: column === 'score' || column === 'combined_score' ? 'cr:Int64' : 'sc:Text',
+          source: { fileObject: { '@id': `${name}-file` }, extract: { column } },
+        })),
+      })),
+    }
+    interceptDatasetGeneration(metadata)
+    cy.intercept('POST', '**/api/v1/metadata/adapters/generate', { body: { metadata: { '@type': 'SoftwareSourceCode' } } }).as('generateAdapter')
+    visitGenerator()
+    fillAdapterStep()
+    cy.window().then(window => {
+      const transfer = new window.DataTransfer()
+      for (const name of ['actions', 'links']) {
+        const file = new window.File(['id\tvalue\n1\t2\n'], `${name}.tsv`)
+        Object.defineProperty(file, 'webkitRelativePath', { value: `STITCH/${name}.tsv` })
+        transfer.items.add(file)
+      }
+      cy.get('input[aria-label="Source dataset folder"]').then($input => {
+        Object.defineProperty($input[0], 'files', { configurable: true, value: transfer.files })
+        $input[0].dispatchEvent(new window.Event('change', { bubbles: true }))
+      })
+    })
+    cy.contains('label', 'Dataset name').find('input').type('STITCH')
+    cy.contains('label', 'Dataset version').find('input').type('5.0')
+    cy.contains('label', 'Date published').find('input').type('2023-11-23')
+    cy.contains('label', 'Dataset download URL').find('input').type('https://example.org/actions.tsv')
+    addCreator('Dataset creators', 'STITCH Consortium')
+    cy.contains('button', 'Add dataset details').click()
+    cy.wait('@datasetGenerationStatus')
+    cy.contains('label > span > span', /^Distribution$/).closest('label').find('select').select('1')
+    cy.contains('label', 'Content URL').find('input').clear().type('https://example.org/updated-links.tsv')
+    cy.contains('label', 'Filename').find('input').should('have.value', 'links.tsv').and('have.attr', 'readonly')
+    cy.contains('label > span > span', /^Record set$/).closest('label').find('select').select('1')
+    cy.contains('label', 'Record set name').find('input').clear().type('stitch-links')
+    cy.get('input[aria-label="Column name for combined_score"]').closest('tr').find('input[maxlength="240"]').clear().type('Combined confidence')
+    cy.get('select[aria-label="Data type for combined_score"]').should('have.value', 'cr:Int64')
+    cy.get('button[aria-label="Remove prediction"]').click()
+    cy.contains('label', /^Field name$/).find('input').type('extra_score')
+    cy.contains('label > span > span', /^Data type$/).closest('label').find('select').select('cr:Int64')
+    cy.contains('button', 'Add manual field').click()
+    cy.contains('label > span > span', /^Distribution$/).closest('label').find('select').select('0')
+    cy.contains('label', 'Content URL').find('input').should('have.value', 'https://example.org/actions.tsv')
+    cy.contains('label > span > span', /^Record set$/).closest('label').find('select').select('0')
+    cy.get('input[aria-label="Column name for item_id_a"]').should('be.visible')
+    cy.contains('label > span > span', /^Distribution$/).closest('label').find('select').select('1')
+    cy.contains('label', 'Content URL').find('input').should('have.value', 'https://example.org/updated-links.tsv')
+    cy.contains('label > span > span', /^Record set$/).closest('label').find('select').select('1')
+    cy.contains('label', 'Record set name').find('input').should('have.value', 'stitch-links')
+    cy.get('input[aria-label="Column name for extra_score"]').should('be.visible')
+    cy.contains('button', 'Save this dataset').click()
+    cy.contains('button', 'Generate adapter Croissant file').click()
+    cy.wait('@generateAdapter').then(({ request }) => {
+      const dataset = request.body.dataset_documents[0]
+      expect(dataset.distribution[0]).to.deep.equal(metadata.distribution[0])
+      expect(dataset.distribution[1].contentUrl).to.equal('https://example.org/updated-links.tsv')
+      expect(dataset.recordSet[0]).to.deep.equal(metadata.recordSet[0])
+      expect(dataset.recordSet[1].name).to.equal('stitch-links')
+      expect(dataset.recordSet[1].field.find((field: { name: string }) => field.name === 'combined_score').description).to.equal('Combined confidence')
+      expect(dataset.recordSet[1].field.some((field: { name: string }) => field.name === 'prediction')).to.equal(false)
+      expect(dataset.recordSet[1].field.find((field: { name: string }) => field.name === 'extra_score').source.fileObject['@id']).to.equal('links-file')
+    })
   })
 
   it('keeps dataset creators after dataset details edit', () => {

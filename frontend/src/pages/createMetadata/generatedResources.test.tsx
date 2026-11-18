@@ -1,0 +1,131 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+import { DatasetDetailsEditor } from './MetadataGeneratorFields'
+import { emptyDataset } from './options'
+import { datasetDraftToDocument, datasetUIStateDraftFromCroissantFile, emptyDatasetManualField } from './utils'
+import type { DatasetDraft } from './types'
+
+function stitchDocument() {
+  const columns = [
+    ['item_id_a', 'item_id_b', 'mode', 'action', 'a_is_acting', 'score'],
+    ['chemical', 'protein', 'experimental', 'prediction', 'database', 'textmining', 'combined_score'],
+  ]
+  return {
+    '@type': 'sc:Dataset', name: 'STITCH', description: 'Related STITCH tables',
+    url: 'https://stitch-db.org/', '@id': 'https://stitch-db.org/',
+    distribution: ['actions', 'links'].map((name) => ({
+      '@type': 'cr:FileObject', '@id': `${name}-file`, name: `${name}.tsv`,
+      contentUrl: `https://example.org/${name}.tsv`, sha256: 'a'.repeat(64),
+      encodingFormat: 'text/tab-separated-values', contentSize: '100',
+    })),
+    recordSet: ['actions', 'links'].map((name, index) => ({
+      '@type': 'cr:RecordSet', '@id': name, name,
+      customProperty: `preserve-${name}`,
+      field: columns[index]!.map((column, columnIndex) => ({
+        '@id': `${name}/${column}`, name: column,
+        dataType: column === 'score' || (index === 1 && columnIndex > 1) ? 'cr:Int64' : 'sc:Text',
+        description: column, customProperty: `preserve-${column}`,
+        source: { fileObject: { '@id': `${name}-file` }, extract: { column } },
+      })),
+    })),
+  }
+}
+
+function project(document = stitchDocument()) {
+  return datasetUIStateDraftFromCroissantFile(document, { ...emptyDataset, id: 'stitch' })
+}
+
+function renderEditor(dataset: DatasetDraft) {
+  return renderToStaticMarkup(<DatasetDetailsEditor
+    dataset={dataset} datasetManualField={emptyDatasetManualField()} licenseOptions={[]}
+    onAddManualField={() => {}} onChange={() => {}} onDistributionChange={() => {}}
+    onFieldChange={() => {}} onManualFieldChange={() => {}} onRemoveField={() => {}}
+    onRecordSetNameChange={() => {}}
+  />)
+}
+
+function resources(document: Record<string, unknown>) {
+  return document as ReturnType<typeof stitchDocument>
+}
+
+describe('generated multi-resource editing', () => {
+  it('exposes both files and both tables, keeping generated file properties read-only', () => {
+    const markup = renderEditor(project())
+    expect(markup).toContain('>Distribution<')
+    expect(markup).toContain('>Record set<')
+    expect(markup).toContain('actions.tsv</option>')
+    expect(markup).toContain('links.tsv</option>')
+    expect(markup).toContain('actions (6 fields)</option>')
+    expect(markup).toContain('links (7 fields)</option>')
+    for (const value of ['actions.tsv', 'text/tab-separated-values', 'a'.repeat(64)]) {
+      expect(markup).toMatch(new RegExp(`readonly=""[^>]*value="${value}"`, 'i'))
+    }
+  })
+
+  it('exports second-resource edits losslessly without consulting stale scalar fields', () => {
+    const original = stitchDocument()
+    const draft = project(original)
+    const edited = {
+      ...draft,
+      distributions: draft.distributions.map((file, index) => index === 1
+        ? { ...file, contentUrl: 'https://example.org/updated-links.tsv' } : file),
+      recordSets: draft.recordSets.map((table, index) => index === 1 ? {
+        ...table, name: 'stitch-links',
+        fields: table.fields.map((field) => field.name === 'combined_score'
+          ? { ...field, description: 'Combined confidence' } : field),
+      } : table),
+      // The resource arrays own edits after generation.
+      contentUrl: 'https://incorrect.example/stale.tsv', fields: [], recordSetName: 'stale',
+    }
+    const result = resources(datasetDraftToDocument(edited))
+    expect(result.distribution[0]).toEqual(original.distribution[0])
+    expect(result.recordSet[0]).toEqual(original.recordSet[0])
+    expect(result.distribution[1]).toEqual({ ...original.distribution[1], contentUrl: 'https://example.org/updated-links.tsv' })
+    expect(result.recordSet[1]).toEqual({ ...original.recordSet[1], name: 'stitch-links',
+      field: original.recordSet[1]!.field.map(field => field.name === 'combined_score'
+        ? { ...field, description: 'Combined confidence' } : field),
+    })
+    expect(result).not.toHaveProperty('@id')
+    expect(original.recordSet[1]!.name).toBe('links')
+  })
+
+  it('adds, removes and changes datatypes only on the selected table, using its source', () => {
+    const draft = project()
+    const added = { ...emptyDatasetManualField(), id: 'new-field', name: 'extra_score', dataType: 'cr:Int64' }
+    const edited = { ...draft, recordSets: draft.recordSets.map((table, index) => index === 1 ? {
+      ...table, name: 'renamed-links',
+      fields: [...table.fields.filter(field => field.name !== 'prediction').map(field => field.name === 'combined_score'
+        ? { ...field, dataType: 'sc:Float' } : field), added],
+    } : table) }
+    const result = resources(datasetDraftToDocument(edited))
+    expect(result.recordSet[0]).toEqual(stitchDocument().recordSet[0])
+    const fields = result.recordSet[1]!.field
+    expect(fields.some(field => field.name === 'prediction')).toBe(false)
+    expect(fields.find(field => field.name === 'combined_score')!.dataType).toBe('sc:Float')
+    expect(fields.find(field => field.name === 'extra_score')).toMatchObject({
+      '@id': 'links/extra_score', dataType: 'cr:Int64',
+      source: { fileObject: { '@id': 'links-file' }, extract: { column: 'extra_score' } },
+    })
+    expect(result.distribution).toEqual(stitchDocument().distribution)
+  })
+
+  it('does not restore removed fields when every field is deleted', () => {
+    const draft = project()
+    const result = resources(datasetDraftToDocument({ ...draft,
+      recordSets: draft.recordSets.map((table, index) => index === 1 ? { ...table, fields: [] } : table),
+    }))
+    expect(result.recordSet[1]!.field).toEqual([])
+    expect(result.recordSet[0]).toEqual(stitchDocument().recordSet[0])
+  })
+
+  it('keeps single-file editing simple and applies its pre-generation download URL', () => {
+    const document = stitchDocument()
+    document.distribution = document.distribution.slice(0, 1)
+    document.recordSet = document.recordSet.slice(0, 1)
+    const draft = datasetUIStateDraftFromCroissantFile(document, { ...emptyDataset, contentUrl: 'https://example.org/published-actions.tsv' })
+    const markup = renderEditor(draft)
+    expect(markup).not.toContain('>Distribution<')
+    expect(markup).not.toContain('>Record set<')
+    expect(resources(datasetDraftToDocument(draft)).distribution[0]!.contentUrl).toBe('https://example.org/published-actions.tsv')
+  })
+})
