@@ -1,5 +1,22 @@
 import type { DatasetSourceSelection } from './types'
 
+export function includedSourceEntries(selection: DatasetSourceSelection) {
+  return selection.entries.filter((entry) => !entry.excluded)
+}
+
+export function setSourceEntryIncluded(
+  selection: DatasetSourceSelection,
+  index: number,
+  included: boolean,
+): DatasetSourceSelection {
+  return {
+    ...selection,
+    entries: selection.entries.map((entry, entryIndex) => (
+      entryIndex === index ? { ...entry, excluded: !included } : entry
+    )),
+  }
+}
+
 export function selectionFromFile(file: File): DatasetSourceSelection {
   return {
     entries: [{ file, relativePath: file.name }],

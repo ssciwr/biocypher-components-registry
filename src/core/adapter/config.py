@@ -8,6 +8,7 @@ from typing import Any
 import typer
 import yaml
 
+from src.core.adapter.classification import AdapterGranularity
 from src.core.adapter.request import AdapterGenerationRequest
 from src.core.dataset.request import GenerationRequest
 from src.core.dataset.service import (
@@ -46,6 +47,24 @@ def build_adapter_request_from_mapping(
     dataset_paths, generated_datasets = _parse_dataset_entries(raw)
     creators, keywords = _resolve_creators_and_keywords(adapter)
     _apply_default_creators(generated_datasets, creators)
+    granularity_value = adapter.get("granularity")
+    try:
+        granularity = (
+            AdapterGranularity(granularity_value)
+            if granularity_value is not None
+            else None
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(
+            "Adapter granularity must be Primary or Secondary."
+        ) from exc
+    if (
+        adapter.get("componentType", adapter.get("component_type", "adapter"))
+        != "adapter"
+    ):
+        raise typer.BadParameter(
+            "Adapter generation only supports componentType adapter."
+        )
 
     return AdapterGenerationRequest(
         output_path=output_override
@@ -68,6 +87,7 @@ def build_adapter_request_from_mapping(
         ),
         dataset_generator=dataset_generator,
         generated_datasets=generated_datasets,
+        granularity=granularity,
     )
 
 

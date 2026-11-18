@@ -133,6 +133,8 @@ function AdapterListView() {
                 </p>
               </a>
               <div className="mt-5 flex flex-wrap gap-2">
+                {adapter.component_type ? <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs">{adapter.component_type}</span> : null}
+                {adapter.granularity ? <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs">{adapter.granularity}</span> : null}
                 {(adapter.keywords ?? []).slice(0, 3).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
@@ -353,6 +355,8 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
             <div className="mt-5 rounded-lg border border-slate-200 p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-bold text-slate-950">Overview</h2>
+                {adapter.component_type ? <span className="text-sm text-slate-700">Component: {adapter.component_type}</span> : null}
+                {adapter.granularity ? <span className="text-sm text-slate-700">Granularity: {adapter.granularity}</span> : null}
                 {adapterKeywords.slice(0, 4).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
@@ -362,6 +366,7 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
               <p className="mt-4 text-base leading-6 text-slate-800">
                 {adapter.description ?? 'No adapter description has been submitted yet.'}
               </p>
+              {adapter.component_url ? <a className="mt-3 inline-block text-sm text-blue-600" href={adapter.component_url}>Component page</a> : null}
               <h3 className="mt-7 flex items-center gap-2 text-sm font-bold text-slate-950">
                 <RocketLaunchIcon className="h-5 w-5 text-blue-600" aria-hidden="true" />
                 Quick Example
@@ -382,7 +387,7 @@ bc.run()`}
               Data Sources
             </h2>
             <div className="mt-5 divide-y divide-slate-200 border border-slate-200">
-              {(adapterDataSources.length ? adapterDataSources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null }]).map((source) => (
+              {(adapterDataSources.length ? adapterDataSources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null, resources: [] }]).map((source) => (
                 <div className="p-4" key={source.name}>
                   <div className="flex items-center justify-between gap-4">
                     <h3 className="text-base font-semibold text-slate-950">{source.name}</h3>
@@ -392,8 +397,22 @@ bc.run()`}
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-700">
                     {source.license ? <span>License: {source.license}</span> : null}
                     {source.version ? <span>Version: {source.version}</span> : null}
-                    {source.url ? <a className="text-blue-600 hover:text-blue-700" href={source.url}>URL: {source.url}</a> : null}
+                    {source.url ? <a className="text-blue-600 hover:text-blue-700" href={source.url}>Dataset landing page: {source.url}</a> : null}
                   </div>
+                  {(source.resources ?? []).length ? (
+                    <ul className="mt-4 space-y-3 text-sm text-slate-700">
+                      {(source.resources ?? []).map((resource, index) => (
+                        <li className="rounded border border-slate-200 p-3" key={resource.resource_id ?? index}>
+                          <p className="font-semibold">{resource.name ?? resource.resource_id ?? 'Resource'}</p>
+                          <p>Resource type: {(resource.resource_types ?? []).join(', ') || 'Not specified'}</p>
+                          <p>Format: {(resource.encoding_formats ?? []).join(', ') || 'Not specified'}</p>
+                          {resource.content_url && /^https?:\/\//i.test(resource.content_url)
+                            ? <a className="break-all text-blue-600 hover:text-blue-700" href={resource.content_url}>Download: {resource.content_url}</a>
+                            : resource.content_url ? <p className="break-all">Location: {resource.content_url}</p> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ))}
             </div>

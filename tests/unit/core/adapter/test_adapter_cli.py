@@ -78,6 +78,8 @@ def test_adapter_direct_command_generates_adapter(tmp_path: Path) -> None:
             str(output_path),
             "--name",
             "Example Adapter",
+            "--granularity",
+            "Primary",
             "--description",
             "Adapter description",
             "--version",
@@ -97,6 +99,9 @@ def test_adapter_direct_command_generates_adapter(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert output_path.exists()
+    document = json.loads(output_path.read_text())
+    assert document["componentType"] == "adapter"
+    assert document["granularity"] == "Primary"
     assert "Adapter Ready" in result.output
 
 

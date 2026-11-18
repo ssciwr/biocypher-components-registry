@@ -1,6 +1,7 @@
 export const metadataDraftStorageKey = 'biocypher-adapter-metadata-draft'
 
 const metadataDraftTextFields = [
+  'granularity',
   'adapterId',
   'codeRepository',
   'description',

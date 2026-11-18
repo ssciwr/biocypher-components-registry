@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from src.core.adapter.classification import AdapterGranularity
 from src.core.dataset.request import GenerationRequest
 
 
@@ -59,6 +60,7 @@ class AdapterGenerationRequest:
     adapter_id: str | None = None
     dataset_generator: str = "croissant-baker"
     generated_datasets: list[GenerationRequest] = field(default_factory=list)
+    granularity: AdapterGranularity | None = None
 
 
 @dataclass(slots=True, frozen=True)

@@ -87,6 +87,7 @@ export type DatasetSourceSelection = {
 }
 
 export type DatasetSourceEntry = {
+  excluded?: boolean
   file: File
   relativePath: string
 }
@@ -94,6 +95,7 @@ export type DatasetSourceEntry = {
 export type DatasetDatasetManualField = {
   id: string
   dataType: string
+  originalDataType?: unknown
   description: string
   example: string
   fieldId: string
@@ -103,6 +105,7 @@ export type DatasetDatasetManualField = {
 }
 
 export type MetadataGeneratorForm = {
+  granularity: '' | 'Primary' | 'Secondary'
   adapterId: string
   codeRepository: string
   creators: CreatorDraft[]

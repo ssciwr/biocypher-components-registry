@@ -6,6 +6,7 @@ import {
   DatasetDetailsEditor,
   DatasetGenerateEditor,
   FileInput,
+  SelectInput,
   LicenseSelectInput,
   TextArea,
   TextInput,
@@ -21,6 +22,7 @@ import type {
 } from './types'
 
 type MetadataTextField = 'adapterId'
+  | 'granularity'
   | 'codeRepository'
   | 'description'
   | 'keywords'
@@ -126,6 +128,17 @@ export function AdapterDetailsStep({
       title="Adapter details"
     >
       <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <SelectInput
+          helpText="Primary adapters represent a single atomic resource, such as UniProt or Reactome. Secondary adapters represent a composite resource combining primary resources, often already harmonized, such as OmniPath or Open Targets. Granularity describes the resource, not the number of input files."
+          label="Adapter granularity"
+          onChange={(value) => onFormChange('granularity', value)}
+          options={[
+            { label: 'Not specified', value: '' },
+            { label: 'Primary', value: 'Primary' },
+            { label: 'Secondary', value: 'Secondary' },
+          ]}
+          value={form.granularity}
+        />
         <TextInput
           label="Adapter name"
           maxLength={100}
@@ -435,12 +448,12 @@ function MetadataSection({ children, description, step, title }: MetadataSection
         <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
           {step}
         </span>
-        <span>
+        <div>
           <h2 className="text-2xl font-bold text-slate-950">{title}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {description}
           </p>
-        </span>
+        </div>
       </div>
       {children}
     </section>

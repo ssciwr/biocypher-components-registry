@@ -3,6 +3,39 @@ import { emptyDataset } from './options'
 import { datasetDraftToDocument, datasetUIStateDraftFromCroissantFile } from './utils'
 
 describe('generated dataset metadata merge', () => {
+  it('keeps separately generated tables distinct when they share a landing page', () => {
+    const landingPage = 'https://stitch-db.org/cgi/download.pl?species_text=Homo+sapiens'
+    const drafts = ['actions', 'details'].map((table) => ({
+      ...emptyDataset,
+      mode: 'generate' as const,
+      name: `STITCH ${table}`,
+      url: landingPage,
+      uploadedDocument: {
+        '@type': 'sc:Dataset',
+        '@id': landingPage,
+        url: landingPage,
+        distribution: [{ '@id': `${table}-file`, contentUrl: `${table}.tsv` }],
+      },
+    }))
+    for (const draft of drafts) {
+      const document = datasetDraftToDocument(draft)
+      expect(document).not.toHaveProperty('@id')
+      expect(document.url).toBe(landingPage)
+      expect(document.distribution).toEqual(draft.uploadedDocument.distribution)
+      expect(draft.uploadedDocument['@id']).toBe(landingPage)
+    }
+  })
+
+  it('preserves an explicitly distinct generated dataset identifier', () => {
+    const document = datasetDraftToDocument({
+      ...emptyDataset,
+      mode: 'generate',
+      uploadedDocument: { '@id': 'stitch-actions-dataset', url: 'https://stitch-db.org/' },
+      url: 'https://stitch-db.org/',
+    })
+    expect(document['@id']).toBe('stitch-actions-dataset')
+  })
+
   it('preserves the dataset license explicitly selected by the user', () => {
     const draft = {
       ...emptyDataset,
@@ -41,6 +74,8 @@ describe('uploaded Croissant metadata', () => {
     const uploadedDocument = {
       '@context': { '@vocab': 'https://schema.org/' },
       '@type': 'sc:Dataset',
+      '@id': 'https://example.org/dataset',
+      url: 'https://example.org/dataset',
       distribution: [
         { '@id': 'archive.zip', '@type': 'cr:FileObject' },
         { '@id': 'data.csv_fileobject', '@type': 'cr:FileObject' },

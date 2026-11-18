@@ -891,6 +891,15 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid Content-Length or missing SHA-256 headers."
+          },
+          "411": {
+            "description": "Content-Length is required."
+          },
+          "415": {
+            "description": "Content-Encoding is not supported."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1064,6 +1073,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Generation cannot be cancelled after finalization."
           },
           "422": {
             "description": "Validation Error",
@@ -2598,6 +2610,13 @@
               }
             ],
             "title": "Column Count"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterResourceResponse"
+            },
+            "type": "array",
+            "title": "Resources"
           }
         },
         "type": "object",
@@ -2627,6 +2646,39 @@
               }
             ],
             "title": "Version"
+          },
+          "component_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Component Type"
+          },
+          "granularity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granularity"
+          },
+          "component_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Component Url"
           },
           "description": {
             "anyOf": [
@@ -2947,6 +2999,28 @@
             ],
             "title": "Version"
           },
+          "component_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Component Type"
+          },
+          "granularity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granularity"
+          },
           "description": {
             "anyOf": [
               {
@@ -3145,6 +3219,27 @@
             ],
             "title": "Adapter Id"
           },
+          "componentType": {
+            "type": "string",
+            "const": "adapter",
+            "title": "Componenttype",
+            "default": "adapter"
+          },
+          "granularity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Primary",
+                  "Secondary"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granularity"
+          },
           "generator": {
             "type": "string",
             "const": "native",
@@ -3220,6 +3315,7 @@
             }
           ],
           "generator": "native",
+          "granularity": "Primary",
           "keywords": [
             "adapter",
             "biocypher"
@@ -3312,6 +3408,60 @@
         ],
         "title": "AdapterMetadataResponse",
         "description": "Response model for one adapter's full Croissant metadata."
+      },
+      "AdapterResourceResponse": {
+        "properties": {
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "resource_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resource Types"
+          },
+          "encoding_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Encoding Formats"
+          },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          }
+        },
+        "type": "object",
+        "title": "AdapterResourceResponse",
+        "description": "A resource as declared by Croissant; representation is not access method."
       },
       "AttemptStatus": {
         "type": "string",

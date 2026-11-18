@@ -9,6 +9,7 @@ from src.api.schemas.adapters import (
     AdapterLatestItemResponse,
     AdapterMaintainerResponse,
     _repository_url,
+    data_sources_from_metadata,
 )
 from src.core.registration.models import (
     RegistryEntry,
@@ -90,7 +91,13 @@ def test_adapter_items_use_singular_maintainer_and_keywords() -> None:
     """
     now = datetime.now(UTC)
     entry = RegistryEntry(
-        "e1", "r1", "Example", "example::1.0", now, now, {"keywords": "a, b,, "}
+        "e1",
+        "r1",
+        "Example",
+        "example::1.0",
+        now,
+        now,
+        {"keywords": "a, b,, ", "componentType": "adapter", "granularity": "Primary"},
     )
     registration = StoredRegistration(
         "r1",
@@ -110,3 +117,37 @@ def test_adapter_items_use_singular_maintainer_and_keywords() -> None:
     assert latest_item.endorsed_by_current_user is True
     assert detail_item.maintainer is not None
     assert detail_item.maintainer.username == "org"
+    assert latest_item.component_type == detail_item.component_type == "adapter"
+    assert latest_item.granularity == detail_item.granularity == "Primary"
+
+
+def test_dataset_resources_keep_croissant_types_formats_and_separate_urls():
+    sources = data_sources_from_metadata(
+        {
+            "hasPart": [
+                {
+                    "name": "STITCH",
+                    "url": "https://stitch-db.org/",
+                    "distribution": [
+                        {
+                            "@id": "actions",
+                            "@type": "cr:FileObject",
+                            "encodingFormat": "text/tab-separated-values",
+                            "contentUrl": "https://zenodo.org/example.tsv",
+                        },
+                        {
+                            "@id": "files",
+                            "@type": ["cr:FileSet"],
+                            "encodingFormat": ["text/csv", "application/json"],
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+    assert sources[0].url == "https://stitch-db.org/"
+    assert sources[0].resources[0].content_url == "https://zenodo.org/example.tsv"
+    assert sources[0].resources[0].resource_types == ["cr:FileObject"]
+    assert sources[0].resources[0].encoding_formats == ["text/tab-separated-values"]
+    assert sources[0].resources[1].resource_types == ["cr:FileSet"]
+    assert sources[0].resources[1].encoding_formats == ["text/csv", "application/json"]

@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { selectionFromFile, selectionFromFolderFiles } from './datasetSourceSelection'
+import { includedSourceEntries, selectionFromFile, selectionFromFolderFiles, setSourceEntryIncluded } from './datasetSourceSelection'
 
 describe('dataset source selection', () => {
+  it('includes files by default and allows exclusion and reselection without losing paths', () => {
+    const file = new File(['id\n1'], 'first.csv')
+    const selection = { kind: 'folder' as const, name: 'dataset', entries: [
+      { file, relativePath: 'first.csv' },
+      { file, relativePath: 'nested/first.csv' },
+    ] }
+    expect(includedSourceEntries(selection)).toHaveLength(2)
+    const excluded = setSourceEntryIncluded(selection, 1, false)
+    expect(includedSourceEntries(excluded).map(entry => entry.relativePath)).toEqual(['first.csv'])
+    expect(excluded.entries).toHaveLength(2)
+    expect(selection.entries[1]).not.toHaveProperty('excluded')
+    expect(includedSourceEntries(setSourceEntryIncluded(excluded, 1, true))).toHaveLength(2)
+  })
+
   it('creates a single-file selection', () => {
     const file = new File(['id,name\n1,Alice\n'], 'people.csv', { type: 'text/csv' })
 

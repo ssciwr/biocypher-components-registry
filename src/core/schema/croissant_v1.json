@@ -54,7 +54,10 @@
       "description": "Tags for discoverability (domain, technology, etc.).",
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "hasPart": {
       "description": "One or more datasets integrated by this adapter.",
@@ -70,16 +73,42 @@
           }
         }
       ]
+    },
+    "componentType": {
+      "description": "BioCypher software component classification. Omission means unspecified.",
+      "type": "string",
+      "enum": [
+        "adapter",
+        "pipeline"
+      ]
+    },
+    "granularity": {
+      "description": "Primary: represents one atomic resource. Secondary: represents a composite, often pre-harmonized resource. none: not applicable to a pipeline. Omission means unspecified.",
+      "type": "string",
+      "enum": [
+        "Primary",
+        "Secondary",
+        "none"
+      ]
     }
   },
   "definitions": {
     "creator": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "@type": { "type": "string" },
-        "name": { "type": "string", "minLength": 1 },
-        "affiliation": { "type": "string" },
+        "@type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affiliation": {
+          "type": "string"
+        },
         "identifier": {
           "description": "ORCID or other persistent identifier.",
           "type": "string"
@@ -107,5 +136,70 @@
       "additionalProperties": true
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "componentType"
+        ],
+        "properties": {
+          "componentType": {
+            "const": "adapter"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "granularity": {
+            "enum": [
+              "Primary",
+              "Secondary"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "componentType"
+        ],
+        "properties": {
+          "componentType": {
+            "const": "pipeline"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "granularity": {
+            "const": "none"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "granularity"
+        ],
+        "properties": {
+          "granularity": {
+            "const": "none"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "componentType"
+        ],
+        "properties": {
+          "componentType": {
+            "const": "pipeline"
+          }
+        }
+      }
+    }
+  ]
 }

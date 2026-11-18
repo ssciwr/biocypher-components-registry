@@ -1,8 +1,8 @@
 const MAX_BIBTEX_BYTES = 1024 * 1024
 
 export async function citationTextFromBibtexFile(file: File): Promise<string> {
-  if (!file.name.toLowerCase().endsWith('.bib')) {
-    throw new Error('Select a BibTeX file with the .bib extension.')
+  if (!/\.(bib|bibtex)$/i.test(file.name)) {
+    throw new Error('Select a BibTeX file with the .bib or .bibtex extension.')
   }
   if (file.size > MAX_BIBTEX_BYTES) {
     throw new Error('The BibTeX file must not exceed 1 MiB.')

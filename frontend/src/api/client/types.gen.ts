@@ -102,6 +102,10 @@ export type AdapterDataSourceResponse = {
      * Column Count
      */
     column_count?: number | null;
+    /**
+     * Resources
+     */
+    resources?: Array<AdapterResourceResponse>;
 };
 
 /**
@@ -122,6 +126,18 @@ export type AdapterDetailResponse = {
      * Version
      */
     version?: string | null;
+    /**
+     * Component Type
+     */
+    component_type?: string | null;
+    /**
+     * Granularity
+     */
+    granularity?: string | null;
+    /**
+     * Component Url
+     */
+    component_url?: string | null;
     /**
      * Description
      */
@@ -279,6 +295,14 @@ export type AdapterLatestItemResponse = {
      */
     version?: string | null;
     /**
+     * Component Type
+     */
+    component_type?: string | null;
+    /**
+     * Granularity
+     */
+    granularity?: string | null;
+    /**
      * Description
      */
     description?: string | null;
@@ -394,6 +418,14 @@ export type AdapterMetadataGenerateRequest = {
      */
     adapter_id?: string | null;
     /**
+     * Componenttype
+     */
+    componentType?: 'adapter';
+    /**
+     * Granularity
+     */
+    granularity?: 'Primary' | 'Secondary' | null;
+    /**
      * Generator
      */
     generator?: 'native';
@@ -458,6 +490,34 @@ export type AdapterMetadataResponse = {
     metadata: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * AdapterResourceResponse
+ *
+ * A resource as declared by Croissant; representation is not access method.
+ */
+export type AdapterResourceResponse = {
+    /**
+     * Resource Id
+     */
+    resource_id?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Resource Types
+     */
+    resource_types?: Array<string>;
+    /**
+     * Encoding Formats
+     */
+    encoding_formats?: Array<string>;
+    /**
+     * Content Url
+     */
+    content_url?: string | null;
 };
 
 /**
@@ -2037,6 +2097,18 @@ export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPu
 
 export type UploadArtifactApiV1MetadataUploadSessionsSessionIdArtifactsEntryIdPutErrors = {
     /**
+     * Invalid Content-Length or missing SHA-256 headers.
+     */
+    400: unknown;
+    /**
+     * Content-Length is required.
+     */
+    411: unknown;
+    /**
+     * Content-Encoding is not supported.
+     */
+    415: unknown;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
@@ -2108,6 +2180,10 @@ export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteData = 
 };
 
 export type DeleteUploadSessionApiV1MetadataUploadSessionsSessionIdDeleteErrors = {
+    /**
+     * Generation cannot be cancelled after finalization.
+     */
+    409: unknown;
     /**
      * Validation Error
      */

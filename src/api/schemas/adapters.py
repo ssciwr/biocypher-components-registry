@@ -57,6 +57,16 @@ class AdapterMaintainerResponse(BaseModel):
         )
 
 
+class AdapterResourceResponse(BaseModel):
+    """A resource as declared by Croissant; representation is not access method."""
+
+    resource_id: str | None = None
+    name: str | None = None
+    resource_types: list[str] = Field(default_factory=list)
+    encoding_formats: list[str] = Field(default_factory=list)
+    content_url: str | None = None
+
+
 class AdapterDataSourceResponse(BaseModel):
     """Metadata-light dataset summary embedded in adapter Croissant metadata."""
 
@@ -66,6 +76,7 @@ class AdapterDataSourceResponse(BaseModel):
     license: str | None = None
     url: str | None = None
     column_count: int | None = None
+    resources: list[AdapterResourceResponse] = Field(default_factory=list)
 
 
 class AdapterCatalogItemResponse(BaseModel):
@@ -99,6 +110,8 @@ class AdapterLatestItemResponse(BaseModel):
     adapter_id: str
     adapter_name: str
     version: str | None = None
+    component_type: str | None = None
+    granularity: str | None = None
     description: str | None = None
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -126,6 +139,8 @@ class AdapterLatestItemResponse(BaseModel):
             adapter_name=entry.adapter_name,
             version=entry.adapter_version,
             description=_metadata_text(metadata, "description"),
+            component_type=_metadata_text(metadata, "componentType"),
+            granularity=_metadata_text(metadata, "granularity"),
             repository_location=repository_location,
             keywords=_metadata_list(metadata, "keywords"),
             maintainer=maintainer,
@@ -153,6 +168,9 @@ class AdapterDetailResponse(BaseModel):
     adapter_id: str
     adapter_name: str
     version: str | None = None
+    component_type: str | None = None
+    granularity: str | None = None
+    component_url: str | None = None
     description: str | None = None
     repository_location: str | None = None
     license_value: str | None = None
@@ -190,6 +208,9 @@ class AdapterDetailResponse(BaseModel):
             adapter_name=latest.adapter_name,
             version=latest.adapter_version,
             description=_metadata_text(metadata, "description"),
+            component_type=_metadata_text(metadata, "componentType"),
+            granularity=_metadata_text(metadata, "granularity"),
+            component_url=_metadata_text(metadata, "url"),
             repository_location=repository_location,
             license_value=(
                 registration.license_value
@@ -305,9 +326,31 @@ def data_sources_from_metadata(
                 license=_metadata_text(item, "license"),
                 url=_metadata_text(item, "url"),
                 column_count=_record_set_column_count(item),
+                resources=resources_from_metadata(item),
             )
         )
     return data_sources
+
+
+def resources_from_metadata(dataset: dict[str, Any]) -> list[AdapterResourceResponse]:
+    distribution = dataset.get("distribution", [])
+    items = distribution if isinstance(distribution, list) else [distribution]
+    return [
+        AdapterResourceResponse(
+            resource_id=_metadata_text(item, "@id"),
+            name=_metadata_text(item, "name"),
+            resource_types=_resource_values(item.get("@type")),
+            encoding_formats=_resource_values(item.get("encodingFormat")),
+            content_url=_metadata_text(item, "contentUrl"),
+        )
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+
+def _resource_values(value: Any) -> list[str]:
+    values = value if isinstance(value, list) else [value]
+    return [item for item in values if isinstance(item, str) and item.strip()]
 
 
 def _metadata_text(metadata: dict[str, Any], key: str) -> str | None:

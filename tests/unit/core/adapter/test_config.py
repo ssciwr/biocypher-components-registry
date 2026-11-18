@@ -36,6 +36,7 @@ def test_build_adapter_request_from_mapping_supports_existing_and_generated() ->
                 "license": "MIT",
                 "code_repository": "https://example.org/repo",
                 "adapter_id": "example-adapter",
+                "granularity": "Secondary",
                 "keywords": ["adapter", "biocypher"],
                 "creators": [
                     {
@@ -64,6 +65,7 @@ def test_build_adapter_request_from_mapping_supports_existing_and_generated() ->
     )
 
     assert request.dataset_generator == "auto"
+    assert request.granularity == "Secondary"
     assert request.validate is False
     assert request.dataset_paths == ["/data/dataset.jsonld"]
     assert len(request.generated_datasets) == 1

@@ -1,6 +1,7 @@
 import Papa, { type ParseResult } from 'papaparse'
 import type { DatasetDraft } from './types'
 import { creatorToApiValue, optionalValue } from './utils'
+import { includedSourceEntries } from './datasetSourceSelection'
 
 const MAX_FILES = 1_000
 const MAX_ARTIFACT_BYTES = 1 * 1024 * 1024
@@ -67,12 +68,14 @@ export async function generateDatasetFromSelection(
 ): Promise<DatasetUploadResult> {
   const selection = dataset.sourceSelection
   if (!selection) throw new Error('Select a source dataset file or folder first.')
+  const includedEntries = includedSourceEntries(selection)
+  if (!includedEntries.length) throw new Error('Select at least one source file to include.')
   if (!dataset.creators.length) throw new Error('Add at least one dataset creator.')
-  if (selection.entries.length > MAX_FILES) {
+  if (includedEntries.length > MAX_FILES) {
     throw new Error(`A folder may contain at most ${MAX_FILES} files.`)
   }
 
-  const plans = selection.entries.map((source, index) => (
+  const plans = includedEntries.map((source, index) => (
     planEntry(source.file, source.relativePath, index, selection.kind, dataset)
   ))
   assertSafeInventory(plans.map((plan) => plan.entry))

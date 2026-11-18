@@ -55,6 +55,7 @@ export const emptyDataset: DatasetDraft = {
 }
 
 export const emptyForm: MetadataGeneratorForm = {
+  granularity: '',
   adapterId: '',
   codeRepository: '',
   creators: [],

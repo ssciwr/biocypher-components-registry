@@ -122,6 +122,7 @@ ADAPTER_METADATA_GENERATE_EXAMPLE: dict[str, Any] = {
     ],
     "keywords": ["adapter", "biocypher"],
     "adapter_id": "people-adapter",
+    "granularity": "Primary",
     "generator": "native",
     "dataset_generator": "native",
 }
@@ -308,6 +309,8 @@ class AdapterMetadataGenerateRequest(BaseModel):
     creators: list[AdapterCreatorGenerateRequest] = Field(..., min_length=1)
     keywords: list[str] = Field(..., min_length=1)
     adapter_id: str | None = None
+    component_type: Literal["adapter"] = Field(default="adapter", alias="componentType")
+    granularity: Literal["Primary", "Secondary"] | None = None
     generator: Literal["native"] = "native"
     dataset_generator: Literal["auto", "croissant-baker", "native"] = "croissant-baker"
 

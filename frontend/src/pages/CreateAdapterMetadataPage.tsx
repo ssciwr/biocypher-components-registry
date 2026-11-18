@@ -27,6 +27,7 @@ import {
   type DatasetCapacityWait,
 } from './createMetadata/datasetUpload'
 import { prepareDatasetDrafts } from './createMetadata/datasetPreparation'
+import { includedSourceEntries } from './createMetadata/datasetSourceSelection'
 import {
   creatorToApiValue,
   datasetUIStateDraftFromCroissantFile,
@@ -163,7 +164,7 @@ function formForStorage(form: MetadataGeneratorForm): MetadataGeneratorForm {
 
 
 // Empty form, restore if set in GET param as resume=1
-function initialForm() {
+function initialForm(): MetadataGeneratorForm {
   const params = new URLSearchParams(globalThis.location.search)
   if (params.get('start') === '1') {
     globalThis.localStorage.removeItem(metadataDraftStorageKey)
@@ -182,6 +183,7 @@ function initialForm() {
     return {
       ...emptyForm,
       ...parsed,
+      granularity: parsed.granularity === 'Primary' || parsed.granularity === 'Secondary' ? parsed.granularity : '',
       creators: Array.isArray(parsed.creators) ? parsed.creators : [],
       datasets: restorableDatasets(parsed.datasets),
     }
@@ -508,7 +510,7 @@ function CreateAdapterMetadataPage() {
       input: selection.name,
       sourceSelection: selection,
       sourceFileName: selection.kind === 'folder'
-        ? `${selection.name} (${selection.entries.length} files)`
+        ? `${selection.name} (${includedSourceEntries(selection).length} of ${selection.entries.length} files included)`
         : selection.name,
       uploadedDocument: undefined,
     }))
@@ -844,6 +846,7 @@ function CreateAdapterMetadataPage() {
       const result = await generateAdapterMetadataApiV1MetadataAdaptersGeneratePost({
         body: {
           adapter_id: optionalValue(form.adapterId),
+          granularity: form.granularity || undefined,
           code_repository: form.codeRepository,
           creators,
           dataset_documents: datasetDocuments,

@@ -72,6 +72,7 @@ class NativeAdapterGenerator(AdapterGenerator):
             keywords=request.keywords,
             datasets=datasets,
             adapter_id=request.adapter_id,
+            granularity=request.granularity,
         )
 
         output_path = Path(request.output_path)

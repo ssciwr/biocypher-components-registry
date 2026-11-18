@@ -9,8 +9,9 @@ import type {
   SelectOption,
 } from './types'
 import { citationTextFromBibtexFile } from './citation'
-import { selectionFromFile, selectionFromFolderFiles } from './datasetSourceSelection'
+import { includedSourceEntries, selectionFromFile, selectionFromFolderFiles, setSourceEntryIncluded } from './datasetSourceSelection'
 import { normaliseOrcid } from './utils'
+import { fieldDataTypeOptions } from './fieldDataTypes'
 
 type TextInputProps = Readonly<{
   fillHeight?: boolean
@@ -69,6 +70,7 @@ type DatasetGenerateEditorProps = Readonly<{
 type DatasetSourceInputProps = Readonly<{
   onChange: (selection: DatasetSourceSelection | null) => void
   required?: boolean
+  selection?: DatasetSourceSelection
 }>
 
 type DatasetDetailsEditorProps = Readonly<{
@@ -101,16 +103,6 @@ type LicenseSelectInputProps = Readonly<{
 const creatorTypeOptions: ReadonlyArray<SelectOption<CreatorType>> = [
   { label: 'Person', value: 'Person' },
   { label: 'Organization', value: 'Organization' },
-]
-
-const fieldDataTypeOptions: ReadonlyArray<SelectOption<string>> = [
-  { disabled: true, label: '(None)', value: '' },
-  { label: 'sc:Text', value: 'sc:Text' },
-  { label: 'sc:Integer', value: 'sc:Integer' },
-  { label: 'sc:Float', value: 'sc:Float' },
-  { label: 'sc:Boolean', value: 'sc:Boolean' },
-  { label: 'sc:Date', value: 'sc:Date' },
-  { label: 'sc:URL', value: 'sc:URL' },
 ]
 
 export const datasetMetadataSectionId = 'dataset-metadata-section'
@@ -255,7 +247,7 @@ function CitationInput({
         <span className="flex items-center gap-1.5">
           <label htmlFor={citationId}>Citation</label>
           <HelpTooltip label="Citation">
-            Citation for this dataset. Paste formatted citation text, enter BibTeX, or import a .bib file.
+            Citation for this dataset. Paste formatted citation text, enter BibTeX, or import a .bib or .bibtex file.
           </HelpTooltip>
         </span>
         <button
@@ -279,7 +271,7 @@ function CitationInput({
         value={value}
       />
       <input
-        accept=".bib,application/x-bibtex,text/x-bibtex"
+        accept=".bib,.bibtex,application/x-bibtex,text/x-bibtex"
         aria-label="Citation BibTeX file"
         className="hidden"
         onChange={(event) => void importBibtex(event.target.files?.[0])}
@@ -374,7 +366,7 @@ export function FileInput({
   )
 }
 
-function DatasetSourceInput({ onChange, required = false }: DatasetSourceInputProps) {
+export function DatasetSourceInput({ onChange, required = false, selection }: DatasetSourceInputProps) {
   const pickerRoot = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
@@ -489,6 +481,30 @@ function DatasetSourceInput({ onChange, required = false }: DatasetSourceInputPr
           type="file"
         />
       </div>
+      {selection ? (
+        <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
+          <legend className="px-1 text-sm font-semibold">Files to include</legend>
+          <p className="mb-2 text-xs font-normal text-slate-600" aria-live="polite">
+            {includedSourceEntries(selection).length} of {selection.entries.length} files included. Uncheck a file to exclude it from generation.
+          </p>
+          <div className="max-h-64 overflow-y-auto">
+            {selection.entries.map((entry, index) => (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm font-normal hover:bg-slate-50" key={entry.relativePath}>
+                <input
+                  checked={!entry.excluded}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                  onChange={(event) => onChange(setSourceEntryIncluded(selection, index, event.target.checked))}
+                  type="checkbox"
+                />
+                <span className="min-w-0 break-all">{entry.relativePath}</span>
+              </label>
+            ))}
+          </div>
+          {!includedSourceEntries(selection).length ? (
+            <p className="mt-2 text-xs font-normal text-red-700" role="alert">Select at least one source file to include.</p>
+          ) : null}
+        </fieldset>
+      ) : null}
       {selectionError ? <p className="text-xs font-normal text-red-700" role="alert">{selectionError}</p> : null}
     </div>
   )
@@ -584,7 +600,7 @@ export function DatasetGenerateEditor({
 }: DatasetGenerateEditorProps) {
   return (
     <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
-      {showSource ? <DatasetSourceInput onChange={onSourceFileChange} required={sourceRequired} /> : null}
+      {showSource ? <DatasetSourceInput onChange={onSourceFileChange} required={sourceRequired} selection={draft.sourceSelection} /> : null}
       {showSource && draft.sourceFileName ? (
         <p className="inline-flex w-fit items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
           <DocumentArrowUpIcon className="h-4 w-4" aria-hidden="true" />
@@ -980,7 +996,14 @@ export function DatasetDetailsEditor({
                   <tr>
                     <th className="px-4 py-3">Actions</th>
                     <th className="px-4 py-3">Field name</th>
-                    <th className="px-4 py-3">Suggested datatype</th>
+                    <th className="px-4 py-3">
+                      <span className="flex items-center gap-1.5">
+                        Suggested datatype
+                        <HelpTooltip label="Field datatypes">
+                          Generated datatypes are preserved, including combinations of types. Selecting a different option replaces the current type or combination.
+                        </HelpTooltip>
+                      </span>
+                    </th>
                     <th className="px-4 py-3">Description</th>
                     <th className="px-4 py-3">Example</th>
                   </tr>
@@ -1010,11 +1033,12 @@ export function DatasetDetailsEditor({
                       </td>
                       <td className="w-44 px-4 py-3">
                         <select
+                          aria-label={`Data type for ${field.name || 'unnamed field'}`}
                           className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-blue-500"
                           onChange={(event) => onFieldChange(editedRecordSetIndex, field.id, 'dataType', event.target.value)}
                           value={field.dataType}
                         >
-                          {fieldDataTypeOptions.map((option) => (
+                          {fieldDataTypeOptions(field.dataType).map((option) => (
                             <option disabled={option.disabled} key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -1057,7 +1081,7 @@ export function DatasetDetailsEditor({
               <SelectInput
                 label="Data type"
                 onChange={(value) => onManualFieldChange('dataType', value)}
-                options={fieldDataTypeOptions}
+                options={fieldDataTypeOptions(datasetManualField.dataType)}
                 surface="plain"
                 value={datasetManualField.dataType}
               />

@@ -149,6 +149,11 @@ uv run cli.py adapter direct --name "My Adapter" --description "..." --version "
 
 Run `uv run cli.py adapter --help` or `uv run cli.py dataset --help` for the full flag list of each mode.
 
+Adapter generation sets `componentType` to `adapter` automatically and accepts
+optional `Primary` / `Secondary` granularity through the UI, CLI, API, and YAML.
+See [component classification and the STITCH frontend walkthrough](docs/adapter_classification.md)
+for definitions and PostgreSQL Compose setup instructions.
+
 ## Agentic workspace
 The agentic workspace can be run through the API (see below) or directly through the command-line using
 ```bash

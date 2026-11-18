@@ -4,6 +4,7 @@ import type {
 import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField, DatasetRecordSetDraft } from './types'
 import type { CroissantDocumentEdit } from './uploadedDocumentEditing'
 import { applyCroissantDocumentEdits } from './uploadedDocumentEditing'
+import { dataTypeForExport, dataTypeSelectionValue } from './fieldDataTypes'
 
 let draftIdCounter = 0
 const jsonIndentSpaces = 2
@@ -86,6 +87,13 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
   const document: Record<string, unknown> = isRecord(dataset.uploadedDocument)
     ? { ...dataset.uploadedDocument }
     : { '@type': 'sc:Dataset' }
+  // Baker uses the landing page as the dataset ID. Independently generated
+  // tables can share that page without being the same dataset. Let JSON-LD
+  // assign separate blank nodes; file and record-set identifiers stay intact.
+  const generatedId = textValue(document['@id'])
+  if (generatedId && generatedId === textValue(document.url)) {
+    delete document['@id']
+  }
   setOptional(document, 'name', dataset.name) // setOtpional is just a pattern so empty values are allowed but sent as backend expects.
   setOptional(document, 'description', dataset.description)
   setOptional(document, 'version', dataset.datasetVersion)
@@ -279,7 +287,9 @@ function mergeUploadedField(
   const document = { ...original }
   const originalName = textValue(original.name)
   mergeUploadedFieldName(document, field.name, originalName, original.source)
-  mergeUploadedFieldValue(document, 'dataType', field.dataType, displayTextValue(original.dataType), true)
+  const dataType = dataTypeForExport(field.dataType, original.dataType)
+  if (dataType === undefined) delete document.dataType
+  else document.dataType = dataType
   mergeUploadedFieldValue(document, 'description', field.description, textValue(original.description))
   mergeUploadedFieldValue(document, 'examples', field.example, exampleText(original.examples), true)
   return document
@@ -643,7 +653,11 @@ function datasetManualFieldToCroissantField(
     name: field.name.trim(),
   }
   setOptional(fieldDocument, '@id', field.fieldId || `${localId(dataset.recordSetName || dataset.name)}/${field.name.trim()}`)
-  setOptional(fieldDocument, 'dataType', field.dataType)
+  const originalFields = recordList(firstRecord(dataset.uploadedDocument?.recordSet)?.field)
+  const originalField = originalFields.find(candidate => field.fieldId && candidate['@id'] === field.fieldId)
+    ?? (field.uploadedIndex === undefined ? undefined : originalFields[field.uploadedIndex])
+  const dataType = dataTypeForExport(field.dataType, field.originalDataType ?? originalField?.dataType)
+  if (dataType !== undefined) fieldDocument.dataType = dataType
   setOptional(fieldDocument, 'description', field.description)
   if (field.example.trim()) {
     fieldDocument.examples = [field.example.trim()]
@@ -681,7 +695,8 @@ function fieldsFromRecordSet(recordSet?: Record<string, unknown>) {
   // Keep Croissant IDs/source mappings so edit -> export does not drop links we do not edit in the UI.
   return fields.map((field, uploadedIndex) => ({
     id: nextDraftId('field'),
-    dataType: displayTextValue(field.dataType),
+    dataType: dataTypeSelectionValue(field.dataType),
+    originalDataType: field.dataType,
     description: textValue(field.description),
     example: exampleText(field.examples),
     fieldId: textValue(field['@id']),

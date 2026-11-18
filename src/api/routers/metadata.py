@@ -369,6 +369,7 @@ def _build_adapter_generation_request(
         ],
         keywords=payload.keywords,
         adapter_id=payload.adapter_id,
+        granularity=payload.granularity,
         dataset_generator=payload.dataset_generator,
         generated_datasets=[
             _build_embedded_dataset_generation_request(dataset)

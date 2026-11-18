@@ -613,6 +613,7 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
         json=_adapter_generate_payload(
             name="People Adapter",
             description="Adapter metadata generated through the API.",
+            granularity="Primary",
             code_repository="https://github.com/example/people-adapter",
             creators=[
                 {
@@ -659,6 +660,8 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
     metadata = payload["metadata"]
     assert metadata["@type"] == "SoftwareSourceCode"
     assert metadata["name"] == "People Adapter"
+    assert metadata["componentType"] == "adapter"
+    assert metadata["granularity"] == "Primary"
     assert metadata["creator"][0]["email"] == "creator@example.org"
     assert metadata["creator"][0]["url"] == "https://example.org/creator"
     assert (
@@ -693,3 +696,21 @@ def test_metadata_generation_openapi_examples_are_available() -> None:
 
     assert adapter_example == ADAPTER_METADATA_GENERATE_EXAMPLE
     assert validation_example == METADATA_VALIDATE_DATASET_EXAMPLE
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("componentType", "pipeline"),
+        ("component_type", "pipeline"),
+        ("granularity", "none"),
+        ("granularity", "primary"),
+    ],
+)
+def test_adapter_generation_rejects_non_adapter_classifications(field, value):
+    payload = dict(ADAPTER_METADATA_GENERATE_EXAMPLE)
+    payload[field] = value
+    response = TestClient(create_app()).post(
+        "/api/v1/metadata/adapters/generate", json=payload
+    )
+    assert response.status_code == 422

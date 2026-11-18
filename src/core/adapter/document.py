@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from src.core.adapter.classification import COMPONENT_TERMS, AdapterGranularity
 from src.core.shared.constants import (
     CROISSANT_CONFORMS_TO_URL,
     DCT_CONFORMS_TO_KEY,
@@ -14,7 +15,11 @@ from src.core.shared.ids import slugify_identifier
 
 JSONLD_TYPE_KEY = "@type"
 
-ADAPTER_CONTEXT: dict[str, Any] = STANDARD_CONTEXT
+ADAPTER_CONTEXT: dict[str, Any] = {
+    **STANDARD_CONTEXT,
+    "componentType": f"{COMPONENT_TERMS}componentType",
+    "granularity": f"{COMPONENT_TERMS}granularity",
+}
 
 
 def build_adapter_creator(
@@ -54,11 +59,13 @@ def build_adapter_document(
     keywords: list[str],
     datasets: list[dict[str, Any]],
     adapter_id: str | None = None,
+    granularity: AdapterGranularity | None = None,
 ) -> dict[str, Any]:
     """Assemble a full adapter metadata document."""
     document: dict[str, Any] = {
         "@context": deepcopy(ADAPTER_CONTEXT),
         JSONLD_TYPE_KEY: "SoftwareSourceCode",
+        "componentType": "adapter",
         DCT_CONFORMS_TO_KEY: "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
         "@id": adapter_id or slugify_identifier(name),
         "name": name,
@@ -70,6 +77,8 @@ def build_adapter_document(
         "keywords": keywords,
         "hasPart": datasets,
     }
+    if granularity is not None:
+        document["granularity"] = AdapterGranularity(granularity).value
     return document
 
 
