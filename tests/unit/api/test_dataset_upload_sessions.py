@@ -38,6 +38,14 @@ def _create_payload(*, count: int = 1) -> dict[str, object]:
     }
 
 
+def _upload_url(session: dict[str, object]) -> str:
+    return f"/api/v1/metadata/upload-sessions/{session['session_id']}/artifacts/entry-0"
+
+
+def _authorization(session: dict[str, object]) -> dict[str, str]:
+    return {"Authorization": f"Bearer {session['token']}"}
+
+
 def test_upload_session_streams_reconciles_and_cleans_up(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -176,6 +184,159 @@ def test_full_admission_capacity_returns_retry_after(
     assert response.status_code == 429
     assert response.headers["retry-after"] == "15"
     assert "capacity" in response.json()["detail"].lower()
+
+
+def test_upload_session_authorization_does_not_disclose_session_existence(
+    tmp_path: Path,
+) -> None:
+    manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+    manager.start()
+    app = create_app(upload_session_manager=manager)
+    app.state.upload_session_manager = manager
+    client = TestClient(app)
+    created = client.post("/api/v1/metadata/upload-sessions", json=_create_payload())
+    session = created.json()
+
+    real_session_wrong_token = client.get(
+        f"/api/v1/metadata/upload-sessions/{session['session_id']}",
+        headers={"Authorization": "Bearer incorrect-token"},
+    )
+    unknown_session = client.get(
+        "/api/v1/metadata/upload-sessions/not-a-real-session",
+        headers={"Authorization": f"Bearer {session['token']}"},
+    )
+    missing_credentials = client.get(
+        f"/api/v1/metadata/upload-sessions/{session['session_id']}"
+    )
+
+    responses = [real_session_wrong_token, unknown_session, missing_credentials]
+    assert {response.status_code for response in responses} == {401}
+    assert len({response.json()["detail"] for response in responses}) == 1
+    assert all(
+        response.headers["cache-control"].startswith("no-store")
+        for response in responses
+    )
+
+
+@pytest.mark.parametrize(
+    ("content", "headers", "expected_status"),
+    [
+        (b"id,name\n", {"Content-Encoding": "gzip"}, 415),
+        (iter([b"id,name\n"]), {}, 411),
+        (b"id,name\n", {"Content-Length": "not-an-integer"}, 400),
+        (b"id,name\n", {}, 400),
+    ],
+    ids=[
+        "unsupported-content-encoding",
+        "missing-content-length",
+        "malformed-content-length",
+        "missing-digests",
+    ],
+)
+def test_artifact_upload_rejects_invalid_transport_metadata(
+    tmp_path: Path,
+    content,
+    headers: dict[str, str],
+    expected_status: int,
+) -> None:
+    manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+    manager.start()
+    app = create_app(upload_session_manager=manager)
+    app.state.upload_session_manager = manager
+    client = TestClient(app)
+    session = client.post(
+        "/api/v1/metadata/upload-sessions", json=_create_payload()
+    ).json()
+
+    response = client.put(
+        _upload_url(session),
+        content=content,
+        headers={**_authorization(session), **headers},
+    )
+
+    assert response.status_code == expected_status
+    assert response.headers["cache-control"].startswith("no-store")
+    authorized = manager.authorize(str(session["session_id"]), str(session["token"]))
+    assert authorized.complete_entries == 0
+
+
+def test_finalize_requires_complete_inventory_and_delete_releases_scratch(
+    tmp_path: Path,
+) -> None:
+    manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+    manager.start()
+    app = create_app(upload_session_manager=manager)
+    app.state.upload_session_manager = manager
+    client = TestClient(app)
+    session = client.post(
+        "/api/v1/metadata/upload-sessions", json=_create_payload()
+    ).json()
+    session_root = tmp_path / str(session["session_id"])
+
+    incomplete = client.post(
+        f"/api/v1/metadata/upload-sessions/{session['session_id']}/finalize",
+        headers=_authorization(session),
+    )
+    assert incomplete.status_code == 409
+    assert session_root.exists()
+
+    deleted = client.delete(
+        f"/api/v1/metadata/upload-sessions/{session['session_id']}",
+        headers=_authorization(session),
+    )
+    assert deleted.status_code == 200
+    assert session_root.exists() is False
+    assert (
+        client.get(
+            f"/api/v1/metadata/upload-sessions/{session['session_id']}",
+            headers=_authorization(session),
+        ).status_code
+        == 401
+    )
+
+
+def test_finalize_is_enqueued_once_and_queued_session_cannot_be_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+    manager.start()
+
+    async def leave_queued() -> None:
+        return None
+
+    monkeypatch.setattr(manager, "_run_generation_worker", leave_queued)
+    app = create_app(upload_session_manager=manager)
+    app.state.upload_session_manager = manager
+    client = TestClient(app)
+    session = client.post(
+        "/api/v1/metadata/upload-sessions", json=_create_payload()
+    ).json()
+    content = b"id,name\n"
+    digest = hashlib.sha256(content).hexdigest()
+    uploaded = client.put(
+        _upload_url(session),
+        content=content,
+        headers={
+            **_authorization(session),
+            "X-Artifact-SHA256": digest,
+            "X-Original-SHA256": digest,
+        },
+    )
+    assert uploaded.status_code == 200
+    finalize_url = f"/api/v1/metadata/upload-sessions/{session['session_id']}/finalize"
+
+    first = client.post(finalize_url, headers=_authorization(session))
+    second = client.post(finalize_url, headers=_authorization(session))
+
+    assert first.status_code == second.status_code == 202
+    assert first.json()["status"] == second.json()["status"] == "finalize_queued"
+    assert manager._generation_queue.qsize() == 1
+    refused_delete = client.delete(
+        f"/api/v1/metadata/upload-sessions/{session['session_id']}",
+        headers=_authorization(session),
+    )
+    assert refused_delete.status_code == 409
+    assert (tmp_path / str(session["session_id"])).exists()
 
 
 @pytest.mark.parametrize("error_type", [RuntimeError, KeyError])

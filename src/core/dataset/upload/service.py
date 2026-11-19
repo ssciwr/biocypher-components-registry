@@ -64,11 +64,10 @@ class UploadSessionManager:
         self._sessions: dict[str, UploadSession] = {}
         self._global_bytes = 0
         self._lock = asyncio.Lock()
-        self.generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
         self._generation_queue: asyncio.Queue[
             tuple[UploadSession, Callable[[UploadSession], Awaitable[object]]]
         ] = asyncio.Queue()
-        self._generation_worker: asyncio.Task[None] | None = None
+        self._generation_workers: set[asyncio.Task[None]] = set()
 
     def start(self) -> None:
         """Verify scratch storage and remove abandoned process-local data."""
@@ -83,11 +82,12 @@ class UploadSessionManager:
 
     async def shutdown(self) -> None:
         """Destroy every session and its artifacts during application shutdown."""
-        if self._generation_worker is not None:
-            self._generation_worker.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._generation_worker
-            self._generation_worker = None
+        workers = list(self._generation_workers)
+        for worker in workers:
+            worker.cancel()
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)
+        self._generation_workers.clear()
         async with self._lock:
             sessions = list(self._sessions.values())
             self._sessions.clear()
@@ -464,9 +464,18 @@ class UploadSessionManager:
             session.state = UploadSessionState.FINALIZE_QUEUED
             session.mark_active()
         await self._generation_queue.put((session, callback))
-        if self._generation_worker is None or self._generation_worker.done():
-            self._generation_worker = asyncio.create_task(self._run_generation_worker())
+        self._ensure_generation_workers()
         return True
+
+    def _ensure_generation_workers(self) -> None:
+        """Keep a bounded pool available for queued generation work."""
+        self._generation_workers = {
+            worker for worker in self._generation_workers if not worker.done()
+        }
+        for _ in range(MAX_CONCURRENT_GENERATIONS - len(self._generation_workers)):
+            self._generation_workers.add(
+                asyncio.create_task(self._run_generation_worker())
+            )
 
     async def _run_generation_worker(self) -> None:
         while True:

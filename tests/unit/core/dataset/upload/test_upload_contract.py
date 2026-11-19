@@ -379,6 +379,114 @@ def test_reconciliation_rejects_an_oversized_final_document(
     asyncio.run(exercise())
 
 
+def test_reconciliation_rejects_distribution_count_mismatch(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+        manager.start()
+        session, _ = await manager.create(
+            source_kind="folder",
+            source_name="dataset",
+            entries=[_entry("one", "one.csv"), _entry("two", "two.csv")],
+            generation=UploadGenerationOptions(),
+        )
+
+        with pytest.raises(UploadSessionError, match="every source file exactly once"):
+            reconcile_generated_metadata(
+                {"distribution": [{"@type": "cr:FileObject", "contentUrl": "one.csv"}]},
+                session,
+            )
+        await manager.shutdown()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    "private_value",
+    [
+        "{scratch}/input/data.csv",
+        "file:///private/data.csv",
+        "data:text/csv,secret",
+    ],
+    ids=["scratch-path", "file-uri", "data-uri"],
+)
+def test_reconciliation_fails_closed_if_private_value_survives_sanitization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    private_value: str,
+) -> None:
+    async def exercise() -> None:
+        manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+        manager.start()
+        entry = _entry("entry-1", "data.csv")
+        session, _ = await manager.create(
+            source_kind="file",
+            source_name="dataset",
+            entries=[entry],
+            generation=UploadGenerationOptions(),
+        )
+        entry.original_sha256 = "a" * 64
+        entry.artifact_sha256 = entry.original_sha256
+        monkeypatch.setattr(
+            reconciliation_module,
+            "_remove_private_values",
+            lambda *_args, **_kwargs: None,
+        )
+        value = private_value.format(scratch=session.root)
+
+        with pytest.raises(UploadSessionError, match="private scratch value"):
+            reconcile_generated_metadata(
+                {
+                    "distribution": {
+                        "@type": "cr:FileObject",
+                        "contentUrl": "data.csv",
+                    },
+                    "recordSet": [{"field": [{"description": value}]}],
+                },
+                session,
+            )
+        await manager.shutdown()
+
+    asyncio.run(exercise())
+
+
+def test_reconciliation_rejects_nested_transient_artifact_identity(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        manager = UploadSessionManager(scratch_root=tmp_path, require_tmpfs=False)
+        manager.start()
+        entry = _entry(
+            "entry-1",
+            "data.csv",
+            size=MAX_ARTIFACT_BYTES + 1,
+            mode="sample",
+            artifact_size=3,
+        )
+        session, _ = await manager.create(
+            source_kind="file",
+            source_name="dataset",
+            entries=[entry],
+            generation=UploadGenerationOptions(),
+        )
+        entry.original_sha256 = "a" * 64
+        entry.artifact_sha256 = "b" * 64
+
+        with pytest.raises(UploadSessionError, match="artifact identity"):
+            reconcile_generated_metadata(
+                {
+                    "distribution": {
+                        "@type": "cr:FileObject",
+                        "contentUrl": "data.csv",
+                    },
+                    "recordSet": [{"field": [{"description": entry.artifact_sha256}]}],
+                },
+                session,
+            )
+        await manager.shutdown()
+
+    asyncio.run(exercise())
+
+
 def test_baker_failure_does_not_invoke_native(monkeypatch: pytest.MonkeyPatch) -> None:
     native_called = False
 

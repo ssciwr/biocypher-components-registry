@@ -210,6 +210,41 @@ def test_database_connection_failure_happens_before_authentication(
     assert not path.exists()
 
 
+def test_unexpected_publish_error_redacts_details_and_marks_outcome_unconfirmed(
+    cli_environment, monkeypatch
+):
+    path, _ = cli_environment
+
+    def fail_after_possible_publish(*args, **kwargs):
+        raise RuntimeError("private-provider-content")
+
+    monkeypatch.setattr(cli, "register_adapter", fail_after_possible_publish)
+    result = runner.invoke(cli.app, ["register", REPO, "--db-path", str(path)])
+
+    assert result.exit_code == 1
+    assert "Operation outcome unconfirmed (RuntimeError)" in result.output
+    assert "Inspect the registry before" in result.output
+    assert "retrying" in result.output
+    assert "private-provider-content" not in result.output
+
+
+def test_interrupted_publish_returns_130_and_marks_outcome_unconfirmed(
+    cli_environment, monkeypatch
+):
+    path, _ = cli_environment
+
+    def interrupt_after_possible_publish(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "register_adapter", interrupt_after_possible_publish)
+    result = runner.invoke(cli.app, ["register", REPO, "--db-path", str(path)])
+
+    assert result.exit_code == 130
+    assert "Operation interrupted; outcome unconfirmed" in result.output
+    assert "Inspect the registry before" in result.output
+    assert "retrying" in result.output
+
+
 def test_failed_publish_does_not_repeat_progress_or_primary_error(
     cli_environment, monkeypatch
 ):

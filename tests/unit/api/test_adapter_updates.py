@@ -6,7 +6,9 @@ import json
 
 import pytest
 
+from src.api.routers import adapters as adapters_router
 from src.core.auth.models import AuthSession
+from src.core.registration.errors import ConcurrentRegistrationChangeError
 from src.core.registration.service import register_adapter
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from tests.support.croissant_fixtures import sample_adapter_document
@@ -86,6 +88,25 @@ def test_unknown_adapter_update_returns_not_found(published_adapter):
         .status_code
         == 404
     )
+
+
+def test_concurrent_adapter_update_returns_conflict(published_adapter, monkeypatch):
+    _, store, _ = published_adapter
+
+    def concurrent_change(*args, **kwargs):
+        raise ConcurrentRegistrationChangeError(
+            "The registration changed while the update was processing."
+        )
+
+    monkeypatch.setattr(adapters_router, "update_adapter_service", concurrent_change)
+    response = create_adapter_client(store, "owner").post(
+        "/api/v1/adapters/example-adapter/update"
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "The registration changed while the update was processing."
+    }
 
 
 @pytest.mark.parametrize("field,value", [("@id", None), ("@context", [])])
