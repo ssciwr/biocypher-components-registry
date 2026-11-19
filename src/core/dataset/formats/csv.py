@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from croissant_baker.handlers.csv_handler import CSVHandler
+from croissant_baker.sources import make_source
 
 from src.core.dataset.formats.base import CSV_MIME, FormatHandler
 from src.core.dataset.request import FileInspection, InferredField
@@ -19,7 +20,7 @@ class CsvFormatHandler(FormatHandler):
 
     def inspect(self, path: Path) -> FileInspection:
         """Inspect a CSV file and build a normalized schema snapshot."""
-        metadata = CSVHandler().extract_metadata(path)
+        metadata = CSVHandler().extract(make_source(path))
         fields = [
             InferredField(name=column, data_type=metadata["column_types"][column])
             for column in metadata["columns"]
