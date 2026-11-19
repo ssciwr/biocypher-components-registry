@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import {
   generateAdapterMetadataApiV1MetadataAdaptersGeneratePost,
@@ -478,25 +478,7 @@ function CreateAdapterMetadataPage() {
     try {
       const datasets: DatasetDraft[] = []
       for (const dataset of datasetsToPrepare) {
-        if (dataset.uploadedDocument) {
-          datasets.push(dataset)
-          continue
-        }
-
-        if (!dataset.sourceFile) {
-          throw new Error('Upload a source dataset file first.')
-        }
-
-        const result = await generateDatasetMetadataApiV1MetadataDatasetsGeneratePost({
-          body: datasetDraftToCroissantGenerateUploadForm(dataset),
-        })
-        if (result.error !== undefined) {
-          throw new Error(errorText(result.error, 'Dataset generation failed.'))
-        }
-        if (!result.data) {
-          throw new Error('Dataset generation did not return metadata.')
-        }
-        datasets.push(datasetUIStateDraftFromCroissantFile(result.data.metadata, dataset))
+        datasets.push(await prepareDataset(dataset))
       }
 
       setForm((current) => ({ ...current, datasets }))
@@ -678,16 +660,11 @@ function CreateAdapterMetadataPage() {
   const selectedDataset = isEditingDataset
     ? datasetDraft
     : form.datasets.find((dataset) => dataset.id === selectedDatasetId)
-  const isReviewingDatasets = step >= 3 && !isEditingDataset && !selectedDataset
   const generatedMetadataJson = generatedMetadata
     ? JSON.stringify(generatedMetadata, undefined, 2)
     : ''
-  let datasetSubmitLabel = datasetDraft.mode === 'generate' ? 'Add dataset details' : 'Add dataset'
-  if (isPreparingDatasets) {
-    datasetSubmitLabel = editingDatasetId ? 'Saving changes...' : 'Saving dataset...'
-  } else if (editingDatasetId) {
-    datasetSubmitLabel = 'Save changes'
-  }
+  const creatorActionLabel = editingCreatorId ? 'Save creator' : 'Add creator'
+  const datasetCreatorActionLabel = editingDatasetCreatorId ? 'Save creator' : 'Add creator'
 
   return (
     <section className="bg-slate-100">
@@ -714,7 +691,7 @@ function CreateAdapterMetadataPage() {
           <form className="grid gap-8" onSubmit={handleMetadataSubmit} ref={formRef}>
             {step === 1 ? (
               <AdapterDetailsStep
-                creatorActionLabel={editingCreatorId ? 'Save creator' : 'Add creator'}
+                creatorActionLabel={creatorActionLabel}
                 creatorDraft={creatorDraft}
                 form={form}
                 isEditingCreator={Boolean(editingCreatorId)}
@@ -744,7 +721,7 @@ function CreateAdapterMetadataPage() {
 
             {step === 2 || isEditingDataset ? (
               <DatasetBasicsStep
-                datasetCreatorActionLabel={editingDatasetCreatorId ? 'Save creator' : 'Add creator'}
+                datasetCreatorActionLabel={datasetCreatorActionLabel}
                 datasetCreatorDraft={datasetCreatorDraft}
                 datasetDraft={datasetDraft}
                 datasets={form.datasets}
@@ -788,104 +765,41 @@ function CreateAdapterMetadataPage() {
               />
             ) : null}
 
-            <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between">
-              <div className="flex gap-3">
-                {!isEditingDataset && step === 2 ? (
-                  <button
-                    className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
-                    onClick={() => {
-                      setError(null)
-                      setStep((current) => (current - 1) as MetadataStep)
-                    }}
-                    type="button"
-                  >
-                    Back
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-4 md:items-end">
-                {error ? (
-                  <p className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:min-w-96">
-                    {error}
-                  </p>
-                ) : null}
-                {step === 1 ? (
-                  <button
-                    className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
-                    type="submit"
-                  >
-                    Continue
-                  </button>
-                ) : null}
-                {step === 2 && !isEditingDataset ? (
-                  <button
-                    className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                    disabled={isPreparingDatasets}
-                    type="submit"
-                  >
-                    {datasetSubmitLabel}
-                  </button>
-                ) : null}
-                {isEditingDataset ? (
-                  <div className="flex flex-wrap justify-end gap-3">
-                    <button
-                      className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                      disabled={isPreparingDatasets}
-                      onClick={(event) => {
-                        if (validateDatasetDetails(event.currentTarget.form)) {
-                          void prepareDatasetsForDetails(3, false, true)
-                        }
-                      }}
-                      type="button"
-                    >
-                      {isPreparingDatasets ? 'Saving dataset...' : 'Save this dataset'}
-                    </button>
-                  </div>
-                ) : null}
-                {step >= 3 && !isEditingDataset && selectedDataset ? (
-                  <div className="flex flex-wrap justify-end gap-3">
-                    <button
-                      className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
-                      onClick={(event) => {
-                        if (validateDatasetDetails(event.currentTarget.form)) {
-                          setSelectedDatasetId(null)
-                        }
-                      }}
-                      type="button"
-                    >
-                      Save this dataset
-                    </button>
-                  </div>
-                ) : null}
-                {isReviewingDatasets ? (
-                  <div className="flex flex-wrap justify-end gap-3">
-                    <button
-                      className="h-12 cursor-pointer rounded-lg bg-slate-200 px-5 text-base font-semibold text-slate-950 hover:bg-slate-300"
-                      onClick={() => {
-                        setDatasetDraft(emptyDataset)
-                        setDatasetCreatorDraft(emptyCreator)
-                        setEditingDatasetCreatorId(null)
-                        setEditingDatasetId(null)
-                        setError(null)
-                        setStep(2)
-                      }}
-                      type="button"
-                    >
-                      Add another dataset
-                    </button>
-                    <button
-                      className="inline-flex h-12 cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                      disabled={isGenerating}
-                      type="submit"
-                    >
-                      {isGenerating ? 'Generating...' : 'Generate adapter Croissant file'}
-                      <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <MetadataFormActions
+              error={error}
+              onBack={() => {
+                setError(null)
+                setStep((current) => (current - 1) as MetadataStep)
+              }}
+              showBack={!isEditingDataset && step === 2}
+            >
+              <MetadataPrimaryAction
+                datasetMode={datasetDraft.mode}
+                hasSelectedDataset={Boolean(selectedDataset)}
+                isEditingDataset={isEditingDataset}
+                isGenerating={isGenerating}
+                isPreparingDatasets={isPreparingDatasets}
+                onAddAnotherDataset={() => {
+                  setDatasetDraft(emptyDataset)
+                  setDatasetCreatorDraft(emptyCreator)
+                  setEditingDatasetCreatorId(null)
+                  setEditingDatasetId(null)
+                  setError(null)
+                  setStep(2)
+                }}
+                onSaveEditedDataset={(datasetForm) => {
+                  if (validateDatasetDetails(datasetForm)) {
+                    void prepareDatasetsForDetails(3, false, true)
+                  }
+                }}
+                onSaveSelectedDataset={(datasetForm) => {
+                  if (validateDatasetDetails(datasetForm)) {
+                    setSelectedDatasetId(null)
+                  }
+                }}
+                step={step}
+              />
+            </MetadataFormActions>
           </form>
           )}
 
@@ -894,6 +808,169 @@ function CreateAdapterMetadataPage() {
       </div>
     </section>
   )
+}
+
+// Keeps uploaded Croissant files as they are and sends source files to the backend generator
+async function prepareDataset(dataset: DatasetDraft): Promise<DatasetDraft> {
+  if (dataset.uploadedDocument) {
+    return dataset
+  }
+
+  if (!dataset.sourceFile) {
+    throw new Error('Upload a source dataset file first.')
+  }
+
+  const result = await generateDatasetMetadataApiV1MetadataDatasetsGeneratePost({
+    body: datasetDraftToCroissantGenerateUploadForm(dataset),
+  })
+  if (result.error !== undefined) {
+    throw new Error(errorText(result.error, 'Dataset generation failed.'))
+  }
+  if (!result.data) {
+    throw new Error('Dataset generation did not return metadata.')
+  }
+  return datasetUIStateDraftFromCroissantFile(result.data.metadata, dataset)
+}
+
+// Footer of the metadata form: back navigation, error message and the primary action passed as children
+function MetadataFormActions({
+  children,
+  error,
+  onBack,
+  showBack,
+}: Readonly<{
+  children: ReactNode
+  error: string | null
+  onBack: () => void
+  showBack: boolean
+}>) {
+  return (
+    <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between">
+      <div className="flex gap-3">
+        {showBack ? (
+          <button
+            className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
+            onClick={onBack}
+            type="button"
+          >
+            Back
+          </button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-4 md:items-end">
+        {error ? (
+          <p className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:min-w-96">
+            {error}
+          </p>
+        ) : null}
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Primary action for the current state. An open dataset edit takes priority so its save action is never hidden
+function MetadataPrimaryAction({
+  datasetMode,
+  hasSelectedDataset,
+  isEditingDataset,
+  isGenerating,
+  isPreparingDatasets,
+  onAddAnotherDataset,
+  onSaveEditedDataset,
+  onSaveSelectedDataset,
+  step,
+}: Readonly<{
+  datasetMode: DatasetDraft['mode']
+  hasSelectedDataset: boolean
+  isEditingDataset: boolean
+  isGenerating: boolean
+  isPreparingDatasets: boolean
+  onAddAnotherDataset: () => void
+  onSaveEditedDataset: (datasetForm: HTMLFormElement | null) => void
+  onSaveSelectedDataset: (datasetForm: HTMLFormElement | null) => void
+  step: MetadataStep
+}>) {
+  if (isEditingDataset) {
+    return (
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          disabled={isPreparingDatasets}
+          onClick={(event) => onSaveEditedDataset(event.currentTarget.form)}
+          type="button"
+        >
+          {isPreparingDatasets ? 'Saving dataset...' : 'Save this dataset'}
+        </button>
+      </div>
+    )
+  }
+
+  if (step === 1) {
+    return (
+      <button
+        className="h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+        type="submit"
+      >
+        Continue
+      </button>
+    )
+  }
+
+  if (step === 2) {
+    return (
+      <button
+        className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+        disabled={isPreparingDatasets}
+        type="submit"
+      >
+        {datasetSubmitLabel(datasetMode, isPreparingDatasets)}
+      </button>
+    )
+  }
+
+  if (hasSelectedDataset) {
+    return (
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          className="h-12 cursor-pointer rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700"
+          onClick={(event) => onSaveSelectedDataset(event.currentTarget.form)}
+          type="button"
+        >
+          Save this dataset
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap justify-end gap-3">
+      <button
+        className="h-12 cursor-pointer rounded-lg bg-slate-200 px-5 text-base font-semibold text-slate-950 hover:bg-slate-300"
+        onClick={onAddAnotherDataset}
+        type="button"
+      >
+        Add another dataset
+      </button>
+      <button
+        className="inline-flex h-12 cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+        disabled={isGenerating}
+        type="submit"
+      >
+        {isGenerating ? 'Generating...' : 'Generate adapter Croissant file'}
+        <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+// Only shown on step 2 while no dataset is being edited
+function datasetSubmitLabel(datasetMode: DatasetDraft['mode'], isPreparingDatasets: boolean) {
+  if (isPreparingDatasets) {
+    return 'Saving dataset...'
+  }
+  return datasetMode === 'generate' ? 'Add dataset details' : 'Add dataset'
 }
 
 // Final results panel, for croissant file export

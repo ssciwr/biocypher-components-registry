@@ -126,3 +126,60 @@ def test_distribution_metadata_prefers_file_object_entries() -> None:
     assert updated.document["distribution"][0]["name"] == "other.csv"
     assert updated.document["distribution"][1] == {"@type": "sc:Thing"}
     assert updated.document["distribution"][2]["name"] == "renamed.csv"
+
+
+def test_distribution_metadata_matches_list_typed_file_object_by_content_url() -> None:
+    """Match a FileObject whose @type is a list via its contentUrl basename."""
+    document = {
+        "distribution": [
+            {"@type": ["sc:Thing", "FileObject"], "name": "other.csv"},
+            {
+                "@type": ["cr:FileObject"],
+                "contentUrl": "https://example.org/files/data.csv?download=1",
+            },
+        ]
+    }
+    request = GenerationRequest(
+        input_path="data.csv", output_path="", filename="renamed.csv"
+    )
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document=document), request=request
+    )
+
+    assert updated.document["distribution"][0]["name"] == "other.csv"
+    assert updated.document["distribution"][1]["name"] == "renamed.csv"
+
+
+def test_distribution_metadata_falls_back_to_first_dict_entry() -> None:
+    """Use the first dict entry when no distribution entry is a FileObject."""
+    document = {"distribution": ["not-a-dict", {"@type": "sc:Thing"}, {"@id": "x"}]}
+    request = GenerationRequest(
+        input_path="data.csv", output_path="", filename="renamed.csv"
+    )
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document=document), request=request
+    )
+
+    assert updated.document["distribution"] == [
+        "not-a-dict",
+        {"@type": "sc:Thing", "name": "renamed.csv"},
+        {"@id": "x"},
+    ]
+
+
+def test_distribution_metadata_creates_distribution_when_missing() -> None:
+    """Create a FileObject distribution when the document has none."""
+    request = GenerationRequest(
+        input_path="data.csv", output_path="", filename="renamed.csv"
+    )
+
+    updated = dataset_service._with_distribution_metadata(
+        result=GenerationResult(output_path="", document={"@type": "sc:Dataset"}),
+        request=request,
+    )
+
+    assert updated.document["distribution"] == [
+        {"@type": "cr:FileObject", "name": "renamed.csv"}
+    ]
