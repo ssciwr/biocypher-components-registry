@@ -250,9 +250,45 @@ function mergeRecordSets(dataset: DatasetDraft, originalValue: unknown): unknown
   const recordSets = dataset.recordSets.map((recordSet) => mergeRecordSet(
     dataset,
     recordSet,
-    isRecord(originals[recordSet.uploadedIndex]) ? originals[recordSet.uploadedIndex] : undefined,
+    originalRecordSetForDraft(recordSet, originals),
   ))
   return !Array.isArray(originalValue) && recordSets.length === 1 ? recordSets[0] : recordSets
+}
+
+function uniqueRecordSetMatch(
+  originals: unknown[],
+  matches: (recordSet: Record<string, unknown>) => boolean,
+) {
+  const candidates = originals.filter((original): original is Record<string, unknown> => (
+    isRecord(original) && matches(original)
+  ))
+  return candidates.length === 1 ? candidates[0] : undefined
+}
+
+function originalRecordSetForDraft(
+  draft: DatasetRecordSetDraft,
+  originals: unknown[],
+): Record<string, unknown> | undefined {
+  const recordSetId = draft.id.trim()
+  if (recordSetId) {
+    const idMatch = uniqueRecordSetMatch(
+      originals,
+      (original) => textValue(original['@id']) === recordSetId,
+    )
+    if (idMatch) return idMatch
+  }
+
+  const sourceFileLabel = draft.sourceFileLabel.trim()
+  if (sourceFileLabel) {
+    const sourceMatch = uniqueRecordSetMatch(
+      originals,
+      (original) => recordSetSourceFileLabel(original) === sourceFileLabel,
+    )
+    if (sourceMatch) return sourceMatch
+  }
+
+  const indexedOriginal = originals[draft.uploadedIndex]
+  return isRecord(indexedOriginal) ? indexedOriginal : undefined
 }
 
 function mergeRecordSet(

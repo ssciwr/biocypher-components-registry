@@ -76,7 +76,7 @@ export async function generateDatasetFromSelection(
   }
 
   const plans = includedEntries.map((source, index) => (
-    planEntry(source.file, source.relativePath, index, selection.kind, dataset)
+    planEntry(source.file, source.relativePath, index, selection.kind)
   ))
   assertSafeInventory(plans.map((plan) => plan.entry))
   // Finish all local work before consuming scarce server admission capacity.
@@ -208,7 +208,6 @@ function planEntry(
   selectedPath: string,
   index: number,
   kind: 'file' | 'folder',
-  dataset: DatasetDraft,
 ): PreparedEntry {
   const relativePath = kind === 'folder' ? selectedPath : file.name
   const { compression, format } = sourceFormat(relativePath)
@@ -226,7 +225,6 @@ function planEntry(
       artifact_mode: sample ? 'sample' : 'complete',
       strategy: artifactStrategy(format, compression, sample),
       artifact_size: 0,
-      content_url: kind === 'file' ? optionalValue(dataset.contentUrl) : undefined,
     },
   }
 }

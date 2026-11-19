@@ -63,6 +63,39 @@ describe('browser dataset preparation', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('/artifacts/'))).toHaveLength(1)
   })
 
+  it('lets the generation engine own the initial content URL', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('Worker', class {
+      onmessage?: (event: { data: { id: string; sha256: string } }) => void
+      postMessage({ id }: { id: string }) {
+        this.onmessage?.({ data: { id, sha256: 'a'.repeat(64) } })
+      }
+      terminate() {}
+    })
+    const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(
+      url === '/api/v1/metadata/upload-sessions'
+        ? { kind: 'session', session_id: 'session-1', token: 'token' }
+        : url.endsWith('/session-1')
+          ? { status: 'complete', result: { metadata: {}, warnings: [] } }
+          : { status: 'ok' },
+    ), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const pending = generateDatasetFromSelection({
+      ...emptyDataset,
+      contentUrl: 'https://example.org/pre-generation-override.csv',
+      creators: [{ id: 'creator', name: 'Example', creatorType: 'Organization', affiliation: '', email: '', orcid: '', url: '' }],
+      sourceSelection: { kind: 'file', name: 'data.csv', entries: [
+        { file: new File(['id\n1'], 'data.csv'), relativePath: 'data.csv' },
+      ] },
+    })
+    await vi.runAllTimersAsync()
+    await pending
+
+    const inventory = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)
+    expect(inventory.entries[0]).not.toHaveProperty('content_url')
+  })
+
   it('switches to sampling only above the 1 MiB boundary', () => {
     expect(artifactModeForSize(1 * 1024 * 1024)).toBe('complete')
     expect(artifactModeForSize(1 * 1024 * 1024 + 1)).toBe('sample')

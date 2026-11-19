@@ -299,6 +299,7 @@ export function DatasetBasicsStep({
             licenseOptions={licenseOptions}
             onChange={onDatasetDraftChange}
             onSourceFileChange={onDatasetSourceUpload}
+            showDistribution={false}
             sourceRequired={!datasets.length}
           />
         ) : (
