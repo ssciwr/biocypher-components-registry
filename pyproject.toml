@@ -43,6 +43,13 @@ performance = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+filterwarnings = [
+    # Upstream RDFLib 7.4 JSON-LD parser still constructs ConjunctiveGraph.
+    'ignore:ConjunctiveGraph is deprecated, use Dataset instead\.:DeprecationWarning:rdflib\.plugins\.parsers\.jsonld',
+    # Uvicorn 0.44 still imports compatibility APIs removed from websockets 16.
+    'ignore:websockets\.legacy is deprecated.*:DeprecationWarning:websockets\.legacy',
+    'ignore:websockets\.server\.WebSocketServerProtocol is deprecated:DeprecationWarning:uvicorn\.protocols\.websockets\.websockets_impl',
+]
 
 [tool.coverage.run]
 omit = ["tests/*"]
