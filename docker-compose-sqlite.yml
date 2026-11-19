@@ -26,7 +26,6 @@ services:
   # Tier 2: Backend Container (FastAPI + Uvicorn)
   # ===========================================================
   backend:
-    env_file: .env
     build:
       context: .
       dockerfile: Dockerfile
@@ -35,15 +34,53 @@ services:
     # Reaps processes orphaned by killed run_command process groups.
     init: true
     environment:
-      BIOCYPHER_REGISTRY_DB_PATH: /app/data/registry.sqlite3
+      # ===========================================================
+      # Database Configuration
+      # ===========================================================
+      DATABASE_BACKEND: sqlite
+      SQLITE_DATABASE_PATH: /app/data/registry.sqlite3
+
+      # ===========================================================
+      # GitHub Authentication
+      # ===========================================================
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-}
+
+      # ===========================================================
+      # Frontend and API URLs
+      # ===========================================================
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+
+      # ===========================================================
+      # Repository Policy
+      # ===========================================================
+      REGISTRY_ALLOWED_REPOSITORY_HOSTS: ${REGISTRY_ALLOWED_REPOSITORY_HOSTS:-}
+
+      # ===========================================================
+      # Agentic Workspace
+      # ===========================================================
       # Agentic workspace API (src/api/routers/workspace.py): per-session
       # directories live under the same persisted data volume.
       AGENT_WORKSPACES_ROOT: /app/data/workspaces
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-}
+      BIOCYPHER_MCP_URL: ${BIOCYPHER_MCP_URL:-}
+      BIOCYPHER_MCP_AUTH_HEADER: ${BIOCYPHER_MCP_AUTH_HEADER:-}
     ports:
       - "8000:8000"
     volumes:
       # Tier 3: SQLite database (file-based, persisted here)
       - biocypher-sqlite-data:/app/data
+    # ===========================================================
+    # Ephemeral Dataset Upload Scratch (RAM only)
+    # ===========================================================
+    # Upload sessions are process-local, so keep one Uvicorn worker and one
+    # backend replica. Session directories inside this sticky root are 0700.
+    tmpfs:
+      - /run/biocypher-upload-scratch:rw,noexec,nosuid,nodev,size=268435456,mode=1777
     networks:
       - biocypher-network
     command:

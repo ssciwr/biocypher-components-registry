@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.core.dataset.formats.base import (
+    GZIP_MIME,
     TSV_MIME,
     FormatHandler,
     inspect_delimited_file,
@@ -24,6 +25,6 @@ class TsvGzFormatHandler(FormatHandler):
         return inspect_delimited_file(
             path=path,
             delimiter="\t",
-            encoding_format=TSV_MIME,
+            encoding_format=[TSV_MIME, GZIP_MIME],
             compressed=True,
         )

@@ -110,7 +110,7 @@ def test_validate_adapter_command_rejects_dataset_root(tmp_path: Path) -> None:
     assert result.exit_code == 1
     assert "Validation Target" in result.output
     assert "Validation Checks" in result.output
-    assert "Croissant compliance" in result.output
+    assert "Complete-file compatibility" in result.output
     assert "Adapter schema" in result.output
     assert "adapter" in result.output
     assert "INVALID" in result.output
@@ -127,7 +127,10 @@ def test_validate_adapter_command_validates_embedded_datasets(tmp_path: Path) ->
 
     assert result.exit_code == 1
     assert "Embedded dataset: Example dataset" in result.output
-    assert "[Example dataset]" in result.output
+    assert (
+        "The current JSON-LD doesn't extend https://schema.org/Dataset."
+        in result.output
+    )
     assert "INVALID" in result.output
 
 

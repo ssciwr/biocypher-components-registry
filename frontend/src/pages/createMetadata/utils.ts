@@ -1,8 +1,10 @@
 import type {
   AdapterCreatorGenerateRequest,
-  BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost,
 } from '../../api/client'
-import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField } from './types'
+import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField, DatasetRecordSetDraft } from './types'
+import type { CroissantDocumentEdit } from './uploadedDocumentEditing'
+import { applyCroissantDocumentEdits } from './uploadedDocumentEditing'
+import { dataTypeForExport, dataTypeSelectionValue } from './fieldDataTypes'
 
 let draftIdCounter = 0
 const jsonIndentSpaces = 2
@@ -77,35 +79,21 @@ function dateAtUtcMidnight(value: string) {
 /*
  * Build multi part form body data for API
  */
-export function datasetDraftToCroissantGenerateUploadForm(
-  dataset: DatasetDraft,
-): BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost {
-  if (!dataset.sourceFile) {
-    throw new Error('Upload a source dataset file first.')
-  }
-
-  return {
-    citation: optionalValue(dataset.citation),
-    creators_json: JSON.stringify(dataset.creators.map(creatorToApiValue)),
-    content_url: optionalValue(dataset.contentUrl),
-    date_published: dateAtUtcMidnight(dataset.datePublished),
-    dataset_version: optionalValue(dataset.datasetVersion),
-    description: optionalValue(dataset.description),
-    encoding_format: optionalValue(dataset.encodingFormat),
-    file: dataset.sourceFile,
-    filename: optionalValue(dataset.filename),
-    generator: 'auto',
-    license: optionalValue(dataset.license),
-    name: optionalValue(dataset.name),
-    sha256: optionalValue(dataset.sha256),
-    url: optionalValue(dataset.url),
-  }
-}
-
 export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, unknown> {
+  if (dataset.mode === 'upload' && isRecord(dataset.uploadedDocument)) {
+    return uploadedDatasetDraftToDocument(dataset, dataset.uploadedDocument)
+  }
+
   const document: Record<string, unknown> = isRecord(dataset.uploadedDocument)
     ? { ...dataset.uploadedDocument }
     : { '@type': 'sc:Dataset' }
+  // Baker uses the landing page as the dataset ID. Independently generated
+  // tables can share that page without being the same dataset. Let JSON-LD
+  // assign separate blank nodes; file and record-set identifiers stay intact.
+  const generatedId = textValue(document['@id'])
+  if (generatedId && generatedId === textValue(document.url)) {
+    delete document['@id']
+  }
   setOptional(document, 'name', dataset.name) // setOtpional is just a pattern so empty values are allowed but sent as backend expects.
   setOptional(document, 'description', dataset.description)
   setOptional(document, 'version', dataset.datasetVersion)
@@ -120,16 +108,22 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
     document.creator = creators
   }
 
-  const distribution = buildDistribution(dataset, firstRecord(document.distribution))
-  if (distribution) {
-    document.distribution = [distribution]
+  const existingDistributions = recordList(document.distribution)
+  const distribution = buildDistribution(dataset, existingDistributions[0])
+  if (dataset.distributions.length) {
+    document.distribution = mergeDistributions(dataset, document.distribution)
+  } else if (distribution) {
+    document.distribution = [distribution, ...existingDistributions.slice(1)]
   }
 
   const fields = [...dataset.fields, ...dataset.manualFields]
     .filter((field) => field.name.trim())
     .map((field) => datasetManualFieldToCroissantField(field, dataset))
-  if (fields.length) {
-    const existingRecordSet = firstRecord(document.recordSet) ?? {}
+  if (dataset.recordSets.length) {
+    document.recordSet = mergeRecordSets(dataset, document.recordSet)
+  } else if (fields.length) {
+    const existingRecordSets = recordList(document.recordSet)
+    const existingRecordSet = existingRecordSets[0] ?? {}
     const recordSetName = dataset.recordSetName.trim() || `${dataset.name || 'Dataset'} records`
     document.recordSet = [
       {
@@ -139,10 +133,308 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
         field: fields,
         name: recordSetName,
       },
+      ...existingRecordSets.slice(1),
     ]
   }
 
   return document
+}
+
+function uploadedDatasetDraftToDocument(
+  dataset: DatasetDraft,
+  original: Record<string, unknown>,
+): Record<string, unknown> {
+  const dirty = new Set(dataset.uploadedDirtyFields)
+  const edits: CroissantDocumentEdit[] = []
+  const addTextEdit = (field: string, value: string) => {
+    if (value.trim()) edits.push({ path: [field], value: value.trim() })
+    else if (Object.hasOwn(original, field)) edits.push({ operation: 'remove', path: [field] })
+  }
+
+  if (dirty.has('name')) addTextEdit('name', dataset.name)
+  if (dirty.has('description')) addTextEdit('description', dataset.description)
+  if (dirty.has('url')) addTextEdit('url', dataset.url)
+  if (dirty.has('citation')) addTextEdit('citeAs', dataset.citation)
+  if (dirty.has('datePublished')) addTextEdit('datePublished', dataset.datePublished.slice(0, 10))
+  if (dirty.has('license')) addTextEdit('license', dataset.license)
+  if (dirty.has('datasetVersion')) addVersionEdit(edits, dataset.datasetVersion, original)
+  if (dirty.has('creators')) addCreatorsEdit(edits, dataset.creators, original)
+  if (dirty.has('fields')) {
+    edits.push({
+      path: ['recordSet'],
+      value: mergeRecordSets(dataset, original.recordSet),
+    })
+  }
+  if (dirty.has('distributions')) {
+    edits.push({
+      path: ['distribution'],
+      value: mergeDistributions(dataset, original.distribution),
+    })
+  }
+
+  return applyCroissantDocumentEdits(original, edits)
+}
+
+function addVersionEdit(
+  edits: CroissantDocumentEdit[],
+  datasetVersion: string,
+  original: Record<string, unknown>,
+) {
+  const editedVersion = datasetVersion.trim()
+  if (!editedVersion && Object.hasOwn(original, 'version')) {
+    edits.push({ operation: 'remove', path: ['version'] })
+    return
+  }
+  if (!editedVersion) return
+
+  const numericVersion = Number(editedVersion)
+  edits.push({
+    path: ['version'],
+    value: typeof original.version === 'number' && Number.isFinite(numericVersion)
+      ? numericVersion
+      : editedVersion,
+  })
+}
+
+function addCreatorsEdit(
+  edits: CroissantDocumentEdit[],
+  creators: CreatorDraft[],
+  original: Record<string, unknown>,
+) {
+  const mergedCreators = mergeUploadedCreators(creators, original.creator)
+  if (mergedCreators === undefined && Object.hasOwn(original, 'creator')) {
+    edits.push({ operation: 'remove', path: ['creator'] })
+  } else if (mergedCreators !== undefined) {
+    edits.push({ path: ['creator'], value: mergedCreators })
+  }
+}
+
+function mergeDistributions(dataset: DatasetDraft, originalValue: unknown): unknown {
+  const originals = Array.isArray(originalValue) ? originalValue : [originalValue]
+  const distributions = dataset.distributions.map((distribution) => {
+    const original = originals[distribution.uploadedIndex]
+    if (!isRecord(original)) return {
+      '@type': 'cr:FileObject',
+      contentUrl: distribution.contentUrl,
+      encodingFormat: distribution.encodingFormat,
+      md5: distribution.md5,
+      name: distribution.filename,
+      sha256: distribution.sha256,
+    }
+    const document = { ...original }
+    applyDistributionTextEdit(document, 'contentUrl', distribution.contentUrl, textValue(original.contentUrl))
+    applyDistributionTextEdit(document, 'encodingFormat', distribution.encodingFormat, displayTextValue(original.encodingFormat))
+    applyDistributionTextEdit(document, 'name', distribution.filename, textValue(original.name))
+    applyDistributionTextEdit(document, 'md5', distribution.md5, textValue(original.md5))
+    applyDistributionTextEdit(document, 'sha256', distribution.sha256, textValue(original.sha256))
+    return document
+  })
+  return !Array.isArray(originalValue) && distributions.length === 1
+    ? distributions[0]
+    : distributions
+}
+
+function applyDistributionTextEdit(
+  document: Record<string, unknown>,
+  property: string,
+  editedValue: string,
+  originalValue: string,
+) {
+  if (editedValue === originalValue) return
+  if (editedValue.trim()) document[property] = editedValue.trim()
+  else delete document[property]
+}
+
+function mergeRecordSets(dataset: DatasetDraft, originalValue: unknown): unknown {
+  const originals = Array.isArray(originalValue) ? originalValue : [originalValue]
+  const recordSets = dataset.recordSets.map((recordSet) => mergeRecordSet(
+    dataset,
+    recordSet,
+    originalRecordSetForDraft(recordSet, originals),
+  ))
+  return !Array.isArray(originalValue) && recordSets.length === 1 ? recordSets[0] : recordSets
+}
+
+function uniqueRecordSetMatch(
+  originals: unknown[],
+  matches: (recordSet: Record<string, unknown>) => boolean,
+) {
+  const candidates = originals.filter((original): original is Record<string, unknown> => (
+    isRecord(original) && matches(original)
+  ))
+  return candidates.length === 1 ? candidates[0] : undefined
+}
+
+function originalRecordSetForDraft(
+  draft: DatasetRecordSetDraft,
+  originals: unknown[],
+): Record<string, unknown> | undefined {
+  const recordSetId = draft.id.trim()
+  if (recordSetId) {
+    const idMatch = uniqueRecordSetMatch(
+      originals,
+      (original) => textValue(original['@id']) === recordSetId,
+    )
+    if (idMatch) return idMatch
+  }
+
+  const sourceFileLabel = draft.sourceFileLabel.trim()
+  if (sourceFileLabel) {
+    const sourceMatch = uniqueRecordSetMatch(
+      originals,
+      (original) => recordSetSourceFileLabel(original) === sourceFileLabel,
+    )
+    if (sourceMatch) return sourceMatch
+  }
+
+  const indexedOriginal = originals[draft.uploadedIndex]
+  return isRecord(indexedOriginal) ? indexedOriginal : undefined
+}
+
+function mergeRecordSet(
+  dataset: DatasetDraft,
+  draft: DatasetRecordSetDraft,
+  originalRecordSet?: Record<string, unknown>,
+): Record<string, unknown> {
+  const recordSet = { ...(originalRecordSet ?? { '@type': 'cr:RecordSet' }) }
+  const originalFieldsValue = originalRecordSet?.field
+  const originalFields = Array.isArray(originalFieldsValue)
+    ? originalFieldsValue
+    : [originalFieldsValue]
+  const fields = draft.fields.map((field) => {
+    const originalField = field.uploadedIndex === undefined
+      ? undefined
+      : originalFields[field.uploadedIndex]
+    if (!isRecord(originalField)) {
+      const addedField = datasetManualFieldToCroissantField(
+        { ...field, fieldId: field.fieldId || `${draft.id || localId(draft.name)}/${field.name.trim()}` },
+        { ...dataset, recordSetName: draft.name },
+      )
+      if (field.source === undefined) {
+        // Infer from this table, never from the first distribution in the dataset.
+        const references = new Map<string, Record<string, unknown>>()
+        for (const sibling of originalFields) {
+          if (!isRecord(sibling) || !isRecord(sibling.source)) continue
+          for (const property of ['fileObject', 'fileSet']) {
+            const reference = sibling.source[property]
+            if (isRecord(reference) && textValue(reference['@id'])) {
+              references.set(`${property}:${textValue(reference['@id'])}`, { [property]: reference })
+            }
+          }
+        }
+        if (references.size === 1) {
+          addedField.source = { ...references.values().next().value, extract: { column: field.name.trim() } }
+        } else {
+          // An empty or multi-source table needs an explicit source, not a guessed first file.
+          delete addedField.source
+        }
+      }
+      return addedField
+    }
+    return mergeUploadedField(field, originalField)
+  })
+
+  if (draft.name !== textValue(originalRecordSet?.name)) {
+    if (draft.name.trim()) recordSet.name = draft.name.trim()
+    else delete recordSet.name
+  }
+  recordSet.field = !Array.isArray(originalFieldsValue) && fields.length === 1 ? fields[0] : fields
+  return recordSet
+}
+
+function mergeUploadedField(
+  field: DatasetDatasetManualField,
+  original: Record<string, unknown>,
+): Record<string, unknown> {
+  const document = { ...original }
+  const originalName = textValue(original.name)
+  mergeUploadedFieldName(document, field.name, originalName, original.source)
+  const dataType = dataTypeForExport(field.dataType, original.dataType)
+  if (dataType === undefined) delete document.dataType
+  else document.dataType = dataType
+  mergeUploadedFieldValue(document, 'description', field.description, textValue(original.description))
+  mergeUploadedFieldValue(document, 'examples', field.example, exampleText(original.examples), true)
+  return document
+}
+
+function mergeUploadedFieldName(
+  document: Record<string, unknown>,
+  editedName: string,
+  originalName: string,
+  originalSource: unknown,
+) {
+  if (editedName === originalName) return
+  const trimmedName = editedName.trim()
+  if (trimmedName) document.name = trimmedName
+  else delete document.name
+
+  const updatedSource = sourceWithRenamedColumn(originalSource, originalName, trimmedName)
+  if (updatedSource !== undefined) document.source = updatedSource
+}
+
+function mergeUploadedFieldValue(
+  document: Record<string, unknown>,
+  property: string,
+  editedValue: string,
+  originalValue: string,
+  asList = false,
+) {
+  if (editedValue === originalValue) return
+  const trimmedValue = editedValue.trim()
+  if (trimmedValue) document[property] = asList ? [trimmedValue] : trimmedValue
+  else delete document[property]
+}
+
+function sourceWithRenamedColumn(source: unknown, originalName: string, editedName: string) {
+  if (!isRecord(source) || !isRecord(source.extract)) return source
+  const originalColumn = textValue(source.extract.column)
+  if (originalColumn !== originalName && originalColumn !== '') return source
+  return {
+    ...source,
+    extract: {
+      ...source.extract,
+      column: editedName,
+    },
+  }
+}
+
+function mergeUploadedCreators(creators: CreatorDraft[], originalValue: unknown): unknown {
+  const originals = Array.isArray(originalValue) ? originalValue : [originalValue]
+  const merged = creators
+    .filter((creator) => creator.name.trim())
+    .map((creator) => {
+      const original = creator.uploadedIndex === undefined
+        ? undefined
+        : originals[creator.uploadedIndex]
+      if (!isRecord(original)) return creatorToCroissantValue(creator)
+
+      const document = { ...original }
+      const originalType = textValue(original['@type']).endsWith('Organization')
+        ? 'Organization'
+        : 'Person'
+      if (creator.creatorType !== originalType) {
+        document['@type'] = `sc:${creator.creatorType}`
+      }
+      if (creator.name !== textValue(original.name)) document.name = creator.name.trim()
+      applyCreatorTextEdit(document, 'affiliation', creator.affiliation, compatibleTextValue(original.affiliation))
+      applyCreatorTextEdit(document, 'email', creator.email, textValue(original.email))
+      applyCreatorTextEdit(document, 'identifier', creator.orcid, compatibleIdentifierValue(original.identifier))
+      applyCreatorTextEdit(document, 'url', creator.url, textValue(original.url))
+      return document
+    })
+  if (!merged.length) return undefined
+  return !Array.isArray(originalValue) && merged.length === 1 ? merged[0] : merged
+}
+
+function applyCreatorTextEdit(
+  document: Record<string, unknown>,
+  property: string,
+  editedValue: string,
+  projectedOriginalValue: string,
+) {
+  if (editedValue === projectedOriginalValue) return
+  if (editedValue.trim()) document[property] = editedValue.trim()
+  else delete document[property]
 }
 
 // Convert uploaded or generated Croissant dataset JSON into the editable frontend DatasetDraft shape, more on this soon.
@@ -151,27 +443,185 @@ export function datasetUIStateDraftFromCroissantFile(
   dataset: DatasetDraft,
   uploadedFileName = '',
 ): DatasetDraft {
+  const topLevel = datasetTopLevelProjectionFromCroissant(document)
+  const uploadedCreators = creatorsProjectionFromCroissant(document.creator)
   const distribution = firstRecord(document.distribution)
   const recordSet = firstRecord(document.recordSet)
+  const distributions = distributionsFromCroissant(document.distribution)
+  const recordSets = recordSetsFromCroissant(document.recordSet)
+  const isUploaded = dataset.mode === 'upload'
+  if (!isUploaded && distributions.length === 1 && dataset.contentUrl.trim()) {
+    distributions[0] = { ...distributions[0]!, contentUrl: dataset.contentUrl }
+  }
 
   return {
     ...dataset,
-    citation: textValue(document.citeAs) || dataset.citation,
-    contentUrl: textValue(distribution?.contentUrl) || dataset.contentUrl,
-    datePublished: textValue(document.datePublished) || dataset.datePublished,
-    datasetVersion: textValue(document.version) || dataset.datasetVersion,
-    description: textValue(document.description) || dataset.description,
-    encodingFormat: textValue(distribution?.encodingFormat) || dataset.encodingFormat,
+    citation: isUploaded ? topLevel.citation : topLevel.citation || dataset.citation,
+    contentUrl: isUploaded
+      ? textValue(distribution?.contentUrl)
+      : dataset.contentUrl || textValue(distribution?.contentUrl),
+    creators: isUploaded ? uploadedCreators : dataset.creators,
+    datePublished: isUploaded ? topLevel.datePublished : topLevel.datePublished || dataset.datePublished,
+    datasetVersion: isUploaded ? topLevel.datasetVersion : topLevel.datasetVersion || dataset.datasetVersion,
+    description: isUploaded ? topLevel.description : topLevel.description || dataset.description,
+    distributions,
+    encodingFormat: isUploaded
+      ? displayTextValue(distribution?.encodingFormat)
+      : displayTextValue(distribution?.encodingFormat) || dataset.encodingFormat,
     fields: fieldsFromRecordSet(recordSet),
-    filename: textValue(distribution?.name) || uploadedFileName || dataset.filename,
-    license: textValue(document.license) || dataset.license,
-    name: textValue(document.name) || uploadedFileName || dataset.name,
-    recordSetName: textValue(recordSet?.name) || dataset.recordSetName,
-    sha256: textValue(distribution?.sha256) || dataset.sha256,
+    filename: isUploaded
+      ? textValue(distribution?.name) || uploadedFileName
+      : textValue(distribution?.name) || uploadedFileName || dataset.filename,
+    license: isUploaded
+      ? topLevel.license
+      : dataset.license || topLevel.license,
+    licenseLabel: isUploaded
+      ? topLevel.licenseLabel
+      : dataset.licenseLabel || topLevel.licenseLabel,
+    manualFields: isUploaded ? [] : dataset.manualFields,
+    name: isUploaded
+      ? topLevel.name || uploadedFileName
+      : topLevel.name || uploadedFileName || dataset.name,
+    recordSetName: isUploaded
+      ? textValue(recordSet?.name)
+      : textValue(recordSet?.name) || dataset.recordSetName,
+    recordSets,
+    sha256: isUploaded ? textValue(distribution?.sha256) : textValue(distribution?.sha256) || dataset.sha256,
     uploadedDocument: document,
+    uploadedDirtyFields: [],
     uploadedFileName,
-    url: textValue(document.url) || dataset.url,
+    url: isUploaded ? topLevel.url : topLevel.url || dataset.url,
   }
+}
+
+function recordSetsFromCroissant(value: unknown): DatasetRecordSetDraft[] {
+  return recordList(value).map((recordSet, uploadedIndex) => ({
+    fields: fieldsFromRecordSet(recordSet),
+    id: textValue(recordSet['@id']),
+    name: textValue(recordSet.name),
+    sourceFileLabel: recordSetSourceFileLabel(recordSet),
+    uploadedIndex,
+  }))
+}
+
+function recordSetSourceFileLabel(recordSet: Record<string, unknown>) {
+  const fields = Array.isArray(recordSet.field) ? recordSet.field : [recordSet.field]
+  for (const field of fields) {
+    if (!isRecord(field) || !isRecord(field.source)) continue
+    for (const property of ['fileObject', 'fileSet']) {
+      const reference = field.source[property]
+      if (isRecord(reference)) {
+        const label = textValue(reference['@id']) || textValue(reference.name)
+        if (label) return label
+      }
+    }
+  }
+  return ''
+}
+
+function distributionsFromCroissant(value: unknown) {
+  return recordList(value).map((distribution, uploadedIndex) => ({
+    containedInLabel: containedInLabel(distribution.containedIn),
+    contentUrl: textValue(distribution.contentUrl),
+    encodingFormat: displayTextValue(distribution.encodingFormat),
+    filename: textValue(distribution.name),
+    id: textValue(distribution['@id']),
+    md5: textValue(distribution.md5),
+    sha256: textValue(distribution.sha256),
+    uploadedIndex,
+  }))
+}
+
+function containedInLabel(value: unknown) {
+  if (isRecord(value)) return textValue(value['@id']) || textValue(value.name)
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => isRecord(item)
+      ? [textValue(item['@id']) || textValue(item.name)]
+      : []).filter(Boolean).join(', ')
+  }
+  return textValue(value)
+}
+
+/** Map only creator properties represented by the existing creator form. */
+export function creatorsProjectionFromCroissant(value: unknown): CreatorDraft[] {
+  const creators = Array.isArray(value) ? value : [value]
+  return creators.flatMap((creator, uploadedIndex) => {
+    if (!isRecord(creator)) return []
+    const name = textValue(creator.name)
+    const type = textValue(creator['@type'])
+    return [{
+      id: nextDraftId('uploaded-creator'),
+      affiliation: compatibleTextValue(creator.affiliation),
+      creatorType: type.endsWith('Organization') ? 'Organization' : 'Person',
+      email: textValue(creator.email),
+      name,
+      orcid: compatibleIdentifierValue(creator.identifier),
+      uploadedIndex,
+      url: textValue(creator.url),
+    }]
+  })
+}
+
+export type DatasetTopLevelProjection = Readonly<{
+  citation: string
+  datePublished: string
+  datasetVersion: string
+  description: string
+  license: string
+  licenseLabel: string
+  name: string
+  url: string
+}>
+
+/** Project only top-level Croissant properties represented by the current form. */
+export function datasetTopLevelProjectionFromCroissant(
+  document: Record<string, unknown>,
+): DatasetTopLevelProjection {
+  const license = licenseProjection(document.license)
+  return {
+    citation: textValue(document.citeAs),
+    datePublished: textValue(document.datePublished),
+    datasetVersion: scalarDisplayValue(document.version),
+    description: textValue(document.description),
+    license: license.value,
+    licenseLabel: license.label,
+    name: textValue(document.name),
+    url: textValue(document.url),
+  }
+}
+
+function licenseProjection(value: unknown): { label: string; value: string } {
+  if (typeof value === 'string') return { label: value, value }
+  if (!isRecord(value)) return { label: '', value: '' }
+
+  const name = textValue(value.name)
+  const url = textValue(value.url)
+  return {
+    label: name && url ? `${name} — ${url}` : name || url,
+    value: url || name,
+  }
+}
+
+function scalarDisplayValue(value: unknown) {
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+}
+
+function compatibleTextValue(value: unknown) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value) && value.every(item => typeof item === 'string')) {
+    return value.join(', ')
+  }
+  return ''
+}
+
+function compatibleIdentifierValue(value: unknown) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => (
+      typeof item === 'string' && item.includes('orcid.org/')
+    )) ?? ''
+  }
+  return ''
 }
 
 // default
@@ -248,7 +698,7 @@ function buildDistribution(dataset: DatasetDraft, existing?: Record<string, unkn
   }
 
   const distribution = {
-    ...(existing ?? {}),
+    ...existing,
     '@type': existing?.['@type'] ?? 'cr:FileObject',
   }
   setOptional(distribution, '@id', textValue(existing?.['@id']) || name)
@@ -268,7 +718,11 @@ function datasetManualFieldToCroissantField(
     name: field.name.trim(),
   }
   setOptional(fieldDocument, '@id', field.fieldId || `${localId(dataset.recordSetName || dataset.name)}/${field.name.trim()}`)
-  setOptional(fieldDocument, 'dataType', field.dataType)
+  const originalFields = recordList(firstRecord(dataset.uploadedDocument?.recordSet)?.field)
+  const originalField = originalFields.find(candidate => field.fieldId && candidate['@id'] === field.fieldId)
+    ?? (field.uploadedIndex === undefined ? undefined : originalFields[field.uploadedIndex])
+  const dataType = dataTypeForExport(field.dataType, field.originalDataType ?? originalField?.dataType)
+  if (dataType !== undefined) fieldDocument.dataType = dataType
   setOptional(fieldDocument, 'description', field.description)
   if (field.example.trim()) {
     fieldDocument.examples = [field.example.trim()]
@@ -304,14 +758,16 @@ function fieldsFromRecordSet(recordSet?: Record<string, unknown>) {
   }
 
   // Keep Croissant IDs/source mappings so edit -> export does not drop links we do not edit in the UI.
-  return fields.map((field) => ({
+  return fields.map((field, uploadedIndex) => ({
     id: nextDraftId('field'),
-    dataType: textValue(field.dataType),
+    dataType: dataTypeSelectionValue(field.dataType),
+    originalDataType: field.dataType,
     description: textValue(field.description),
     example: exampleText(field.examples),
     fieldId: textValue(field['@id']),
     name: textValue(field.name),
     source: field.source,
+    uploadedIndex,
   }))
 }
 
@@ -325,12 +781,29 @@ function firstRecord(value: unknown): Record<string, unknown> | undefined {
   return undefined
 }
 
+function recordList(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord)
+  }
+  return isRecord(value) ? [value] : []
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function textValue(value: unknown) {
   return typeof value === 'string' ? value : ''
+}
+
+function displayTextValue(value: unknown) {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string').join(', ')
+  }
+  return ''
 }
 
 // manage params which are empty values, convert them into a format the API eventually wants.

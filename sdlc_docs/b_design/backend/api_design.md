@@ -103,11 +103,17 @@ outside the API layer. The API settings module may re-export shared values for
 OpenAPI and dependency wiring, but the source of truth for registry database
 path settings is `src/core/settings.py`.
 
-Current runtime settings:
+Current registry runtime settings:
 
 ```text
-BIOCYPHER_REGISTRY_DB_PATH -> registry.sqlite3
+DATABASE_BACKEND -> explicit sqlite or postgresql selection
+SQLITE_DATABASE_PATH -> SQLite file path
+POSTGRES_HOST / POSTGRES_PORT / POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+    -> PostgreSQL connection components
 ```
+
+Both the API and direct-service CLI use this selection. Initialization supports
+fresh databases; historical schema upgrades require a separate migration plan.
 
 Current store construction:
 
@@ -115,9 +121,9 @@ Current store construction:
 src/api/dependencies.py -> src.persistence.factory.build_registration_store()
 ```
 
-Docker Compose should set `BIOCYPHER_REGISTRY_DB_PATH` to a path inside a
-mounted backend volume or to the location expected by the database container
-strategy chosen for the environment.
+Docker Compose should set `DATABASE_BACKEND` explicitly. SQLite Compose sets
+`SQLITE_DATABASE_PATH` to a path inside a mounted backend volume; PostgreSQL
+Compose supplies the database service connection components.
 
 ## API Folder Layout
 
@@ -130,15 +136,24 @@ src/api/
 ├── schemas/
 │   ├── __init__.py
 │   ├── adapters.py
+│   ├── auth.py
 │   ├── common.py
+│   ├── dataset_uploads.py
+│   ├── metadata.py
 │   ├── registrations.py
-│   └── registry.py
+│   ├── registry.py
+│   └── workspace.py
 └── routers/
     ├── __init__.py
     ├── adapters.py
+    ├── auth.py
+    ├── dataset_uploads.py
     ├── health.py
+    ├── metadata.py
     ├── registrations.py
-    └── registry.py
+    ├── registry.py
+    ├── schemas.py
+    └── workspace.py
 ```
 
 Responsibilities:
@@ -148,8 +163,8 @@ app.py
   FastAPI application factory and router registration.
 
 dependencies.py
-  Settings, persistence adapter, and service/query wiring. Future auth hooks
-  live here.
+  Settings, shared persistence construction, service/query wiring, and
+  authenticated GitHub session dependencies.
 
 errors.py
   Mapping from core exceptions to HTTP errors.
@@ -187,7 +202,7 @@ sequenceDiagram
     R-->>F: HTTP JSON response
 ```
 
-## Initial Endpoint Scope
+## Current Endpoint Scope
 
 Health:
 
@@ -195,73 +210,112 @@ Health:
 GET /api/v1/health
 ```
 
+Browser authentication:
+
+```text
+GET /api/v1/auth/me
+POST /api/v1/auth/logout
+```
+
+The GitHub OAuth start and callback redirects are implemented but intentionally
+use `include_in_schema=False`, so they do not appear in Swagger/OpenAPI.
+
 Registration workflow:
 
 ```text
 POST /api/v1/registrations
+POST /api/v1/registrations/stream
 GET /api/v1/registrations
+GET /api/v1/registrations/croissant-file-present-check
 GET /api/v1/registrations/{registration_id}
 GET /api/v1/registrations/{registration_id}/events
-POST /api/v1/registrations/{registration_id}/process
-POST /api/v1/registrations/{registration_id}/revalidate
+POST /api/v1/adapters/{adapter_id}/update
+GET /api/v1/schemas/{version}
 ```
 
-Registry operations:
+Registry reads:
 
 ```text
 GET /api/v1/registry/registrations
-GET /api/v1/registry/registrations?status=INVALID&latest_event=FETCH_FAILED
-POST /api/v1/registry/refreshes
+GET /api/v1/registry/registrations?latest_event=FETCH_FAILED
 GET /api/v1/registry/refreshes/latest
 GET /api/v1/registry/entries
 GET /api/v1/registry/entries/{entry_id}
 ```
 
-Future discovery:
+The process, revalidation and HTTP batch-trigger endpoints were removed. Use
+`register` for a new or corrected first submission, owner-authorized Update for
+a published adapter, and trusted CLI `refresh-registry` for batch maintenance.
+
+Adapter discovery and metadata reads:
 
 ```text
 GET /api/v1/adapters
+GET /api/v1/adapters/latest
+GET /api/v1/adapters/search
 GET /api/v1/adapters/{adapter_id}
-GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata
+DELETE /api/v1/adapters/{adapter_id}
+POST /api/v1/adapters/{adapter_id}/endorse
+GET /api/v1/adapters/{adapter_id}/metadata
 ```
 
-Metadata utilities:
+Metadata utilities retain their separate generation/validation boundary:
 
 ```text
 POST /api/v1/metadata/validate
 POST /api/v1/metadata/adapters/generate
 POST /api/v1/metadata/datasets/generate
+POST /api/v1/metadata/upload-sessions
+PUT /api/v1/metadata/upload-sessions/{session_id}/artifacts/{entry_id}
+POST /api/v1/metadata/upload-sessions/{session_id}/finalize
+GET /api/v1/metadata/upload-sessions/{session_id}
+DELETE /api/v1/metadata/upload-sessions/{session_id}
 ```
 
-Current implementation status:
+The runtime OpenAPI document is authoritative for exact request and response
+schemas. The registry path prefix remains `/api/v1`; this branch intentionally
+replaces the earlier staged registration contract under that prefix. Consumers
+must update their generated contracts together with the backend.
+
+### Inspecting the generated contract
+
+Run the application and open the generated documentation:
+
+```bash
+uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
 
 ```text
-implemented: GET /api/v1/health
-implemented: POST /api/v1/registrations
-implemented: GET /api/v1/registrations
-implemented: GET /api/v1/registrations/{registration_id}
-implemented: GET /api/v1/registrations/{registration_id}/events
-implemented: POST /api/v1/registrations/{registration_id}/process
-implemented: POST /api/v1/registrations/{registration_id}/revalidate
-implemented: GET /api/v1/registry/registrations
-implemented: POST /api/v1/registry/refreshes
-implemented: GET /api/v1/registry/refreshes/latest
-implemented: GET /api/v1/registry/entries
-implemented: GET /api/v1/registry/entries/{entry_id}
-implemented: GET /api/v1/adapters
-implemented: GET /api/v1/adapters/{adapter_id}
-implemented: GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata
-implemented: POST /api/v1/metadata/validate
-implemented: POST /api/v1/metadata/adapters/generate
-implemented: POST /api/v1/metadata/datasets/generate
-planned: none in the current API metadata scope
+Swagger UI:   http://localhost:8000/docs
+ReDoc:        http://localhost:8000/redoc
+OpenAPI JSON: http://localhost:8000/openapi.json
 ```
+
+Swagger UI is the primary human-readable reference for the current contract.
+For each operation it shows parameters, request bodies, response/status models,
+examples, and the component schemas generated from Pydantic. **Try it out** sends
+requests to the running service and therefore may persist changes in its
+configured database; use a development database for mutation testing.
+
+Authentication requirements still apply. GitHub-protected operations need the
+normal browser session cookie. OAuth start/callback routes are intentionally
+hidden with `include_in_schema=False`. Optional workspace routes are present
+only when that router is enabled while OpenAPI is generated.
+
+When reviewing an API route or schema change:
+
+1. Inspect `app.openapi()` or `/openapi.json` from the changed application.
+2. Check the affected operation and component schemas in `/docs`.
+3. Regenerate the frontend contract with `cd frontend && pnpm run openapi-ts`.
+4. Review the generated OpenAPI and TypeScript diffs with the backend change.
+5. Update prose only where behavior, workflow, or architecture changed; do not
+   manually redefine generated schemas.
 
 ## Interface Parity
 
-The FastAPI layer is not the only delivery interface during development. The
-legacy web UI and CLI remain useful for learning, manual checks, and workflows
-that existed before the API.
+The FastAPI layer and CLI call the same registration services. React consumes
+the API. Legacy web references below retain the earlier interface design context;
+they are not a separate current registration implementation.
 
 All three interfaces should use the same core registration contract:
 
@@ -273,9 +327,13 @@ CLI commands   -> RegistrationStore port -> persistence adapter
 
 Current parity rules:
 
-- Registration submission must call the core registration service.
-- Processing, revalidation, and batch refresh must call core registration
-  services.
+- First registration, manual adapter updates and batch refresh call the shared
+  core services. The CLI calls these directly instead of calling HTTP routes.
+- Browser publication uses the existing GitHub cookie session; CLI publication
+  verifies identity through device authorization and revokes its temporary user
+  token before processing. Updates require source ownership.
+- Failed first registration returns diagnostics without stored records. Failed
+  updates retain accepted metadata and append terminal processing history.
 - Registration lists, event history, and registry entry reads should use
   `RegistrationStore` methods instead of direct database table access.
 - Metadata generation should validate by default across FastAPI, CLI, config,
@@ -307,28 +365,64 @@ Suggested registration schemas:
 
 ```text
 RegistrationCreateRequest
-RegistrationCreateResponse
+RegistrationAttemptResponse
+RegistrationCreateResponse (read-side source summary)
 RegistrationDetailResponse
 RegistrationEventResponse
-RegistrationProcessResponse
-RegistrationRevalidateResponse
+RegistrationStreamEvent
+ValidationCheckResponse
+ValidationDetailResponse
 ```
 
 `RegistrationCreateRequest` should expose only fields that belong to the HTTP
 registration contract:
 
 ```text
-adapter_name: string
 repository_location: string
+license_value: optional string
+doi: optional string
+cff_url: optional string
 ```
 
 Do not include UI-only confirmation fields in the API contract. For example, a
 frontend checkbox confirming that `croissant.jsonld` exists at the repository
 root is a client-side workflow guard, not persisted registry state.
 
-`RegistrationCreateResponse` and `RegistrationDetailResponse` should include
-the normalized submitted repository details so clients can show them back to
-maintainers.
+Identity and display name derive from metadata; ownership derives from the
+verified account. The browser and CLI publish public HTTPS repositories with a
+root-level `croissant.jsonld` on the default branch. The shared service/API also
+accepts server-local paths for development and integration tests.
+
+`POST /registrations` returns `RegistrationAttemptResponse`. Successful first
+acceptance returns `201`; retrieval/validation rejection returns `200` with
+`attempt_status: FAILED` and no source, entry or event. A corrected first
+registration may retry the same version. An already accepted repository returns
+`409`; an ownership violation returns `403`.
+
+Terminal fields include `attempt_status` (`SUCCEEDED` or `FAILED`),
+`published_version`, `update_applied`, `message`, optional identifiers and
+`reason_code`, plus validation errors, details, checks and profile information.
+`RegistrationCreateResponse` and `RegistrationDetailResponse` are read-side
+source models; they expose accepted state separately from `latest_attempt`.
+
+`POST /adapters/{adapter_id}/update` requires ownership of all published sources
+for the identity. Failed updates retain accepted metadata. Changed metadata must
+preserve identity and use a different, unused version label; semantic-version
+ordering is not enforced. Unchanged metadata succeeds without replacing the
+entry. CLI updates can explicitly force validation of unchanged metadata.
+
+`POST /registrations/stream` emits `snapshot`, `check` and one terminal `result`
+or `error`, with heartbeat comments. Authentication fails before the stream
+starts; later errors use the event envelope. Processing may complete after a
+disconnect, so clients must not automatically reconnect or repeat this POST.
+Without a terminal result, display an unconfirmed outcome and inspect the
+catalog before another attempt.
+
+Registration checks use `PENDING`, `RUNNING`, `PASSED`, `FAILED` and `NOT_RUN`.
+They cover retrieval/JSON, Croissant compliance, adapter schema, semantics and
+embedded datasets, with available file positions, JSON paths, requirements and
+validator/schema provenance. `GET /schemas/{version}` returns the bundled
+adapter schema as `application/schema+json`; unknown versions return `404`.
 
 `GET /api/v1/registrations` must return summary list items only. It should not
 include full Croissant metadata, metadata paths, or validation error details.
@@ -368,10 +462,10 @@ includes the registered version list, so a separate
 `GET /api/v1/adapters/{adapter_id}/versions` endpoint is intentionally omitted
 until pagination or version-specific filtering is needed.
 
-Full Croissant metadata is exposed only through the dedicated metadata endpoint:
+The latest accepted Croissant document is exposed through the dedicated metadata endpoint:
 
 ```text
-GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata
+GET /api/v1/adapters/{adapter_id}/metadata
 ```
 
 Suggested metadata validation schemas:
@@ -401,15 +495,21 @@ items are removed. Required scalar fields and required list fields, such as
 adapter `creators` and `keywords`, must still contain at least one non-blank
 value after normalization or the API returns `422`.
 
-`POST /api/v1/metadata/datasets/generate` generates dataset Croissant metadata
-from a server-side input path. The API writes the generated file to a temporary
-server location and returns the generated metadata document in the response.
-The endpoint validates by default and includes the same structured dataset
-validation result returned by `POST /api/v1/metadata/validate`. Clients may
-pass `validate: false` to opt out. The public JSON field is `license`; the
-internal core request still receives it as `license_value`. The request schema
-includes an OpenAPI example using the native generator so maintainers can
-verify the endpoint directly from `/docs`.
+`POST /api/v1/metadata/datasets/generate` is a standalone one-file
+`multipart/form-data` operation. The required `file` part contains the source
+data; optional form fields configure generation. The API copies the upload to a
+temporary server path, removes it after the request, and returns the generated
+metadata document. The endpoint validates by default and includes the same
+structured dataset validation result returned by
+`POST /api/v1/metadata/validate`; clients may pass `validate=false` to opt out.
+The public form field is `license`, while the internal core request receives it
+as `license_value`. Swagger/OpenAPI is authoritative for the complete form
+schema.
+
+The React file/folder workflow does not call this endpoint. It uses the
+ephemeral upload-session API so the browser can declare, prepare, and upload a
+bounded multi-file inventory. Importing an existing Croissant JSON-LD document
+is a separate browser-local workflow and does not invoke either generation API.
 
 `POST /api/v1/metadata/adapters/generate` generates adapter Croissant metadata
 from one or more existing dataset metadata files and/or generated dataset
@@ -422,57 +522,54 @@ internal core request still receives it as `license_value`. The request schema
 includes an OpenAPI example that generates an embedded dataset from a local
 server-side path, matching the manual Swagger UI verification workflow.
 
-Canonical public statuses:
+Publication and attempt state:
 
 ```text
-SUBMITTED
-VALID
-INVALID
+published_version: accepted metadata version, when present
+latest_attempt.attempt_status: SUCCEEDED or FAILED
+update_applied: whether a published entry changed in this operation
+latest_event_type: terminal persisted event, separate from publication
 ```
 
-Known event types:
+There is no public registration lifecycle `status` field. Current persisted
+success events include `VALID_CREATED` and `UNCHANGED`; failure events describe
+retrieval, validation, identity and version conflicts. Historical `SUBMITTED`
+and `REVALIDATED` names are not emitted by the current publication workflow.
 
-```text
-SUBMITTED
-FETCH_FAILED
-UNCHANGED
-VALID_CREATED
-INVALID_MLCROISSANT
-INVALID_SCHEMA
-INVALID_BOTH
-REJECTED_SAME_VERSION_CHANGED
-DUPLICATE
-REVALIDATED
-```
-
-`FETCH_FAILED` is an event outcome, not necessarily a public registration
-status. The API may expose both `status` and `latest_event_type`.
-`GET /api/v1/registry/registrations` accepts `status` and `latest_event` as
-strict enum-like query parameters. Unsupported values return `422` instead of
-silently producing an empty list.
+`GET /api/v1/registry/registrations` accepts `latest_event` filtering. It no
+longer supports the former `status` filter. Unsupported event values return
+`422`. Batch summary reads include `internal_failed` separately from
+`fetch_failed`.
 
 ## Error Mapping
 
-Suggested HTTP mapping:
+HTTP mapping for registration and update requests:
 
 ```text
-registration not found      -> 404
-duplicate registration      -> 409
-invalid request payload     -> 422
-repository fetch failure    -> 502 or action result with FETCH_FAILED
-unexpected backend failure  -> 500
+missing sign-in                   -> 401
+wrong owner                       -> 403
+missing adapter/source/schema     -> 404
+already accepted repository       -> 409
+concurrent registration conflict  -> 409
+invalid request shape             -> 422
+unexpected backend failure        -> 500
 ```
 
-A validation failure is usually a successful API operation with an invalid
-registry outcome:
+A first-registration validation or retrieval rejection is a terminal attempt:
 
 ```text
 HTTP 200
-status: INVALID
-latest_event_type: INVALID_SCHEMA
+attempt_status: FAILED
+published_version: null
+registration_id: null
+validation_errors: [...]
 ```
 
-It should not automatically become an HTTP error.
+Accepted first registrations return `201`. Update processing returns a terminal
+attempt with the still-published version when a candidate fails. Streaming
+requests report errors occurring after response start inside their terminal
+event. Neither a check marked `PASSED` nor an HTTP stream opening confirms a
+database commit; the final attempt result does.
 
 ## Development Plan
 

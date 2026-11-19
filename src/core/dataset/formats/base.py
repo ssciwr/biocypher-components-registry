@@ -6,6 +6,7 @@ import csv
 import gzip
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import ClassVar
 
 from src.core.dataset.request import FileInspection, InferredField
 
@@ -16,10 +17,13 @@ BOOLEAN_TYPE = "sc:Boolean"
 CSV_MIME = "text/csv"
 TSV_MIME = "text/tab-separated-values"
 PARQUET_MIME = "application/vnd.apache.parquet"
+GZIP_MIME = "application/gzip"
 
 
 class FormatHandler(ABC):
     """Interface implemented by concrete file format inspectors."""
+
+    croissant_baker_supported: ClassVar[bool] = True
 
     @abstractmethod
     def supports(self, path: Path) -> bool:
@@ -33,7 +37,7 @@ class FormatHandler(ABC):
 def inspect_delimited_file(
     path: Path,
     delimiter: str,
-    encoding_format: str,
+    encoding_format: str | list[str],
     compressed: bool = False,
     max_rows: int = 500,
     n_examples: int = 1,

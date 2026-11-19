@@ -8,6 +8,11 @@ from urllib.parse import ParseResult, quote, urlparse
 
 from pydantic import BaseModel, Field
 
+from src.api.schemas.registrations import RegistrationAttemptResponse
+from src.core.adapter.catalog import (
+    adapter_id_from_uniqueness_key,
+    latest_registry_entry,
+)
 from src.core.registration.models import RegistryEntry, StoredRegistration
 
 # ===========================================================
@@ -52,6 +57,16 @@ class AdapterMaintainerResponse(BaseModel):
         )
 
 
+class AdapterResourceResponse(BaseModel):
+    """A resource as declared by Croissant; representation is not access method."""
+
+    resource_id: str | None = None
+    name: str | None = None
+    resource_types: list[str] = Field(default_factory=list)
+    encoding_formats: list[str] = Field(default_factory=list)
+    content_url: str | None = None
+
+
 class AdapterDataSourceResponse(BaseModel):
     """Metadata-light dataset summary embedded in adapter Croissant metadata."""
 
@@ -61,6 +76,7 @@ class AdapterDataSourceResponse(BaseModel):
     license: str | None = None
     url: str | None = None
     column_count: int | None = None
+    resources: list[AdapterResourceResponse] = Field(default_factory=list)
 
 
 class AdapterCatalogItemResponse(BaseModel):
@@ -94,6 +110,8 @@ class AdapterLatestItemResponse(BaseModel):
     adapter_id: str
     adapter_name: str
     version: str | None = None
+    component_type: str | None = None
+    granularity: str | None = None
     description: str | None = None
     repository_location: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -121,6 +139,8 @@ class AdapterLatestItemResponse(BaseModel):
             adapter_name=entry.adapter_name,
             version=entry.adapter_version,
             description=_metadata_text(metadata, "description"),
+            component_type=_metadata_text(metadata, "componentType"),
+            granularity=_metadata_text(metadata, "granularity"),
             repository_location=repository_location,
             keywords=_metadata_list(metadata, "keywords"),
             maintainer=maintainer,
@@ -148,6 +168,9 @@ class AdapterDetailResponse(BaseModel):
     adapter_id: str
     adapter_name: str
     version: str | None = None
+    component_type: str | None = None
+    granularity: str | None = None
+    component_url: str | None = None
     description: str | None = None
     repository_location: str | None = None
     license_value: str | None = None
@@ -159,6 +182,8 @@ class AdapterDetailResponse(BaseModel):
     endorsement_count: int = 0
     endorsed_by_current_user: bool = False
     can_delete: bool = False
+    can_update: bool = False
+    latest_attempt: RegistrationAttemptResponse | None = None
 
     @classmethod
     def from_entries(
@@ -169,6 +194,7 @@ class AdapterDetailResponse(BaseModel):
         endorsement_count: int = 0,
         endorsed_by_current_user: bool = False,
         can_delete: bool = False,
+        latest_attempt: RegistrationAttemptResponse | None = None,
     ) -> AdapterDetailResponse:
         """Build adapter detail from canonical entry and source data."""
         latest = latest_registry_entry(entries)
@@ -182,6 +208,9 @@ class AdapterDetailResponse(BaseModel):
             adapter_name=latest.adapter_name,
             version=latest.adapter_version,
             description=_metadata_text(metadata, "description"),
+            component_type=_metadata_text(metadata, "componentType"),
+            granularity=_metadata_text(metadata, "granularity"),
+            component_url=_metadata_text(metadata, "url"),
             repository_location=repository_location,
             license_value=(
                 registration.license_value
@@ -196,6 +225,8 @@ class AdapterDetailResponse(BaseModel):
             endorsement_count=endorsement_count,
             endorsed_by_current_user=endorsed_by_current_user,
             can_delete=can_delete,
+            can_update=can_delete,
+            latest_attempt=latest_attempt,
         )
 
 
@@ -219,16 +250,6 @@ class AdapterMetadataResponse(BaseModel):
 # ===========================================================
 # =====================  Mapping Helpers ====================
 # ===========================================================
-
-
-def adapter_id_from_uniqueness_key(uniqueness_key: str) -> str:
-    """Extract the adapter id from the canonical uniqueness key."""
-    return uniqueness_key.split("::", maxsplit=1)[0]
-
-
-def latest_registry_entry(entries: list[RegistryEntry]) -> RegistryEntry:
-    """Return the most recently updated entry from a non-empty entry list."""
-    return max(entries, key=lambda entry: (entry.updated_at, entry.created_at))
 
 
 def _repository_url(repository_location: str | None) -> ParseResult | None:
@@ -305,9 +326,31 @@ def data_sources_from_metadata(
                 license=_metadata_text(item, "license"),
                 url=_metadata_text(item, "url"),
                 column_count=_record_set_column_count(item),
+                resources=resources_from_metadata(item),
             )
         )
     return data_sources
+
+
+def resources_from_metadata(dataset: dict[str, Any]) -> list[AdapterResourceResponse]:
+    distribution = dataset.get("distribution", [])
+    items = distribution if isinstance(distribution, list) else [distribution]
+    return [
+        AdapterResourceResponse(
+            resource_id=_metadata_text(item, "@id"),
+            name=_metadata_text(item, "name"),
+            resource_types=_resource_values(item.get("@type")),
+            encoding_formats=_resource_values(item.get("encodingFormat")),
+            content_url=_metadata_text(item, "contentUrl"),
+        )
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+
+def _resource_values(value: Any) -> list[str]:
+    values = value if isinstance(value, list) else [value]
+    return [item for item in values if isinstance(item, str) and item.strip()]
 
 
 def _metadata_text(metadata: dict[str, Any], key: str) -> str | None:

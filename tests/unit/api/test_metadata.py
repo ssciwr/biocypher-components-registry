@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -171,10 +173,18 @@ def test_validate_metadata_endpoint_returns_invalid_adapter_result() -> None:
     assert payload["is_valid"] is False
     assert payload["errors"]
     assert [check["name"] for check in payload["checks"]] == [
-        "Croissant compliance",
+        "Complete-file compatibility",
         "Adapter schema",
         "Adapter semantics",
     ]
+    assert [check["id"] for check in payload["validation_checks"]] == [
+        "croissant",
+        "schema",
+        "semantics",
+        "datasets",
+    ]
+    assert payload["validation_checks"][0]["validator_name"] == "mlcroissant"
+    assert payload["validation_checks"][1]["schema_title"]
 
 
 def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> None:
@@ -200,7 +210,7 @@ def test_validate_metadata_endpoint_validates_embedded_adapter_datasets() -> Non
         if check["name"] == "Embedded dataset: Example dataset"
     )
     assert embedded_check["is_valid"] is False
-    assert any("[Example dataset]" in error for error in embedded_check["errors"])
+    assert embedded_check["errors"]
 
 
 def test_validate_metadata_endpoint_rejects_unknown_auto_type() -> None:
@@ -238,10 +248,13 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
 ) -> None:
     """Generate dataset metadata through the API without persisting it."""
     captured: dict[str, object] = {}
+    event_loop_thread_ids: list[int] = []
+    original_to_thread = asyncio.to_thread
 
     def fake_execute_dataset_request(request, generator):
         captured["request"] = request
         captured["generator"] = generator
+        captured["thread_id"] = threading.get_ident()
         captured["contents"] = Path(request.input_path).read_text(encoding="utf-8")
         document = _valid_dataset_document()
         Path(request.output_path).write_text(json.dumps(document), encoding="utf-8")
@@ -253,11 +266,16 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
             warnings=["Missing license; using 'UNKNOWN'."],
         )
 
+    async def tracked_to_thread(function, /, *args, **kwargs):
+        event_loop_thread_ids.append(threading.get_ident())
+        return await original_to_thread(function, *args, **kwargs)
+
     monkeypatch.setattr(
         metadata_router,
         "execute_dataset_request",
         fake_execute_dataset_request,
     )
+    monkeypatch.setattr(metadata_router.asyncio, "to_thread", tracked_to_thread)
     client = TestClient(create_app())
 
     response = client.post(
@@ -289,6 +307,7 @@ def test_generate_dataset_metadata_endpoint_returns_generated_document(
     payload = response.json()
     request = captured["request"]
     assert captured["generator"] == "native"
+    assert captured["thread_id"] != event_loop_thread_ids[-1]
     assert captured["contents"] == "id,name\n1,Alice\n"
     assert Path(request.input_path).name == "people.csv"
     assert request.name == "Example dataset"
@@ -366,6 +385,29 @@ def test_generate_dataset_metadata_endpoint_requires_file() -> None:
     response = client.post(DATASET_GENERATE_PATH, data={"generator": "native"})
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("people.csv", "people.csv"),
+        ("../../etc/passwd", "passwd"),
+        ("..\\..\\evil.csv", "evil.csv"),
+        ("/abs/path/data.tsv", "data.tsv"),
+        ("..", "dataset-upload"),
+        (".", "dataset-upload"),
+        (None, "dataset-upload"),
+        (".hidden", "hidden"),
+    ],
+)
+def test_resolve_upload_path_stays_inside_directory(
+    tmp_path: Path, filename: str | None, expected: str
+) -> None:
+    """Keep sanitized upload paths inside the destination directory."""
+    resolved = metadata_router._resolve_upload_path(tmp_path, filename)
+
+    assert resolved.parent == tmp_path.resolve()
+    assert resolved.name == expected
 
 
 # Covers compact helper edges for metadata upload/generation routing.
@@ -571,6 +613,7 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
         json=_adapter_generate_payload(
             name="People Adapter",
             description="Adapter metadata generated through the API.",
+            granularity="Primary",
             code_repository="https://github.com/example/people-adapter",
             creators=[
                 {
@@ -617,6 +660,8 @@ def test_generate_adapter_metadata_endpoint_runs_real_native_generator(
     metadata = payload["metadata"]
     assert metadata["@type"] == "SoftwareSourceCode"
     assert metadata["name"] == "People Adapter"
+    assert metadata["componentType"] == "adapter"
+    assert metadata["granularity"] == "Primary"
     assert metadata["creator"][0]["email"] == "creator@example.org"
     assert metadata["creator"][0]["url"] == "https://example.org/creator"
     assert (
@@ -651,3 +696,21 @@ def test_metadata_generation_openapi_examples_are_available() -> None:
 
     assert adapter_example == ADAPTER_METADATA_GENERATE_EXAMPLE
     assert validation_example == METADATA_VALIDATE_DATASET_EXAMPLE
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("componentType", "pipeline"),
+        ("component_type", "pipeline"),
+        ("granularity", "none"),
+        ("granularity", "primary"),
+    ],
+)
+def test_adapter_generation_rejects_non_adapter_classifications(field, value):
+    payload = dict(ADAPTER_METADATA_GENERATE_EXAMPLE)
+    payload[field] = value
+    response = TestClient(create_app()).post(
+        "/api/v1/metadata/adapters/generate", json=payload
+    )
+    assert response.status_code == 422

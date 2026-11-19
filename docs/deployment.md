@@ -38,7 +38,7 @@ Consequences without isolation:
 - **Subprocess env allowlist** (`_exec_env`): `run_command` subprocesses get
   only `EXEC_ENV_ALLOWLIST` (`PATH`, `LANG`, `LC_ALL`, `TZ`) plus `HOME` set
   to the workspace, so no backend secret (OAuth/session secrets,
-  `DATABASE_URL`, API keys) is inherited.
+  database configuration, API keys) is inherited.
 - **Result caps and timeouts**: tool results truncated at
   `MCP_RESULT_MAX_CHARS`; `run_command` output is read with the same byte
   cap (memory stays bounded) and the command is killed after
@@ -182,3 +182,60 @@ later items limit cost abuse and exfiltration.
   container this should be pinned via configuration instead.
 - Decide the concrete orchestrator (compose + small spawner service vs.
   Kubernetes) based on expected scale.
+
+## Ephemeral dataset upload deployment contract
+
+Browser dataset generation uses process-local upload sessions and the fixed
+scratch path `/run/biocypher-upload-scratch`. The SQLite, PostgreSQL, and
+production Compose files mount that path as a 256 MiB `tmpfs` with
+`noexec,nosuid,nodev`. The API fails closed when the path is absent, is not
+`tmpfs`, lacks those mount restrictions, or is not writable.
+
+This is one shared 256 MiB mount per backend container, not 256 MiB allocated
+to each user or session. Each session gets a subdirectory under the same mount;
+creating that directory does not reserve its maximum size.
+
+The browser completes hashing and preparation before requesting a session. One
+artifact may contain at most 1 MiB and one session at most 50 MiB. Plain UTF-8
+CSV/TSV files above 1 MiB and every supported `.csv.gz`/`.tsv.gz` source use
+complete-row browser sampling. The browser hashes the original bytes; the server
+independently verifies the transient artifact hash. Prepared bytes remain in
+browser memory until upload and are never persisted in browser storage.
+
+Keep exactly one backend replica and one Uvicorn worker while sessions remain
+in process memory. Horizontal scaling requires a separately designed shared
+session coordinator; adding workers before that would route later artifact
+requests to processes that do not know the session capability.
+
+The process-local admission controller atomically reserves each prepared
+artifact's declared bytes when it creates a session. It admits at most 100 active
+sessions and 110 MiB of aggregate artifact reservations; it does not maintain a
+backend waiting queue. One manager-owned worker serializes Croissant generation,
+so upload concurrency never increases generator concurrency above one. When
+either admission limit is reached, the API returns `429` with `Retry-After`; the
+open browser keeps its prepared artifacts in memory and retries the unchanged
+request without hashing, sampling, or compressing the source again. A new session
+has 60 seconds to begin uploading, then expires after 10 minutes without upload
+activity. Status polling does not extend either deadline. Generation work and
+terminal results intentionally do not survive a backend
+restart; the resumable form remains available, but the browser must reselect
+its source after losing its in-memory `File` handles.
+
+For example, ten users with small prepared artifacts can share the mount if
+their combined reservations stay within 110 MiB. If every session reserves the
+full 50 MiB, only two can be admitted at once; the rest receive `429` until
+capacity is released.
+
+Nginx disables request buffering, response buffering, proxy caching, and
+temporary response files for `/api/v1/metadata/upload-sessions`. Responses use
+`Cache-Control: no-store`. Upload capabilities and hashes stay in headers,
+never URLs. The backend runs generators with a secret-free environment,
+bounded diagnostics, resource limits, and a wall timeout.
+
+No dataset upload is written to a named volume or database. Success and failure
+remove artifact scratch and release admission capacity immediately. A bounded
+lightweight result remains in process memory briefly for status polling and is
+then expired. Cancellation, timeout, idle expiry, explicit DELETE, and shutdown
+also clean scratch. Linux `tmpfs` is RAM-backed but its pages can
+be moved to swap; production hosts handling sensitive data should disable swap
+or use encrypted swap.

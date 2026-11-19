@@ -15,6 +15,7 @@ import CitationEndorsement from '../components/CitationEndorsement'
 import {
   endorseAdapterApiV1AdaptersAdapterIdEndorsePost,
   deleteAdapterApiV1AdaptersAdapterIdDelete,
+  updateAdapterApiV1AdaptersAdapterIdUpdatePost,
   getAdapterApiV1AdaptersAdapterIdGet,
   listLatestAdaptersApiV1AdaptersLatestGet,
   searchAdaptersApiV1AdaptersSearchGet,
@@ -112,13 +113,13 @@ function AdapterListView() {
 
         <div className="mt-14 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
           {adapters === null ? (
-            <div className="col-span-full flex justify-center text-slate-500" role="status">
+            <output className="col-span-full flex justify-center text-slate-500">
               <ArrowPathIcon className="h-6 w-6 animate-spin" aria-hidden="true" /><br />
               <span className="sr-only">Searching adapters...</span>
-            </div>
+            </output>
           ) : null}
           {!loadError && adapters?.length === 0 ? (
-            <p className="col-span-full text-center text-slate-500" role="status">No Adapters found</p>
+            <output className="col-span-full text-center text-slate-500">No Adapters found</output>
           ) : null}
           {adapters?.map((adapter) => (
             <article
@@ -132,6 +133,8 @@ function AdapterListView() {
                 </p>
               </a>
               <div className="mt-5 flex flex-wrap gap-2">
+                {adapter.component_type ? <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs">{adapter.component_type}</span> : null}
+                {adapter.granularity ? <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs">{adapter.granularity}</span> : null}
                 {(adapter.keywords ?? []).slice(0, 3).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
@@ -153,11 +156,55 @@ function AdapterListView() {
   )
 }
 
+function updateLabel(attempt: NonNullable<AdapterDetail['latest_attempt']>) {
+  if (attempt.attempt_status === 'FAILED') return 'Update failed'
+  return attempt.update_applied ? 'Update successful' : 'Already up to date'
+}
+
+// Messages can repeat, so the key combines the text with its occurrence number.
+function keyedMessages(messages: string[]) {
+  const seen = new Map<string, number>()
+  return messages.map((message) => {
+    const occurrence = (seen.get(message) ?? 0) + 1
+    seen.set(message, occurrence)
+    return { message, key: `${message}#${occurrence}` }
+  })
+}
+
+function AdapterUpdateStatus({ attempt }: Readonly<{ attempt: NonNullable<AdapterDetail['latest_attempt']> }>) {
+  const failed = attempt.attempt_status === 'FAILED'
+  const errors = keyedMessages(attempt.validation_errors ?? [])
+
+  return (
+    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+      <output className="block"><strong>Update status:</strong> {updateLabel(attempt)}</output>
+      <p><strong>Current version:</strong> {attempt.published_version ?? 'None'}</p>
+      {failed ? (
+        <>
+          <p className="mt-2">
+            The metadata could not be updated.{' '}
+            {attempt.published_version ? <>Version {attempt.published_version} is still available. </> : null}
+            Fix the issues below, then click <strong>Update</strong> again.
+          </p>
+          {errors.length > 0 ? (
+            <details className="mt-2">
+              <summary>Update details</summary>
+              <ul>{errors.map(({ message, key }) => <li key={key}>{message}</li>)}</ul>
+            </details>
+          ) : <p className="mt-2">{attempt.message}</p>}
+        </>
+      ) : null}
+    </div>
+  )
+}
+
 function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string; signedIn: boolean }>) {
   const [adapter, setAdapter] = useState<AdapterDetail | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [isEndorsing, setIsEndorsing] = useState(false)
   const [endorsementError, setEndorsementError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -229,6 +276,30 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
   }
 
 
+  async function updateCurrentAdapter() {
+    setIsUpdating(true)
+    setUpdateError(null)
+    try {
+      const response = await updateAdapterApiV1AdaptersAdapterIdUpdatePost({ path: { adapter_id: adapterId } })
+      if (!response.data || response.error) {
+        const details = response.error as { detail?: string } | undefined
+        setUpdateError(details?.detail ?? 'Could not confirm the update result. Reload this page before trying again.')
+        return
+      }
+      const outcome = response.data
+      setAdapter((current) => current ? { ...current, latest_attempt: outcome, version: outcome.published_version } : current)
+      if (outcome.attempt_status === 'SUCCEEDED' && outcome.update_applied) {
+        const refreshed = await getAdapterApiV1AdaptersAdapterIdGet({ path: { adapter_id: adapterId } })
+        if (refreshed.data) setAdapter(refreshed.data)
+        else setUpdateError('Update succeeded. Reload the page to load the latest adapter details.')
+      }
+    } catch {
+      setUpdateError('Could not confirm the update result. Reload this page before trying again.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   async function deleteCurrentAdapter() {
     if (!globalThis.confirm(`Remove ${adapter?.adapter_name ?? 'this adapter'} from the registry?`)) return
 
@@ -284,6 +355,8 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
             <div className="mt-5 rounded-lg border border-slate-200 p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-bold text-slate-950">Overview</h2>
+                {adapter.component_type ? <span className="text-sm text-slate-700">Component: {adapter.component_type}</span> : null}
+                {adapter.granularity ? <span className="text-sm text-slate-700">Granularity: {adapter.granularity}</span> : null}
                 {adapterKeywords.slice(0, 4).map((keyword) => (
                   <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-700" key={keyword}>
                     {keyword}
@@ -293,6 +366,7 @@ function AdapterDetailView({ adapterId, signedIn }: Readonly<{ adapterId: string
               <p className="mt-4 text-base leading-6 text-slate-800">
                 {adapter.description ?? 'No adapter description has been submitted yet.'}
               </p>
+              {adapter.component_url ? <a className="mt-3 inline-block text-sm text-blue-600" href={adapter.component_url}>Component page</a> : null}
               <h3 className="mt-7 flex items-center gap-2 text-sm font-bold text-slate-950">
                 <RocketLaunchIcon className="h-5 w-5 text-blue-600" aria-hidden="true" />
                 Quick Example
@@ -313,7 +387,7 @@ bc.run()`}
               Data Sources
             </h2>
             <div className="mt-5 divide-y divide-slate-200 border border-slate-200">
-              {(adapterDataSources.length ? adapterDataSources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null }]).map((source) => (
+              {(adapterDataSources.length ? adapterDataSources : [{ name: 'No data sources listed', description: null, version: null, license: null, url: null, column_count: null, resources: [] }]).map((source) => (
                 <div className="p-4" key={source.name}>
                   <div className="flex items-center justify-between gap-4">
                     <h3 className="text-base font-semibold text-slate-950">{source.name}</h3>
@@ -323,8 +397,22 @@ bc.run()`}
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-700">
                     {source.license ? <span>License: {source.license}</span> : null}
                     {source.version ? <span>Version: {source.version}</span> : null}
-                    {source.url ? <a className="text-blue-600 hover:text-blue-700" href={source.url}>URL: {source.url}</a> : null}
+                    {source.url ? <a className="text-blue-600 hover:text-blue-700" href={source.url}>Dataset landing page: {source.url}</a> : null}
                   </div>
+                  {(source.resources ?? []).length ? (
+                    <ul className="mt-4 space-y-3 text-sm text-slate-700">
+                      {(source.resources ?? []).map((resource, index) => (
+                        <li className="rounded border border-slate-200 p-3" key={resource.resource_id ?? index}>
+                          <p className="font-semibold">{resource.name ?? resource.resource_id ?? 'Resource'}</p>
+                          <p>Resource type: {(resource.resource_types ?? []).join(', ') || 'Not specified'}</p>
+                          <p>Format: {(resource.encoding_formats ?? []).join(', ') || 'Not specified'}</p>
+                          {resource.content_url && /^https?:\/\//i.test(resource.content_url)
+                            ? <a className="break-all text-blue-600 hover:text-blue-700" href={resource.content_url}>Download: {resource.content_url}</a>
+                            : resource.content_url ? <p className="break-all">Location: {resource.content_url}</p> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -379,17 +467,30 @@ bc.run()`}
             {endorsementError ? (
               <p className="mt-2 text-sm text-red-700" role="alert">{endorsementError}</p>
             ) : null}
-            {adapter.can_delete ? (
+            {adapter.can_delete || adapter.can_update ? (
               <div className="mt-7 border-t border-slate-100 pt-5">
-                <button
+                <div className="flex flex-wrap gap-3">
+                {adapter.can_update ? (
+                  <button className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isUpdating || isDeleting} onClick={() => void updateCurrentAdapter()} type="button">
+                    <ArrowPathIcon className="h-4 w-4" aria-hidden="true" />
+                    {isUpdating ? 'Updating...' : 'Update'}
+                  </button>
+                ) : null}
+                {adapter.can_delete ? <button
                   className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isDeleting}
+                  disabled={isDeleting || isUpdating}
                   onClick={() => void deleteCurrentAdapter()}
                   type="button"
                 >
                   <TrashIcon className="h-4 w-4" aria-hidden="true" />
                   {isDeleting ? 'Removing adapter...' : 'Delete adapter'}
-                </button>
+                </button> : null}
+                </div>
+                {isUpdating ? <output className="mt-3 block text-sm text-blue-700">Checking for updates...</output> : null}
+                {!isUpdating && adapter.latest_attempt ? (
+                  <AdapterUpdateStatus attempt={adapter.latest_attempt} />
+                ) : null}
+                {updateError ? <p className="mt-2 text-sm text-red-700" role="alert">{updateError}</p> : null}
                 {deleteError ? <p className="mt-2 text-sm text-red-700" role="alert">{deleteError}</p> : null}
               </div>
             ) : null}

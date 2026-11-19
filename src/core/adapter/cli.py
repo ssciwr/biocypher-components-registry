@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from src.core.adapter.classification import AdapterGranularity
 from src.core.adapter.config import request_from_config as adapter_request_from_config
 from src.core.adapter.request import AdapterGenerationRequest
 from src.core.adapter.service import execute_request as execute_adapter_request
@@ -196,6 +197,11 @@ def direct_cmd(
         "--adapter-id",
         help="Optional explicit adapter @id.",
     ),
+    granularity: AdapterGranularity | None = typer.Option(  # noqa: B008
+        None,
+        "--granularity",
+        help="Primary: atomic resource; Secondary: composite, often pre-harmonized resource.",
+    ),
 ) -> None:
     """Generate adapter metadata directly from CLI flags and dataset inputs.
 
@@ -232,6 +238,7 @@ def direct_cmd(
         creators=creator or [],
         keywords=[item.strip() for item in keywords.split(",") if item.strip()],
         adapter_id=adapter_id,
+        granularity=granularity,
         dataset_generator=dataset_generator,
         generated_datasets=generated_datasets,
     )
@@ -439,6 +446,7 @@ def prompt_for_adapter_request(
     validate = typer.confirm("Validate generated metadata?", default=True)
     console.print(Panel.fit("[bold]Adapter Metadata[/bold]", border_style="cyan"))
     name = typer.prompt("Adapter name [required]")
+    granularity = _prompt_granularity()
     description = typer.prompt("Description [required]")
     version = _prompt_semver("Version [required]", default="0.1.0")
     license_value = typer.prompt(
@@ -461,6 +469,7 @@ def prompt_for_adapter_request(
 
     request = AdapterGenerationRequest(
         output_path=selected_output,
+        granularity=granularity,
         name=name,
         description=description,
         version=version,
@@ -481,6 +490,21 @@ def prompt_for_adapter_request(
 
 def _edit_name(request: AdapterGenerationRequest) -> None:
     request.name = typer.prompt("Adapter name [required]", default=request.name)
+
+
+def _prompt_granularity(default: str = "unspecified") -> AdapterGranularity | None:
+    value = _prompt_choice(
+        "Adapter granularity (Primary: atomic resource; Secondary: composite resource)",
+        {"primary", "secondary", "unspecified"},
+        default=default.lower(),
+    )
+    return None if value == "unspecified" else AdapterGranularity(value.capitalize())
+
+
+def _edit_granularity(request: AdapterGenerationRequest) -> None:
+    request.granularity = _prompt_granularity(
+        request.granularity.value if request.granularity else "unspecified"
+    )
 
 
 def _edit_description(request: AdapterGenerationRequest) -> None:
@@ -548,6 +572,7 @@ def _edit_adapter_id(request: AdapterGenerationRequest) -> None:
 
 
 _REQUEST_EDIT_HANDLERS: dict[str, Callable[[AdapterGenerationRequest], None]] = {
+    "granularity": _edit_granularity,
     "name": _edit_name,
     "description": _edit_description,
     "version": _edit_version,
@@ -580,6 +605,9 @@ def _print_request_summary(request: AdapterGenerationRequest) -> None:
     """Print a concise summary of the current adapter request."""
     console.print("\n[bold]Review adapter metadata[/bold]")
     console.print(f"  name: {request.name}")
+    console.print(
+        f"  granularity: {request.granularity.value if request.granularity else '-'}"
+    )
     console.print(f"  description: {request.description}")
     console.print(f"  version: {request.version}")
     console.print(f"  license: {request.license_value}")

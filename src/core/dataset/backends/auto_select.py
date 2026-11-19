@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from croissant_baker.files import discover_files as discover_baker_files
-
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.backends.croissant_baker import CroissantBakerGenerator
 from src.core.dataset.backends.native import NativeDatasetGenerator
+from src.core.dataset.formats.base import FormatHandler
+from src.core.dataset.formats.resolver import resolve_format_handler
 from src.core.dataset.request import GenerationRequest, GenerationResult
-from src.core.shared.errors import InputDiscoveryError
+from src.core.shared.errors import UnsupportedFormatError
 
 
 class AutoDatasetGenerator(DatasetGenerator):
@@ -20,7 +20,7 @@ class AutoDatasetGenerator(DatasetGenerator):
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         """Select a generator, run it, and prepend selection details to stdout."""
-        selected_generator, reason = select_generator_for_request(request)
+        selected_generator, reason = select_generator(request)
         result = selected_generator.generate(request)
 
         delegate_name = getattr(
@@ -44,35 +44,51 @@ class AutoDatasetGenerator(DatasetGenerator):
         )
 
 
-def select_generator_for_request(
-    request: GenerationRequest,
+def select_generator(
+    request: GenerationRequest | None = None,
 ) -> tuple[DatasetGenerator, str]:
-    """Pick the most suitable dataset generator for the given request."""
-    files = _discover_input_files(Path(request.input_path).expanduser())
-
-    for path in files:
-        suffixes = tuple(s.lower() for s in path.suffixes)
-        if suffixes[-2:] == (".tsv", ".gz"):
+    """Prefer Baker, using Native for inputs only Native can inspect."""
+    if request is not None:
+        files = _discover_files(request)
+        handlers = _native_handlers(files)
+        if handlers and any(
+            not handler.croissant_baker_supported for handler in handlers
+        ):
             return (
                 NativeDatasetGenerator(),
-                f"detected '{path.name}', which is outside croissant-baker's supported path.",
+                "Croissant Baker does not support every selected file.",
             )
 
     return (
         CroissantBakerGenerator(),
-        "detected only standard dataset inputs handled by croissant-baker.",
+        "croissant-baker is the preferred backend when it supports the input.",
     )
 
 
-def _discover_input_files(input_path: Path) -> list[Path]:
-    """Expand a request input path into the files considered for selection."""
+def _discover_files(request: GenerationRequest) -> list[Path]:
+    """Find input files using the same directory rules as Native generation."""
+    input_path = Path(request.input_path).expanduser()
     if not input_path.exists():
-        raise InputDiscoveryError(f"Input path does not exist: {input_path}")
+        return []
     if input_path.is_file():
         return [input_path]
+    if not input_path.is_dir():
+        return []
 
-    relative_paths = discover_baker_files(str(input_path))
-    files = [input_path / relative_path for relative_path in relative_paths]
-    if not files:
-        raise InputDiscoveryError(f"No files were found under: {input_path}")
-    return files
+    excluded_path = Path(request.output_path).expanduser().resolve()
+    return sorted(
+        path
+        for path in input_path.rglob("*")
+        if path.is_file() and not path.is_symlink() and path.resolve() != excluded_path
+    )
+
+
+def _native_handlers(files: list[Path]) -> list[FormatHandler] | None:
+    """Return handlers for every file, or None when Native cannot inspect one."""
+    handlers: list[FormatHandler] = []
+    for path in files:
+        try:
+            handlers.append(resolve_format_handler(path))
+        except UnsupportedFormatError:
+            return None
+    return handlers

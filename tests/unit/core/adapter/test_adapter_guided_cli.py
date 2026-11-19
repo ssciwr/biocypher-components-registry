@@ -44,6 +44,7 @@ def test_prompt_for_adapter_request_collects_existing_dataset_values(
     prompt_values = iter(
         [
             "Example Adapter",
+            "Primary",
             "Adapter description",
             "1.0.0",
             "MIT",
@@ -67,6 +68,7 @@ def test_prompt_for_adapter_request_collects_existing_dataset_values(
     request = adapter_cli.prompt_for_adapter_request(output_path="croissant.jsonld")
 
     assert request.name == "Example Adapter"
+    assert request.granularity == "Primary"
     assert request.output_path == "out.jsonld"
     assert request.creators == [
         "Edwin Carreno, SSC, https://orcid.org/0000-0000-0000-0000"
@@ -82,6 +84,7 @@ def test_prompt_for_adapter_request_defaults_adapter_id_from_name(monkeypatch) -
     prompt_values = iter(
         [
             "Example Adapter",
+            "Primary",
             "Adapter description",
             "1.0.0",
             "MIT",
@@ -113,6 +116,7 @@ def test_prompt_for_adapter_request_collects_generated_dataset_values(
     prompt_values = iter(
         [
             "Example Adapter",
+            "Primary",
             "Adapter description",
             "1.0.0",
             "MIT",
@@ -169,6 +173,7 @@ def test_prompt_for_adapter_request_shows_metadata_panels(monkeypatch) -> None:
     prompt_values = iter(
         [
             "Example Adapter",
+            "Primary",
             "Adapter description",
             "1.0.0",
             "MIT",

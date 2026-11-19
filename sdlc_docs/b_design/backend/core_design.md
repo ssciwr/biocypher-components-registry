@@ -9,13 +9,15 @@ application and domain layer.
 is the source of truth for registry behavior.
 
 Database-specific implementation code belongs in `src/persistence`, not in core
-business modules. Core modules define the ports/interfaces they need.
+business modules. The registration core defines the persistence ports it needs.
+Repository access through Git and GitHub identity checks through HTTPS currently
+remain concrete infrastructure dependencies inside core.
 
 ## Core Responsibilities
 
 `src/core` owns:
 
-- adapter registration submission
+- synchronous adapter registration and owner-authorized updates
 - metadata discovery from local or remote repositories
 - adapter and dataset metadata generation
 - adapter and dataset validation
@@ -23,7 +25,7 @@ business modules. Core modules define the ports/interfaces they need.
 - checksum-based change detection
 - canonical registry entry creation
 - registration event history
-- batch refresh and revalidation workflows
+- manual batch refresh and immediate retry/update workflows
 - registry read/query behavior for API, CLI, future MCP, and workers
 
 `src/core` must not own:
@@ -43,23 +45,27 @@ src/core/adapter/
   adapter metadata generation, discovery, and adapter-specific helpers
 
 src/core/dataset/
-  dataset metadata generation, file inference, and dataset request models
+  dataset metadata generation, file inference, backend/format selection,
+  bounded subprocess execution, and transient browser-upload sessions
+
+src/core/auth/
+  shared GitHub identity and device/browser authentication services
 
 src/core/registration/
-  registration use cases, status models, store/query ports, and registration
-  business rules
+  registration and update use cases, attempt models, store/query ports, and
+  atomic acceptance rules
 
 src/core/schema/
   validation schema resources and active profile loading
 
 src/core/shared/
-  shared backend utilities and constants
+  shared backend utilities, JSON loading, repository access policy, and constants
 
 src/core/validation/
   adapter and dataset validation logic
 
-src/core/web/
-  temporary legacy server-rendered web interface
+src/core/workspace/
+  agentic workspace sessions and client-loop services (a separate interface boundary)
 ```
 
 ## Service Boundary
@@ -78,6 +84,25 @@ flowchart TB
     Services --> Discovery["Discovery/generation"]
     Services --> Store["Store/query interfaces"]
 ```
+
+### Registration service contract
+
+`register_adapter` retrieves and validates a candidate before calling atomic
+acceptance. A rejected first attempt has no registration identifier or saved
+source, entry or event. Corrected metadata can be submitted again with the same
+version.
+
+`update_adapter` checks ownership of every source for the adapter identity and
+delegates to `update_registration`. Failed candidates retain published metadata
+and append a terminal event. Changed metadata preserves the adapter identity and
+requires a different, unused version label; labels need not increase semantically.
+Unchanged metadata succeeds without replacing the canonical entry.
+
+`ProcessingOutcome` separates `attempt_status` (`SUCCEEDED` or `FAILED`) from
+`published_version` and `update_applied`. Validation checks carry status,
+provenance and available source/field diagnostics. These models remain independent
+of HTTP and React. Remote repository access uses the configured authority policy
+and root metadata from the default branch.
 
 ## Query Boundary
 
@@ -107,38 +132,41 @@ query/read interfaces.
 Detailed persistence adapter guidance is documented in
 `sdlc_docs/b_design/backend/persistence_design.md`.
 
-The core service layer should depend on interfaces. Concrete implementations
-live in `src/persistence` and handle SQLAlchemy, SQLite, and future PostgreSQL
-details.
+For persistence, the core service layer depends on interfaces. Concrete database
+implementations live in `src/persistence` and handle SQLAlchemy, SQLite, and
+PostgreSQL details. This abstraction does not currently extend to Git execution
+or GitHub identity HTTP calls.
 
 ```text
 core service -> store/query interface -> src/persistence adapter -> database
 ```
 
-Expected direction:
+Current direction:
 
 ```text
 src/core/registration/
 ├── service.py
 ├── store.py
 ├── models.py
-└── queries.py
+└── errors.py
 
 src/persistence/
-├── database.py
+├── factory.py
+├── schema.py
 ├── tables.py
+├── registration_store_base.py
 ├── registration_sqlite_store.py
 └── registration_postgres_store.py
 ```
 
 `src/core/registration/store.py` defines what registration workflows need from
-persistence. `src/persistence/registration_sqlite_store.py` or a future
-PostgreSQL implementation defines how that port is fulfilled.
+persistence. `src/persistence/registration_sqlite_store.py` and the PostgreSQL
+implementation define how that port is fulfilled.
 
-## Legacy Web Layer
+## Delivery Layers
 
-`src/core/web` is temporary. New reusable behavior should not be added there.
-
-When API or frontend work reveals useful behavior currently trapped in
-`src/core/web`, move that behavior into reusable core services or queries and
-let the web layer call those services until it is retired.
+Current registration uses the React/FastAPI boundary, while the CLI calls the
+same core services directly. There is no `src/core/web` server-rendered delivery
+layer. The agentic workspace is a separate delivery concern and does not define
+registration behavior. New reusable behavior belongs in core services or query
+ports rather than React components, route handlers, or CLI presentation code.

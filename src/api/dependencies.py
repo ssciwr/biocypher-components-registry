@@ -10,11 +10,14 @@ from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
 from src.api.settings import settings
 from src.core.auth.models import AuthSession
+from src.core.dataset.upload.service import UploadSessionManager
 from src.core.registration.store import RegistrationStore  # Port
 from src.core.settings import get_registration_database_path as core_database_path
 from src.core.workspace.service import Session, SessionManager
 from src.persistence.auth_store import AuthSessionStore
 from src.persistence.factory import build_auth_session_store, build_registration_store
+
+_INVALID_WORKSPACE_SESSION_DETAIL = "unknown session or invalid session token"
 
 # ===========================================================
 # Persistence Dependencies
@@ -34,6 +37,11 @@ def get_registration_store() -> RegistrationStore:
 def get_auth_session_store() -> AuthSessionStore:
     """Create the auth session store used by API routes. Use the same pattern above for test purposes"""
     return build_auth_session_store()
+
+
+def get_upload_session_manager(request: Request) -> UploadSessionManager:
+    """Return the app-lifetime ephemeral dataset upload manager."""
+    return request.app.state.upload_session_manager
 
 
 def get_optional_auth_session(
@@ -85,10 +93,10 @@ def get_workspace_session(
     if authorization and authorization.startswith("Bearer "):
         supplied = authorization[len("Bearer ") :].strip()
     if session is None or not supplied:
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     if session.owner_github_user_id != auth_session.github_user_id:
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     if not pysecrets.compare_digest(supplied, session.token):
-        raise HTTPException(401, "unknown session or invalid session token")
+        raise HTTPException(401, _INVALID_WORKSPACE_SESSION_DETAIL)
     session.mark_active()
     return session

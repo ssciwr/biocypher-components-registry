@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.core.dataset.formats.base import (
     CSV_MIME,
+    GZIP_MIME,
     FormatHandler,
     inspect_delimited_file,
 )
@@ -24,6 +25,6 @@ class CsvGzFormatHandler(FormatHandler):
         return inspect_delimited_file(
             path=path,
             delimiter=",",
-            encoding_format=CSV_MIME,
+            encoding_format=[CSV_MIME, GZIP_MIME],
             compressed=True,
         )

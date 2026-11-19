@@ -2,9 +2,13 @@
 
 ## Purpose
 
-This document is a working design-tracking note for the future React frontend.
+This document preserves the design-tracking history for the implemented React
+frontend and records unfinished Penpot work.
 
-It is intended to help shape the look and feel of the application before implementation begins in React. The current visual inspiration is the Apache Airflow Registry, especially its clean landing page, card-based browsing, strong search focus, and professional registry-style presentation.
+It shaped the application's look and feel before implementation began. The
+visual inspiration was the Apache Airflow Registry, especially its clean
+landing page, card-based browsing, strong search focus, and professional
+registry-style presentation.
 
 This note is not a final specification yet. It is a place to track:
 
@@ -13,7 +17,14 @@ This note is not a final specification yet. It is a place to track:
 - target pages
 - user flows
 - Penpot planning progress
-- decisions that should later inform React implementation
+- decisions that informed or may refine the React implementation
+
+The registration implementation now uses live validation and one terminal
+publication result, with owner-authorized updates for published adapters.
+Staged process/revalidation screens below are retained as prototype history;
+their endpoints and browser batch trigger are superseded by the current
+[frontend API contract](frontend_api_contract.md). The metadata-creation
+inventory, visual references and Penpot progress log remain unchanged.
 
 ## Design Intent
 
@@ -21,9 +32,9 @@ The frontend should:
 
 - feel professional, modern, and trustworthy
 - support both metadata creation and registry operations
-- eventually replace the current server-rendered frontend responsibilities
+- keep user workflows in the React frontend
 - reuse the current backend business logic instead of duplicating it in the UI
-- remain compatible with a future backend move to FastAPI or Flask
+- consume the current FastAPI contract through generated clients
 
 ## User Roles
 
@@ -272,7 +283,7 @@ Second iteration:
 
 - [x] Added `US-12 React front-end migration`
 - [x] Added frontend architecture design note
-- [x] Identified current web UI scope from `src/core/web`
+- [x] Identified the former server-rendered UI scope
 - [x] Drafted expanded page inventory for Penpot planning
 - [ ] Finalize page list for first Penpot pass
 - [ ] Finalize user flows for first Penpot pass

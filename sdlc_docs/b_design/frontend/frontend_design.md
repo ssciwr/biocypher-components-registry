@@ -6,13 +6,15 @@ This document is the primary guide for designing and implementing the React fron
 
 It is intended to align work between project maintainers and AI agents. It should be used before making frontend implementation decisions, creating React components, adding routes, or changing API integration behavior.
 
-The frontend must support the current SQLite-backed backend implementation while keeping the architecture ready for a future separation into independent backend/API/frontend repositories.
+The frontend supports the SQLite and PostgreSQL persistence configurations
+through the same FastAPI contract. A future repository split must preserve that
+contract and must not move business rules into the browser.
 
 ## Project Context
 
-The BioCypher Components Registry currently has backend logic implemented in Python under `src/core`. The existing web UI is server-rendered and supports metadata generation, adapter registration, registration status inspection, revalidation, and registry operations.
-
-The project now needs a professional React frontend that gradually replaces the current server-rendered frontend responsibilities.
+The BioCypher Components Registry has a React frontend under `frontend/`, a
+FastAPI delivery layer under `src/api`, business logic under `src/core`, and
+SQLite/PostgreSQL adapters under `src/persistence`.
 
 The React frontend should:
 
@@ -21,7 +23,7 @@ The React frontend should:
 - avoid duplicating validation or persistence rules in the browser
 - support normal users and maintainers
 - be easy to move into a standalone frontend repository later
-- remain compatible with a future FastAPI or Flask backend API layer
+- use generated clients derived from the FastAPI OpenAPI document
 
 ## User Roles
 
@@ -48,7 +50,7 @@ Maintainers can:
 - inspect registry internals
 - monitor active registration sources
 - review validation and processing outcomes
-- trigger registry operations such as refresh or revalidation
+- update owned published adapters; global batch refresh remains CLI maintenance
 - apply supported online actions through API-backed workflows
 
 Maintainer navigation can extend the normal navigation with:
@@ -59,22 +61,23 @@ The `Registry` area should be treated as maintainer-facing.
 
 ## Core Frontend Scope
 
-The first React implementation should focus on registration functionality because these flows are already covered by wireframes and prototypes.
+Registration now consists of one repository submission followed by validation
+and a terminal publication result. The registration-specific states are:
 
-The registration functionality includes:
+- signed-out and signed-in form states
+- repository preflight and request validation errors
+- live file/JSON, Croissant, profile, semantic and per-dataset checks
+- confirmed publication with its accepted version
+- rejected first registration with actionable diagnostics and no saved record
+- unconfirmed connection loss without automatic resubmission
+- owner-authorized published adapter updates
+- unchanged updates and failed updates that retain accepted metadata
+- read-only registry source/history and latest CLI batch summary views
 
-- registration form default state
-- registration form validation error state
-- registration form successful submission state
-- registration detail submitted state
-- registration detail invalid state
-- registration detail valid state
-- registration detail fetch-failed state
-- revalidation success state
-- revalidation failed state
-- registry operations default unfiltered table state
-- registry operations filtered table state
-- registry operations batch refresh completed summary state
+Older staged registration and revalidation wireframes remain historical visual
+references. Their process/revalidation buttons and browser batch trigger are not
+current endpoint contracts. The other visual, metadata-creation and layout
+guidance below remains the baseline design.
 
 ## Existing Design References
 
@@ -237,7 +240,7 @@ The React frontend should depend on the backend through an explicit API layer.
 flowchart TB
     subgraph Frontend["React Frontend"]
         App["App + Routes"]
-        Pages["Feature Pages\nRegistration Form\nRegistration Detail\nRevalidation Result\nRegistry Operations"]
+        Pages["Feature Pages\nRegistration Form\nValidation Progress / Result\nOwned Adapter Update\nRegistry Reads"]
         Components["Shared Components\nAppShell, Card, Button, StatusChip, DataGrid"]
         ApiClient["Frontend API Client\nregistration/api.ts\nshared/api/client.ts"]
     end
@@ -248,15 +251,16 @@ flowchart TB
     end
 
     subgraph Core["Existing Python Core"]
-        RegService["Registration Services\nsubmit_registration\nfinish_registration\nrevalidate_registration\nrefresh_active_registrations"]
+        RegService["Registration Services\nregister_adapter\nupdate_adapter\nrefresh_active_registrations"]
         Validation["Validation\nmlcroissant + schema profile"]
-        Discovery["Metadata Discovery\nlocal/GitHub croissant.jsonld"]
+        Discovery["Source Access\nremote Git or local path"]
         StoreInterface["RegistrationStore Interface"]
     end
 
     subgraph Persistence["src/persistence"]
-        SQLiteStore["SQLiteRegistrationStore\nfuture PostgreSQL store"]
-        DB[("SQLite DB\nregistration_sources\nregistry_entries\nregistration_events")]
+        SQLiteStore["SQLite store"]
+        PostgresStore["PostgreSQL store"]
+        DB[("Selected database")]
     end
 
     App --> Pages
@@ -269,7 +273,9 @@ flowchart TB
     RegService --> Validation
     RegService --> StoreInterface
     StoreInterface --> SQLiteStore
+    StoreInterface --> PostgresStore
     SQLiteStore --> DB
+    PostgresStore --> DB
 ```
 
 Key rule:
@@ -339,9 +345,9 @@ flowchart LR
     end
 
     subgraph BackendRepo["Current/backend repo\nbiocypher-components-registry"]
-        APILayer["API Layer\nFastAPI/Flask/current adapter"]
+        APILayer["API Layer\nFastAPI"]
         CoreServices["Core Services"]
-        Database["SQLite now\nfuture DB later"]
+        Database["SQLite / PostgreSQL"]
     end
 
     ReactApp --> UI
@@ -401,8 +407,10 @@ Examples:
 ```text
 POST /api/v1/registrations
 GET /api/v1/registrations/{registration_id}
-GET /api/v1/registry/registrations?status=INVALID&latest_event=FETCH_FAILED
-POST /api/v1/registry/refreshes
+POST /api/v1/registrations/stream
+POST /api/v1/adapters/{adapter_id}/update
+GET /api/v1/registry/registrations?latest_event=FETCH_FAILED
+GET /api/v1/registry/refreshes/latest
 GET /api/v1/adapters
 POST /api/v1/metadata/validate
 ```
@@ -412,56 +420,39 @@ Implementation note:
 - Keep the API base URL centralized in the frontend configuration, such as
   `VITE_API_BASE_URL`.
 - Do not scatter `/api/v1` literals across components.
-- The UI should expose both registration status filtering and latest-event
-  filtering for registry operations.
+- Registry reads may filter the latest event; publication and latest attempt
+  are separate fields rather than a lifecycle status filter.
 
 ## Registration Data Model For Frontend
 
-Suggested frontend type shape:
+Use the generated OpenAPI types rather than maintaining a second lifecycle
+enum. Relevant terminal attempt fields are:
 
 ```ts
-type RegistrationStatus = "SUBMITTED" | "VALID" | "INVALID";
+type RegistrationAttemptStatus = "SUCCEEDED" | "FAILED";
 
-type RegistrationEventType =
-  | "SUBMITTED"
-  | "FETCH_FAILED"
-  | "UNCHANGED"
-  | "VALID_CREATED"
-  | "INVALID_MLCROISSANT"
-  | "INVALID_SCHEMA"
-  | "INVALID_BOTH"
-  | "REJECTED_SAME_VERSION_CHANGED"
-  | "DUPLICATE"
-  | "REVALIDATED";
-
-type RegistrySourceRow = {
-  registrationId: string;
-  adapterName: string;
-  adapterId?: string;
-  repositoryLocation: string;
-  repositoryKind: "local" | "remote";
-  status: RegistrationStatus;
-  latestEventType: RegistrationEventType;
-  lastCheckedAt?: string;
-  lastSeenAt?: string;
-  profileVersion?: string;
-  validationErrors?: string[];
+type AttemptSummary = {
+  attempt_status: RegistrationAttemptStatus;
+  published_version?: string | null;
+  update_applied: boolean;
+  reason_code?: string | null;
+  message: string;
 };
 ```
 
-CTA derivation should be implemented in a small frontend helper based on backend state:
+Source/detail reads expose accepted metadata and `latest_attempt` separately.
+Registry rows include `published_version` and `latest_event_type`; a failed
+candidate must not replace a successful published version in the UI.
 
-```ts
-function sourceRowCta(row: RegistrySourceRow) {
-  if (row.latestEventType === "FETCH_FAILED") return "Retry fetch";
-  if (row.status === "INVALID") return "Revalidate";
-  if (row.status === "SUBMITTED") return "Process";
-  if (row.status === "VALID") return "View";
-  return "Inspect";
-}
-```
+Active processing and unconfirmed disconnection are UI states. Validation checks
+use `PENDING`, `RUNNING`, `PASSED`, `FAILED` and `NOT_RUN`, distinct from attempt
+status. Display the field locations, requirements and schema provenance supplied
+by the backend, and fetch exact schemas from `/api/v1/schemas/{version}`.
 
-The CTA helper should not decide backend status transitions. It only maps current backend state to a user-facing action label.
+The backend supplies `can_update` and `can_delete` for published adapters. Use
+these capabilities to show actions, while retaining server-side authorization.
+Retries of rejected first submissions use the registration form; updates of
+published adapters use `/api/v1/adapters/{adapter_id}/update`.
 
 ## Implementation Plan
 
@@ -507,9 +498,8 @@ Add a thin JSON API layer around existing backend services.
 
 The API layer should call existing functions such as:
 
-- `submit_registration`
-- `finish_registration`
-- `revalidate_registration`
+- `register_adapter`
+- `update_adapter`
 - `refresh_active_registrations`
 
 Do not move backend business rules into the API route handlers.
@@ -526,17 +516,19 @@ The API route handlers should translate HTTP requests into service calls and ser
 
 ### Phase 6: Complete registration functionality
 
-The frontend should support:
+The implemented registration workflow supports:
 
-- creating a registration
-- showing field-level validation errors
-- showing successful registration submission
-- showing submitted/valid/invalid/fetch-failed registration detail states
-- triggering process/revalidate/retry actions
-- showing revalidation success and failure
-- filtering registry sources
-- running batch refresh
-- showing batch refresh summary
+- one authenticated registration request with live validation checks
+- field-level and available file-position diagnostics
+- confirmed publication or a rejected first attempt without persisted records
+- an unconfirmed result when the terminal response is lost
+- owner-authorized updates and unchanged/failure feedback
+- preserved accepted metadata after failed updates
+- event history and read-only latest batch summary
+
+The former staged process/revalidation actions and browser batch trigger are
+replaced by this contract. Remaining visual milestones can reuse the original
+design principles and prototype references without restoring those old APIs.
 
 ### Phase 7: Prepare for frontend repository extraction
 
@@ -557,8 +549,8 @@ The first milestone is complete when:
 
 - React app runs locally
 - registration form page exists
-- registration detail page handles submitted, valid, invalid, and fetch-failed mock states
-- revalidation result page handles success and failure mock states
+- registration progress/result handles accepted, failed and unconfirmed outcomes
+- owned adapter updates preserve published state when a candidate fails
 - registry operations page includes Material UI-style table behavior at the UI level
 - components are organized by feature and shared primitives
 - styles use centralized tokens

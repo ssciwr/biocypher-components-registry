@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from src.core.dataset.document import DATASET_CONTEXT
-from src.core.validation.mlcroissant import validate_with_mlcroissant
+from src.core.validation.mlcroissant import validate_with_mlcroissant_report
 from src.core.validation.results import ValidationCheck, ValidationResult
 
 
@@ -19,17 +19,19 @@ def validate_dataset(document: dict[str, Any]) -> ValidationResult:
     Returns:
         The validation result for the dataset.
     """
-    mlcroissant_errors = validate_with_mlcroissant(document)
+    report = validate_with_mlcroissant_report(document)
     checks = [
         ValidationCheck(
             name="Croissant compliance",
-            is_valid=len(mlcroissant_errors) == 0,
-            errors=mlcroissant_errors,
+            is_valid=len(report.errors) == 0,
+            errors=report.errors,
+            warnings=report.warnings,
         )
     ]
     return ValidationResult(
         is_valid=all(check.is_valid for check in checks),
         errors=[error for check in checks for error in check.errors],
+        warnings=[warning for check in checks for warning in check.warnings],
         checks=checks,
     )
 

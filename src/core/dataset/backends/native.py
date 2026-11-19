@@ -1,18 +1,13 @@
-"""Native dataset backend that inspects local files and builds metadata in-process."""
+"""Independent native dataset backend and its private in-process builder."""
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
-from croissant_baker.files import discover_files as discover_baker_files
-from croissant_baker.handlers.utils import (
-    compute_file_hash,
-    get_clean_record_name,
-    sanitize_id,
-)
 
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.document import (
@@ -31,23 +26,44 @@ from src.core.validation.dataset import validate_dataset
 
 
 class NativeDatasetGenerator(DatasetGenerator):
-    """Generate dataset metadata directly from supported local file formats."""
+    """Invoke native generation through the common bounded process boundary."""
 
     name = "native"
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
+        """Generate metadata without running native parsing in the caller process."""
+        from src.core.dataset.native_process import generate_native_in_bounded_process
+
+        return generate_native_in_bounded_process(request)
+
+
+class NativeDatasetBuilder:
+    """Build native metadata in-process only inside the private worker."""
+
+    def generate(self, request: GenerationRequest) -> GenerationResult:
         """Inspect input files, build a dataset document, and optionally validate it."""
         input_path = Path(request.input_path).expanduser()
-        files = self._discover_files(input_path)
+        files = self._discover_files(
+            input_path,
+            excluded_path=Path(request.output_path).expanduser(),
+        )
         warnings: list[str] = []
         inspections: list[FileInspection] = []
+        unsupported: list[str] = []
 
         for path in files:
             try:
                 handler = resolve_format_handler(path)
                 inspections.append(handler.inspect(path))
             except UnsupportedFormatError as exc:
-                warnings.append(str(exc))
+                unsupported.append(str(exc))
+
+        if unsupported:
+            details = "; ".join(unsupported)
+            raise InputDiscoveryError(
+                "Native generation requires every selected file to be supported: "
+                f"{details}"
+            )
 
         if not inspections:
             raise InputDiscoveryError(
@@ -85,16 +101,21 @@ class NativeDatasetGenerator(DatasetGenerator):
             warnings=warnings,
         )
 
-    def _discover_files(self, input_path: Path) -> list[Path]:
+    def _discover_files(
+        self, input_path: Path, *, excluded_path: Path | None = None
+    ) -> list[Path]:
         """Resolve the files that should be inspected for one input path."""
         if not input_path.exists():
             raise InputDiscoveryError(f"Input path does not exist: {input_path}")
         if input_path.is_file():
             return [input_path]
-        files = [
-            input_path / relative_path
-            for relative_path in discover_baker_files(str(input_path))
-        ]
+        files = sorted(
+            path
+            for path in input_path.rglob("*")
+            if path.is_file()
+            and not path.is_symlink()
+            and (excluded_path is None or path.resolve() != excluded_path.resolve())
+        )
         if not files:
             raise InputDiscoveryError(f"No files were found under: {input_path}")
         return files
@@ -138,9 +159,10 @@ class NativeDatasetGenerator(DatasetGenerator):
         for index, inspection in enumerate(inspections):
             relative = self._relative_to_input(inspection.path, request.input_path)
             file_id = f"file_{index}"
-            record_set_id = sanitize_id(get_clean_record_name(inspection.path.name))
+            record_name = _record_name(inspection.path.name)
+            record_set_id = _sanitize_id(record_name)
             file_size = str(inspection.path.stat().st_size)
-            sha256 = compute_file_hash(inspection.path)
+            sha256 = _compute_file_hash(inspection.path)
             distributions.append(
                 build_distribution_file(
                     content_url=relative,
@@ -163,7 +185,7 @@ class NativeDatasetGenerator(DatasetGenerator):
             ]
             record_sets.append(
                 build_record_set(
-                    name=get_clean_record_name(inspection.path.name),
+                    name=record_name,
                     fields=fields,
                     record_set_id=record_set_id,
                     description=f"Records from {inspection.path.name}",
@@ -190,6 +212,29 @@ class NativeDatasetGenerator(DatasetGenerator):
             return str(path.relative_to(input_root))
         except ValueError:
             return str(path)
+
+
+def _record_name(filename: str) -> str:
+    """Preserve record IDs while handling a compression suffix explicitly."""
+    path = Path(filename)
+    if path.suffix.lower() in {".bz2", ".gz", ".xz"}:
+        path = Path(path.stem)
+    return path.stem
+
+
+def _sanitize_id(value: str) -> str:
+    """Build a stable Croissant identifier without Baker implementation imports."""
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip()).strip("_")
+    return normalized or "records"
+
+
+def _compute_file_hash(path: Path) -> str:
+    """Hash a native input independently from Croissant Baker internals."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:

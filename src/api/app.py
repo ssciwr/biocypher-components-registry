@@ -6,17 +6,22 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.dependencies import get_registration_store
 from src.api.routers import (
     adapters,
     auth,
+    dataset_uploads,
     health,
     metadata,
     registrations,
     registry,
+    schemas,
     workspace,
 )
 from src.api.settings import settings
+from src.core.dataset.upload.service import UploadSessionManager
 from src.core.workspace.service import SessionManager
+from src.persistence.factory import close_stores
 
 agentic_api_active: bool = False
 
@@ -25,7 +30,10 @@ agentic_api_active: bool = False
 # ===========================================================
 
 
-def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
+def create_app(
+    workspace_manager: SessionManager | None = None,
+    upload_session_manager: UploadSessionManager | None = None,
+) -> FastAPI:
     """Create and configure the FastAPI application.
 
     ``workspace_manager`` is an injection seam for tests; production always
@@ -35,15 +43,31 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):  # pragma: no cover - workspace API is disabled
+        initialize = app.dependency_overrides.get(
+            get_registration_store, get_registration_store
+        )
+        await asyncio.to_thread(initialize)
         app.state.workspace_manager = workspace_manager or SessionManager()
+        app.state.upload_session_manager = (
+            upload_session_manager or UploadSessionManager()
+        )
+        app.state.upload_session_manager.start()
         idle_reaper = asyncio.create_task(app.state.workspace_manager.run_idle_reaper())
+        upload_reaper = asyncio.create_task(
+            app.state.upload_session_manager.run_idle_reaper()
+        )
         try:
             yield
         finally:
             idle_reaper.cancel()
+            upload_reaper.cancel()
             with suppress(asyncio.CancelledError):
                 await idle_reaper
+            with suppress(asyncio.CancelledError):
+                await upload_reaper
             await app.state.workspace_manager.shutdown()
+            await app.state.upload_session_manager.shutdown()
+            close_stores()
 
     app = FastAPI(
         title=settings.app_title,
@@ -57,6 +81,16 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def prevent_upload_response_storage(request, call_next):
+        """Apply no-store headers to upload successes and handled failures."""
+        response = await call_next(request)
+        upload_prefixes = (f"{settings.api_v1_prefix}/metadata/upload-sessions",)
+        if request.url.path.startswith(upload_prefixes):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+        return response
 
     app.include_router(
         auth.router,
@@ -79,6 +113,11 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         tags=["metadata"],
     )
     app.include_router(
+        dataset_uploads.router,
+        prefix=settings.api_v1_prefix,
+        tags=["metadata"],
+    )
+    app.include_router(
         registrations.router,
         prefix=settings.api_v1_prefix,
         tags=["registrations"],
@@ -88,6 +127,7 @@ def create_app(workspace_manager: SessionManager | None = None) -> FastAPI:
         prefix=settings.api_v1_prefix,
         tags=["registry"],
     )
+    app.include_router(schemas.router, prefix=settings.api_v1_prefix, tags=["schemas"])
     if agentic_api_active:
         app.include_router(
             workspace.router,

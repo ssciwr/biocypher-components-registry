@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This document defines how the future React frontend should consume the current
-FastAPI API.
+This document defines how the implemented React frontend consumes the FastAPI
+API and which contracts new screens must preserve.
 
 It is a screen-by-screen contract for frontend implementation. It does not
 replace the OpenAPI schema; it explains which endpoints each screen needs, what
@@ -13,7 +13,7 @@ The frontend should treat the backend as the source of truth for:
 
 - metadata validation
 - repository discovery
-- registration status transitions
+- registration publication and attempt outcomes
 - duplicate detection
 - checksum/change detection
 - persistence
@@ -48,7 +48,12 @@ Do not hardcode `/api/v1` across individual components.
 The frontend should use dedicated API-client functions instead of raw `fetch`
 calls scattered through page components.
 
-Recommended first module shape:
+Registration uses the generated client in `frontend/src/api/client/` and the
+stream wrapper in `frontend/src/api/registration.ts`. Regenerate the contract
+with `pnpm run openapi-ts` when API schemas change. The wrapper consumes progress
+events without automatically retrying the publication POST.
+
+The original suggested module separation remains:
 
 ```text
 frontend/src/api/client.ts
@@ -68,6 +73,15 @@ Recommended response handling:
   Backend rejected a validly shaped request during processing.
   Display detail as an operation error.
 
+401
+  Sign-in is required for publication.
+
+403
+  The current account does not own the source/adapter being modified.
+
+409
+  Repository already registered or a concurrent change prevented acceptance.
+
 404
   Requested registration, registry entry, adapter, or refresh does not exist.
   Display a not-found state.
@@ -85,69 +99,50 @@ Recommended response handling:
 | Frontend Screen | Endpoint(s) | Purpose |
 | --- | --- | --- |
 | Health/dev status | `GET /api/v1/health` | Confirm backend availability during development. |
-| Registration form | `POST /api/v1/registrations` | Submit one adapter repository for tracking. |
-| Registration detail | `GET /api/v1/registrations/{registration_id}` | Show registration status, metadata, and validation results. |
+| Registration form | `POST /api/v1/registrations/stream` (or JSON `POST /api/v1/registrations`) | Validate and accept one repository in a single operation. |
+| Registration detail | `GET /api/v1/registrations/{registration_id}` | Show accepted metadata, published version and latest attempt. |
 | Registration events | `GET /api/v1/registrations/{registration_id}/events` | Show event history/timeline. |
-| Registration actions | `POST /api/v1/registrations/{registration_id}/process`, `POST /api/v1/registrations/{registration_id}/revalidate` | Process or revalidate one registration. |
-| Registry operations | `GET /api/v1/registry/registrations`, `POST /api/v1/registry/refreshes`, `GET /api/v1/registry/refreshes/latest` | Maintainer overview and batch refresh. |
+| Adapter update | `POST /api/v1/adapters/{adapter_id}/update` | Owner-authorized refresh of a published adapter. |
+| Validation schema | `GET /api/v1/schemas/{version}` | Read the exact deployed adapter schema. |
+| Registry operations | `GET /api/v1/registry/registrations`, `GET /api/v1/registry/refreshes/latest` | Read published source/attempt state and the last CLI batch summary. |
 | Registry entries | `GET /api/v1/registry/entries`, `GET /api/v1/registry/entries/{entry_id}` | Maintainer canonical entry inspection. |
 | Adapter catalog | `GET /api/v1/adapters` | Public list of valid adapters. |
 | Adapter detail | `GET /api/v1/adapters/{adapter_id}` | Public detail for one adapter and its versions. |
-| Adapter metadata | `GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata` | Full Croissant metadata for one adapter version. |
+| Adapter metadata | `GET /api/v1/adapters/{adapter_id}/metadata` | Latest accepted Croissant metadata for one adapter. |
 | Metadata validation | `POST /api/v1/metadata/validate` | Validate inline adapter or dataset metadata. |
-| Dataset metadata generation | `POST /api/v1/metadata/datasets/generate` | Generate dataset Croissant metadata from server-visible files. |
+| Dataset metadata generation | `POST /api/v1/metadata/datasets/generate` | Generate dataset Croissant metadata from one multipart file upload. |
+| Browser dataset generation | `POST /api/v1/metadata/upload-sessions`, artifact `PUT`, finalize `POST`, status `GET`, session `DELETE` | Prepare a selected file/folder in the browser and generate without persistent upload storage. |
 | Adapter metadata generation | `POST /api/v1/metadata/adapters/generate` | Generate adapter metadata with existing or generated datasets. |
 
 ## Shared Types
 
-### Registration Status
+### Registration Attempt Status
 
-The frontend should treat registration status as an enum-like string.
-
-Known values:
+Terminal attempts use:
 
 ```text
-SUBMITTED
-VALID
-INVALID
-FETCH_FAILED
+SUCCEEDED
+FAILED
 ```
 
-UI display guidance:
+Keep this separate from `published_version`, `update_applied` and
+`latest_event_type`. A failed update can coexist with a valid published version.
+There is no registration lifecycle `status` field.
 
-```text
-SUBMITTED
-  Neutral or info state. Processing has not completed yet.
-
-VALID
-  Success state. A canonical registry entry may exist.
-
-INVALID
-  Warning/error state. Validation errors should be visible.
-
-FETCH_FAILED
-  Warning/error state. Repository or metadata discovery failed.
-```
+Active request states (processing/retrying) are local UI state. A disconnected
+request without a final result is **Unconfirmed**; it is not proof that the
+server rejected or rolled back publication.
 
 ### Registration Event Types
 
-Known event types currently used by registry workflows:
+Persisted success events include `VALID_CREATED` and `UNCHANGED`. Failure names
+describe retrieval, validation, identity or version conflicts, for example
+`FETCH_FAILED`, `INVALID_JSON`, `INVALID_SCHEMA`, `INVALID_MLCROISSANT`,
+`REJECTED_SAME_VERSION_CHANGED`, `DUPLICATE` and `ADAPTER_ID_CHANGED`.
 
-```text
-SUBMITTED
-VALID_CREATED
-UNCHANGED
-DUPLICATE
-REJECTED_SAME_VERSION_CHANGED
-INVALID_SCHEMA
-INVALID_MLCROISSANT
-INVALID_BOTH
-FETCH_FAILED
-REVALIDATED
-```
-
-Frontend event rendering should not assume this list is exhaustive. Unknown
-event types should still render as text.
+First-registration failures create no event. Historical names such as
+`SUBMITTED` and `REVALIDATED` are not emitted by the current workflow. Event
+rendering must preserve unknown names instead of assuming a closed enum.
 
 ### Validation Result
 
@@ -173,217 +168,129 @@ Use `is_valid` for the summary state. Use `checks` for detailed diagnostic UI.
 
 ## Registration Form
 
-Primary route suggestion:
-
-```text
-/registrations/new
-```
-
-Endpoint:
-
-```text
-POST /api/v1/registrations
-```
+The current registration page uses `POST /api/v1/registrations/stream`; JSON
+clients can use `POST /api/v1/registrations`. Both call the same core operation
+and require the existing signed-in GitHub cookie session.
 
 Request fields:
 
-| Field | Required | UI Control | Notes |
-| --- | --- | --- | --- |
-| `adapter_name` | Yes | Text input | Human-readable name. Frontend should trim before submit. |
-| `repository_location` | Yes | Text input | Local server path or supported remote repository URL. |
-
-UI-only field:
-
-| Field | Sent to API | Notes |
+| Field | Required | Notes |
 | --- | --- | --- |
-| `confirm_croissant_root` | No | Checkbox reminding users that `croissant.jsonld` must be at repository root. |
+| `repository_location` | Yes | Browser publishing uses a public HTTPS repository with root-level metadata on its default branch. |
+| `license_value` | No | Optional submitted license text. |
+| `doi` | No | Optional DOI. |
+| `cff_url` | No | Optional Citation File Format URL. |
 
-Successful response fields used by UI:
+Name and adapter identity derive from the metadata; owner identity derives from
+the authenticated account. `confirm_croissant_root` remains UI-only state.
+
+The form checks `GET /api/v1/registrations/croissant-file-present-check` before
+submission. Repository changes invalidate earlier preflight results. A passing
+preflight does not guarantee acceptance because registration retrieves fresh
+metadata and applies all validation and ownership rules.
+
+Terminal response fields used by the UI:
 
 ```text
-registration_id
-adapter_name
-adapter_id
-repository_location
-repository_kind
-status
-created_at
+attempt_status
+registration_id / adapter_id / adapter_name / repository_location (when accepted)
+published_version
+update_applied
+reason_code
+message
+validation_errors
+validation_details
+validation_checks
+profile_version
 ```
 
-Success behavior:
+Successful first acceptance returns JSON `201`, or an SSE terminal `result`
+after the atomic commit. A rejected first candidate returns a terminal `FAILED`
+attempt without a persisted source, entry or event; a corrected submission may
+retry the same version. JSON processing failures normally use HTTP `200`.
 
-- Show a success confirmation.
-- Navigate to `/registrations/{registration_id}` or provide a clear link.
-- Keep the status visible, usually `SUBMITTED`.
+Stream handling:
 
-Validation and error states:
+| Event | UI behavior |
+| --- | --- |
+| `snapshot` | Initialize ordered validation checks. |
+| `check` | Replace/add the matching check by ID. |
+| `result` | Render the terminal attempt and published version. |
+| `error` | Render the reported request/processing error. |
 
-- Empty `adapter_name`: show client-side required-field message.
-- Empty `repository_location`: show client-side required-field message.
-- Backend `400`: show operation-level error, such as unsupported repository URL
-  or missing local path.
-- Backend `422`: show request validation errors near fields when possible.
+Heartbeat comments carry no result. Render file/JSON, Croissant, adapter profile,
+semantic and per-dataset checks separately. Check states are `PENDING`, `RUNNING`,
+`PASSED`, `FAILED` and `NOT_RUN`; these are distinct from terminal attempt status.
+Show available file positions, JSON paths, requirements and expected formats.
+The schema viewer loads `GET /api/v1/schemas/{version}` and displays the applied
+schema/validator provenance. Do not invent missing diagnostic positions.
 
-Manual verification reference:
+A stream opening or a passed check does not confirm persistence. If the
+connection ends without a terminal result, display **Unconfirmed** and direct
+the user to inspect the adapter catalog before retrying. The service may have
+completed after disconnect; never automatically reconnect or repeat this POST.
 
-```bash
-http POST :8000/api/v1/registrations \
-  adapter_name="Manual Example Adapter" \
-  repository_location=/tmp/biocypher-api-manual-adapter
-```
+Handle `401` with sign-in feedback, `403` as an ownership rejection, `409` as an
+already accepted repository/concurrent conflict, and `422` as request validation
+errors. The JSON API also accepts server-local paths for development; see the
+[manual verification guide](../../c_verification/api_manual_verification.md)
+for an authenticated HTTPie example.
 
 ## Registration Detail
 
-Primary route suggestion:
-
-```text
-/registrations/:registrationId
-```
-
-Endpoints:
+Read endpoints:
 
 ```text
 GET /api/v1/registrations/{registration_id}
 GET /api/v1/registrations/{registration_id}/events
-POST /api/v1/registrations/{registration_id}/process
-POST /api/v1/registrations/{registration_id}/revalidate
 ```
 
-Detail response fields used by UI:
+Detail fields include source identifiers and normalized repository details,
+`published_version`, `latest_attempt`, timestamps, `metadata`, `metadata_path`,
+`profile_version`, `uniqueness_key` and validation errors. Event fields retain
+their source/entry identifiers, event type, message, profile/errors, checksum,
+validation outcomes and start/finish timestamps.
 
-```text
-registration_id
-adapter_name
-adapter_id
-repository_location
-repository_kind
-status
-created_at
-metadata_path
-metadata
-profile_version
-updated_at
-uniqueness_key
-validation_errors
-```
+Primary UI regions remain source information, accepted metadata, latest attempt
+diagnostics and event history. Present the accepted version separately from the
+latest failed candidate; a failed update does not unpublish accepted metadata.
 
-Event response fields used by UI:
+Published adapter detail exposes `can_update` and `can_delete` from the backend.
+Only the owner can invoke `POST /api/v1/adapters/{adapter_id}/update`. This
+replaces the former process/revalidation actions. After an update, refresh
+accepted detail and history; use the returned attempt to show diagnostics.
 
-```text
-event_id
-event_type
-message
-profile_version
-error_details
-observed_checksum
-mlcroissant_valid
-schema_valid
-started_at
-finished_at
-registry_entry_id
-```
+- Unchanged metadata succeeds without replacing the entry.
+- Changed metadata must preserve identity and use a different, unused label.
+  Semantic-version ordering is not enforced.
+- Failed updates retain the accepted version and append terminal history.
+- Rejected first registrations are corrected and resubmitted through the form;
+  there is no failed-source detail record to revalidate.
 
-Primary UI regions:
-
-- registration summary
-- status badge
-- repository information
-- validation result/errors
-- current metadata section, if present
-- event timeline
-- action area
-
-Action rules:
-
-```text
-SUBMITTED
-  Show "Process registration".
-
-INVALID
-  Show "Revalidate".
-
-FETCH_FAILED
-  Show "Revalidate".
-
-VALID
-  Show read-only status and canonical information.
-```
-
-The backend remains the source of truth. If the frontend shows an action that
-the backend rejects, display the backend error and refresh the detail view.
-
-Refresh behavior after actions:
-
-- `process` returns the updated registration detail shape.
-- `revalidate` returns the updated registration detail shape.
-- After either action, refresh the events endpoint or update the event list from
-  a follow-up fetch.
-
-Empty/loading/error states:
-
-- Loading: show skeleton or progress area for summary and events.
-- `404`: show registration not found.
-- `400`: show action failed with backend detail.
-- No events: show a neutral "No event history yet" message.
-- No metadata: show "Metadata not discovered yet."
+Keep loading and not-found states explicit. Missing historical events should
+produce a neutral empty timeline, and rejected actions should display the
+backend error before refreshing accepted state.
 
 ## Registry Operations
 
-Primary route suggestion:
-
-```text
-/registry
-```
-
-Endpoints:
+The registry read boundary remains:
 
 ```text
 GET /api/v1/registry/registrations
-GET /api/v1/registry/registrations?status=INVALID&latest_event=FETCH_FAILED
-POST /api/v1/registry/refreshes
+GET /api/v1/registry/registrations?latest_event=FETCH_FAILED
 GET /api/v1/registry/refreshes/latest
 GET /api/v1/registry/entries
 ```
 
-Registration table fields:
+Overview rows expose `registration_id`, `adapter_name`, `adapter_id`, repository
+kind/location, `published_version`, `latest_attempt`, `latest_event_type`,
+timestamps, profile and uniqueness information. Lists omit full Croissant
+metadata. The former lifecycle `status` field/filter is removed; `latest_event`
+accepts strict supported values and invalid values return `422`.
 
-```text
-registration_id
-adapter_name
-adapter_id
-repository_kind
-repository_location
-status
-latest_event_type
-created_at
-updated_at
-profile_version
-uniqueness_key
-```
-
-Supported filters:
-
-```text
-status
-latest_event
-```
-
-The backend uses strict query values. Unsupported values return `422`.
-
-Batch refresh response fields:
-
-```text
-active_sources
-processed
-valid_created
-unchanged
-invalid
-duplicate
-rejected_same_version_changed
-fetch_failed
-```
-
-Latest refresh response fields:
+Batch refresh is a trusted CLI `refresh-registry` operation. There is no HTTP
+batch-trigger route or browser batch button in this implementation. The read-only
+latest-summary response contains:
 
 ```text
 refresh_id
@@ -397,27 +304,12 @@ invalid
 duplicate
 rejected_same_version_changed
 fetch_failed
+internal_failed
 ```
 
-Primary UI regions:
-
-- status/event filters
-- active registration table
-- batch refresh action
-- latest refresh summary
-- optional canonical entries table
-
-Action behavior:
-
-- Disable "Run batch refresh" while request is in flight.
-- On success, update the summary and reload the registration table.
-- On failure, keep the previous table visible and show an operation-level error.
-
-Empty states:
-
-- No active registrations: show a clear empty state and link to registration form.
-- No latest refresh: display "No batch refresh has been run yet." The endpoint
-  returns `404` in this case.
+Retain clear empty states: no published sources links back to registration;
+`404` for the latest summary means no batch has completed. A failed background
+read should keep the previous accepted data visible with an operation error.
 
 ## Adapter Catalog
 
@@ -445,7 +337,7 @@ version_count
 Important behavior:
 
 - Only canonical valid registry entries appear in the adapter catalog.
-- `SUBMITTED`, `INVALID`, and `FETCH_FAILED` registrations should not appear.
+- Rejected first candidates never appear. Published adapters remain visible after a failed update.
 - This is a public read model, not a maintainer operations table.
 
 Empty state:
@@ -464,7 +356,7 @@ Endpoints:
 
 ```text
 GET /api/v1/adapters/{adapter_id}
-GET /api/v1/adapters/{adapter_id}/versions/{version}/metadata
+GET /api/v1/adapters/{adapter_id}/metadata
 ```
 
 Detail fields:
@@ -500,16 +392,16 @@ metadata
 
 UI behavior:
 
-- Show all registered versions.
-- Make the latest version visually clear.
-- Fetch full metadata only when the user opens a version detail or metadata
+- Show registered versions and the latest attempt separately.
+- Make the published version visually clear.
+- Fetch full accepted metadata only when the user opens a metadata
   panel. Do not fetch full metadata for the catalog list.
 - Render metadata in a readable JSON viewer or structured summary.
 
 Error states:
 
 - `404` adapter not found.
-- `404` version not found.
+- Missing metadata uses the backend not-found response.
 
 ## Metadata Workspace
 
@@ -519,8 +411,19 @@ Primary route suggestion:
 /metadata
 ```
 
-This area is more advanced because the current API works with server-side paths
-visible to the backend process. The frontend must communicate that clearly.
+The workspace supports two independent browser workflows:
+
+- **Generate from source data:** the user selects one data file or a folder. The
+  browser prepares bounded artifacts and uses ephemeral upload sessions to
+  generate dataset Croissant metadata.
+- **Import existing metadata:** the user selects a dataset Croissant JSON-LD
+  file. The browser parses it locally and populates the editable fields without
+  creating an upload session.
+
+Both workflows produce an editable dataset draft and converge only when the
+frontend sends dataset documents for final adapter generation. UI copy must not
+present a browser-local path as a server path or imply that uploaded data is
+persistent.
 
 ### Validate Metadata
 
@@ -563,7 +466,7 @@ POST /api/v1/metadata/datasets/generate
 Request fields:
 
 ```text
-input_path
+file (required binary upload)
 generator
 validate
 name
@@ -571,10 +474,13 @@ description
 url
 license
 citation
+content_url
 dataset_version
 date_published
-creators
-extra_args
+encoding_format
+filename
+sha256
+creators_json
 ```
 
 Allowed `generator` values:
@@ -588,9 +494,9 @@ native
 Default UI behavior:
 
 - `validate` should default to `true`.
-- `generator` can default to `auto` or `native` depending on product choice.
-- Make clear that `input_path` is a backend-visible path, not a browser file
-  upload.
+- `generator` defaults to `auto`.
+- Treat this endpoint as a standalone one-file multipart API operation. The
+  React file/folder workflow uses upload sessions instead.
 
 Response fields:
 
@@ -602,6 +508,52 @@ stderr
 warnings
 validation
 ```
+
+For browser-selected source data, the React application uses the upload-session
+protocol for both a single file and a folder. It does not call the standalone
+multipart endpoint above. The browser accepts one UTF-8 CSV/TSV file or a folder
+of up to 1,000 CSV/TSV files, including `.csv.gz` and `.tsv.gz`. It hashes the
+original bytes, uses complete files up to 1 MiB, and prepares complete-row
+samples for larger plain files and gzip sources. The declared artifacts are
+limited to 1 MiB each and 50 MiB per session.
+
+Importing an existing dataset Croissant file is separate from source-data
+generation. The browser reads the JSON-LD document locally, projects supported
+properties into the editor, and preserves unrepresented properties. No dataset
+upload session or standalone generation request is created for this import.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as React
+    participant H as Web workers
+    participant A as Upload API
+
+    U->>F: Select file or folder
+    F->>H: Prepare and hash artifacts
+    H-->>F: Inventory and artifacts
+    F->>A: Create session
+    A-->>F: Session id and token
+    loop Each entry
+        F->>A: Upload artifact and hashes
+        A-->>F: Verified progress
+    end
+    F->>A: Finalize
+    A-->>F: Queued
+    loop Until terminal
+        F->>A: Poll status
+        A-->>F: State or result
+    end
+    F->>A: Delete session
+    F-->>U: Show editable metadata
+```
+
+The frontend keeps the bearer token out of URLs and persistent browser storage.
+It treats `429` as admission backpressure and honors `Retry-After`; prepared
+artifacts can be retried while their in-memory handles remain available. A lost
+backend process loses the session, and reselecting the source may be required.
+Cancellation is allowed only before finalization starts. The terminal response
+contains generated metadata, selected generator, warnings, and validation.
 
 ### Generate Adapter Metadata
 
@@ -681,8 +633,8 @@ validation
 Use loading indicators for:
 
 - initial page data fetch
-- process/revalidate actions
-- batch refresh
+- registration and owner-authorized update actions
+- registry summary reads
 - metadata generation
 - metadata validation
 
@@ -737,16 +689,15 @@ Before considering a screen complete:
 
 - It handles `400`, `404`, and `422` responses where applicable.
 - It does not request full metadata for list/table pages.
-- It can recover after process/revalidate/refresh actions.
+- It refreshes accepted state after owned updates and handles unconfirmed registration outcomes.
 - It renders unknown event types without crashing.
 - It has a manual verification path.
 
 ## Deferred Decisions
 
-- Authentication and authorization for maintainer-facing registry operations.
+- Administrator authorization for future global maintenance operations; publication already requires GitHub identity.
 - Pagination for large registration and adapter lists.
 - Server-side sorting and search.
-- Browser file upload support for metadata validation/generation.
 - Whether the metadata workspace should remain an expert tool or become a main
   user-facing workflow.
 - Whether public adapter catalog query helpers should move from API-only logic

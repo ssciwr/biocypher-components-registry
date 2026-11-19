@@ -22,9 +22,13 @@ def test_build_adapter_document_assembles_expected_shape() -> None:
         ],
         keywords=["adapter", "biocypher"],
         datasets=[{"@type": "sc:Dataset", "name": "Example dataset"}],
+        granularity="Secondary",
     )
 
     assert document["@type"] == "SoftwareSourceCode"
+    assert document["componentType"] == "adapter"
+    assert document["granularity"] == "Secondary"
+    assert document["@context"]["granularity"].endswith("/granularity")
     assert document["@id"] == "example-adapter"
     assert document["creator"][0]["name"] == "Edwin Carreno"
     assert document["keywords"] == ["adapter", "biocypher"]

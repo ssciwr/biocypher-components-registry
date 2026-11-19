@@ -16,47 +16,37 @@ Defer the following decisions while preserving their architecture boundaries.
 
 ### Frontend API Type Generation
 
-Decision: do not generate frontend API types from OpenAPI yet.
+Implemented. The React application consumes generated TypeScript types and
+clients under `frontend/src/api/client/`. Run `pnpm run openapi-ts` from
+`frontend/` after changing the FastAPI contract; the command exports the
+OpenAPI document before regenerating the client.
 
-Generate or document frontend API types when the React frontend starts calling
-real API endpoints.
-
-Reason:
-
-- OpenAPI should exist early.
-- Type generation is valuable only once the React app consumes the API.
-- Deferring avoids adding frontend tooling before it is needed.
+The original boundary remains: FastAPI's OpenAPI schema is the source for
+frontend transport types, so API models are not maintained independently in
+React.
 
 ### Registry Run Summary Persistence
 
-Decision: decide after the initial API skeleton.
+Implemented for CLI batch refreshes in `registry_refreshes`. Each completed run
+records its identifier, timestamps and outcome counters, including separate
+fetch and internal failures. Read the latest summary through
+`GET /api/v1/registry/refreshes/latest` or `show-latest-refresh`.
 
-Start by returning the current counter-based summary through the API. Add a
-persisted run table, such as `registration_runs` or `processing_runs`, when
-batch refresh becomes a first-class API workflow.
-
-Reason:
-
-- current behavior can be wrapped incrementally
-- project requirements call for timestamped run identifiers and aggregate run
-  reporting
-- the persistence shape should be designed with API response and reporting
-  needs visible
+The original reporting boundary remains: summaries are produced by shared core
+services and persisted through the store port. There is no public HTTP batch
+mutation endpoint or scheduled worker in this implementation.
 
 ### Maintainer Authentication
 
-Decision: defer the mechanism, but preserve the boundary.
+Registration now requires a verified GitHub account. Browser requests use the
+existing OAuth cookie session; CLI `register` and `update` use device
+authorization and call shared services directly after verification and temporary
+token revocation. Owner checks protect published adapter updates.
 
-Treat `Registry`, refresh, and revalidation operations as maintainer-facing. Do
-not hardcode an auth approach until deployment assumptions are clearer.
-
-Potential future options:
-
-- local-only access
-- reverse-proxy authentication
-- GitHub OAuth
-- institutional SSO
-- API tokens
+Batch refresh remains a trusted CLI maintenance operation. A broader
+administrator role, institutional SSO, API tokens and authorization for future
+operator workflows remain deployment decisions. This change does not redefine
+the agentic workspace's authentication boundary.
 
 ### MCP Retrieval
 
@@ -104,9 +94,8 @@ Tradeoffs:
 
 ## Follow-Up
 
-- Revisit run summary persistence after the initial API routes exist.
-- Revisit authentication before exposing maintainer workflows beyond local
-  development.
+- Keep persisted batch summaries aligned with processing outcome counters.
+- Revisit administrator authorization before exposing global maintenance actions.
 - Revisit MCP after registry read/query services are stable.
 - Keep any future automation on top of the shared registration and registry
   services rather than reintroducing a separate scripts pipeline.
