@@ -120,11 +120,15 @@ def _valid_adapter_document(
 )
 def test_submit_registration_rejects_main_master_branch_duplicate(
     tmp_path: Path,
+    monkeypatch,
     main_url: str,
     master_url: str,
     canonical_url: str,
 ) -> None:
     """Reject branch-specific URLs that resolve to the same repository root."""
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.example.org"
+    )
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     first = submit_registration(main_url, store)
 
@@ -154,6 +158,7 @@ def test_submit_registration_rejects_main_master_branch_duplicate(
 )
 def test_submit_registration_reuses_failed_registration_to_complete_reattempt_with(
     tmp_path: Path,
+    monkeypatch,
     main_url: str,
     master_url: str,
     canonical_url: str,
@@ -161,6 +166,9 @@ def test_submit_registration_reuses_failed_registration_to_complete_reattempt_wi
     """Reuse a failed registration if the user provides a url for one which has already failed later on in a "resubmission"
     Test based on `test_submit_registration_rejects_main_master_branch_duplicate`.
     """
+    monkeypatch.setenv(
+        "REGISTRY_ALLOWED_REPOSITORY_HOSTS", "github.com,gitlab.example.org"
+    )
     store = SQLiteRegistrationStore(tmp_path / "registry.sqlite3")
     first = submit_registration(main_url, store)
     store.mark_registration_invalid(first.registration_id, ["Invalid metadata."], None)
