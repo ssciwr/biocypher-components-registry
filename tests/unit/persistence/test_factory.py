@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.core.settings import get_registration_database_path, settings
+import pytest
+
+from src.core.settings import (
+    DatabaseBackend,
+    DatabaseSettings,
+    get_registration_database_path,
+    settings,
+)
+from src.persistence.errors import DatabaseSetupError
 from src.persistence.factory import build_registration_store
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 
@@ -20,7 +28,7 @@ def test_registration_database_path_uses_environment_override(
 ) -> None:
     """Shared settings expose the deployment database path override."""
     database_path = tmp_path / "registry.sqlite3"
-    monkeypatch.setenv(settings.registry_db_path_env, str(database_path))
+    monkeypatch.setenv(settings.sqlite_database_path_env, str(database_path))
 
     assert get_registration_database_path() == database_path
 
@@ -32,3 +40,40 @@ def test_registration_store_factory_builds_sqlite_store(tmp_path: Path) -> None:
     store = build_registration_store(database_path)
 
     assert isinstance(store, SQLiteRegistrationStore)
+
+
+def test_store_is_reused_without_reinitializing_schema(tmp_path, monkeypatch):
+    from src.persistence.factory import build_auth_session_store
+
+    path = tmp_path / "registry.sqlite3"
+    first = build_registration_store(path)
+
+    def reject_schema_changes(*args):
+        raise AssertionError("Existing store must not initialize the schema again")
+
+    monkeypatch.setattr(
+        SQLiteRegistrationStore, "_initialize_database", reject_schema_changes
+    )
+    assert build_registration_store(path) is first
+    first_auth = build_auth_session_store(path)
+    assert build_auth_session_store(path) is first_auth
+    assert first_auth.engine is first.engine
+
+
+def test_registration_store_redacts_low_level_setup_failures(tmp_path, monkeypatch):
+    from src.persistence import factory
+
+    def fail_to_open(_):
+        raise OSError("credential-token-must-not-leak")
+
+    monkeypatch.setattr(factory, "SQLiteRegistrationStore", fail_to_open)
+    configured = DatabaseSettings(
+        backend=DatabaseBackend.SQLITE,
+        sqlite_database_path=tmp_path / "unavailable" / "registry.sqlite3",
+    )
+
+    with pytest.raises(DatabaseSetupError) as error:
+        build_registration_store(database_settings=configured)
+
+    assert "Database setup failed" in str(error.value)
+    assert "credential-token-must-not-leak" not in str(error.value)
