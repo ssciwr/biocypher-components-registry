@@ -6,6 +6,28 @@ many test files (see SonarQube duplicated-lines findings).
 
 from __future__ import annotations
 
+from copy import deepcopy
+
+from src.core.shared.constants import STANDARD_CONTEXT
+
+_ADAPTER_CONTEXT_TERMS = (
+    "@language",
+    "@vocab",
+    "citeAs",
+    "column",
+    "conformsTo",
+    "cr",
+    "dataType",
+    "dct",
+    "examples",
+    "extract",
+    "field",
+    "fileObject",
+    "recordSet",
+    "sc",
+    "source",
+)
+
 
 def sample_dataset_document() -> dict:
     """Return a minimal valid Croissant dataset document for test fixtures."""
@@ -51,4 +73,32 @@ def sample_dataset_document() -> dict:
                 ],
             }
         ],
+    }
+
+
+def sample_adapter_document() -> dict:
+    return {
+        "@context": deepcopy(
+            {term: STANDARD_CONTEXT[term] for term in _ADAPTER_CONTEXT_TERMS}
+        ),
+        "@type": "SoftwareSourceCode",
+        "@id": "example-adapter",
+        "name": "Example Adapter",
+        "description": "Adapter description",
+        "conformsTo": "https://bioschemas.org/profiles/ComputationalTool/1.0-RELEASE/",
+        "version": "1.0.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://example.org/repo",
+        "programmingLanguage": "Python",
+        "targetProduct": "BioCypher",
+        "creator": [
+            {
+                "@type": "sc:Person",
+                "name": "Example Creator",
+                "affiliation": "SSC",
+                "identifier": "https://orcid.org/0000-0000-0000-0000",
+            }
+        ],
+        "keywords": ["adapter", "biocypher"],
+        "hasPart": [sample_dataset_document()],
     }
