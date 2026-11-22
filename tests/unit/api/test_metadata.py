@@ -379,6 +379,18 @@ def test_generate_dataset_metadata_endpoint_requires_file() -> None:
     assert response.status_code == 422
 
 
+def test_generate_dataset_metadata_openapi_declares_required_multipart() -> None:
+    """Keep the generated client contract aligned with runtime validation."""
+    operation = create_app().openapi()["paths"][DATASET_GENERATE_PATH]["post"]
+
+    assert operation["requestBody"]["required"] is True
+    multipart_schema = operation["requestBody"]["content"]["multipart/form-data"][
+        "schema"
+    ]
+    assert multipart_schema["required"] == ["file"]
+    assert "422" in operation["responses"]
+
+
 # Covers compact helper edges for metadata upload/generation routing.
 def test_metadata_helpers_handle_parse_edges_and_file_fallback(tmp_path: Path) -> None:
     output_path = tmp_path / "metadata.jsonld"
