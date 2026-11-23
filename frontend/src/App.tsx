@@ -7,6 +7,7 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
 import AppHeader from './components/AppHeader'
+import AdapterSearch from './components/AdapterSearch'
 import type { AuthUser } from './components/AppHeader'
 import CreatePage from './pages/CreatePage'
 import CreateAdapterMetadataPage from './pages/CreateAdapterMetadataPage'
@@ -221,28 +222,20 @@ function HomePage({ backendOnline }: { backendOnline: boolean }) {
             Search adapters, create Croissant metadata, and submit your adapter repository to us
           </p>
 
-          <label className="mx-auto mt-14 flex max-w-3xl items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm">
-            <MagnifyingGlassIcon className="h-5 w-5 flex-none text-slate-300" aria-hidden="true" />
-            <input
-              aria-label="Search adapters"
-              className="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-500"
-              placeholder="Search adapters..."
-              type="search"
-            />
-          </label>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
-            <span>Popular:</span>
-            {popularAdapters.map((adapter) => (
-              <a
-                className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
-                href={`/adapters?query=${encodeURIComponent(adapter)}`}
-                key={adapter}
-              >
-                {adapter}
-              </a>
-            ))}
-          </div>
+          <AdapterSearch showLatest={false}>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
+              <span>Popular:</span>
+              {popularAdapters.map((adapter) => (
+                <a
+                  className="min-w-32 rounded-lg border border-slate-200 bg-white px-5 py-2 text-slate-800 hover:border-blue-200 hover:text-blue-600"
+                  href={`/adapters?query=${encodeURIComponent(adapter)}`}
+                  key={adapter}
+                >
+                  {adapter}
+                </a>
+              ))}
+            </div>
+          </AdapterSearch>
         </div>
       </section>
 
