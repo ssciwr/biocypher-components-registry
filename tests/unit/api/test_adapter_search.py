@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 from sqlalchemy import update
 
-from src.core.adapter.service import create_registration_request
 from src.persistence.registration_sqlite_store import SQLiteRegistrationStore
 from src.persistence.tables import registry_entries_table
+from tests.support.registration_fixtures import accepted_source
 from tests.unit.api.adapter_test_helpers import create_adapter_client
 
 
@@ -24,23 +24,15 @@ def search_store(tmp_path: Path) -> SQLiteRegistrationStore:
     for position, (adapter_id, adapter_name, keywords, is_active) in enumerate(
         adapter_metadata, start=1
     ):
-        registration = store.create_registration(
-            create_registration_request(
-                repository_location=f"https://github.com/example/{adapter_id}"
-            )
-        )
-        store.mark_registration_valid(
-            registration_id=registration.registration_id,
+        registration = accepted_source(
+            store,
+            f"https://github.com/example/{adapter_id}",
             metadata={
                 "@id": adapter_id,
                 "name": adapter_name,
                 "version": "1.0.0",
                 "keywords": keywords,
             },
-            metadata_path="croissant.jsonld",
-            profile_version="v1",
-            uniqueness_key=f"{adapter_id}::1.0.0",
-            observed_checksum=f"checksum-{adapter_id}",
         )
         with store.engine.begin() as connection:
             connection.execute(
