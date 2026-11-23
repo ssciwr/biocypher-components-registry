@@ -87,13 +87,16 @@ def list_latest_adapters(
 @router.get(
     "/adapters/search",
     summary="Search public adapters",
-    description="Return public adapter cards whose title matches the search term.",
+    description=(
+        "Return public adapter cards whose title or keywords match the search term, "
+        "ignoring whitespace and letter case."
+    ),
 )
 def search_adapters(
     query: Annotated[str, Query(min_length=1)],
     store: RegistrationStoreDep,
 ) -> AdapterLatestListResponse:
-    """Return adapter cards from the PostgreSQL-backed title search."""
+    """Return adapter cards whose title or keywords match the query."""
     search_entries = getattr(store, "search_registry_entries_by_adapter_name", None)
     if not callable(search_entries):
         return AdapterLatestListResponse(items=[])
