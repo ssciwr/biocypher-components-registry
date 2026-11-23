@@ -99,6 +99,19 @@ def test_postgres_backend_requires_every_connection_component(
         load_database_settings()
 
 
+@pytest.mark.parametrize(
+    "compose_file", ["docker-compose-sqlite.yml", "docker-compose-postgresql.yml"]
+)
+def test_compose_repository_policy_defaults_to_public_hosts(compose_file):
+    root = Path(__file__).resolve().parents[3]
+    compose = yaml.safe_load((root / compose_file).read_text())
+    environment = compose["services"]["backend"]["environment"]
+    # Compose's :- operator applies the default for both unset and empty values.
+    assert environment["REGISTRY_ALLOWED_REPOSITORY_HOSTS"] == (
+        "${REGISTRY_ALLOWED_REPOSITORY_HOSTS:-github.com,gitlab.com}"
+    )
+
+
 def test_compose_backends_override_host_database_configuration():
     root = Path(__file__).resolve().parents[3]
     sqlite = yaml.safe_load((root / "docker-compose-sqlite.yml").read_text())
