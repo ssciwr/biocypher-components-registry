@@ -44,7 +44,7 @@ const repositoryCheckDisplays: Record<RepositoryCheckStatus, { className: string
   idle: { className: 'text-blue-700', text: 'Checking Croissant file' },
   CHECKING: { className: 'text-blue-700', text: 'Checking Croissant file' },
   FOUND: { className: 'text-emerald-600', text: 'Croissant file found at repository root' },
-  NOT_FOUND: { className: 'text-red-600', text: "Croissant file not found at repository root" },
+  NOT_FOUND: { className: 'text-red-600', text: 'Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.' },
   BLOCKED: { className: 'text-red-600', text: 'Enter the source code repository URL for this adapter.' },
   UNAVAILABLE: { className: 'text-red-600', text: connectionMessage },
 }

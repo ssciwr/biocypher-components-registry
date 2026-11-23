@@ -254,6 +254,12 @@ def test_presence_check_normalizes_branch_links(monkeypatch, present, expected):
     assert response.status_code == 200
     assert response.json()["status"] == expected
     assert response.json()["has_croissant_file"] is present
+    if not present:
+        assert response.json()["message"] == (
+            "Could not find croissant.jsonld at the repository root. "
+            "Ensure your metadata file has this exact filename, "
+            "including the .jsonld extension."
+        )
     exists.assert_called_once_with("https://gitlab.example.org/group/subgroup/repo")
 
 

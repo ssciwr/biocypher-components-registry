@@ -49,7 +49,7 @@ describe('automatic pre-flight and synchronous registration', () => {
     cy.wait('@preflight')
     cy.contains('Repository access is restricted.').should('be.visible')
     cy.contains('button', 'Register adapter').should('be.disabled')
-    cy.contains('Croissant file not found').should('not.exist')
+    cy.contains('Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.').should('not.exist')
   })
 
   it('ignores an older successful response after the URL changes', () => {
@@ -60,7 +60,7 @@ describe('automatic pre-flight and synchronous registration', () => {
         request.reply({ delay: 1800, body: found })
       } else {
         request.alias = 'newCheck'
-        request.reply({ ...found, status: 'NOT_FOUND', has_croissant_file: false })
+        request.reply({ ...found, status: 'NOT_FOUND', has_croissant_file: false, message: 'Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.' })
       }
     })
     cy.visit('/register')
@@ -68,11 +68,11 @@ describe('automatic pre-flight and synchronous registration', () => {
     cy.wrap(null).should(() => expect(oldCheckStarted).to.equal(true))
     repositoryInput().clear().type(`${repositoryUrl}-other`, { delay: 0 })
     cy.wait('@newCheck')
-    cy.contains('Croissant file not found at repository root').should('be.visible')
+    cy.contains('Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.').should('be.visible')
     // Wait beyond the old response delay to prove it cannot re-enable submission.
     cy.wait(1900)
     cy.contains('button', 'Register adapter').should('be.disabled')
-    cy.contains('Croissant file not found at repository root').should('be.visible')
+    cy.contains('Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.').should('be.visible')
   })
 
   it('automatically retries a transient check failure', () => {
@@ -156,6 +156,7 @@ describe('automatic pre-flight and synchronous registration', () => {
   })
 
   for (const failure of [
+    { reason_code: 'METADATA_NOT_FOUND', status: 'FAILED - croissant.jsonld not found at repository root', message: 'Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.' },
     { reason_code: 'INVALID_JSON', status: 'FAILED - Invalid JSON', message: 'Metadata must be UTF-8 encoded JSON.' },
     { reason_code: null, status: 'FAILED - Not registered', message: 'Registration could not be completed.' },
     { reason_code: 'NEW_BACKEND_REASON', status: 'FAILED - Not registered', message: 'The repository could not be processed.' },
