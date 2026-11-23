@@ -135,8 +135,13 @@ def test_missing_file_is_proven_by_tree_and_not_guessed(remote_repository):
     git(remote_repository, "commit", "-am", "Remove metadata")
     with repositories.repository_snapshot("https://github.com/org/repo") as snapshot:
         assert not snapshot.has_metadata()
-        with pytest.raises(MetadataNotFoundError):
+        with pytest.raises(MetadataNotFoundError) as caught:
             snapshot.read_metadata()
+        assert str(caught.value) == (
+            "Could not find croissant.jsonld at the repository root. "
+            "Ensure your metadata file has this exact filename, "
+            "including the .jsonld extension."
+        )
 
 
 def test_metadata_size_limit_and_cleanup(remote_repository, monkeypatch):
