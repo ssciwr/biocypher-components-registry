@@ -170,7 +170,7 @@
           "adapters"
         ],
         "summary": "Search public adapters",
-        "description": "Return public adapter cards whose title matches the search term.",
+        "description": "Return public adapter cards whose title or keywords match the search term, ignoring whitespace and letter case.",
         "operationId": "search_adapters_api_v1_adapters_search_get",
         "parameters": [
           {

@@ -195,7 +195,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hasCroissantFile, setHasCroissantFile] = useState(false)
+  const [validatedRepositoryUrl, setValidatedRepositoryUrl] = useState<string | null>(null)
   const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
@@ -204,6 +204,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
 
   const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
   const doiCheckDisplay = doiCheckDisplays[doiCheckStatus]
+  const hasCroissantFile = validatedRepositoryUrl === form.repositoryLocation.trim()
+  const isResumingRegistration = globalThis.localStorage.getItem(submitAfterAuthKey) === '1'
   const canSubmitDirectly = Boolean(authUser && authVerified)
   const idleSubmitButtonText = canSubmitDirectly ? 'Register adapter' : 'Sign in with GitHub'
   const submitButtonText = status === 'idle' ? idleSubmitButtonText : isRetrying ? 'Retrying...' : 'Registering...'
@@ -231,7 +233,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   }
 
   const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm, retry = false) => {
-    if (!hasCroissantFile || submissionRef.current) return
+    if (registrationForm.repositoryLocation.trim() !== validatedRepositoryUrl || submissionRef.current) return
     const controller = new AbortController()
     submissionRef.current = controller
     setError(null)
@@ -263,7 +265,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       if (submissionRef.current === controller) submissionRef.current = null
       if (!controller.signal.aborted) setStatus('idle')
     }
-  }, [hasCroissantFile])
+  }, [validatedRepositoryUrl])
 
   useEffect(() => {
     if (!hasCroissantFile) return
@@ -271,7 +273,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
     if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
     globalThis.queueMicrotask(() => {
-      if (autoSubmitAttemptedRef.current) return
+      if (autoSubmitAttemptedRef.current || globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
       autoSubmitAttemptedRef.current = true
       globalThis.localStorage.removeItem(submitAfterAuthKey)
@@ -335,12 +337,16 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 labelClassName="grid gap-3 text-sm font-semibold text-slate-950"
                 onChange={(value) => {
                   setError(null)
-                  if (value.trim() !== form.repositoryLocation.trim()) setHasCroissantFile(false)
+                  if (value.trim() !== form.repositoryLocation.trim()) {
+                    setValidatedRepositoryUrl(null)
+                    globalThis.localStorage.removeItem(submitAfterAuthKey)
+                  }
                   updateField('repositoryLocation', value)
                 }}
-                onValidationChange={setHasCroissantFile}
+                onValidatedRepositoryChange={setValidatedRepositoryUrl}
                 placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
                 required
+                showValidationFeedback={isResumingRegistration}
                 value={form.repositoryLocation}
               />
 
