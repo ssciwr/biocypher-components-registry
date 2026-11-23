@@ -43,11 +43,11 @@ describe('repository checks when returning from sign-in', () => {
     cy.get('@createRegistration.all').should('have.length', 0)
     cy.intercept('GET', repositoryCheckRoute, { body: {
       status: 'NOT_FOUND', repository_url: `${repositoryLocation}-missing`,
-      has_croissant_file: false, message: 'Croissant file not found at repository root.',
+      has_croissant_file: false, message: 'Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.',
     } })
     repositoryInput().type('-missing', { delay: 0 })
     cy.tick(200)
-    cy.contains('Croissant file not found').should('be.visible')
+    cy.contains('Could not find croissant.jsonld at the repository root. Ensure your metadata file has this exact filename, including the .jsonld extension.').should('be.visible')
     cy.get('button[type="submit"]').should('be.disabled')
     cy.get('@createRegistration.all').should('have.length', 0)
     cy.intercept({

@@ -75,7 +75,7 @@ const registrationFailureReasons: Record<string, string> = {
   SCHEMA_INVALID: 'Schema validation failed',
   MLCROISSANT_INVALID: 'Croissant validation failed',
   SEMANTICS_INVALID: 'Invalid metadata structure',
-  METADATA_NOT_FOUND: 'Croissant file not found',
+  METADATA_NOT_FOUND: 'croissant.jsonld not found at repository root',
   REPOSITORY_UNAVAILABLE: 'Repository unavailable',
   REMOTE_TEMPORARY: 'Repository host temporarily unavailable',
   DEFAULT_BRANCH_UNRESOLVED: 'Default branch could not be resolved',
