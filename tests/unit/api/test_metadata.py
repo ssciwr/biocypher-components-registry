@@ -651,3 +651,86 @@ def test_metadata_generation_openapi_examples_are_available() -> None:
 
     assert adapter_example == ADAPTER_METADATA_GENERATE_EXAMPLE
     assert validation_example == METADATA_VALIDATE_DATASET_EXAMPLE
+
+
+def test_generate_dataset_metadata_endpoint_accepts_unsupported_file() -> None:
+    """Unsupported uploads yield file-level metadata instead of an error."""
+    client = TestClient(create_app())
+
+    response = client.post(
+        DATASET_GENERATE_PATH,
+        data={"generator": "auto", "validate": "false", "name": "Map"},
+        files={"file": ("../map.sbgn", b"<sbgn/>", "application/octet-stream")},
+    )
+
+    assert response.status_code == 200
+    metadata = response.json()["metadata"]
+    assert metadata["distribution"][0]["name"] == "map.sbgn"
+    assert "recordSet" not in metadata
+
+
+@pytest.mark.parametrize(
+    ("filename", "content", "extra", "expected_format"),
+    [
+        ("map.sbgn", b"<sbgn/>", {}, None),
+        ("blob.zzqx9", b"\x00\x01\x02", {}, "application/octet-stream"),
+        (
+            "map.sbgn",
+            b"<sbgn/>",
+            {"encoding_format": "application/xml"},
+            "application/xml",
+        ),
+    ],
+)
+def test_generate_dataset_metadata_endpoint_validates_file_level_metadata(
+    filename, content, extra, expected_format
+) -> None:
+    """File-only metadata passes the real Croissant validator, not a mock."""
+    client = TestClient(create_app())
+
+    response = client.post(
+        DATASET_GENERATE_PATH,
+        data={
+            "generator": "auto",
+            "validate": "true",
+            "name": "Generic file",
+            "description": "Non-tabular upload",
+            "license": "https://creativecommons.org/licenses/by/4.0/",
+            "dataset_version": "1.0.0",
+            "url": "https://example.org/data",
+            "date_published": "2024-01-01",
+            **extra,
+        },
+        files={"file": (filename, content, "application/octet-stream")},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["validation"]["is_valid"] is True, payload["validation"]
+    metadata = payload["metadata"]
+    assert "recordSet" not in metadata
+    (file_object,) = metadata["distribution"]
+    assert file_object["contentUrl"] == filename
+    assert file_object["contentSize"] == str(len(content))
+    assert len(file_object["sha256"]) == 64
+    if expected_format:
+        assert file_object["encodingFormat"] == expected_format
+
+
+def test_generate_dataset_metadata_endpoint_preserves_explicit_content_url() -> None:
+    """An explicit remote content URL is not replaced by a local path."""
+    client = TestClient(create_app())
+
+    response = client.post(
+        DATASET_GENERATE_PATH,
+        data={
+            "generator": "auto",
+            "validate": "false",
+            "content_url": "https://example.org/files/map.sbgn",
+        },
+        files={"file": ("map.sbgn", b"<sbgn/>", "application/octet-stream")},
+    )
+
+    assert response.status_code == 200, response.text
+    file_object = response.json()["metadata"]["distribution"][0]
+    assert file_object["contentUrl"] == "https://example.org/files/map.sbgn"

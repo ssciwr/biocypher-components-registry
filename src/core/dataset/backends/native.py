@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -41,20 +42,17 @@ class NativeDatasetGenerator(DatasetGenerator):
         files = self._discover_files(input_path)
         warnings: list[str] = []
         inspections: list[FileInspection] = []
+        file_only: list[Path] = []
 
         for path in files:
             try:
                 handler = resolve_format_handler(path)
-                inspections.append(handler.inspect(path))
-            except UnsupportedFormatError as exc:
-                warnings.append(str(exc))
+            except UnsupportedFormatError:
+                file_only.append(path)
+                continue
+            inspections.append(handler.inspect(path))
 
-        if not inspections:
-            raise InputDiscoveryError(
-                "No supported dataset files were found in the input path."
-            )
-
-        document = self._build_document(request, inspections, warnings)
+        document = self._build_document(request, inspections, warnings, file_only)
         output_path = Path(request.output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
@@ -63,7 +61,7 @@ class NativeDatasetGenerator(DatasetGenerator):
 
         stdout_lines = [
             "Success! Generated native Croissant metadata",
-            f"Files: {len(inspections)}",
+            f"Files: {len(inspections) + len(file_only)}",
             f"Record sets: {len(inspections)}",
             f"Saved to: {output_path}",
         ]
@@ -104,6 +102,7 @@ class NativeDatasetGenerator(DatasetGenerator):
         request: GenerationRequest,
         inspections: list[FileInspection],
         warnings: list[str],
+        file_only: list[Path] | None = None,
     ) -> dict:
         """Build a dataset document from normalized file inspections."""
         dataset_name = request.name or Path(request.input_path).expanduser().name
@@ -128,13 +127,26 @@ class NativeDatasetGenerator(DatasetGenerator):
 
         creators = _build_creators(request.creators)
         raw_date_published = request.date_published or _infer_date_published(
-            inspections
+            [inspection.path for inspection in inspections] + list(file_only or [])
         )
         date_published = _format_date_published(raw_date_published)
         if not request.date_published:
             warnings.append(f"Missing date published; using '{date_published}'.")
         distributions = []
         record_sets = []
+        for index, path in enumerate(file_only or [], start=len(inspections)):
+            distributions.append(
+                build_distribution_file(
+                    content_url=self._relative_to_input(path, request.input_path),
+                    encoding_format=_guess_encoding_format(
+                        path, request.encoding_format
+                    ),
+                    name=path.name,
+                    file_id=f"file_{index}",
+                    content_size=str(path.stat().st_size),
+                    sha256=compute_file_hash(path),
+                )
+            )
         for index, inspection in enumerate(inspections):
             relative = self._relative_to_input(inspection.path, request.input_path)
             file_id = f"file_{index}"
@@ -186,10 +198,20 @@ class NativeDatasetGenerator(DatasetGenerator):
     def _relative_to_input(self, path: Path, input_path: str) -> str:
         """Return a path relative to the input root when possible."""
         input_root = Path(input_path).expanduser()
+        if input_root.is_file():
+            return path.name
         try:
             return str(path.relative_to(input_root))
         except ValueError:
             return str(path)
+
+
+def _guess_encoding_format(path: Path, explicit: str | None) -> str:
+    """Return the explicit MIME type, else a guessed one, else octet-stream."""
+    if explicit and explicit.strip():
+        return explicit.strip()
+    guessed, _ = mimetypes.guess_type(path.name)
+    return guessed or "application/octet-stream"
 
 
 def _build_creators(raw_creators: list[str | dict[str, Any]]) -> list[dict]:
@@ -237,9 +259,9 @@ def _build_creator_from_mapping(raw: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
-def _infer_date_published(inspections: list[FileInspection]) -> str:
-    """Infer a publication date from the newest inspected source file."""
-    latest_mtime = max(inspection.path.stat().st_mtime for inspection in inspections)
+def _infer_date_published(paths: list[Path]) -> str:
+    """Infer a publication date from the newest source file."""
+    latest_mtime = max(path.stat().st_mtime for path in paths)
     return _format_date_published(
         datetime.fromtimestamp(latest_mtime, tz=UTC).date().isoformat()
     )

@@ -323,7 +323,6 @@ export function DatasetGenerateEditor({
   return (
     <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
       <FileInput
-        accept=".csv,.tsv,.txt,.json,.jsonl,.gz,text/csv,text/tab-separated-values,application/json,application/gzip"
         label="Source dataset file"
         onChange={onSourceFileChange}
         required={sourceRequired}
@@ -411,6 +410,7 @@ export function DatasetDetailsEditor({
   onRemoveField,
 }: DatasetDetailsEditorProps) {
   const fields = [...dataset.fields, ...dataset.manualFields]
+  const isFileOnly = fields.length === 0 && !dataset.recordSetName.trim()
   const datasetName = dataset.name.trim() || 'Untitled dataset'
   const datasetNameLabel = datasetName.length > 16 ? `${datasetName.slice(0, 16)}...` : datasetName
 
@@ -526,12 +526,17 @@ export function DatasetDetailsEditor({
         <div className="border-b border-slate-200 px-5 py-4">
           <h3 className="text-xl font-bold text-slate-950">Field entries</h3>
         </div>
-        <div className="grid gap-5 p-5">
+        {isFileOnly ? (
+          <p className="p-5 text-sm leading-6 text-slate-600">
+            Not applicable: this file has no structured fields, so no record set is generated.
+          </p>
+        ) : null}
+        <div className={isFileOnly ? 'hidden' : 'grid gap-5 p-5'}>
           <TextInput
             label="Record set name"
             maxLength={120}
             onChange={(value) => onChange('recordSetName', value)}
-            required
+            required={!isFileOnly}
             value={dataset.recordSetName}
           />
 

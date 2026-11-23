@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from croissant_baker.files import discover_files as discover_baker_files
+from croissant_baker.handlers.registry import find_handler, register_all_handlers
 
 from src.core.dataset.backends.base import DatasetGenerator
 from src.core.dataset.backends.croissant_baker import CroissantBakerGenerator
@@ -58,10 +59,24 @@ def select_generator_for_request(
                 f"detected '{path.name}', which is outside croissant-baker's supported path.",
             )
 
+    # Anything croissant-baker can process keeps its previous behaviour; the
+    # native backend (structured handlers, then file-level fallback) takes the rest.
+    if not any(_baker_supports(path) for path in files):
+        return (
+            NativeDatasetGenerator(),
+            "no file is handled by croissant-baker; using native handlers.",
+        )
+
     return (
         CroissantBakerGenerator(),
         "detected only standard dataset inputs handled by croissant-baker.",
     )
+
+
+def _baker_supports(path: Path) -> bool:
+    """Return whether croissant-baker has a handler registered for this file."""
+    register_all_handlers()
+    return find_handler(path) is not None
 
 
 def _discover_input_files(input_path: Path) -> list[Path]:

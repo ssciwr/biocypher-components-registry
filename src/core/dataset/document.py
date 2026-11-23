@@ -168,5 +168,6 @@ def build_dataset_document(
     document["url"] = url
     document["version"] = version
     document["distribution"] = distributions
-    document["recordSet"] = record_sets
+    if record_sets:
+        document["recordSet"] = record_sets
     return document
