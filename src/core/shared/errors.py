@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.core.shared.constants import METADATA_FILENAME
+
 
 class GeneratorError(RuntimeError):
     """Base error for generation failures."""
@@ -94,7 +96,11 @@ class MetadataNotFoundError(RemoteResourceNotFoundError):
         super().__init__(
             repo_url,
             status_code=404,
-            message="Metadata file not found for repository URL.",
+            message=(
+                f"Could not find {METADATA_FILENAME} at the repository root. "
+                "Ensure your metadata file has this exact filename, "
+                "including the .jsonld extension."
+            ),
         )
 
 
