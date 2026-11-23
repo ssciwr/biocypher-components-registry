@@ -56,7 +56,7 @@ services:
       # ===========================================================
       # Repository Policy
       # ===========================================================
-      REGISTRY_ALLOWED_REPOSITORY_HOSTS: ${REGISTRY_ALLOWED_REPOSITORY_HOSTS:-}
+      REGISTRY_ALLOWED_REPOSITORY_HOSTS: ${REGISTRY_ALLOWED_REPOSITORY_HOSTS:-github.com,gitlab.com}
 
       # ===========================================================
       # Agentic Workspace
