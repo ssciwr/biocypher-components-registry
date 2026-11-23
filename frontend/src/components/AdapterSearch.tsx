@@ -79,13 +79,13 @@ function AdapterSearch({ showLatest = true, children }: Readonly<{ showLatest?: 
       {showResults ? (
         <div className="mt-14 grid gap-8 text-left md:grid-cols-2 xl:grid-cols-4">
           {adapters === null ? (
-            <div className="col-span-full flex justify-center text-slate-500" role="status">
+            <output className="col-span-full flex justify-center text-slate-500">
               <ArrowPathIcon className="h-6 w-6 animate-spin" aria-hidden="true" />
               <span className="sr-only">Searching adapters...</span>
-            </div>
+            </output>
           ) : null}
           {!loadError && adapters?.length === 0 ? (
-            <p className="col-span-full text-center text-slate-500" role="status">No adapters found</p>
+            <output className="col-span-full text-center text-slate-500">No adapters found</output>
           ) : null}
           {adapters?.map((adapter) => (
             <article

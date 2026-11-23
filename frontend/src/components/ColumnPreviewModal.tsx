@@ -77,8 +77,8 @@ function ColumnPreviewDialog({ adapterId, source, onClose }: Omit<ColumnPreviewM
               </tr>
             ))}
             {columns !== null && matchingColumns.length === 0 ? (
-              <tr><td className="px-5 py-6 text-slate-600" colSpan={4} role="status">
-                {columns.length ? 'No columns match your search.' : 'Service not available presently, sorry. Please try again later.'}
+              <tr><td className="px-5 py-6 text-slate-600" colSpan={4}>
+                <output>{columns.length ? 'No columns match your search.' : 'Service not available presently, sorry. Please try again later.'}</output>
               </td></tr>
             ) : null}
           </tbody>

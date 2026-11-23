@@ -75,7 +75,7 @@ describe('adapter column preview', () => {
     cy.get('dialog button[aria-label="Close modal"]').last().click()
     cy.intercept('GET', '**/api/v1/adapters/column-preview/metadata', { delay: 6000, body: metadata })
     openPreview()
-    cy.get('[role="status"]', { timeout: 6500 }).should('have.text', 'Service not available presently, sorry. Please try again later.')
+    cy.get('tbody output', { timeout: 6500 }).should('have.text', 'Service not available presently, sorry. Please try again later.')
     cy.get('tbody th').should('not.exist')
   })
 
@@ -87,7 +87,7 @@ describe('adapter column preview', () => {
     cy.get('tbody tr').should('have.length', 1)
     cy.get('tbody th').should('have.text', 'target')
     searchColumns('stringP0DP25')
-    cy.get('[role="status"]').should('have.text', 'No columns match your search.')
+    cy.get('tbody output').should('have.text', 'No columns match your search.')
     cy.get('tbody th').should('not.exist') // no matches
     searchColumns('   ')
     cy.get('tbody tr').should('have.length', 7) // same "before", null search basically
