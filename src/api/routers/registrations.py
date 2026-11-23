@@ -33,6 +33,7 @@ from src.core.registration.service import (
     register_adapter,
 )
 from src.core.registration.store import RegistrationStore
+from src.core.shared.constants import METADATA_FILENAME
 from src.core.shared.errors import InvalidRepoURLError, RepositoryUnavailableError
 from src.core.shared.files import remote_metadata_exists
 from src.core.shared.repositories import normalize_repository_url
@@ -253,7 +254,11 @@ def check_registration_croissant_file_presence(
         has_croissant_file=present,
         message="Croissant file found at repository root."
         if present
-        else "Croissant file not found at repository root.",
+        else (
+            f"Could not find {METADATA_FILENAME} at the repository root. "
+            "Ensure your metadata file has this exact filename, "
+            "including the .jsonld extension."
+        ),
     )
 
 
