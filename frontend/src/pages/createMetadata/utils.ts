@@ -1,6 +1,6 @@
 import type {
   AdapterCreatorGenerateRequest,
-  BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost,
+  GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData,
 } from '../../api/client'
 import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField } from './types'
 
@@ -79,7 +79,7 @@ function dateAtUtcMidnight(value: string) {
  */
 export function datasetDraftToCroissantGenerateUploadForm(
   dataset: DatasetDraft,
-): BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost {
+): GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData['body'] {
   if (!dataset.sourceFile) {
     throw new Error('Upload a source dataset file first.')
   }

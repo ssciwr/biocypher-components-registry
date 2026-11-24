@@ -83,12 +83,23 @@ def validate_metadata(
     ),
     openapi_extra={
         "requestBody": {
+            "required": True,
             "content": {
                 "multipart/form-data": {
                     "schema": _DATASET_METADATA_MULTIPART_SCHEMA,
                 }
+            },
+        },
+        "responses": {
+            "422": {
+                "description": "Validation Error",
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": "#/components/schemas/HTTPValidationError"}
+                    }
+                },
             }
-        }
+        },
     },
 )
 # modified lightly using AI to support data flow
