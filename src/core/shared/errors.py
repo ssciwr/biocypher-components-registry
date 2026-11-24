@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.core.shared.constants import METADATA_FILENAME
+
 
 class GeneratorError(RuntimeError):
     """Base error for generation failures."""
@@ -27,6 +29,16 @@ class MetadataDiscoveryError(Exception):
     """Raised when ``croissant.jsonld`` cannot be uniquely located or loaded."""
 
 
+class RepositoryUnavailableError(MetadataDiscoveryError):
+    """A repository could not be inspected; absence has not been established."""
+
+    def __init__(
+        self, message: str, reason_code: str = "REPOSITORY_UNAVAILABLE"
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
 class MetadataFileNotFoundError(FileNotFoundError, MetadataDiscoveryError):
     """Raised when no croissant.jsonld can be found for a repository."""
 
@@ -37,6 +49,21 @@ class AmbiguousMetadataFileError(ValueError, MetadataDiscoveryError):
 
 class InvalidMetadataJSONError(ValueError, MetadataDiscoveryError):
     """Raised when croissant.jsonld contains invalid JSON."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+        source_file: str | None = None,
+        source_url: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.line = line
+        self.column = column
+        self.source_file = source_file
+        self.source_url = source_url
 
 
 class RemoteResourceNotFoundError(FileNotFoundError):
@@ -57,7 +84,9 @@ class InvalidRepoURLError(ValueError):
 
     def __init__(self, repo_url: str) -> None:
         self.repo_url = repo_url
-        super().__init__(f"Invalid repository URL: {repo_url}")
+        super().__init__(
+            "Invalid repository URL. Use an approved HTTPS repository host without embedded credentials."
+        )
 
 
 class MetadataNotFoundError(RemoteResourceNotFoundError):
@@ -67,7 +96,11 @@ class MetadataNotFoundError(RemoteResourceNotFoundError):
         super().__init__(
             repo_url,
             status_code=404,
-            message="Metadata file not found for repository URL.",
+            message=(
+                f"Could not find {METADATA_FILENAME} at the repository root. "
+                "Ensure your metadata file has this exact filename, "
+                "including the .jsonld extension."
+            ),
         )
 
 

@@ -26,7 +26,7 @@ def search_store(tmp_path: Path) -> SQLiteRegistrationStore:
     ):
         registration = store.create_registration(
             create_registration_request(
-                repository_location=f"https://example.org/{adapter_id}"
+                repository_location=f"https://github.com/example/{adapter_id}"
             )
         )
         store.mark_registration_valid(

@@ -52,7 +52,7 @@ def test_build_croissant_baker_command_includes_known_flags() -> None:
         "--creator",
         "Saezlab,saezlab@gmail.com,https://www.saezlab.org",
         "--creator",
-        "Person|Dataset Creator||dataset.creator@example.org||",
+        "Dataset Creator,dataset.creator@example.org",
         "--custom-flag",
         "value",
     ]
