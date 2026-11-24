@@ -16,8 +16,18 @@ const uploadedDatasetMetadata = {
   license: 'MIT',
   version: '0.0.1',
   datePublished: '2026-04-17',
-  distribution: [{ '@type': 'cr:FileObject', contentUrl: 'https://example.org/uploaded.csv', name: 'uploaded.csv' }],
-  recordSet: [{ '@type': 'cr:RecordSet', name: 'Uploaded records', field: [] }],
+  distribution: [
+    { '@type': 'cr:FileObject', '@id': 'repo', contentUrl: 'https://example.org/dataset', name: 'repo', encodingFormat: 'git+https' },
+    { '@type': 'cr:FileSet', '@id': 'parquet-files', containedIn: { '@id': 'repo' }, includes: '*.parquet', encodingFormat: 'application/x-parquet' },
+  ],
+  recordSet: [
+    {
+      '@type': 'cr:RecordSet', '@id': 'default', name: 'Uploaded records', field: [
+        { '@type': 'cr:Field', '@id': 'default/label', name: 'label', dataType: 'sc:Integer', source: { fileSet: { '@id': 'parquet-files' }, extract: { column: 'label' } } },
+      ],
+    },
+    { '@type': 'cr:RecordSet', '@id': 'extra', name: 'Extra records', field: [] },
+  ],
 }
 
 /*
@@ -144,6 +154,20 @@ describe('adapter metadata generator editing', () => {
       expect(dataset.datePublished).to.equal('2026-04-17T00:00:00Z')
       expect(dataset.creator).to.have.length(2)
       expect(dataset.creator[0].name).to.equal('Dataset Creator A')
+    })
+  })
+
+  it('preserves additional distribution entries and record sets on export', () => {
+    cy.intercept('POST', '**/api/v1/metadata/adapters/generate', { body: { metadata: { '@type': 'SoftwareSourceCode' } } }).as('generateAdapter')
+    visitGenerator()
+    fillAdapterStep()
+    addUploadedDataset()
+    cy.contains('button', 'Save this dataset').click()
+    cy.contains('button', 'Generate adapter Croissant file').click()
+    cy.wait('@generateAdapter').its('request.body.dataset_documents.0').should((dataset) => {
+      expect(dataset.distribution).to.deep.equal(uploadedDatasetMetadata.distribution)
+      expect(dataset.recordSet[1]).to.deep.equal(uploadedDatasetMetadata.recordSet[1])
+      expect(dataset.recordSet[0].field[0].source.fileSet).to.deep.equal({ '@id': 'parquet-files' })
     })
   })
 
