@@ -9,6 +9,9 @@ The LLM provider is swappable via base URL:
 - Anthropic (default): set ANTHROPIC_API_KEY
 - Local model: run an Anthropic-compatible endpoint (LiteLLM proxy,
   llama.cpp server) and set ANTHROPIC_BASE_URL + a dummy ANTHROPIC_API_KEY
+- OpenAI & co: run the LiteLLM proxy (deploy/litellm/) which translates the
+  Anthropic Messages API to the provider; CLAUDE_MODEL then names a LiteLLM
+  model alias and the key is the LiteLLM master key
 
 Env vars:
 - ANTHROPIC_API_KEY          (required; any non-empty value for local models)
@@ -22,6 +25,12 @@ Env vars:
                               variant supported like ANTHROPIC_API_KEY_FILE)
 - ANTHROPIC_BASE_URL         (optional, e.g. http://localhost:4000 for LiteLLM)
 - CLAUDE_MODEL               (default: claude-opus-4-8)
+- CLAUDE_MAX_TOKENS          (default: 16000 — output cap per response; lower
+                              it for models with smaller output limits)
+- CLAUDE_THINKING            (adaptive|off; default: adaptive only without
+                              ANTHROPIC_BASE_URL)
+- CLAUDE_PROMPT_CACHE        (on|off; default: on only without
+                              ANTHROPIC_BASE_URL)
 - BIOCYPHER_MCP_URL          (default: https://mcp.biocypher.org/mcp)
 - BIOCYPHER_MCP_AUTH_HEADER  (optional, e.g. "Bearer <token>")
 - BIOCYPHER_MCP_AUTH_HEADER_FILE (file variant, same semantics as
@@ -60,6 +69,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
 MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
+MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "16000"))
 MCP_URL = os.getenv("BIOCYPHER_MCP_URL", "https://mcp.biocypher.org/mcp")
 RESULT_MAX_CHARS = int(os.getenv("MCP_RESULT_MAX_CHARS", "20000"))
 FILE_ROOT = Path(os.getenv("FILE_TOOLS_ROOT", ".")).resolve()
@@ -109,6 +119,33 @@ def thinking_config() -> dict | None:
     if mode == "adaptive" or not os.getenv("ANTHROPIC_BASE_URL"):
         return {"type": "adaptive"}
     return None
+
+
+def cache_control_config() -> dict | None:
+    """Top-level auto prompt caching against Anthropic; off for other endpoints.
+
+    Same rationale as thinking_config: proxies (LiteLLM) and local servers may
+    reject the top-level cache_control kwarg. Override with
+    CLAUDE_PROMPT_CACHE=on|off.
+    """
+    mode = os.getenv("CLAUDE_PROMPT_CACHE", "").lower()
+    if mode == "off":
+        return None
+    if mode == "on" or not os.getenv("ANTHROPIC_BASE_URL"):
+        return {"type": "ephemeral"}
+    return None
+
+
+def optional_request_params() -> dict:
+    """Provider-dependent tool_runner kwargs; omitted entirely when off."""
+    params = {}
+    if thinking := thinking_config():
+        params["thinking"] = thinking
+    # Auto-cache the prefix up to the latest turn; each turn then reads the
+    # previous turns from cache instead of re-billing them.
+    if cache_control := cache_control_config():
+        params["cache_control"] = cache_control
+    return params
 
 
 # The only env vars run_command subprocesses inherit. An allowlist rather than
@@ -549,7 +586,6 @@ async def chat(tools, api_key: str | None, auth_token: str | None) -> None:
     # read_secret scrubbed it from the environment the SDK would read it from
     client = AsyncAnthropic(api_key=api_key, auth_token=auth_token)
     history: list[dict] = []
-    thinking = thinking_config()
     # prompt_toolkit: async input keeps the event loop (and the MCP HTTP
     # session) alive while waiting, and bracketed paste keeps pasted
     # newlines in the edit buffer instead of submitting on them.
@@ -577,15 +613,12 @@ async def chat(tools, api_key: str | None, auth_token: str | None) -> None:
 
         runner = client.beta.messages.tool_runner(
             model=MODEL,
-            max_tokens=16000,
+            max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             tools=tools,
             messages=history,
             stream=True,
-            # Auto-cache the prefix up to the latest turn; each turn then
-            # reads the previous turns from cache instead of re-billing them.
-            cache_control={"type": "ephemeral"},
-            **({"thinking": thinking} if thinking else {}),
+            **optional_request_params(),
         )
         # Mirror the runner's conversation into our history so the next turn
         # continues from the full context (runner keeps its own copy).

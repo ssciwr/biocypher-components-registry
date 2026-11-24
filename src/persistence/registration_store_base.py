@@ -59,11 +59,20 @@ class SQLAlchemyRegistrationStore:
         )
 
         with self.engine.begin() as connection:
-            if self._registration_source_by_repository_location(
+            existing_source = self._registration_source_by_repository_location(
                 connection,
                 registration.repository_location,
-            ):
-                raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
+            )
+            if existing_source is not None:
+                source_id = str(existing_source["id"])
+                existing_registration = self._source_to_registration(
+                    existing_source,
+                    self._current_registry_entry(connection, source_id),
+                    self._latest_event_for_source(connection, source_id),
+                )
+                if existing_registration.status != RegistrationStatus.INVALID:
+                    raise DuplicateRegistrationError(DUPLICATE_REPOSITORY_URL_MESSAGE)
+                return existing_registration
             try:
                 connection.execute(
                     insert(registration_sources_table).values(
@@ -186,34 +195,32 @@ class SQLAlchemyRegistrationStore:
         query: str,
         limit: int = 10_000,
     ) -> list[RegistryEntry]:
-        """Return active canonical entries whose adapter title matches the query."""
-        search_term = query.strip()
-        if not search_term:
+        """Return active entries whose title or keywords match the query."""
+        search_term = "".join(query.split()).lower()
+        if not search_term or limit <= 0:
             return []
 
-        with self.engine.connect() as connection:
-            rows = (
-                connection.execute(
-                    select(registry_entries_table)
-                    .where(
-                        registry_entries_table.c.is_active.is_(True),
-                        registry_entries_table.c.adapter_name.icontains(
-                            search_term,
-                            autoescape=True,
-                        ),
-                    )
-                    .order_by(
-                        registry_entries_table.c.updated_at.desc(),
-                        registry_entries_table.c.created_at.desc(),
-                        registry_entries_table.c.id.desc(),
-                    )
-                    .limit(limit)
-                )
-                .mappings()
-                .all()
-            )
+        entries = sorted(
+            self.list_registry_entries(),
+            key=lambda entry: (entry.updated_at, entry.created_at, entry.entry_id),
+            reverse=True,
+        )
+        matches: list[RegistryEntry] = []
+        for entry in entries:
+            keywords = (entry.metadata or {}).get("keywords", [])
+            if isinstance(keywords, str):
+                keywords = keywords.split(",")
+            elif not isinstance(keywords, list):
+                keywords = []
+            if any(
+                search_term in "".join(str(value).split()).lower()
+                for value in [entry.adapter_name, *keywords]
+            ):
+                matches.append(entry)
+                if len(matches) >= limit:
+                    break
 
-        return [self._registry_entry_row_to_entry(row) for row in rows]
+        return matches
 
     def get_registry_entry(self, entry_id: str) -> RegistryEntry | None:
         """Return one active canonical registry entry by identifier when it exists."""

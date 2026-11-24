@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "openapi-ts": "cd .. && uv run python scripts/export_openapi.py && cd frontend && openapi-ts",
-    "ui-tests": "cypress run"
+    "ui-tests": "tsc -p cypress/tsconfig.json && cypress run"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

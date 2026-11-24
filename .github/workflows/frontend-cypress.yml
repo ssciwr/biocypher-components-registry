@@ -51,7 +51,8 @@ jobs:
         run: pnpm exec cypress verify
 
       - name: Run Cypress tests
-        uses: cypress-io/github-action@f790eee7a50d9505912f50c2095510be7de06aa7
+        # cypress-io/github-action v7.4.4
+        uses: cypress-io/github-action@01e3b659a495b41649cdd0aa82e1d1624e26520b
         with:
           working-directory: frontend
           install: false

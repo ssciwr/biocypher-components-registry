@@ -240,6 +240,7 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   const [status, setStatus] = useState<'idle' | 'submitting' | 'processing'>('idle')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [validatedRepositoryUrl, setValidatedRepositoryUrl] = useState<string | null>(null)
   const [doiCheck, setDoiCheck] = useState<{ status: DoiCheckStatus; value: string }>({ status: 'idle', value: '' })
 
   function updateField(field: keyof RegistrationForm, value: string) {
@@ -248,7 +249,9 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
 
   const doiCheckStatus = doiCheck.value === registrationDoiValue(form.doi) ? doiCheck.status : 'idle' // reactive prop
   const doiCheckDisplay = doiCheckDisplays[doiCheckStatus]
-  const canSubmitDirectly = Boolean(authUser)
+  const hasCroissantFile = Boolean(validatedRepositoryUrl && validatedRepositoryUrl === form.repositoryLocation.trim())
+  const isResumingRegistration = globalThis.localStorage.getItem(submitAfterAuthKey) === '1'
+  const canSubmitDirectly = Boolean(authUser && authVerified)
   const idleSubmitButtonText = canSubmitDirectly ? 'Register adapter' : 'Sign in with GitHub'
   const submitButtonText = status === 'idle' ? idleSubmitButtonText : submitStatusText[status]
   const SubmitButtonIcon = canSubmitDirectly ? PlusIcon : ArrowRightIcon
@@ -275,6 +278,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
   }
 
   const submitAuthenticatedRegistration = useCallback(async (registrationForm: RegistrationForm) => {
+    if (!hasCroissantFile || registrationForm.repositoryLocation.trim() !== validatedRepositoryUrl) return
+
     setError(null)
     setResult(null)
 
@@ -308,7 +313,10 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       setStatus('processing')
 
-      const processResult = await processRegistrationApiV1RegistrationsRegistrationIdProcessPost({
+      const processRegistration = registration.status === 'INVALID'
+        ? revalidateRegistrationRouteApiV1RegistrationsRegistrationIdRevalidatePost
+        : processRegistrationApiV1RegistrationsRegistrationIdProcessPost
+      const processResult = await processRegistration({
         path: { registration_id: registration.registration_id }, // NOSONAR: we ignore this in SONAR because the registration ID comes from our backend response, and it only goes into an already host-specified generated API request back to our own backend. If it is bad, the user only gets a not found or failed processing request.
       })
 
@@ -335,9 +343,10 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
           : details?.details || details?.detail || 'Registration failed.'
       )
     }
-  }, [])
+  }, [hasCroissantFile, validatedRepositoryUrl])
 
   useEffect(() => {
+    if (!hasCroissantFile) return
     if (!authVerified || !authUser || autoSubmitAttemptedRef.current || result || status !== 'idle') return
     if (globalThis.localStorage.getItem(submitAfterAuthKey) !== '1') return
 
@@ -348,14 +357,15 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
       globalThis.localStorage.removeItem(submitAfterAuthKey)
       void submitAuthenticatedRegistration(form)
     })
-  }, [authUser, authVerified, form, result, status, submitAuthenticatedRegistration])
+  }, [authUser, authVerified, form, hasCroissantFile, result, status, submitAuthenticatedRegistration])
 
   async function submitRegistration(event: { preventDefault: () => void }) {
     event.preventDefault()
+    if (!hasCroissantFile || status !== 'idle') return
 
     const doi = registrationDoiValue(form.doi)
 
-    if (!authUser) {
+    if (!canSubmitDirectly) {
       globalThis.localStorage.setItem(draftKey, JSON.stringify({ ...form, doi }))
       globalThis.localStorage.setItem(submitAfterAuthKey, '1')
       globalThis.location.href = client.buildUrl({ url: '/api/v1/auth/github/start', query: { return_to: '/register' } })
@@ -433,10 +443,16 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 labelClassName="grid gap-3 text-sm font-semibold text-slate-950"
                 onChange={(value) => {
                   setError(null)
+                  if (value.trim() !== form.repositoryLocation.trim()) {
+                    setValidatedRepositoryUrl(null)
+                    globalThis.localStorage.removeItem(submitAfterAuthKey)
+                  }
                   updateField('repositoryLocation', value)
                 }}
+                onValidatedRepositoryChange={setValidatedRepositoryUrl}
                 placeholder="https://gitlab.institute.org/group/clinical-visit-adapter"
                 required
+                showValidationFeedback={isResumingRegistration}
                 value={form.repositoryLocation}
               />
 
@@ -492,8 +508,8 @@ function RegisterPage({ authVerified, authUser }: RegisterPageProps) { // NOSONA
                 Sign in once so we can attach your login to the registration.
               </p>
               <button
-                className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-                disabled={status !== 'idle'}
+                className="inline-flex h-14 min-w-56 cursor-pointer items-center justify-center gap-3 rounded-lg bg-slate-950 px-6 text-base font-semibold text-white enabled:hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                disabled={!hasCroissantFile || status !== 'idle'}
                 type="submit"
               >
                 {submitButtonText}

@@ -31,7 +31,9 @@ jobs:
         # actions/setup-python v6
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          python-version-file: "pyproject.toml"
+          # Pinned to match the Docker image; ">=3.12" from pyproject.toml
+          # would resolve to the newest release, which deps may not support yet.
+          python-version: "3.13"
 
       - name: Set up uv
         # astral-sh/setup-uv v8.2.0

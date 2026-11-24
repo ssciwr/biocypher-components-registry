@@ -38,6 +38,45 @@ def test_thinking_config_explicit_override(monkeypatch):
     assert cl.thinking_config() is None
 
 
+def test_cache_control_default_anthropic(monkeypatch, cl):
+    monkeypatch.delenv("CLAUDE_PROMPT_CACHE", raising=False)
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    assert cl.cache_control_config() == {"type": "ephemeral"}
+
+
+def test_cache_control_off_for_proxy_endpoint(monkeypatch, cl):
+    monkeypatch.delenv("CLAUDE_PROMPT_CACHE", raising=False)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:4000")
+    assert cl.cache_control_config() is None
+
+
+def test_cache_control_explicit_override(monkeypatch, cl):
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:4000")
+    monkeypatch.setenv("CLAUDE_PROMPT_CACHE", "on")
+    assert cl.cache_control_config() == {"type": "ephemeral"}
+    monkeypatch.setenv("CLAUDE_PROMPT_CACHE", "off")
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    assert cl.cache_control_config() is None
+
+
+def test_optional_request_params_anthropic(monkeypatch, cl):
+    monkeypatch.delenv("CLAUDE_THINKING", raising=False)
+    monkeypatch.delenv("CLAUDE_PROMPT_CACHE", raising=False)
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    assert cl.optional_request_params() == {
+        "thinking": {"type": "adaptive"},
+        "cache_control": {"type": "ephemeral"},
+    }
+
+
+def test_optional_request_params_proxy_omits_kwargs(monkeypatch, cl):
+    # Absent keys, not None values: proxies reject unknown params even as null.
+    monkeypatch.delenv("CLAUDE_THINKING", raising=False)
+    monkeypatch.delenv("CLAUDE_PROMPT_CACHE", raising=False)
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:4000")
+    assert cl.optional_request_params() == {}
+
+
 def test_mcp_headers(monkeypatch, cl):
     monkeypatch.delenv("BIOCYPHER_MCP_AUTH_HEADER", raising=False)
     monkeypatch.delenv("BIOCYPHER_MCP_AUTH_HEADER_FILE", raising=False)
