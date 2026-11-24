@@ -15,9 +15,16 @@ export function nextDraftId(prefix: string) {
   return `${prefix}-${draftIdCounter}`
 }
 
-// Simple form to avoid overcomplicated regexes etc. We do not verify or link to ORCID etc externally.
+// Canonicalize complete ORCID identifiers without truncating other identifiers.
+// This formats identifiers locally; it does not verify ownership or existence.
 export function normaliseOrcid(value: string) {
-  return value.replaceAll('-', '').replace('https://orcid.org/', '').slice(0, 16)
+  const trimmed = value.trim()
+  const identifier = trimmed.replace(/^https?:\/\/orcid\.org\//i, '').replace(/\/$/, '')
+  if (!/^(?:\d{15}[\dX]|\d{4}-\d{4}-\d{4}-\d{3}[\dX])$/i.test(identifier)) {
+    return trimmed
+  }
+  const compact = identifier.replaceAll('-', '').toUpperCase()
+  return `https://orcid.org/${compact.match(/.{4}/g)!.join('-')}`
 }
 
 /*
@@ -25,7 +32,7 @@ export function normaliseOrcid(value: string) {
  * (rather than an array of '|' joined strings)
  */
 export function creatorToApiValue(creator: CreatorDraft): AdapterCreatorGenerateRequest {
-  const orcid = optionalValue(creator.orcid)
+  const orcid = optionalValue(normaliseOrcid(creator.orcid))
 
   return {
     affiliation: optionalValue(creator.affiliation),
@@ -46,7 +53,7 @@ function creatorToCroissantValue(creator: CreatorDraft): Record<string, unknown>
   }
   setOptional(document, 'affiliation', creator.affiliation)
   setOptional(document, 'email', creator.email)
-  setOptional(document, 'identifier', creator.orcid)
+  setOptional(document, 'identifier', normaliseOrcid(creator.orcid))
   setOptional(document, 'url', creator.url)
   return document
 }
@@ -418,7 +425,10 @@ function mergeUploadedCreators(creators: CreatorDraft[], originalValue: unknown)
       if (creator.name !== textValue(original.name)) document.name = creator.name.trim()
       applyCreatorTextEdit(document, 'affiliation', creator.affiliation, compatibleTextValue(original.affiliation))
       applyCreatorTextEdit(document, 'email', creator.email, textValue(original.email))
-      applyCreatorTextEdit(document, 'identifier', creator.orcid, compatibleIdentifierValue(original.identifier))
+      const originalIdentifier = compatibleIdentifierValue(original.identifier)
+      if (creator.orcid !== originalIdentifier) {
+        applyCreatorTextEdit(document, 'identifier', normaliseOrcid(creator.orcid), originalIdentifier)
+      }
       applyCreatorTextEdit(document, 'url', creator.url, textValue(original.url))
       return document
     })

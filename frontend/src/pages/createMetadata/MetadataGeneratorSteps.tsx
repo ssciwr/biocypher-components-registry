@@ -538,37 +538,36 @@ function DatasetOverviewTable({
 
   return (
     <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+      <table className="w-full min-w-[48rem] table-fixed divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
           <tr>
-            <th className="w-44 px-4 py-3">Dataset</th>
+            <th className="w-[35%] px-4 py-3">Dataset</th>
             <th className="px-4 py-3">Description</th>
-            <th className="w-40 px-4 py-3">Source</th>
-            <th className="w-32 px-4 py-3 text-right">Actions</th>
+            <th className="w-32 px-4 py-3">Source</th>
+            <th className="w-40 px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
           {datasets.map((dataset) => {
             const label = datasetLabel(dataset)
-            const displayLabel = label.length > 15 ? `${label.slice(0, 15)}...` : label
             let rowClass = 'bg-white'
             if (dataset.id === selectedDatasetId) {
               rowClass = 'bg-blue-50'
             }
             return (
               <tr className={rowClass} key={dataset.id}>
-                <td className="w-44 whitespace-nowrap px-4 py-3 font-semibold text-slate-950" title={label}>
-                  <span className="block">{displayLabel}</span>
+                <td className="px-4 py-3 font-semibold leading-6 text-slate-950" title={label}>
+                  <span className="block whitespace-normal [overflow-wrap:anywhere]">{label}</span>
                 </td>
                 <td className="max-w-xs px-4 py-3 text-slate-700" title={dataset.description || 'No description yet'}>
                   <span className="block truncate">{dataset.description || 'No description yet'}</span>
                 </td>
-                <td className="w-40 px-4 py-3 text-slate-700">
+                <td className="px-4 py-3 text-slate-700">
                   <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                     {dataset.mode === 'upload' ? 'Croissant file' : 'Sample file'}
                   </span>
                 </td>
-                <td className="w-32 px-4 py-3">
+                <td className="px-4 py-3">
                   <span className="flex justify-end gap-2">
                     {onEdit ? (
                       <button

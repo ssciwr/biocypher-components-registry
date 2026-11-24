@@ -131,6 +131,31 @@ function addUploadedDataset() {
 
 
 describe('adapter metadata generator editing', () => {
+  it('edits adapter details from the dataset review without losing datasets', () => {
+    cy.intercept('POST', '**/api/v1/metadata/adapters/generate', {
+      body: { metadata: { '@type': 'SoftwareSourceCode' } },
+    }).as('generateAdapter')
+    visitGenerator()
+    fillAdapterStep()
+    addUploadedDataset()
+    cy.contains('button', 'Save this dataset').click()
+
+    cy.contains('button', 'Edit adapter details').click()
+    cy.contains('label', 'Adapter name').find('input').should('have.value', 'Edit Flow Adapter')
+    cy.contains('label', 'Adapter name').find('input').clear().type('Updated Adapter')
+    cy.contains('label', 'Description').find('textarea').clear().type('Updated adapter description.')
+    cy.contains('button', 'Continue').click()
+
+    getDatasetRow('Uploaded Dataset').should('be.visible')
+    cy.contains('button', 'Generate adapter Croissant file').click()
+    cy.wait('@generateAdapter').then(({ request }) => {
+      expect(request.body.name).to.equal('Updated Adapter')
+      expect(request.body.description).to.equal('Updated adapter description.')
+      expect(request.body.dataset_documents).to.have.length(1)
+      expect(request.body.dataset_documents[0]).to.deep.equal(uploadedDatasetMetadata)
+    })
+  })
+
   it('does not offer resume until a previous session contains user input', () => {
     cy.visit('/create', {
       onBeforeLoad(window) {

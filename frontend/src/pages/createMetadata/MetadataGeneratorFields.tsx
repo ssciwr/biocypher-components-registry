@@ -10,7 +10,6 @@ import type {
 } from './types'
 import { citationTextFromBibtexFile } from './citation'
 import { includedSourceEntries, selectionFromFile, selectionFromFolderFiles, setSourceEntryIncluded } from './datasetSourceSelection'
-import { normaliseOrcid } from './utils'
 import { fieldDataTypeOptions } from './fieldDataTypes'
 
 type TextInputProps = Readonly<{
@@ -551,7 +550,7 @@ export function CreatorEditor({
       <div className="grid gap-4 md:grid-cols-2">
         <TextInput
           label="ORCID ID"
-          onChange={(value) => onChange('orcid', normaliseOrcid(value))}
+          onChange={(value) => onChange('orcid', value)}
           placeholder="Example: https://orcid.org/1234-5678-9101-1121"
           surface="plain"
           value={draft.orcid}

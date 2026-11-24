@@ -1,6 +1,52 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDataset } from './options'
-import { datasetDraftToDocument, datasetUIStateDraftFromCroissantFile } from './utils'
+import { creatorToApiValue, datasetDraftToDocument, datasetUIStateDraftFromCroissantFile, normaliseOrcid } from './utils'
+import type { CreatorDraft } from './types'
+
+describe('creator ORCID export', () => {
+  const canonical = 'https://orcid.org/0000-0002-4441-6513'
+  const creator: CreatorDraft = {
+    id: 'creator', name: 'Elias Farr', creatorType: 'Person',
+    affiliation: '', email: '', url: '', orcid: canonical,
+  }
+
+  it.each([
+    canonical,
+    '0000-0002-4441-6513',
+    '0000000244416513',
+    ' http://orcid.org/0000-0002-4441-6513/ ',
+  ])('exports %s as a full URL for adapter and dataset creators', (orcid) => {
+    const draft = { ...creator, orcid }
+    expect(creatorToApiValue(draft).identifier).toBe(canonical)
+    const document = datasetDraftToDocument({ ...emptyDataset, creators: [draft] })
+    expect(document.creator).toEqual([{
+      '@type': 'sc:Person', name: 'Elias Farr', identifier: canonical,
+    }])
+  })
+
+  it('preserves check-digit X and does not truncate incomplete or unrelated identifiers', () => {
+    expect(normaliseOrcid('000000017885715x')).toBe('https://orcid.org/0000-0001-7885-715X')
+    expect(normaliseOrcid('https://orcid.org/0000-')).toBe('https://orcid.org/0000-')
+    expect(normaliseOrcid('https://example.org/researcher/123456789')).toBe('https://example.org/researcher/123456789')
+    expect(creatorToApiValue({ ...creator, orcid: '' }).identifier).toBeUndefined()
+  })
+
+  it('canonicalizes explicitly edited uploaded creators while preserving untouched identifiers', () => {
+    const original = {
+      '@type': 'sc:Dataset',
+      creator: [{ '@type': 'sc:Person', name: 'Elias Farr', identifier: 'local-id', extra: 'retained' }],
+    }
+    const draft = datasetUIStateDraftFromCroissantFile(original, { ...emptyDataset, mode: 'upload' })
+    const edited = {
+      ...draft, uploadedDirtyFields: ['creators'] as const,
+      creators: draft.creators.map(value => ({ ...value, orcid: '0000000244416513' })),
+    }
+    expect(datasetDraftToDocument({ ...edited, uploadedDirtyFields: ['creators'] }).creator).toEqual([
+      { ...original.creator[0], identifier: canonical },
+    ])
+    expect(datasetDraftToDocument({ ...draft, uploadedDirtyFields: ['creators'] }).creator).toEqual(original.creator)
+  })
+})
 
 describe('generated dataset metadata merge', () => {
   it('keeps separately generated tables distinct when they share a landing page', () => {

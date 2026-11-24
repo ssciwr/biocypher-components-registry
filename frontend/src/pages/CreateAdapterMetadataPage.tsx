@@ -246,7 +246,7 @@ function MetadataFormFooter({
   return (
     <div className="flex flex-col gap-4 border-t border-slate-200 pt-8 md:flex-row md:items-center md:justify-between">
       <div className="flex gap-3">
-        {!isEditingDataset && step === 2 ? backAction : null}
+        {!isEditingDataset && (step === 2 || isReviewingDatasets) ? backAction : null}
       </div>
       <div className="flex flex-col gap-4 md:items-end">
         {capacityWait ? <CapacityWaitPanel wait={capacityWait} /> : null}
@@ -599,7 +599,12 @@ function CreateAdapterMetadataPage() {
     }
 
     setError(null)
-    setStep(2)
+    if (form.datasets.length) {
+      setSelectedDatasetId(null)
+      setStep(3)
+    } else {
+      setStep(2)
+    }
   }
 
   async function prepareDatasetsForDetails(
@@ -1056,14 +1061,19 @@ function CreateAdapterMetadataPage() {
               )}
               backAction={(
                 <button
-                  className="h-12 rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300"
+                  className="h-12 cursor-pointer rounded-lg border border-slate-200 bg-white px-5 text-base font-semibold text-slate-950 hover:border-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isGenerating || isPreparingDatasets}
                   onClick={() => {
                     setError(null)
-                    setStep((current) => (current - 1) as MetadataStep)
+                    setSelectedDatasetId(null)
+                    setStep(1)
+                    globalThis.requestAnimationFrame(() => {
+                      formRef.current?.scrollIntoView({ block: 'start' })
+                    })
                   }}
                   type="button"
                 >
-                  Back
+                  {step >= 3 ? 'Edit adapter details' : 'Back'}
                 </button>
               )}
               capacityWait={capacityWait}
