@@ -29,5 +29,12 @@ describe('Adapter metadata generator step 1 stage', () => {
       .then((draft) => {
         expect(JSON.parse(String(draft)).creators[0].name).to.equal('Ada Lovelace')
       })
+
+    cy.reload()
+    cy.contains('h2', 'Basic dataset info').should('be.visible')
+    cy.contains('button', 'Back').click()
+    cy.contains('label', 'Adapter name').find('input').should('have.value', 'Required Test Adapter')
+    cy.contains('label', 'Description').find('textarea').should('have.value', 'Creates metadata.')
+    cy.contains('Ada Lovelace').should('be.visible')
   })
 })

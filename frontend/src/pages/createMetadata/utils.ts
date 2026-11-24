@@ -1,6 +1,6 @@
 import type {
   AdapterCreatorGenerateRequest,
-  BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost,
+  GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData,
 } from '../../api/client'
 import type { CreatorDraft, DatasetDraft, DatasetDatasetManualField } from './types'
 
@@ -79,7 +79,7 @@ function dateAtUtcMidnight(value: string) {
  */
 export function datasetDraftToCroissantGenerateUploadForm(
   dataset: DatasetDraft,
-): BodyGenerateDatasetMetadataApiV1MetadataDatasetsGeneratePost {
+): GenerateDatasetMetadataApiV1MetadataDatasetsGeneratePostData['body'] {
   if (!dataset.sourceFile) {
     throw new Error('Upload a source dataset file first.')
   }
@@ -122,7 +122,7 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
 
   const distribution = buildDistribution(dataset, firstRecord(document.distribution))
   if (distribution) {
-    document.distribution = [distribution]
+    document.distribution = replaceFirstRecord(document.distribution, distribution)
   }
 
   const fields = [...dataset.fields, ...dataset.manualFields]
@@ -131,15 +131,13 @@ export function datasetDraftToDocument(dataset: DatasetDraft): Record<string, un
   if (fields.length) {
     const existingRecordSet = firstRecord(document.recordSet) ?? {}
     const recordSetName = dataset.recordSetName.trim() || `${dataset.name || 'Dataset'} records`
-    document.recordSet = [
-      {
-        ...existingRecordSet,
-        '@type': existingRecordSet['@type'] ?? 'cr:RecordSet',
-        '@id': existingRecordSet['@id'] ?? localId(recordSetName),
-        field: fields,
-        name: recordSetName,
-      },
-    ]
+    document.recordSet = replaceFirstRecord(document.recordSet, {
+      ...existingRecordSet,
+      '@type': existingRecordSet['@type'] ?? 'cr:RecordSet',
+      '@id': existingRecordSet['@id'] ?? localId(recordSetName),
+      field: fields,
+      name: recordSetName,
+    })
   }
 
   return document
@@ -323,6 +321,15 @@ function firstRecord(value: unknown): Record<string, unknown> | undefined {
     return value
   }
   return undefined
+}
+
+
+function replaceFirstRecord(value: unknown, editedRecord: Record<string, unknown>): unknown[] {
+  if (!Array.isArray(value)) {
+    return [editedRecord]
+  }
+  const index = value.findIndex(isRecord)
+  return value.toSpliced(index === -1 ? value.length : index, 1, editedRecord)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

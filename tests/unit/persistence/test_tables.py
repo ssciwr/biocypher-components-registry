@@ -84,6 +84,7 @@ def test_registry_refreshes_table_has_expected_columns() -> None:
         "duplicate",
         "rejected_same_version_changed",
         "fetch_failed",
+        "internal_failed",
     }
 
 
