@@ -25,9 +25,11 @@ from src.api.dependencies import get_auth_session_store, get_current_auth_sessio
 from src.api.schemas.auth import AuthMeResponse
 from src.api.settings import settings
 from src.core.auth.models import AuthSession
+from src.core.auth.service import GitHubAuthenticationError, github_user, github_user_id
 from src.persistence.auth_store import AuthSessionStore
 
 router = APIRouter()
+GITHUB_LOGIN_FAILED_DETAIL = "GitHub login failed."
 AuthSessionCookie = Annotated[
     str | None,
     Cookie(alias=settings.auth_session_cookie_name),
@@ -181,37 +183,25 @@ def _github_access_token(client_id: str, client_secret: str, code: str) -> str:
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="GitHub login failed.",
+            detail=GITHUB_LOGIN_FAILED_DETAIL,
         )
     return token
 
 
 def _github_user(access_token: str) -> dict[str, Any]:
     """Fetch the signed-in GitHub account identity."""
-    response = requests.get(
-        "https://api.github.com/user",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {access_token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-        timeout=10,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    _github_user_id(payload)
-    return payload
+    try:
+        return github_user(access_token, http=requests)
+    except GitHubAuthenticationError as exc:
+        raise HTTPException(status_code=400, detail=GITHUB_LOGIN_FAILED_DETAIL) from exc
 
 
 def _github_user_id(payload: dict[str, Any]) -> str:
-    """Extract GitHub's stable numeric user id as a string."""
-    raw_user_id = payload.get("id")
-    if type(raw_user_id) is int and raw_user_id > 0:
-        return str(raw_user_id)
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="GitHub login failed.",
-    )
+    """Extract the shared verified identity for a browser session."""
+    try:
+        return github_user_id(payload)
+    except GitHubAuthenticationError as exc:
+        raise HTTPException(status_code=400, detail=GITHUB_LOGIN_FAILED_DETAIL) from exc
 
 
 def _signed_state(state: str, secret: str) -> str:
