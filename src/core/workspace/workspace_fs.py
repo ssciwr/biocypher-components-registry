@@ -1,8 +1,8 @@
 """Workspace file access, performed as the session's sandbox user.
 
-Each session's workspace belongs to the pool user leased for that session
-(mode 0700), so the API user cannot read it. Every file operation the API
-performs on a workspace (the model's file tools, the file routes, the zip
+Each session's workspace belongs to the sandbox user leased from the pool
+for that session (mode 0700), so the API user cannot read it. Every file
+operation the backend performs on a workspace (the model's file tools, the file routes, the zip
 download) therefore runs as that user:
 
 - sandboxed: this file is executed as a script via ``sudo -u <user>``, with a
@@ -232,7 +232,7 @@ class WorkspaceFS:
     async def _spawn(self, op: str, stdout):
         return await asyncio.create_subprocess_exec(
             *self._argv(op),
-            # The API user's own cwd may be closed to the pool user.
+            # The API user's own cwd may be closed to the sandbox user.
             cwd=self.root.parent,
             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
             stdin=asyncio.subprocess.PIPE,

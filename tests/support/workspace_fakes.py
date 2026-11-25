@@ -123,8 +123,8 @@ def fake_client_factory(runner):
 def install_fake_sudo(monkeypatch):
     """Run "sandboxed" commands as the current user instead of via sudo.
 
-    Exercises the sandboxed code paths (pool users, ``env --chdir``, the
-    workspace_fs helper subprocess) without sudo or real pool users. Returns
+    Exercises the sandboxed code paths (sandbox users, ``env --chdir``, the
+    workspace_fs helper subprocess) without sudo or real sandbox users. Returns
     the list of ``(user, argv)`` calls. ``kill -1`` (kill every process of
     the user) and the shared-temp ``find -delete`` become no-ops: as the test
     user they would kill the test run and delete the test user's files.

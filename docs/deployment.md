@@ -50,20 +50,20 @@ Consequences without isolation:
   session's workspace belongs to its user (mode `0700`), and everything the
   session does runs as that user via sudo: `run_command`, the file tools, the
   file routes and the zip download (`src/core/workspace/workspace_fs.py`).
-  The sudoers rule in the `Dockerfile` lets apiuser become pool users only.
+  The sudoers rule in the `Dockerfile` lets apiuser become sandbox users only.
   So sessions cannot list, read or write each other's workspaces, nor read
   the cwd or environment of each other's processes; the API user cannot read
-  workspaces either. Pool users share only the `sandbox` group, which lets
+  workspaces either. Sandbox users share only the `sandbox` group, which lets
   them traverse `/app/data` and create their workspace in the workspaces
   root (`1730`: sticky, no read). They cannot reach the registry database,
-  the API process's `/proc` entries or the service venv. Each session gets
+  the backend's `/proc` entries or the service venv. Each session gets
   its own `.venv` in the workspace for `pip install`, and `TMPDIR` points
   at `.tmp` inside it. On teardown, every process of the user is killed, its
   files in `/tmp`, `/var/tmp` and `/dev/shm` are deleted and the workspace
   is removed before the user returns to the pool. A user is held back from
   the pool if its workspace could not be removed or its session's turn did
   not stop within 10 s. At startup the API removes workspaces (session-id
-  directories only) left behind by a crash, and drops pool users that do
+  directories only) left behind by a crash, and drops sandbox users that do
   not exist in the image (`AGENT_SANDBOX_POOL_SIZE` above the build arg).
   The pool size is also the global session cap: when every user is leased,
   creating a session returns 429. Leases live in one process, so run the

@@ -1,9 +1,9 @@
 name: Workspace isolation
 
 # Builds the backend image and checks the agentic workspace sandbox inside it:
-# sessions run as different pool users and cannot reach each other's files or
-# processes (scripts/check_workspace_isolation.py). The unit tests fake sudo,
-# so only this job exercises the real users, permissions and sudoers rule.
+# sessions run as different sandbox users and cannot reach each other's files
+# or processes (scripts/check_workspace_isolation.py). The unit tests fake
+# sudo, so only this job exercises the real users, permissions and sudoers rule.
 
 on:
   pull_request:

@@ -780,7 +780,8 @@ def test_sweep_removes_orphaned_workspaces(tmp_path, monkeypatch):
     )
     assert asyncio.run(manager.sweep_orphaned_workspaces()) == 2
     assert list(root.iterdir()) == []
-    # Pool-owned orphans are removed as their owner, others as the API user.
+    # Orphans owned by sandbox users are removed as their owner, others as the
+    # API user.
     assert ("sandbox2", ["/bin/kill", "-KILL", "-1"]) in calls
     assert all(user == "sandbox2" for user, _ in calls)
 

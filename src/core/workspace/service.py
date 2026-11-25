@@ -3,7 +3,7 @@
 Each workspace session owns:
 
 - a workspace directory (file tools and run_command are confined to it),
-- when sandboxed, a pool user leased for the session's lifetime: the
+- when sandboxed, a sandbox user leased from the pool for the session's lifetime: the
   workspace belongs to that user (mode 0700) and every file operation and
   command of the session runs as it, so sessions cannot reach each other,
 - a conversation history with the snapshot/rollback pattern per turn,
@@ -74,9 +74,9 @@ SANDBOX_POOL_SIZE = int(os.getenv("AGENT_SANDBOX_POOL_SIZE", "0"))
 SESSION_DIR_RE = re.compile(r"[0-9a-f]{32}")
 # Lock file in the workspaces root held by the one process that manages it.
 LOCK_FILE = ".manager.lock"
-# Shared temp directories a pool user may leave files in; cleared on release.
-# Only deleted from, as the pool user (who cannot touch other users' files
-# there), never used to create files, so S5443 does not apply.
+# Shared temp directories a sandbox user may leave files in; cleared on
+# release. Only deleted from, as the sandbox user (who cannot touch other
+# users' files there), never used to create files, so S5443 does not apply.
 SHARED_TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")  # NOSONAR(python:S5443)
 # Lower-cased error substrings meaning "key valid but out of money": Anthropic
 # ("credit balance is too low") and OpenAI via LiteLLM ("insufficient_quota").
@@ -142,7 +142,7 @@ def _has_tool_details(value: object) -> bool:
 
 
 def sandbox_pool() -> list[str]:
-    """Pool user names from the environment; empty when unsandboxed."""
+    """Sandbox user names in the pool, from the env; empty when unsandboxed."""
     if not SANDBOX_USER_PREFIX or SANDBOX_POOL_SIZE <= 0:
         return []
     return [f"{SANDBOX_USER_PREFIX}{i}" for i in range(1, SANDBOX_POOL_SIZE + 1)]
@@ -582,7 +582,7 @@ class SessionManager:
                 del self._pending_creates[owner_github_user_id]
 
     def _lease_user(self) -> str | None:
-        """Take a free pool user; None when unsandboxed."""
+        """Take a free sandbox user from the pool; None when unsandboxed."""
         if not self.sandboxed:
             return None
         if not self._free_users:
@@ -789,8 +789,8 @@ class SessionManager:
         """Prepare the workspaces root; call once before serving sessions.
 
         Takes the root's lock (one managing process per root: separate
-        processes would lease the same pool users and sweep each other's
-        live workspaces), drops pool users missing from the system, and
+        processes would lease the same sandbox users and sweep each other's
+        live workspaces), drops sandbox users missing from the system, and
         removes workspaces orphaned by a crash. Never raises: a failure here
         disables the workspace feature, not the API.
         """
@@ -810,7 +810,7 @@ class SessionManager:
         await self.sweep_orphaned_workspaces()
 
     def _check_sandbox_pool(self) -> None:
-        """Drop pool users that do not exist (pool size above the image's)."""
+        """Drop sandbox users that do not exist (pool size above the image's)."""
         missing = []
         for user in tuple(self._free_users):
             try:
@@ -827,7 +827,7 @@ class SessionManager:
     async def sweep_orphaned_workspaces(self) -> int:
         """Remove workspaces left behind by a crash or restart.
 
-        Leases live in memory, so after a restart every pool user is free
+        Leases live in memory, so after a restart every sandbox user is free
         again; a leftover workspace must not stay readable by whichever
         session leases its owner next. Only session directories are touched.
         Logs instead of raising. Returns the number of workspaces removed.

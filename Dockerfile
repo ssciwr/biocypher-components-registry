@@ -18,11 +18,11 @@ USER root
 # Agentic workspace sandbox: every active session leases its own user from a
 # pool sandbox1..N (N = maximum concurrent sessions overall). Each session's
 # workspace belongs to its user (mode 0700), so sessions cannot read each
-# other's files nor inspect each other's processes. Pool users have private
+# other's files nor inspect each other's processes. Sandbox users have private
 # primary groups and share only the `sandbox` group, which lets them traverse
 # /app/data and create their workspace in the workspaces root (sticky, no
 # read: they can neither list nor remove other entries). The sudoers rule lets
-# apiuser run commands as pool users and nothing else; env_reset +
+# apiuser run commands as sandbox users and nothing else; env_reset +
 # umask_override give every command a clean environment and private files.
 ARG SANDBOX_POOL_SIZE=20
 RUN apt-get update \

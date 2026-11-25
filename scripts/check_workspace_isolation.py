@@ -1,6 +1,6 @@
 """Check workspace sandbox isolation inside the built Docker image.
 
-Creates two workspaces the way the service does, owned by two pool users,
+Creates two workspaces the way the service does, owned by two sandbox users,
 and verifies that neither session user can list, read or write the other's
 workspace or inspect its processes, that the API user cannot read either
 workspace directly, that file access through the session user still works,
@@ -172,7 +172,7 @@ async def main() -> int:
     # Session-style names, so the startup sweep removes them after a crash.
     ws_a = root / uuid.uuid4().hex
     ws_b = root / uuid.uuid4().hex
-    # Deliberately in shared /tmp: checks that teardown removes a pool user's
+    # Deliberately in shared /tmp: checks that teardown removes a sandbox user's
     # temp files there. Random name, created by the sandbox user.
     leftover = f"/tmp/isolation-{uuid.uuid4().hex}"  # NOSONAR(python:S5443)
     await service._make_workspace(ws_a, user_a)
