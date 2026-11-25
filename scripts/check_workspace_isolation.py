@@ -172,7 +172,9 @@ async def main() -> int:
     # Session-style names, so the startup sweep removes them after a crash.
     ws_a = root / uuid.uuid4().hex
     ws_b = root / uuid.uuid4().hex
-    leftover = f"/tmp/isolation-{uuid.uuid4().hex}"
+    # Deliberately in shared /tmp: checks that teardown removes a pool user's
+    # temp files there. Random name, created by the sandbox user.
+    leftover = f"/tmp/isolation-{uuid.uuid4().hex}"  # NOSONAR(python:S5443)
     await service._make_workspace(ws_a, user_a)
     await service._make_workspace(ws_b, user_b)
     sleeper = None

@@ -75,7 +75,9 @@ SESSION_DIR_RE = re.compile(r"[0-9a-f]{32}")
 # Lock file in the workspaces root held by the one process that manages it.
 LOCK_FILE = ".manager.lock"
 # Shared temp directories a pool user may leave files in; cleared on release.
-SHARED_TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")
+# Only deleted from, as the pool user (who cannot touch other users' files
+# there), never used to create files, so S5443 does not apply.
+SHARED_TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")  # NOSONAR(python:S5443)
 # Lower-cased error substrings meaning "key valid but out of money": Anthropic
 # ("credit balance is too low") and OpenAI via LiteLLM ("insufficient_quota").
 OUT_OF_CREDIT_MARKERS = ("credit balance is too low", "insufficient_quota")
@@ -226,6 +228,22 @@ async def _remove_workspace(workspace: Path, user: str | None) -> bool:
     # off-thread for the same reason as the mkdir in _make_workspace.
     await asyncio.to_thread(shutil.rmtree, workspace, ignore_errors=True)
     return not await asyncio.to_thread(os.path.lexists, workspace)
+
+
+def _lock_workspaces_root(root: Path) -> int:
+    """Create ``root`` and take its exclusive manager lock; return the lock fd.
+
+    Blocking, so callers run it in a thread. Raises ``OSError`` when the root
+    is unusable or another process already holds the lock.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    fd = os.open(root / LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        raise
+    return fd
 
 
 def _owner_name(path: Path) -> str | None:
@@ -777,13 +795,9 @@ class SessionManager:
         disables the workspace feature, not the API.
         """
         try:
-            await asyncio.to_thread(
-                self.workspaces_root.mkdir, parents=True, exist_ok=True
+            self._lock_fd = await asyncio.to_thread(
+                _lock_workspaces_root, self.workspaces_root
             )
-            self._lock_fd = os.open(
-                self.workspaces_root / LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600
-            )
-            fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             logger.exception(
                 "workspaces root %s unusable or managed by another process "

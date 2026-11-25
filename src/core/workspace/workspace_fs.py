@@ -62,14 +62,11 @@ def resolve_in_root(path: str, root: Path) -> Path:
         raise ValueError(f"absolute paths are not allowed: {path}")
     if any(part == ".." for part in candidate.parts):
         raise ValueError(f"path must not contain '..': {path}")
-    root_str = str(root)
-    normalized = os.path.normpath(os.path.join(root_str, path))
-    if normalized != root_str and not normalized.startswith(root_str + os.sep):
+    root_real = os.path.realpath(root)
+    resolved = os.path.realpath(os.path.join(root_real, path))
+    if os.path.commonpath([root_real, resolved]) != root_real:
         raise ValueError(f"path escapes workspace root: {path}")
-    resolved = Path(normalized).resolve()
-    if resolved != root and not resolved.is_relative_to(root):
-        raise ValueError(f"path escapes workspace root: {path}")
-    return resolved
+    return Path(resolved)
 
 
 def _resolve(root: str, path: str) -> Path:

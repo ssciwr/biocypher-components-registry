@@ -104,16 +104,22 @@ def _fs_http_error(session: Session, error: wfs.WorkspaceFSError) -> HTTPExcepti
     return HTTPException(409, "filesystem error in the workspace")
 
 
+def _new_archive_file():
+    """Open a temp file for the archive; blocking, so run it in a thread."""
+    return NamedTemporaryFile(suffix=".zip", delete=False)
+
+
 async def _create_workspace_archive(session: Session) -> str:
     """Zip the workspace into a temp file owned by this process; return its path."""
-    with NamedTemporaryFile(suffix=".zip", delete=False) as file:
-        archive_path = file.name
-        try:
-            await session.fs.archive(file, ARCHIVE_EXCLUDED, MAX_ARCHIVE_BYTES)
-        except BaseException:
-            os.unlink(archive_path)
-            raise
-    return archive_path
+    file = await asyncio.to_thread(_new_archive_file)
+    try:
+        await session.fs.archive(file, ARCHIVE_EXCLUDED, MAX_ARCHIVE_BYTES)
+    except BaseException:
+        file.close()
+        os.unlink(file.name)
+        raise
+    await asyncio.to_thread(file.close)
+    return file.name
 
 
 # ===========================================================
