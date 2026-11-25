@@ -4,6 +4,17 @@ Status: findings from the security review of `src/core/workspace/client_loop.py`
 deployment planning for public multi-user operation alongside the
 [biocypher-components-registry](https://github.com/ssciwr/biocypher-components-registry) stack.
 
+## Terminology
+
+| Term | Meaning |
+|---|---|
+| **Backend** | The registry API process: receives requests, runs the LLM loop and decides what to run. Runs as the Unix user `apiuser`; "API user" refers to that Unix user only (sudoers rule, file permissions). |
+| **Executor** | The component that runs model-controlled code and file operations for a session. Currently the backend fills this role itself via sudo; it is planned to become a separate service. |
+| **Sandbox user** | The Unix user one session's code runs as (`sandbox1..N`). |
+| **Pool** | The set of sandbox users (`AGENT_SANDBOX_POOL_SIZE`). |
+| **Lease** | A session's claim on one sandbox user for the session's whole lifetime. |
+| **Workspace** | A session's directory, owned by its sandbox user. |
+
 ## Threat model
 
 `client_loop.py` executes tools that the *model* chooses: four file tools

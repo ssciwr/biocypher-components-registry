@@ -391,7 +391,7 @@ async def download_files(session_id: str, session: WorkspaceSessionDep) -> FileR
     except wfs.WorkspaceFSError as e:
         if e.kind == wfs.TOO_LARGE:
             raise HTTPException(413, "Workspace too large to download.") from None
-        logger.error("workspace download failed: session_id=%s: %s", session.id, e)
+        logger.exception("workspace download failed: session_id=%s", session.id)
         raise HTTPException(409, "Could not prepare workspace download.") from None
     except OSError:
         logger.exception("workspace download failed: session_id=%s", session.id)

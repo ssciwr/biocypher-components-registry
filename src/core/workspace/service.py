@@ -77,7 +77,7 @@ LOCK_FILE = ".manager.lock"
 # Shared temp directories a sandbox user may leave files in; cleared on
 # release. Only deleted from, as the sandbox user (who cannot touch other
 # users' files there), never used to create files, so S5443 does not apply.
-SHARED_TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")  # NOSONAR(python:S5443)
+SHARED_TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")  # NOSONAR
 # Lower-cased error substrings meaning "key valid but out of money": Anthropic
 # ("credit balance is too low") and OpenAI via LiteLLM ("insufficient_quota").
 OUT_OF_CREDIT_MARKERS = ("credit balance is too low", "insufficient_quota")

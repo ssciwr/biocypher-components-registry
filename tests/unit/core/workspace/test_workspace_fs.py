@@ -67,8 +67,9 @@ def test_write_read_list_edit(fs, root):
 def test_errors_carry_kind(fs, root, call, kind):
     (root / "big.txt").write_text("xxxx")
     (root / "bin.dat").write_bytes(b"\xff\xfe\x00")
+    operation = call(fs)
     with pytest.raises(wfs.WorkspaceFSError) as excinfo:
-        run(call(fs))
+        run(operation)
     assert excinfo.value.kind == kind
 
 
@@ -77,8 +78,9 @@ def test_symlink_escape_rejected(fs, root, tmp_path):
     outside.mkdir()
     (outside / "secret").write_text("s")
     (root / "link").symlink_to(outside)
+    operation = fs.read_text("link/secret")
     with pytest.raises(wfs.WorkspaceFSError, match="escapes workspace root"):
-        run(fs.read_text("link/secret"))
+        run(operation)
 
 
 def test_archive_skips_excluded_and_symlinks(fs, root):
@@ -96,8 +98,9 @@ def test_archive_skips_excluded_and_symlinks(fs, root):
 
 def test_archive_over_cap_is_too_large(fs, root):
     (root / "a.txt").write_bytes(bytes(range(256)) * 400)
+    operation = fs.archive(io.BytesIO(), set(), 100)
     with pytest.raises(wfs.WorkspaceFSError) as excinfo:
-        run(fs.archive(io.BytesIO(), set(), 100))
+        run(operation)
     assert excinfo.value.kind == wfs.TOO_LARGE
 
 
@@ -111,8 +114,9 @@ def test_helper_reports_non_json_failure(root, monkeypatch):
     monkeypatch.setattr(
         wfs, "sandbox_argv", lambda *a, **k: ["/bin/sh", "-c", "echo boom >&2; exit 1"]
     )
+    operation = wfs.WorkspaceFS(root, "sandbox1").list_dir(".")
     with pytest.raises(wfs.WorkspaceFSError, match="boom") as excinfo:
-        run(wfs.WorkspaceFS(root, "sandbox1").list_dir("."))
+        run(operation)
     assert excinfo.value.kind == wfs.OS_ERROR
 
 
@@ -139,8 +143,9 @@ def test_sandbox_argv_enters_cwd_as_user():
 def test_helper_over_archive_cap_is_killed_as_user(root, monkeypatch):
     calls = install_fake_sudo(monkeypatch)
     (root / "a.txt").write_bytes(bytes(range(256)) * 4000)
+    operation = wfs.WorkspaceFS(root, "sandbox1").archive(io.BytesIO(), set(), 100)
     with pytest.raises(wfs.WorkspaceFSError) as excinfo:
-        run(wfs.WorkspaceFS(root, "sandbox1").archive(io.BytesIO(), set(), 100))
+        run(operation)
     assert excinfo.value.kind == wfs.TOO_LARGE
     kills = [argv for _, argv in calls if argv[0] == "/bin/kill"]
     assert len(kills) == 1

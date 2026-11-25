@@ -118,7 +118,10 @@ def write_text(root: str, path: str, content: str) -> None:
     target = _resolve(root, path)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content)
+        # Confined by _resolve. Sonar S2083 also counts ``root`` as tainted
+        # (it arrives on stdin), but only the backend can start this helper
+        # via sudo, and it may run anything as the sandbox user anyway.
+        target.write_text(content)  # NOSONAR
     except OSError as e:
         raise WorkspaceFSError(OS_ERROR, str(e)) from None
 

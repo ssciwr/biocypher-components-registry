@@ -173,8 +173,8 @@ async def main() -> int:
     ws_a = root / uuid.uuid4().hex
     ws_b = root / uuid.uuid4().hex
     # Deliberately in shared /tmp: checks that teardown removes a sandbox user's
-    # temp files there. Random name, created by the sandbox user.
-    leftover = f"/tmp/isolation-{uuid.uuid4().hex}"  # NOSONAR(python:S5443)
+    # temp files there. Random name, created by the sandbox user (S5443).
+    leftover = f"/tmp/isolation-{uuid.uuid4().hex}"  # NOSONAR
     await service._make_workspace(ws_a, user_a)
     await service._make_workspace(ws_b, user_b)
     sleeper = None

@@ -728,8 +728,9 @@ def test_teardown_kills_remaining_processes_of_user(tmp_path, monkeypatch):
 def test_failed_create_returns_user_to_pool(tmp_path, monkeypatch):
     manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
     monkeypatch.setattr(service, "READY_TIMEOUT", 0)
+    create = manager.create(owner_github_user_id="1")
     with pytest.raises(SessionStartupError):
-        asyncio.run(manager.create(owner_github_user_id="1"))
+        asyncio.run(create)
     assert list(manager._free_users) == ["sandbox1"]
     assert manager._leased_users == set()
     assert list(manager.workspaces_root.iterdir()) == []
@@ -738,16 +739,18 @@ def test_failed_create_returns_user_to_pool(tmp_path, monkeypatch):
 def test_failed_workspace_creation_returns_user_to_pool(tmp_path, monkeypatch):
     manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
     monkeypatch.setattr(service, "_run_as", AsyncMock(return_value=1))
+    create = manager.create(owner_github_user_id="1")
     with pytest.raises(service.WorkspaceStorageError):
-        asyncio.run(manager.create(owner_github_user_id="1"))
+        asyncio.run(create)
     assert list(manager._free_users) == ["sandbox1"]
 
 
 def test_failed_root_creation_returns_user_to_pool(tmp_path, monkeypatch):
     manager, _ = make_pool_manager(tmp_path, monkeypatch, users=("sandbox1",))
     monkeypatch.setattr(service.asyncio, "to_thread", AsyncMock(side_effect=OSError))
+    create = manager.create(owner_github_user_id="1")
     with pytest.raises(service.WorkspaceStorageError):
-        asyncio.run(manager.create(owner_github_user_id="1"))
+        asyncio.run(create)
     assert list(manager._free_users) == ["sandbox1"]
 
 
